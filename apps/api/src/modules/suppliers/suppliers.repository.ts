@@ -1,16 +1,23 @@
 import { and, eq, sql } from 'drizzle-orm';
 import type { Db } from '../../db/index.js';
-import { supplierPayments, suppliers } from '../../db/schema.js';
+import {
+  purchaseInvoices,
+  supplierPayments,
+  suppliers,
+} from '../../db/schema.js';
 import type {
   PaymentInput,
   SupplierInput,
   SupplierUpdateInput,
 } from './suppliers.schemas.js';
 
-// balance = opening balance + purchase credit (later) − payments.
+// balance = opening balance + purchase invoices − payments.
 // Qualified names are spelled out because drizzle strips table prefixes
 // inside select fields, which breaks the correlated subquery.
-const balanceExpr = sql<string>`\`suppliers\`.\`opening_balance\` - COALESCE((
+const balanceExpr = sql<string>`\`suppliers\`.\`opening_balance\` + COALESCE((
+  SELECT SUM(\`pi\`.\`total_amount\`) FROM \`purchase_invoices\` \`pi\`
+  WHERE \`pi\`.\`supplier_id\` = \`suppliers\`.\`id\`
+), 0) - COALESCE((
   SELECT SUM(\`sp\`.\`amount\`) FROM \`supplier_payments\` \`sp\`
   WHERE \`sp\`.\`supplier_id\` = \`suppliers\`.\`id\`
 ), 0)`;
@@ -68,6 +75,15 @@ export class SuppliersRepository {
     return Boolean(row);
   }
 
+  async hasPurchases(supplierId: number) {
+    const [row] = await this.db
+      .select({ id: purchaseInvoices.id })
+      .from(purchaseInvoices)
+      .where(eq(purchaseInvoices.supplierId, supplierId))
+      .limit(1);
+    return Boolean(row);
+  }
+
   async create(data: SupplierInput) {
     const [result] = await this.db
       .insert(suppliers)
@@ -113,5 +129,18 @@ export class SuppliersRepository {
       .from(supplierPayments)
       .where(eq(supplierPayments.supplierId, supplierId))
       .orderBy(supplierPayments.paidAt, supplierPayments.id);
+  }
+
+  listPurchases(supplierId: number) {
+    return this.db
+      .select({
+        id: purchaseInvoices.id,
+        invoiceNumber: purchaseInvoices.invoiceNumber,
+        purchasedAt: purchaseInvoices.purchasedAt,
+        totalAmount: purchaseInvoices.totalAmount,
+      })
+      .from(purchaseInvoices)
+      .where(eq(purchaseInvoices.supplierId, supplierId))
+      .orderBy(purchaseInvoices.purchasedAt, purchaseInvoices.id);
   }
 }

@@ -15,6 +15,7 @@ function repository(overrides: Record<string, unknown> = {}) {
       isActive: true,
     }),
     hasPayments: vi.fn().mockResolvedValue(false),
+    hasPurchases: vi.fn().mockResolvedValue(false),
     update: vi.fn().mockResolvedValue(true),
     createPayment: vi.fn().mockResolvedValue(9),
     deactivate: vi.fn().mockResolvedValue(true),
@@ -102,7 +103,9 @@ describe('SuppliersService financial consistency', () => {
         repo as unknown as SuppliersRepository,
       );
 
-      await expect(service.deactivate(1)).rejects.toMatchObject({ status: 409 });
+      await expect(service.deactivate(1)).rejects.toMatchObject({
+        status: 409,
+      });
       expect(repo.deactivate).not.toHaveBeenCalled();
     },
   );

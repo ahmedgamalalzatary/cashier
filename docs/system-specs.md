@@ -94,6 +94,7 @@ A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inv
 - Header: supplier, date, invoice number (supplier's paper ref), notes.
 - Lines: item, quantity (in purchase or stock unit), unit price → each line creates a FIFO batch.
 - **Payment on invoice:** paid in full, partial, or fully on credit (آجل). Unpaid remainder increases the supplier's balance.
+- Confirmed purchase invoices are immutable so their FIFO batches and supplier accounting cannot drift; corrections use explicit stock/accounting adjustments rather than editing history.
 - **Supplier payments:** recorded any time against the supplier balance (amount, date, note); shown in the statement.
 - **No purchase returns** — damaged/rejected goods are recorded as waste (§11).
 

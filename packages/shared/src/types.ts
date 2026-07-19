@@ -39,6 +39,17 @@ export type SupplierPayment = {
   notes: string | null;
 };
 
+export type SupplierStatementMovement = {
+  id: string;
+  type: "purchase" | "payment";
+  referenceId: number;
+  date: string;
+  description: string;
+  /** Signed amount: purchases increase debt, payments reduce it. */
+  amount: string;
+  balanceAfter: string;
+};
+
 export type Category = {
   id: number;
   name: string;
@@ -84,4 +95,40 @@ export type InventoryStockRow = {
   minimumLevel: string;
   isLowStock: boolean;
   isNegativeStock: boolean;
+};
+
+export type PurchaseUnitMode = "stock" | "purchase";
+
+export type PurchaseInvoiceSummary = {
+  id: number;
+  supplierId: number;
+  supplierName: string;
+  invoiceNumber: string | null;
+  purchasedAt: string;
+  notes: string | null;
+  totalAmount: string;
+  paidAmount: string;
+  dueAmount: string;
+  createdBy: number;
+  createdByName: string;
+  /** ISO timestamp — Date on the server, serialized to string over JSON */
+  createdAt: string;
+};
+
+export type PurchaseInvoiceLine = {
+  id: number;
+  itemId: number;
+  itemName: string;
+  quantity: string;
+  unitMode: PurchaseUnitMode;
+  unitName: string;
+  stockQuantity: string;
+  stockUnit: string;
+  unitPrice: string;
+  unitCost: string;
+  lineTotal: string;
+};
+
+export type PurchaseInvoiceDetail = PurchaseInvoiceSummary & {
+  lines: PurchaseInvoiceLine[];
 };

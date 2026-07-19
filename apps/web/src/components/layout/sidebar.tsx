@@ -21,6 +21,7 @@ import {
   LogOut,
   KeyRound,
   UserCog,
+  ShoppingCart,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -35,6 +36,7 @@ const navIcons: Record<NavHref, LucideIcon> = {
   "/warehouse": Warehouse,
   "/cafe": CupSoda,
   "/suppliers": Truck,
+  "/purchases": ShoppingCart,
   "/users": UserCog,
   "/shifts": Clock,
   "/employees": Users,

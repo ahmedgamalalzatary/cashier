@@ -43,10 +43,10 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 - [x] `suppliers` + `supplier_payments` tables
 - [x] Suppliers CRUD (soft delete) + balances
 - [x] Payments + account statement screen
-- [ ] `purchase_invoices` + `purchase_lines` (creates FIFO batches in main)
-- [ ] Payment on invoice: full / partial / credit → supplier balance
-- [ ] Purchases screen + invoice entry form
-- [ ] Statement includes purchase invoices (not just payments)
+- [x] `purchase_invoices` + `purchase_lines` (creates FIFO batches in main)
+- [x] Payment on invoice: full / partial / credit → supplier balance
+- [x] Purchases screen + immutable invoice entry/detail flow
+- [x] Statement includes purchase invoices and server-calculated running balances
 
 ## 5. Cafe Sub-Warehouse & Transfers
 
@@ -133,6 +133,5 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 ## Deferred technical decisions
 
 - [ ] Decide whether items with non-zero stock may be deactivated. The current intentional behavior keeps their stock visible and supports later reactivation.
-- [ ] Move supplier-statement running balances into the API when purchase invoices add new statement movement types.
 - [ ] Consolidate duplicated decimal, optional-text, and response-type utilities when their contracts stabilize; this is cleanup rather than a current behavior bug.
 - [ ] Reuse the existing cashier-accessible `GET /api/inventory/cafe/stock` endpoint when the cafe stock page is implemented.

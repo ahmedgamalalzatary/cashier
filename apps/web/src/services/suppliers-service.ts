@@ -1,4 +1,8 @@
-import type { Supplier, SupplierPayment } from "@cashier/shared";
+import type {
+  Supplier,
+  SupplierPayment,
+  SupplierStatementMovement,
+} from "@cashier/shared";
 import { api } from "../lib/api";
 
 type IdResponse = { id: number };
@@ -23,9 +27,11 @@ export function listSuppliers() {
 }
 
 export function getSupplierStatement(id: number) {
-  return api<{ supplier: Supplier; payments: SupplierPayment[] }>(
-    `/api/suppliers/${id}/statement`,
-  );
+  return api<{
+    supplier: Supplier;
+    payments: SupplierPayment[];
+    movements: SupplierStatementMovement[];
+  }>(`/api/suppliers/${id}/statement`);
 }
 
 export function createSupplier(body: SupplierSaveBody) {

@@ -10,6 +10,7 @@ import {
   text,
   mysqlEnum,
   index,
+  uniqueIndex,
   foreignKey,
   type AnyMySqlColumn,
 } from 'drizzle-orm/mysql-core';
@@ -51,6 +52,33 @@ export const suppliers = mysqlTable('suppliers', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
+export const purchaseInvoices = mysqlTable(
+  'purchase_invoices',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    supplierId: int('supplier_id')
+      .notNull()
+      .references(() => suppliers.id),
+    invoiceNumber: varchar('invoice_number', { length: 100 }),
+    purchasedAt: date('purchased_at', { mode: 'string' }).notNull(),
+    notes: text('notes'),
+    totalAmount: decimal('total_amount', { precision: 12, scale: 2 }).notNull(),
+    paidAmount: decimal('paid_amount', { precision: 12, scale: 2 }).notNull(),
+    createdBy: int('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('purchase_invoices_supplier_id_idx').on(table.supplierId),
+    index('purchase_invoices_purchased_at_idx').on(table.purchasedAt),
+    uniqueIndex('purchase_invoices_supplier_number_uidx').on(
+      table.supplierId,
+      table.invoiceNumber,
+    ),
+  ],
+);
+
 export const supplierPayments = mysqlTable(
   'supplier_payments',
   {
@@ -58,12 +86,18 @@ export const supplierPayments = mysqlTable(
     supplierId: int('supplier_id')
       .notNull()
       .references(() => suppliers.id),
+    purchaseInvoiceId: int('purchase_invoice_id').references(
+      () => purchaseInvoices.id,
+    ),
     amount: decimal('amount', { precision: 12, scale: 2 }).notNull(),
     paidAt: date('paid_at', { mode: 'string' }).notNull(),
     notes: varchar('notes', { length: 255 }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
-  (table) => [index('supplier_payments_supplier_id_idx').on(table.supplierId)],
+  (table) => [
+    index('supplier_payments_supplier_id_idx').on(table.supplierId),
+    index('supplier_payments_invoice_id_idx').on(table.purchaseInvoiceId),
+  ],
 );
 
 export const items = mysqlTable(
@@ -97,6 +131,32 @@ export const items = mysqlTable(
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   (table) => [index('items_category_id_idx').on(table.categoryId)],
+);
+
+export const purchaseLines = mysqlTable(
+  'purchase_lines',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    invoiceId: int('invoice_id')
+      .notNull()
+      .references(() => purchaseInvoices.id),
+    itemId: int('item_id')
+      .notNull()
+      .references(() => items.id),
+    quantity: decimal('quantity', { precision: 14, scale: 3 }).notNull(),
+    unitMode: mysqlEnum('unit_mode', ['stock', 'purchase']).notNull(),
+    stockQuantity: decimal('stock_quantity', {
+      precision: 14,
+      scale: 3,
+    }).notNull(),
+    unitPrice: decimal('unit_price', { precision: 12, scale: 2 }).notNull(),
+    unitCost: decimal('unit_cost', { precision: 16, scale: 6 }).notNull(),
+    lineTotal: decimal('line_total', { precision: 12, scale: 2 }).notNull(),
+  },
+  (table) => [
+    index('purchase_lines_invoice_id_idx').on(table.invoiceId),
+    index('purchase_lines_item_id_idx').on(table.itemId),
+  ],
 );
 
 export const stockBatches = mysqlTable(

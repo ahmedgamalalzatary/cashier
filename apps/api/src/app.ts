@@ -9,6 +9,7 @@ import { createCategoriesModule } from "./modules/categories/categories.module.j
 import { createItemsModule } from "./modules/items/items.module.js";
 import { createInventoryModule } from "./modules/inventory/inventory.module.js";
 import { createUsersModule } from "./modules/users/users.module.js";
+import { createPurchasesModule } from "./modules/purchases/purchases.module.js";
 
 export type AppOptions = {
   jwtSecret: string;
@@ -42,6 +43,7 @@ export function createApp(
     requireRole("admin"),
   ] as const;
   app.use("/api/suppliers", ...adminOnly, createSuppliersModule(db));
+  app.use("/api/purchases", ...adminOnly, createPurchasesModule(db));
   app.use("/api/categories", ...adminOnly, createCategoriesModule(db));
   app.use(
     "/api/items",
