@@ -1,0 +1,25 @@
+{
+  "name": "cashier",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Cashier + warehouse system (POS, main warehouse, cafe sub-warehouse) — see docs/system-specs.md",
+  "packageManager": "pnpm@11.13.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:web": "pnpm --filter @cashier/web dev",
+    "dev:api": "pnpm --filter @cashier/api dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,css}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.5.3",
+    "turbo": "^2.5.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

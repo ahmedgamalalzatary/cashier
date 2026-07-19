@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# builds
+.next/
+dist/
+build/
+out/
+
+# env
+.env
+.env.*
+!.env.example
+
+# logs & caches
+*.log
+.turbo/
+coverage/
+.vitest-cache/
+
+# misc
+.DS_Store
+Thumbs.db
