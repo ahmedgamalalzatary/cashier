@@ -11,6 +11,7 @@ import { createInventoryModule } from "./modules/inventory/inventory.module.js";
 import { createUsersModule } from "./modules/users/users.module.js";
 import { createPurchasesModule } from "./modules/purchases/purchases.module.js";
 import { createTransfersModule } from "./modules/transfers/transfers.module.js";
+import { createRecipesModule } from "./modules/recipes/recipes.module.js";
 
 export type AppOptions = {
   jwtSecret: string;
@@ -46,6 +47,7 @@ export function createApp(
   app.use("/api/suppliers", ...adminOnly, createSuppliersModule(db));
   app.use("/api/purchases", ...adminOnly, createPurchasesModule(db));
   app.use("/api/categories", ...adminOnly, createCategoriesModule(db));
+  app.use("/api/recipes", ...adminOnly, createRecipesModule(db));
   app.use(
     "/api/items",
     authenticate(db, jwtSecret),

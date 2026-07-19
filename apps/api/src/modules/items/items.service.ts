@@ -68,10 +68,14 @@ export class ItemsService {
       const changesStockMeaning =
         (data.stockUnit !== undefined && data.stockUnit !== item.stockUnit) ||
         (data.type !== undefined && data.type !== item.type);
-      if (changesStockMeaning && (await repo.hasStockHistory(id))) {
+      if (
+        changesStockMeaning &&
+        ((await repo.hasStockHistory(id)) ||
+          (await repo.hasActiveRecipeReferences(id)))
+      ) {
         throw new HttpError(
           409,
-          "لا يمكن تغيير نوع الصنف أو وحدة المخزون بعد تسجيل حركة مخزون",
+          "لا يمكن تغيير نوع الصنف أو وحدة المخزون بعد تسجيل حركة مخزون أو ربطه بوصفة نشطة",
         );
       }
       await repo.update(id, data);
@@ -83,6 +87,9 @@ export class ItemsService {
       const item = await repo.findByIdForUpdate(id);
       if (!item) throw new HttpError(404, "الصنف غير موجود");
       if (!item.isActive) return;
+      if (await repo.hasActiveRecipeReferences(id)) {
+        throw new HttpError(409, "لا يمكن إيقاف صنف مرتبط بوصفة نشطة");
+      }
       await repo.deactivate(id);
     });
   }

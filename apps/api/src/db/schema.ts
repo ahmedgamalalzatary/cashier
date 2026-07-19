@@ -284,6 +284,126 @@ export const transferLines = mysqlTable(
   ],
 );
 
+export const recipes = mysqlTable(
+  'recipes',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    name: varchar('name', { length: 191 }).notNull(),
+    type: mysqlEnum('type', ['product', 'prepared']).notNull(),
+    categoryId: int('category_id')
+      .notNull()
+      .references(() => categories.id),
+    outputItemId: int('output_item_id').references(() => items.id),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => [
+    index('recipes_category_id_idx').on(table.categoryId),
+    uniqueIndex('recipes_output_item_id_uidx').on(table.outputItemId),
+  ],
+);
+
+export const recipeSizes = mysqlTable(
+  'recipe_sizes',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    recipeId: int('recipe_id')
+      .notNull()
+      .references(() => recipes.id),
+    name: varchar('name', { length: 100 }).notNull(),
+    sellingPrice: decimal('selling_price', { precision: 12, scale: 2 }),
+    outputQuantity: decimal('output_quantity', { precision: 14, scale: 3 }),
+    sortOrder: int('sort_order').notNull().default(0),
+  },
+  (table) => [
+    uniqueIndex('recipe_sizes_recipe_name_uidx').on(
+      table.recipeId,
+      table.name,
+    ),
+    index('recipe_sizes_recipe_id_idx').on(table.recipeId),
+  ],
+);
+
+export const recipeIngredients = mysqlTable(
+  'recipe_ingredients',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    recipeSizeId: int('recipe_size_id')
+      .notNull()
+      .references(() => recipeSizes.id),
+    itemId: int('item_id')
+      .notNull()
+      .references(() => items.id),
+    quantity: decimal('quantity', { precision: 14, scale: 3 }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('recipe_ingredients_size_item_uidx').on(
+      table.recipeSizeId,
+      table.itemId,
+    ),
+    index('recipe_ingredients_item_id_idx').on(table.itemId),
+  ],
+);
+
+export const preparations = mysqlTable(
+  'preparations',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    recipeId: int('recipe_id')
+      .notNull()
+      .references(() => recipes.id),
+    recipeName: varchar('recipe_name', { length: 191 }).notNull(),
+    outputItemId: int('output_item_id')
+      .notNull()
+      .references(() => items.id),
+    outputItemName: varchar('output_item_name', { length: 191 }).notNull(),
+    producedQuantity: decimal('produced_quantity', {
+      precision: 14,
+      scale: 3,
+    }).notNull(),
+    totalCost: decimal('total_cost', { precision: 30, scale: 2 }).notNull(),
+    unitCost: decimal('unit_cost', { precision: 16, scale: 6 }).notNull(),
+    outputBatchId: int('output_batch_id').references(() => stockBatches.id),
+    preparedBy: int('prepared_by')
+      .notNull()
+      .references(() => users.id),
+    notes: text('notes'),
+    occurredAt: timestamp('occurred_at').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('preparations_recipe_id_idx').on(table.recipeId),
+    index('preparations_occurred_at_idx').on(table.occurredAt),
+    uniqueIndex('preparations_output_batch_uidx').on(table.outputBatchId),
+  ],
+);
+
+export const preparationAllocations = mysqlTable(
+  'preparation_allocations',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    preparationId: int('preparation_id')
+      .notNull()
+      .references(() => preparations.id),
+    ingredientItemId: int('ingredient_item_id')
+      .notNull()
+      .references(() => items.id),
+    ingredientItemName: varchar('ingredient_item_name', {
+      length: 191,
+    }).notNull(),
+    quantity: decimal('quantity', { precision: 14, scale: 3 }).notNull(),
+    unitCost: decimal('unit_cost', { precision: 16, scale: 6 }).notNull(),
+    sourceBatchId: int('source_batch_id')
+      .notNull()
+      .references(() => stockBatches.id),
+  },
+  (table) => [
+    index('preparation_allocations_preparation_idx').on(table.preparationId),
+    index('preparation_allocations_item_idx').on(table.ingredientItemId),
+  ],
+);
+
 export const stockMovements = mysqlTable(
   'stock_movements',
   {

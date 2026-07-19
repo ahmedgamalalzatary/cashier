@@ -170,6 +170,10 @@ A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inv
 - **Sub-recipes (prepared items):** a recipe that produces a stock item instead of a menu product (e.g. 1L sugar syrup from sugar + water). Admin runs **“prepare batch”** with a produced quantity → raw ingredients are deducted (FIFO) from cafe stock and a new batch of the prepared item is added at the computed ingredient cost. Prepared items are then used as ingredients in menu recipes.
 - **Live costing:** each recipe/size shows its current FIFO ingredient cost next to its selling price (cost %, margin) to guide pricing.
 - Recipes are created and edited by Admin only; changes affect future sales only (past orders keep their historical cost).
+- A prepared recipe declares a base yield. Any requested preparation quantity scales every ingredient proportionally to that yield, rounded to the stock ledger's three-decimal quantity precision.
+- Preparation never permits negative ingredient stock. The recipe, all cafe FIFO deductions, allocation snapshots, and the costed prepared-item output batch commit atomically; insufficient stock returns a conflict and changes nothing.
+- Every preparation is immutable and retains recipe/output names, the administrator, time, notes, source FIFO batches, exact carried costs, and the resulting cafe batch. Recipe edits affect only later preparations.
+- An active recipe protects its category, ingredient items, and prepared output item from incompatible deactivation or stock-unit/type changes. Prepared-recipe dependency cycles are rejected.
 
 ---
 

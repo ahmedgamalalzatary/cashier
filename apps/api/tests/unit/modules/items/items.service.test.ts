@@ -6,6 +6,7 @@ describe("ItemsService deactivation", () => {
   it("locks and deactivates the item inside one transaction", async () => {
     const transactionRepo = {
       findByIdForUpdate: vi.fn().mockResolvedValue({ id: 7, isActive: true }),
+      hasActiveRecipeReferences: vi.fn().mockResolvedValue(false),
       deactivate: vi.fn().mockResolvedValue(true),
     };
     const repo = {

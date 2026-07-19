@@ -7,7 +7,6 @@ describe("unfinished module routes", () => {
       [
         "employees",
         "expenses",
-        "recipes",
         "refunds",
         "reports",
         "salaries",

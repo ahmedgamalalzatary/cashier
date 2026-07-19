@@ -191,3 +191,95 @@ export type TransferLine = {
 export type TransferDetail = TransferSummary & {
   lines: TransferLine[];
 };
+
+export type RecipeType = "product" | "prepared";
+
+export type RecipeIngredientCost = {
+  id: number;
+  itemId: number;
+  itemName: string;
+  itemType: ItemType;
+  stockUnit: string;
+  requiredQuantity: string;
+  availableQuantity: string;
+  currentCost: string | null;
+  hasSufficientStock: boolean;
+  itemIsActive: boolean;
+};
+
+type RecipeCommon = {
+  id: number;
+  name: string;
+  categoryId: number;
+  categoryName: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProductRecipeSize = {
+  id: number;
+  name: string;
+  sellingPrice: string;
+  currentCost: string | null;
+  marginAmount: string | null;
+  marginPercentage: string | null;
+  costPercentage: string | null;
+  hasSufficientStock: boolean;
+  ingredients: RecipeIngredientCost[];
+};
+
+export type ProductRecipe = RecipeCommon & {
+  type: "product";
+  outputItemId: null;
+  outputItemName: null;
+  outputStockUnit: null;
+  sizes: ProductRecipeSize[];
+};
+
+export type PreparedRecipe = RecipeCommon & {
+  type: "prepared";
+  outputItemId: number;
+  outputItemName: string;
+  outputStockUnit: string;
+  baseYield: string;
+  currentCost: string | null;
+  estimatedUnitCost: string | null;
+  hasSufficientStock: boolean;
+  ingredients: RecipeIngredientCost[];
+};
+
+export type Recipe = ProductRecipe | PreparedRecipe;
+
+export type PreparationSummary = {
+  id: number;
+  recipeId: number;
+  recipeName: string;
+  outputItemId: number;
+  outputItemName: string;
+  outputStockUnit: string;
+  producedQuantity: string;
+  totalCost: string;
+  unitCost: string;
+  outputBatchId: number;
+  preparedBy: number;
+  preparedByName: string;
+  notes: string | null;
+  occurredAt: string;
+  createdAt: string;
+};
+
+export type PreparationAllocation = {
+  id: number;
+  ingredientItemId: number;
+  ingredientItemName: string;
+  stockUnit: string;
+  quantity: string;
+  unitCost: string;
+  lineCost: string;
+  sourceBatchId: number;
+};
+
+export type PreparationDetail = PreparationSummary & {
+  allocations: PreparationAllocation[];
+};

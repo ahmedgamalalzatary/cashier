@@ -29,11 +29,6 @@ export const unfinishedModules = {
     title: "المرتجع",
     description: "معالجة المرتجعات وربطها بالفواتير الأصلية قيد التجهيز.",
   },
-  recipes: {
-    code: "RC",
-    title: "الوصفات",
-    description: "تعريف مكونات المنتجات وتكلفتها سيُدار من هذه الصفحة.",
-  },
   reports: {
     code: "RP",
     title: "التقارير",

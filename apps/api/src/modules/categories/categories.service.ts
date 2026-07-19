@@ -57,7 +57,10 @@ export class CategoriesService {
     return this.repo.transaction(async (repo) => {
       if (data.parentId != null) {
         await this.assertValidParent(repo, data.parentId);
-        if (await repo.hasActiveItems([data.parentId])) {
+        if (
+          (await repo.hasActiveItems([data.parentId])) ||
+          (await repo.hasActiveRecipes([data.parentId]))
+        ) {
           throw new HttpError(
             409,
             'لا يمكن إضافة فرع تحت تصنيف مرتبط بأصناف مباشرة',
@@ -89,7 +92,10 @@ export class CategoriesService {
             'لا يمكن نقل تصنيف رئيسي له فروع تحت تصنيف آخر',
           );
         this.validateParent(locked.get(requestedParentId));
-        if (await repo.hasActiveItems([requestedParentId])) {
+        if (
+          (await repo.hasActiveItems([requestedParentId])) ||
+          (await repo.hasActiveRecipes([requestedParentId]))
+        ) {
           throw new HttpError(
             409,
             'لا يمكن إضافة فرع تحت تصنيف مرتبط بأصناف مباشرة',
@@ -117,6 +123,9 @@ export class CategoriesService {
       const categoryIds = [id, ...children.map((row) => row.id)];
       if (await repo.hasActiveItems(categoryIds)) {
         throw new HttpError(409, 'لا يمكن إيقاف تصنيف مرتبط بأصناف نشطة');
+      }
+      if (await repo.hasActiveRecipes(categoryIds)) {
+        throw new HttpError(409, 'لا يمكن إيقاف تصنيف مرتبط بوصفات نشطة');
       }
       await repo.deactivateMany(categoryIds);
     });

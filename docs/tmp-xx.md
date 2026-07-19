@@ -56,12 +56,14 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 - [x] Atomic main → cafe stock move with original FIFO batch costs
 - [x] Cafe stock, request review, transfer history, and transfer detail screens
 
-## 6. Recipes
+## 6. Recipes ✅
 
-- [ ] `recipes` + `recipe_sizes` + `recipe_ingredients`
-- [ ] Recipe products with size variants (S/M/L, own price + quantities)
-- [ ] Sub-recipes (prepared items) + "prepare batch" action (`preparations`)
-- [ ] Live FIFO ingredient cost + margin per size
+- [x] `recipes` + `recipe_sizes` + `recipe_ingredients`
+- [x] Recipe products with size variants (S/M/L, own price + quantities)
+- [x] Sub-recipes (prepared items) + "prepare batch" action (`preparations`)
+- [x] Live FIFO ingredient cost + margin per size
+- [x] Atomic cafe FIFO consumption, costed prepared-output batches, and immutable preparation allocation history
+- [x] Admin recipe/preparation screens with lifecycle controls and shortage visibility
 
 ## 7. POS (Sales)
 

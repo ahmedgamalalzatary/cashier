@@ -1,6 +1,13 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
-import { categories, items, stockMovements } from "../../db/schema.js";
+import {
+  categories,
+  items,
+  recipeIngredients,
+  recipes,
+  recipeSizes,
+  stockMovements,
+} from "../../db/schema.js";
 import type { ItemInput, ItemUpdateInput } from "./items.schemas.js";
 
 const itemColumns = {
@@ -107,6 +114,28 @@ export class ItemsRepository {
       .select({ id: stockMovements.id })
       .from(stockMovements)
       .where(eq(stockMovements.itemId, itemId))
+      .limit(1);
+    return Boolean(row);
+  }
+
+  async hasActiveRecipeReferences(itemId: number) {
+    const [row] = await this.db
+      .select({ id: recipes.id })
+      .from(recipes)
+      .leftJoin(recipeSizes, eq(recipeSizes.recipeId, recipes.id))
+      .leftJoin(
+        recipeIngredients,
+        eq(recipeIngredients.recipeSizeId, recipeSizes.id),
+      )
+      .where(
+        and(
+          eq(recipes.isActive, true),
+          or(
+            eq(recipes.outputItemId, itemId),
+            eq(recipeIngredients.itemId, itemId),
+          ),
+        ),
+      )
       .limit(1);
     return Boolean(row);
   }

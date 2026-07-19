@@ -11,11 +11,13 @@ export function Modal({
   open,
   onClose,
   children,
+  size = "md",
 }: {
   title: string;
   open: boolean;
   onClose: () => void;
   children: ReactNode;
+  size?: "md" | "xl";
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -67,7 +69,7 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-xl bg-surface text-ink shadow-xl outline-none"
+        className={`flex max-h-[calc(100dvh-2rem)] w-full ${size === "xl" ? "max-w-4xl" : "max-w-md"} flex-col overflow-hidden rounded-xl bg-surface text-ink shadow-xl outline-none`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-line px-5 py-3.5">
