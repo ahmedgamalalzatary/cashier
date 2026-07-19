@@ -9,12 +9,7 @@ import { Table } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
 import type { Supplier } from "../supplier-modals";
 
-type Payment = {
-  id: number;
-  amount: string;
-  paidAt: string;
-  notes: string | null;
-};
+import type { SupplierPayment as Payment } from "@cashier/shared";
 
 export default function SupplierStatementPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);

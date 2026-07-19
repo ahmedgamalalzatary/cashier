@@ -3,6 +3,7 @@ import cors from 'cors';
 import type { Db } from './db/index.js';
 import { errorHandler } from './middleware/error.js';
 import { createSuppliersModule } from './modules/suppliers/suppliers.module.js';
+import { createCategoriesModule } from './modules/categories/categories.module.js';
 
 export function createApp(db: Db) {
   const app = express();
@@ -14,6 +15,7 @@ export function createApp(db: Db) {
   });
 
   app.use('/api/suppliers', createSuppliersModule(db));
+  app.use('/api/categories', createCategoriesModule(db));
 
   app.use(errorHandler);
   return app;

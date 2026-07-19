@@ -16,10 +16,12 @@ import {
   RotateCcw,
   BookOpen,
   BarChart3,
+  Tags,
 } from "lucide-react";
 
 const nav = [
   { href: "/", label: "الرئيسية", icon: LayoutDashboard },
+  { href: "/categories", label: "التصنيفات", icon: Tags },
   { href: "/warehouse", label: "المخزن الرئيسي", icon: Warehouse },
   { href: "/cafe", label: "الكافيه", icon: CupSoda },
   { href: "/suppliers", label: "الموردين", icon: Truck },

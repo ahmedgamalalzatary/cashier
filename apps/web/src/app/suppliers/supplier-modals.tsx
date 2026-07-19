@@ -6,16 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Field, TextAreaField } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 
-export type Supplier = {
-  id: number;
-  name: string;
-  phone: string | null;
-  address: string | null;
-  notes: string | null;
-  openingBalance: string;
-  isActive: boolean;
-  balance: string;
-};
+import type { Supplier } from "@cashier/shared";
+
+export type { Supplier };
 
 const emptyForm = { name: "", phone: "", address: "", notes: "", openingBalance: "0" };
 

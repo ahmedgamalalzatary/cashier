@@ -8,7 +8,17 @@ import {
   timestamp,
   date,
   text,
+  type AnyMySqlColumn,
 } from 'drizzle-orm/mysql-core';
+
+// two levels only: main (parentId null) → sub (parentId = a main category)
+export const categories = mysqlTable('categories', {
+  id: int('id').autoincrement().primaryKey(),
+  name: varchar('name', { length: 191 }).notNull(),
+  parentId: int('parent_id').references((): AnyMySqlColumn => categories.id),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
 
 export const suppliers = mysqlTable('suppliers', {
   id: int('id').autoincrement().primaryKey(),

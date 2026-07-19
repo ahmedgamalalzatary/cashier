@@ -24,5 +24,6 @@ beforeEach(async () => {
   await db.execute(sql`SET FOREIGN_KEY_CHECKS = 0`);
   await db.execute(sql`TRUNCATE TABLE supplier_payments`);
   await db.execute(sql`TRUNCATE TABLE suppliers`);
+  await db.execute(sql`TRUNCATE TABLE categories`);
   await db.execute(sql`SET FOREIGN_KEY_CHECKS = 1`);
 });
