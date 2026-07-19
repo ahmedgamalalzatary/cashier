@@ -9,6 +9,7 @@ export type UserSaveBody = {
   username?: string;
   role?: Role;
   password?: string;
+  isActive?: boolean;
 };
 
 export function listUsers() {
@@ -30,8 +31,5 @@ export function updateUser(id: number, body: UserSaveBody) {
 }
 
 export function setUserActive(id: number, isActive: boolean) {
-  return api<OkResponse>(`/api/users/${id}`, {
-    method: "PUT",
-    body: JSON.stringify({ isActive }),
-  });
+  return updateUser(id, { isActive });
 }

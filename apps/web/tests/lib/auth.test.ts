@@ -115,5 +115,6 @@ describe("login redirects", () => {
     expect(ADMIN_PATHS).toContain("/warehouse");
     expect(ADMIN_PATHS).toContain("/categories");
     expect(ADMIN_PATHS).toContain("/users");
+    expect(ADMIN_PATHS).toContain("/recipes");
   });
 });

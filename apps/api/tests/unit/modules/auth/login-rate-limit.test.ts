@@ -96,7 +96,7 @@ describe("login rate limiting", () => {
     expect((await attempt("third")).status).toBe(429);
   });
 
-  it("retains the shared IP attempts after a successful login", async () => {
+  it("does not count successful logins against the shared IP failure limit", async () => {
     const app = express();
     app.set("trust proxy", 1);
     app.use(express.json());
@@ -116,8 +116,9 @@ describe("login rate limiting", () => {
         .set("X-Forwarded-For", "203.0.113.30")
         .send({ username, password });
 
+    expect((await attempt("first", "wrong")).status).toBe(401);
     expect((await attempt("admin", "correct")).status).toBe(200);
-    expect((await attempt("other", "wrong")).status).toBe(401);
+    expect((await attempt("second", "wrong")).status).toBe(401);
     expect((await attempt("third", "wrong")).status).toBe(429);
   });
 

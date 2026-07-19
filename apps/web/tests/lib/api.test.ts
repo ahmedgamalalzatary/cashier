@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { buildHeaders } from "../../src/lib/api";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { api, buildHeaders } from "../../src/lib/api";
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("buildHeaders", () => {
   it("preserves Headers input and caller precedence", () => {
@@ -31,5 +33,11 @@ describe("buildHeaders", () => {
     expect(buildHeaders(undefined, undefined, true).get("Content-Type")).toBe(
       "application/json",
     );
+  });
+
+  it("maps network failures to an Arabic message", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+
+    await expect(api("/api/health")).rejects.toThrow("تعذر الاتصال بالخادم");
   });
 });

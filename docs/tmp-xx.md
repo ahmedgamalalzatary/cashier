@@ -129,3 +129,10 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 - [ ] Waste & refunds report
 - [ ] Suppliers report (statements, purchases, balances)
 - [ ] PDF export (Arabic) for every report
+
+## Deferred technical decisions
+
+- [ ] Decide whether items with non-zero stock may be deactivated. The current intentional behavior keeps their stock visible and supports later reactivation.
+- [ ] Move supplier-statement running balances into the API when purchase invoices add new statement movement types.
+- [ ] Consolidate duplicated decimal, optional-text, and response-type utilities when their contracts stabilize; this is cleanup rather than a current behavior bug.
+- [ ] Reuse the existing cashier-accessible `GET /api/inventory/cafe/stock` endpoint when the cafe stock page is implemented.

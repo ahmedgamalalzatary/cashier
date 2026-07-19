@@ -11,7 +11,7 @@ export const NAV_ITEMS = [
   { href: "/expenses", label: "المصروفات" },
   { href: "/waste", label: "الهالك" },
   { href: "/refunds", label: "المرتجع" },
-  { href: "/recipes", label: "الوصفات" },
+  { href: "/recipes", label: "الوصفات", adminOnly: true },
   { href: "/reports", label: "التقارير", adminOnly: true },
 ] as const;
 

@@ -5,6 +5,7 @@ import {
   listUsers,
   setUserActive,
   updateUser,
+  type UserSaveBody,
 } from "../../src/services/users-service";
 
 vi.mock("../../src/lib/api", () => ({ api: vi.fn() }));
@@ -43,10 +44,12 @@ describe("users service", () => {
   });
 
   it("changes account state", async () => {
+    const body: UserSaveBody = { isActive: false };
+
     await setUserActive(3, false);
     expect(request).toHaveBeenCalledWith("/api/users/3", {
       method: "PUT",
-      body: JSON.stringify({ isActive: false }),
+      body: JSON.stringify(body),
     });
   });
 });

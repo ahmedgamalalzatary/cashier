@@ -65,6 +65,7 @@ export function createLoginRateLimiter({
       consume(usernames, usernameAndIp, maxUsernameAttempts, timestamp),
       consume(clientIps, ip, maxIpAttempts, timestamp),
     ].filter((attempt): attempt is Attempt => Boolean(attempt));
+    const consumedIpAttempt = clientIps.get(ip);
 
     if (blocked.length > 0) {
       const resetAt = Math.max(...blocked.map((attempt) => attempt.resetAt));
@@ -81,6 +82,10 @@ export function createLoginRateLimiter({
     res.once("finish", () => {
       if (res.statusCode < 400) {
         usernames.delete(usernameAndIp);
+        if (consumedIpAttempt && clientIps.get(ip) === consumedIpAttempt) {
+          if (consumedIpAttempt.count === 1) clientIps.delete(ip);
+          else consumedIpAttempt.count -= 1;
+        }
       }
     });
     next();
