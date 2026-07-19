@@ -8,8 +8,19 @@ import {
   timestamp,
   date,
   text,
+  mysqlEnum,
   type AnyMySqlColumn,
 } from 'drizzle-orm/mysql-core';
+
+export const users = mysqlTable('users', {
+  id: int('id').autoincrement().primaryKey(),
+  name: varchar('name', { length: 191 }).notNull(),
+  username: varchar('username', { length: 100 }).notNull().unique(),
+  passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+  role: mysqlEnum('role', ['admin', 'cashier']).notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
 
 // two levels only: main (parentId null) → sub (parentId = a main category)
 export const categories = mysqlTable('categories', {

@@ -1,12 +1,24 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { db } from './setup.js';
+import { loginAs } from './helpers.js';
 
 const app = () => createApp(db);
+let authorization: { readonly Authorization: string };
+const api = () => ({
+  get: (url: string) => request(app()).get(url).set(authorization),
+  post: (url: string) => request(app()).post(url).set(authorization),
+  put: (url: string) => request(app()).put(url).set(authorization),
+  delete: (url: string) => request(app()).delete(url).set(authorization),
+});
+
+beforeEach(async () => {
+  authorization = await loginAs(app(), 'admin');
+});
 
 async function createCategory(name: string, parentId?: number) {
-  return request(app()).post('/api/categories').send({ name, parentId });
+  return api().post('/api/categories').send({ name, parentId });
 }
 
 describe('categories', () => {
@@ -17,7 +29,7 @@ describe('categories', () => {
     const sub = await createCategory('قهوة', main.body.id);
     expect(sub.status).toBe(201);
 
-    const list = await request(app()).get('/api/categories');
+    const list = await api().get('/api/categories');
     expect(list.body).toHaveLength(2);
     const subRow = list.body.find((c: { name: string }) => c.name === 'قهوة');
     expect(subRow.parentId).toBe(main.body.id);
@@ -37,17 +49,17 @@ describe('categories', () => {
 
   it('renames a category', async () => {
     const main = await createCategory('حلويات');
-    const res = await request(app())
+    const res = await api()
       .put(`/api/categories/${main.body.id}`)
       .send({ name: 'حلويات شرقية' });
     expect(res.status).toBe(200);
-    const list = await request(app()).get('/api/categories');
+    const list = await api().get('/api/categories');
     expect(list.body[0].name).toBe('حلويات شرقية');
   });
 
   it('rejects making a category its own parent', async () => {
     const main = await createCategory('مأكولات');
-    const res = await request(app())
+    const res = await api()
       .put(`/api/categories/${main.body.id}`)
       .send({ parentId: main.body.id });
     expect(res.status).toBe(400);
@@ -57,7 +69,7 @@ describe('categories', () => {
     const a = await createCategory('أ');
     await createCategory('أ-فرعي', a.body.id);
     const b = await createCategory('ب');
-    const res = await request(app())
+    const res = await api()
       .put(`/api/categories/${a.body.id}`)
       .send({ parentId: b.body.id });
     expect(res.status).toBe(400);
@@ -66,9 +78,9 @@ describe('categories', () => {
   it('deactivating a main deactivates its subs', async () => {
     const main = await createCategory('مثلجات');
     const sub = await createCategory('آيس كريم', main.body.id);
-    const res = await request(app()).delete(`/api/categories/${main.body.id}`);
+    const res = await api().delete(`/api/categories/${main.body.id}`);
     expect(res.status).toBe(200);
-    const list = await request(app()).get('/api/categories');
+    const list = await api().get('/api/categories');
     const rows: Array<{ id: number; isActive: boolean }> = list.body;
     const mainRow = rows.find((c) => c.id === main.body.id);
     const subRow = rows.find((c) => c.id === sub.body.id);
@@ -78,13 +90,13 @@ describe('categories', () => {
 
   it('rejects creating a sub under a deactivated main', async () => {
     const main = await createCategory('مخبوزات');
-    await request(app()).delete(`/api/categories/${main.body.id}`);
+    await api().delete(`/api/categories/${main.body.id}`);
     const res = await createCategory('كرواسون', main.body.id);
     expect(res.status).toBe(400);
   });
 
   it('404s on a missing category', async () => {
-    const res = await request(app()).delete('/api/categories/999');
+    const res = await api().delete('/api/categories/999');
     expect(res.status).toBe(404);
   });
 });

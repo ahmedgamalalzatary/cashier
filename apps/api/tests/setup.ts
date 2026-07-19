@@ -13,6 +13,7 @@ const dbName = testUrl ? new URL(testUrl).pathname.replace(/^\//, '') : '';
 if (!dbName.includes('test')) {
   throw new Error(`DATABASE_URL in .env.test must point to a test database (got "${dbName}")`);
 }
+process.env.JWT_SECRET = 'test-only-jwt-secret-at-least-32-characters';
 
 export const db = createDb(testUrl!);
 
@@ -25,5 +26,6 @@ beforeEach(async () => {
   await db.execute(sql`TRUNCATE TABLE supplier_payments`);
   await db.execute(sql`TRUNCATE TABLE suppliers`);
   await db.execute(sql`TRUNCATE TABLE categories`);
+  await db.execute(sql`TRUNCATE TABLE users`);
   await db.execute(sql`SET FOREIGN_KEY_CHECKS = 1`);
 });
