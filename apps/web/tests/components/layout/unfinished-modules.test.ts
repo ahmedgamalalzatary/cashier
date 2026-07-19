@@ -5,7 +5,6 @@ describe("unfinished module routes", () => {
   it("defines an intentional placeholder for every advertised unfinished route", () => {
     expect(Object.keys(unfinishedModules).sort()).toEqual(
       [
-        "cafe",
         "employees",
         "expenses",
         "recipes",

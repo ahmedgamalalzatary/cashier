@@ -191,6 +191,99 @@ export const stockBatches = mysqlTable(
   ],
 );
 
+export const transferRequests = mysqlTable(
+  'transfer_requests',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    requestedBy: int('requested_by')
+      .notNull()
+      .references(() => users.id),
+    notes: text('notes'),
+    status: mysqlEnum('status', ['pending', 'approved', 'rejected'])
+      .notNull()
+      .default('pending'),
+    reviewedBy: int('reviewed_by').references(() => users.id),
+    rejectionReason: varchar('rejection_reason', { length: 500 }),
+    reviewedAt: timestamp('reviewed_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('transfer_requests_status_created_idx').on(
+      table.status,
+      table.createdAt,
+    ),
+    index('transfer_requests_requested_by_idx').on(table.requestedBy),
+  ],
+);
+
+export const transferRequestLines = mysqlTable(
+  'transfer_request_lines',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    requestId: int('request_id')
+      .notNull()
+      .references(() => transferRequests.id),
+    itemId: int('item_id')
+      .notNull()
+      .references(() => items.id),
+    quantity: decimal('quantity', { precision: 14, scale: 3 }).notNull(),
+  },
+  (table) => [
+    index('transfer_request_lines_request_idx').on(table.requestId),
+    uniqueIndex('transfer_request_lines_request_item_uidx').on(
+      table.requestId,
+      table.itemId,
+    ),
+  ],
+);
+
+export const transfers = mysqlTable(
+  'transfers',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    requestId: int('request_id').references(() => transferRequests.id),
+    createdBy: int('created_by')
+      .notNull()
+      .references(() => users.id),
+    approvedBy: int('approved_by')
+      .notNull()
+      .references(() => users.id),
+    notes: text('notes'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('transfers_request_id_uidx').on(table.requestId),
+    index('transfers_created_at_idx').on(table.createdAt),
+  ],
+);
+
+// One line per FIFO allocation keeps every carried main-batch cost auditable.
+export const transferLines = mysqlTable(
+  'transfer_lines',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    transferId: int('transfer_id')
+      .notNull()
+      .references(() => transfers.id),
+    itemId: int('item_id')
+      .notNull()
+      .references(() => items.id),
+    quantity: decimal('quantity', { precision: 14, scale: 3 }).notNull(),
+    unitCost: decimal('unit_cost', { precision: 16, scale: 6 }).notNull(),
+    sourceBatchId: int('source_batch_id')
+      .notNull()
+      .references(() => stockBatches.id),
+    cafeBatchId: int('cafe_batch_id')
+      .notNull()
+      .references(() => stockBatches.id),
+  },
+  (table) => [
+    index('transfer_lines_transfer_idx').on(table.transferId),
+    index('transfer_lines_item_idx').on(table.itemId),
+    uniqueIndex('transfer_lines_cafe_batch_uidx').on(table.cafeBatchId),
+  ],
+);
+
 export const stockMovements = mysqlTable(
   'stock_movements',
   {

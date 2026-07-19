@@ -1,9 +1,4 @@
 export const unfinishedModules = {
-  cafe: {
-    code: "CF",
-    title: "الكافيه",
-    description: "شاشة البيع ومخزون الكافيه قيد التجهيز.",
-  },
   shifts: {
     code: "SH",
     title: "الورديات",

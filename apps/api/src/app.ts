@@ -10,6 +10,7 @@ import { createItemsModule } from "./modules/items/items.module.js";
 import { createInventoryModule } from "./modules/inventory/inventory.module.js";
 import { createUsersModule } from "./modules/users/users.module.js";
 import { createPurchasesModule } from "./modules/purchases/purchases.module.js";
+import { createTransfersModule } from "./modules/transfers/transfers.module.js";
 
 export type AppOptions = {
   jwtSecret: string;
@@ -55,6 +56,11 @@ export function createApp(
     "/api/inventory",
     authenticate(db, jwtSecret),
     createInventoryModule(db, requireRole("admin")),
+  );
+  app.use(
+    "/api/transfers",
+    authenticate(db, jwtSecret),
+    createTransfersModule(db, requireRole("admin")),
   );
 
   app.use(errorHandler);

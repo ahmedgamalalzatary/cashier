@@ -132,3 +132,62 @@ export type PurchaseInvoiceLine = {
 export type PurchaseInvoiceDetail = PurchaseInvoiceSummary & {
   lines: PurchaseInvoiceLine[];
 };
+
+export type TransferRequestStatus = "pending" | "approved" | "rejected";
+
+export type TransferRequestSummary = {
+  id: number;
+  requestedBy: number;
+  requestedByName: string;
+  notes: string | null;
+  status: TransferRequestStatus;
+  reviewedBy: number | null;
+  reviewedByName: string | null;
+  rejectionReason: string | null;
+  /** ISO timestamp, or null while pending. */
+  reviewedAt: string | null;
+  /** ISO timestamp. */
+  createdAt: string;
+  lineCount: number;
+};
+
+export type TransferRequestLine = {
+  id: number;
+  itemId: number;
+  itemName: string;
+  stockUnit: string;
+  quantity: string;
+};
+
+export type TransferRequestDetail = Omit<TransferRequestSummary, "lineCount"> & {
+  lines: TransferRequestLine[];
+};
+
+export type TransferSummary = {
+  id: number;
+  requestId: number | null;
+  createdBy: number;
+  createdByName: string;
+  approvedBy: number;
+  approvedByName: string;
+  notes: string | null;
+  totalCost: string;
+  /** ISO timestamp. */
+  createdAt: string;
+};
+
+export type TransferLine = {
+  id: number;
+  itemId: number;
+  itemName: string;
+  stockUnit: string;
+  quantity: string;
+  unitCost: string;
+  lineCost: string;
+  sourceBatchId: number;
+  cafeBatchId: number;
+};
+
+export type TransferDetail = TransferSummary & {
+  lines: TransferLine[];
+};

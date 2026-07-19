@@ -37,6 +37,10 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await db.execute(sql`SET FOREIGN_KEY_CHECKS = 0`);
+  await db.execute(sql`TRUNCATE TABLE transfer_lines`);
+  await db.execute(sql`TRUNCATE TABLE transfers`);
+  await db.execute(sql`TRUNCATE TABLE transfer_request_lines`);
+  await db.execute(sql`TRUNCATE TABLE transfer_requests`);
   await db.execute(sql`TRUNCATE TABLE purchase_lines`);
   await db.execute(sql`TRUNCATE TABLE purchase_invoices`);
   await db.execute(sql`TRUNCATE TABLE stock_deficit_allocations`);

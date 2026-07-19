@@ -48,13 +48,13 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 - [x] Purchases screen + immutable invoice entry/detail flow
 - [x] Statement includes purchase invoices and server-calculated running balances
 
-## 5. Cafe Sub-Warehouse & Transfers
+## 5. Cafe Sub-Warehouse & Transfers ✅
 
-- [ ] `transfer_requests` + `transfers` + `transfer_lines`
-- [ ] Cashier: create transfer request
-- [ ] Admin: approve (editable quantities) / reject; direct transfer
-- [ ] Stock moves main → cafe with batch costs
-- [ ] Cafe stock view
+- [x] `transfer_requests` + request lines + immutable `transfers` + FIFO allocation lines
+- [x] Cashier/admin: create transfer request and view shared request history
+- [x] Admin: approve with edited quantities / reject with reason; direct transfer
+- [x] Atomic main → cafe stock move with original FIFO batch costs
+- [x] Cafe stock, request review, transfer history, and transfer detail screens
 
 ## 6. Recipes
 
@@ -134,4 +134,3 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 
 - [ ] Decide whether items with non-zero stock may be deactivated. The current intentional behavior keeps their stock visible and supports later reactivation.
 - [ ] Consolidate duplicated decimal, optional-text, and response-type utilities when their contracts stabilize; this is cleanup rather than a current behavior bug.
-- [ ] Reuse the existing cashier-accessible `GET /api/inventory/cafe/stock` endpoint when the cafe stock page is implemented.

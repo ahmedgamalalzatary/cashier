@@ -105,9 +105,11 @@ A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inv
 - The cafe holds its own stock (with its own FIFO batches carried over from main).
 - **Request → approve flow:**
   1. Cashier creates a **transfer request**: items + quantities + note.
-  2. Admin reviews, may edit quantities, then **approves** → stock moves main → cafe immediately; or **rejects** with a reason.
+  2. Admin reviews, may edit each requested quantity (without adding or dropping item lines), then **approves** → stock moves main → cafe immediately; or **rejects** with a reason.
+- All cashiers and admins see the shared request queue for the single cafe. Request lines preserve the originally requested quantities; approved quantities are stored on the resulting transfer.
+- Approval is atomic. If any approved quantity is unavailable in the main warehouse, no stock moves, the API returns a conflict, and the request remains pending for adjustment and retry.
 - Admin can also create a **direct transfer** (no request) in one step.
-- Every transfer document lists items, quantities, batch costs, requester, approver, timestamps.
+- Reviewed requests and completed transfers are immutable audit records. Every transfer document lists items, quantities, source and cafe batch IDs, carried FIFO costs, requester, approver, and timestamps.
 
 ---
 
