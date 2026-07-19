@@ -55,8 +55,15 @@ export class CategoriesService {
 
   create(data: CategoryInput) {
     return this.repo.transaction(async (repo) => {
-      if (data.parentId != null)
+      if (data.parentId != null) {
         await this.assertValidParent(repo, data.parentId);
+        if (await repo.hasActiveItems([data.parentId])) {
+          throw new HttpError(
+            409,
+            'لا يمكن إضافة فرع تحت تصنيف مرتبط بأصناف مباشرة',
+          );
+        }
+      }
       return repo.create(data);
     });
   }
@@ -82,6 +89,12 @@ export class CategoriesService {
             'لا يمكن نقل تصنيف رئيسي له فروع تحت تصنيف آخر',
           );
         this.validateParent(locked.get(requestedParentId));
+        if (await repo.hasActiveItems([requestedParentId])) {
+          throw new HttpError(
+            409,
+            'لا يمكن إضافة فرع تحت تصنيف مرتبط بأصناف مباشرة',
+          );
+        }
       }
       await repo.update(id, data);
     });
@@ -94,6 +107,9 @@ export class CategoriesService {
       const category = lockedRows.find((row) => row.id === id);
       if (!category) throw new HttpError(404, 'التصنيف غير موجود');
       const children = lockedRows.filter((row) => row.parentId === id);
+      if (await repo.hasActiveItems(lockedRows.map((row) => row.id))) {
+        throw new HttpError(409, 'لا يمكن إيقاف تصنيف مرتبط بأصناف نشطة');
+      }
       await repo.deactivateMany([id, ...children.map((c) => c.id)]);
     });
   }

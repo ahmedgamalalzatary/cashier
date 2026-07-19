@@ -1,0 +1,90 @@
+import { HttpError } from "../../middleware/error.js";
+import type { ItemsRepository } from "./items.repository.js";
+import {
+  hasValidPurchaseUnitConfiguration,
+  type ItemInput,
+  type ItemUpdateInput,
+} from "./items.schemas.js";
+
+export class ItemsService {
+  constructor(private repo: ItemsRepository) {}
+
+  list() {
+    return this.repo.list();
+  }
+
+  private async validateCategory(repo: ItemsRepository, categoryId: number) {
+    const categories = await repo.lockCategories([categoryId]);
+    const category = categories.find((row) => row.id === categoryId);
+    if (!category) throw new HttpError(400, "التصنيف غير موجود");
+    if (!category.isActive) throw new HttpError(409, "التصنيف موقوف");
+    if (
+      category.parentId === null &&
+      (await repo.categoryHasChildren(categoryId))
+    ) {
+      throw new HttpError(
+        409,
+        "اختر تصنيفاً فرعياً؛ هذا التصنيف الرئيسي يحتوي على فروع",
+      );
+    }
+  }
+
+  create(data: ItemInput) {
+    return this.repo.transaction(async (repo) => {
+      await this.validateCategory(repo, data.categoryId);
+      return repo.create(data);
+    });
+  }
+
+  update(id: number, data: ItemUpdateInput) {
+    return this.repo.transaction(async (repo) => {
+      const item = await repo.findByIdForUpdate(id);
+      if (!item) throw new HttpError(404, "الصنف غير موجود");
+
+      if (
+        data.categoryId !== undefined &&
+        data.categoryId !== item.categoryId
+      ) {
+        await this.validateCategory(repo, data.categoryId);
+      }
+
+      const purchaseUnit =
+        data.purchaseUnit !== undefined ? data.purchaseUnit : item.purchaseUnit;
+      const purchaseToStockFactor =
+        data.purchaseToStockFactor !== undefined
+          ? data.purchaseToStockFactor
+          : item.purchaseToStockFactor;
+      if (
+        !hasValidPurchaseUnitConfiguration({
+          purchaseUnit,
+          purchaseToStockFactor:
+            purchaseToStockFactor === null
+              ? null
+              : Number(purchaseToStockFactor),
+        })
+      ) {
+        throw new HttpError(400, "وحدة الشراء ومعامل التحويل مطلوبان معاً");
+      }
+
+      const changesStockMeaning =
+        (data.stockUnit !== undefined && data.stockUnit !== item.stockUnit) ||
+        (data.type !== undefined && data.type !== item.type);
+      if (changesStockMeaning && (await repo.hasStockHistory(id))) {
+        throw new HttpError(
+          409,
+          "لا يمكن تغيير نوع الصنف أو وحدة المخزون بعد تسجيل حركة مخزون",
+        );
+      }
+      await repo.update(id, data);
+    });
+  }
+
+  deactivate(id: number) {
+    return this.repo.transaction(async (repo) => {
+      const item = await repo.findByIdForUpdate(id);
+      if (!item) throw new HttpError(404, "الصنف غير موجود");
+      if (!item.isActive) return;
+      await repo.deactivate(id);
+    });
+  }
+}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import {
   Coffee,
   LayoutDashboard,
@@ -18,29 +19,41 @@ import {
   BarChart3,
   Tags,
   LogOut,
+  KeyRound,
+  UserCog,
+  type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
+import { NAV_ITEMS } from "@/lib/navigation";
+import { ChangePasswordModal } from "@/components/auth/change-password-modal";
 
-const nav = [
-  { href: "/", label: "الرئيسية", icon: LayoutDashboard },
-  { href: "/categories", label: "التصنيفات", icon: Tags, adminOnly: true },
-  { href: "/warehouse", label: "المخزن الرئيسي", icon: Warehouse, adminOnly: true },
-  { href: "/cafe", label: "الكافيه", icon: CupSoda },
-  { href: "/suppliers", label: "الموردين", icon: Truck, adminOnly: true },
-  { href: "/shifts", label: "الورديات", icon: Clock },
-  { href: "/employees", label: "الموظفين", icon: Users, adminOnly: true },
-  { href: "/salaries", label: "المرتبات", icon: Wallet, adminOnly: true },
-  { href: "/expenses", label: "المصروفات", icon: Receipt },
-  { href: "/waste", label: "الهالك", icon: Trash2 },
-  { href: "/refunds", label: "المرتجع", icon: RotateCcw },
-  { href: "/recipes", label: "الوصفات", icon: BookOpen },
-  { href: "/reports", label: "التقارير", icon: BarChart3, adminOnly: true },
-];
+type NavHref = (typeof NAV_ITEMS)[number]["href"];
+
+const navIcons: Record<NavHref, LucideIcon> = {
+  "/": LayoutDashboard,
+  "/categories": Tags,
+  "/warehouse": Warehouse,
+  "/cafe": CupSoda,
+  "/suppliers": Truck,
+  "/users": UserCog,
+  "/shifts": Clock,
+  "/employees": Users,
+  "/salaries": Wallet,
+  "/expenses": Receipt,
+  "/waste": Trash2,
+  "/refunds": RotateCcw,
+  "/recipes": BookOpen,
+  "/reports": BarChart3,
+};
 
 export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const visibleNav = nav.filter((item) => !item.adminOnly || user?.role === "admin");
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const visibleNav = NAV_ITEMS.filter(
+    (item) =>
+      !("adminOnly" in item && item.adminOnly) || user?.role === "admin",
+  );
   return (
     <aside className="w-56 shrink-0 bg-sidebar text-sidebar-ink flex flex-col">
       <div className="flex items-center gap-2 px-5 py-5 text-accent">
@@ -48,8 +61,10 @@ export function Sidebar() {
         <span className="text-lg font-bold text-white">الكافيه</span>
       </div>
       <nav className="flex-1 px-3 pb-6 space-y-0.5">
-        {visibleNav.map(({ href, label, icon: Icon }) => {
-          const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+        {visibleNav.map(({ href, label }) => {
+          const Icon = navIcons[href];
+          const active =
+            href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
             <Link
               key={href}
@@ -74,6 +89,14 @@ export function Sidebar() {
         </div>
         <button
           type="button"
+          onClick={() => setPasswordOpen(true)}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-white/5 hover:text-white"
+        >
+          <KeyRound className="size-4.5" />
+          تغيير كلمة المرور
+        </button>
+        <button
+          type="button"
           onClick={logout}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-white/5 hover:text-white"
         >
@@ -81,6 +104,9 @@ export function Sidebar() {
           تسجيل الخروج
         </button>
       </div>
+      {passwordOpen && (
+        <ChangePasswordModal onClose={() => setPasswordOpen(false)} />
+      )}
     </aside>
   );
 }

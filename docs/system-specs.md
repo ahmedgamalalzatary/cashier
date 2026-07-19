@@ -41,6 +41,7 @@ A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inv
 | Cafe waste entry | ✔ | ✔ |
 | Main-warehouse waste, stocktake | ✔ | ✘ |
 | Items, categories, recipes, prices | ✔ | ✘ |
+| Application users and roles | ✔ | ✘ |
 | Purchases, suppliers, payments | ✔ | ✘ |
 | Employees, salaries, advances | ✔ | ✘ |
 | General expenses, expense categories | ✔ | ✘ |

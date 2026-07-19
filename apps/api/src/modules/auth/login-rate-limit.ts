@@ -1,4 +1,4 @@
-import type { NextFunction, Request, Response } from 'express';
+import type { NextFunction, Request, Response } from "express";
 
 type Options = {
   maxUsernameAttempts?: number;
@@ -35,8 +35,15 @@ export function createLoginRateLimiter({
     if (current.count >= limit) return current;
 
     if (!previous && buckets.size >= maxTrackedKeys) {
-      const oldest = buckets.keys().next().value as string | undefined;
-      if (oldest !== undefined) buckets.delete(oldest);
+      for (const [trackedKey, attempt] of buckets) {
+        if (attempt.resetAt <= timestamp) buckets.delete(trackedKey);
+      }
+      if (buckets.size >= maxTrackedKeys) {
+        const earliestReset = Math.min(
+          ...Array.from(buckets.values(), (attempt) => attempt.resetAt),
+        );
+        return { count: limit, resetAt: earliestReset };
+      }
     }
     current.count += 1;
     buckets.set(key, current);
@@ -45,31 +52,32 @@ export function createLoginRateLimiter({
 
   return (req: Request, res: Response, next: NextFunction) => {
     const username =
-      typeof req.body?.username === 'string'
+      typeof req.body?.username === "string"
         ? req.body.username.trim().toLowerCase()
-        : '<invalid>';
-    const ip = req.ip ?? '<unknown>';
+        : "<invalid>";
+    const ip = req.ip ?? "<unknown>";
+    const usernameAndIp = `${username}\u0000${ip}`;
     const timestamp = now();
     const blocked = [
-      consume(usernames, username, maxUsernameAttempts, timestamp),
+      consume(usernames, usernameAndIp, maxUsernameAttempts, timestamp),
       consume(clientIps, ip, maxIpAttempts, timestamp),
     ].filter((attempt): attempt is Attempt => Boolean(attempt));
 
     if (blocked.length > 0) {
       const resetAt = Math.max(...blocked.map((attempt) => attempt.resetAt));
       res.setHeader(
-        'Retry-After',
+        "Retry-After",
         Math.max(1, Math.ceil((resetAt - timestamp) / 1000)),
       );
       res
         .status(429)
-        .json({ error: 'محاولات دخول كثيرة. حاول مرة أخرى لاحقاً' });
+        .json({ error: "محاولات دخول كثيرة. حاول مرة أخرى لاحقاً" });
       return;
     }
 
-    res.once('finish', () => {
+    res.once("finish", () => {
       if (res.statusCode < 400) {
-        usernames.delete(username);
+        usernames.delete(usernameAndIp);
       }
     });
     next();

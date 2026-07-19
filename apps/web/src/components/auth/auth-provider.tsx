@@ -1,10 +1,18 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import {
   canOpenPath,
+  loginPathFor,
+  postLoginPath,
   readSession,
   subscribeToSessionChanges,
   writeSession,
@@ -33,9 +41,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (session === undefined) return;
-    if (!session && pathname !== "/login") router.replace("/login");
-    else if (session && pathname === "/login") router.replace("/");
-    else if (session && !canOpenPath(session.user.role, pathname)) router.replace("/");
+    if (!session && pathname !== "/login")
+      router.replace(loginPathFor(pathname));
+    else if (session && pathname === "/login")
+      router.replace(postLoginPath(window.location.search, session.user.role));
+    else if (session && !canOpenPath(session.user.role, pathname))
+      router.replace("/");
   }, [pathname, router, session]);
 
   async function login(username: string, password: string) {
@@ -45,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     writeSession(next);
     setSession(next);
-    router.replace("/");
+    router.replace(postLoginPath(window.location.search, next.user.role));
   }
 
   function logout() {
@@ -57,17 +68,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const blocked =
     session === undefined ||
     (!session && pathname !== "/login") ||
-    (!!session && (pathname === "/login" || !canOpenPath(session.user.role, pathname)));
+    (!!session &&
+      (pathname === "/login" || !canOpenPath(session.user.role, pathname)));
 
   if (blocked) {
     return (
-      <div className="grid min-h-screen place-items-center bg-paper" role="status" aria-label="جاري التحميل">
+      <div
+        className="grid min-h-screen place-items-center bg-paper"
+        role="status"
+        aria-label="جاري التحميل"
+      >
         <span className="size-8 animate-spin rounded-full border-2 border-line border-t-primary" />
       </div>
     );
   }
 
-  return <AuthContext.Provider value={{ user: session?.user ?? null, login, logout }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{ user: session?.user ?? null, login, logout }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

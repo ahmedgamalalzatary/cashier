@@ -2,8 +2,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   AUTH_CHANGED_EVENT,
   SESSION_KEY,
+  loginPathFor,
+  postLoginPath,
+  readSession,
   subscribeToSessionChanges,
 } from "./auth";
+import { ADMIN_PATHS } from "./navigation";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -40,5 +44,63 @@ describe("subscribeToSessionChanges", () => {
 
     expect(listener).toHaveBeenCalledOnce();
     unsubscribe();
+  });
+});
+
+function tokenWithExpiration(exp: number) {
+  const encode = (value: object) =>
+    Buffer.from(JSON.stringify(value)).toString("base64url");
+  return `${encode({ alg: "HS256", typ: "JWT" })}.${encode({ exp })}.signature`;
+}
+
+function browserWithSession(token: string) {
+  const browser = Object.assign(new EventTarget(), {
+    localStorage: {
+      getItem: vi.fn(() =>
+        JSON.stringify({
+          token,
+          user: { id: 1, name: "Admin", role: "admin" },
+        }),
+      ),
+      removeItem: vi.fn(),
+      setItem: vi.fn(),
+    },
+  });
+  vi.stubGlobal("window", browser);
+  return browser;
+}
+
+describe("session validity", () => {
+  it("rejects and removes an expired JWT before rendering protected UI", () => {
+    const browser = browserWithSession(tokenWithExpiration(1));
+
+    expect(readSession()).toBeNull();
+    expect(browser.localStorage.removeItem).toHaveBeenCalledWith(SESSION_KEY);
+  });
+
+  it("accepts a structurally valid unexpired session", () => {
+    browserWithSession(tokenWithExpiration(Math.floor(Date.now() / 1000) + 60));
+
+    expect(readSession()?.user.role).toBe("admin");
+  });
+});
+
+describe("login redirects", () => {
+  it("preserves an allowed protected deep link through login", () => {
+    expect(loginPathFor("/warehouse")).toBe("/login?next=%2Fwarehouse");
+    expect(postLoginPath("?next=%2Fwarehouse", "admin")).toBe("/warehouse");
+  });
+
+  it("rejects external and role-forbidden return locations", () => {
+    expect(postLoginPath("?next=https%3A%2F%2Fevil.example", "admin")).toBe(
+      "/",
+    );
+    expect(postLoginPath("?next=%2Fwarehouse", "cashier")).toBe("/");
+  });
+
+  it("derives every protected route from the shared navigation config", () => {
+    expect(ADMIN_PATHS).toContain("/warehouse");
+    expect(ADMIN_PATHS).toContain("/categories");
+    expect(ADMIN_PATHS).toContain("/users");
   });
 });

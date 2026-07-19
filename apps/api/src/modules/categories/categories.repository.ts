@@ -1,6 +1,6 @@
-import { eq, inArray, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../../db/index.js';
-import { categories } from '../../db/schema.js';
+import { categories, items } from '../../db/schema.js';
 
 export class CategoriesRepository {
   constructor(private db: Db) {}
@@ -60,6 +60,17 @@ export class CategoriesRepository {
       .select()
       .from(categories)
       .where(eq(categories.parentId, parentId));
+  }
+
+  async hasActiveItems(categoryIds: number[]) {
+    const [row] = await this.db
+      .select({ id: items.id })
+      .from(items)
+      .where(
+        and(inArray(items.categoryId, categoryIds), eq(items.isActive, true)),
+      )
+      .limit(1);
+    return Boolean(row);
   }
 
   async create(data: { name: string; parentId?: number | null }) {

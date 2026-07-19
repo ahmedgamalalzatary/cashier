@@ -57,21 +57,29 @@ export function Modal({
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
+      onClick={onClose}
+    >
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="w-full max-w-md rounded-xl bg-surface shadow-xl outline-none"
+        className="w-full max-w-md rounded-xl bg-surface text-ink shadow-xl outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <h2 id={titleId} className="font-bold">
             {title}
           </h2>
-          <button type="button" onClick={onClose} className="text-muted hover:text-ink" aria-label="إغلاق">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-muted hover:text-ink"
+            aria-label="إغلاق"
+          >
             <X className="size-4.5" />
           </button>
         </div>

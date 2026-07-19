@@ -10,6 +10,7 @@ import {
   text,
   mysqlEnum,
   index,
+  foreignKey,
   type AnyMySqlColumn,
 } from 'drizzle-orm/mysql-core';
 
@@ -62,4 +63,126 @@ export const supplierPayments = mysqlTable(
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   (table) => [index('supplier_payments_supplier_id_idx').on(table.supplierId)],
+);
+
+export const items = mysqlTable(
+  'items',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    name: varchar('name', { length: 191 }).notNull(),
+    categoryId: int('category_id')
+      .notNull()
+      .references(() => categories.id),
+    type: mysqlEnum('type', ['raw', 'resale', 'prepared']).notNull(),
+    stockUnit: varchar('stock_unit', { length: 50 }).notNull(),
+    purchaseUnit: varchar('purchase_unit', { length: 50 }),
+    purchaseToStockFactor: decimal('purchase_to_stock_factor', {
+      precision: 14,
+      scale: 6,
+    }),
+    mainMinimumLevel: decimal('main_minimum_level', {
+      precision: 14,
+      scale: 3,
+    })
+      .notNull()
+      .default('0'),
+    cafeMinimumLevel: decimal('cafe_minimum_level', {
+      precision: 14,
+      scale: 3,
+    })
+      .notNull()
+      .default('0'),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [index('items_category_id_idx').on(table.categoryId)],
+);
+
+export const stockBatches = mysqlTable(
+  'stock_batches',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    itemId: int('item_id')
+      .notNull()
+      .references(() => items.id),
+    warehouse: mysqlEnum('warehouse', ['main', 'cafe']).notNull(),
+    initialQuantity: decimal('initial_quantity', {
+      precision: 14,
+      scale: 3,
+    }).notNull(),
+    remainingQuantity: decimal('remaining_quantity', {
+      precision: 14,
+      scale: 3,
+    }).notNull(),
+    unitCost: decimal('unit_cost', { precision: 16, scale: 6 }).notNull(),
+    receivedAt: timestamp('received_at').notNull(),
+    sourceType: varchar('source_type', { length: 50 }).notNull(),
+    sourceId: int('source_id'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('stock_batches_fifo_idx').on(
+      table.itemId,
+      table.warehouse,
+      table.receivedAt,
+      table.id,
+    ),
+  ],
+);
+
+export const stockMovements = mysqlTable(
+  'stock_movements',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    itemId: int('item_id')
+      .notNull()
+      .references(() => items.id),
+    warehouse: mysqlEnum('warehouse', ['main', 'cafe']).notNull(),
+    batchId: int('batch_id').references(() => stockBatches.id),
+    movementType: varchar('movement_type', { length: 50 }).notNull(),
+    quantity: decimal('quantity', { precision: 14, scale: 3 }).notNull(),
+    unitCost: decimal('unit_cost', { precision: 16, scale: 6 }).notNull(),
+    referenceType: varchar('reference_type', { length: 50 }),
+    referenceId: int('reference_id'),
+    notes: varchar('notes', { length: 255 }),
+    occurredAt: timestamp('occurred_at').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('stock_movements_ledger_idx').on(
+      table.itemId,
+      table.warehouse,
+      table.occurredAt,
+      table.id,
+    ),
+    index('stock_movements_batch_id_idx').on(table.batchId),
+  ],
+);
+
+// When sales are allowed to take stock negative, later receipts allocate their
+// real batch cost back to those uncosted deficit movements for audit/reporting.
+export const stockDeficitAllocations = mysqlTable(
+  'stock_deficit_allocations',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    deficitMovementId: int('deficit_movement_id').notNull(),
+    batchId: int('batch_id').notNull(),
+    quantity: decimal('quantity', { precision: 14, scale: 3 }).notNull(),
+    unitCost: decimal('unit_cost', { precision: 16, scale: 6 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('stock_deficit_allocations_movement_idx').on(table.deficitMovementId),
+    index('stock_deficit_allocations_batch_idx').on(table.batchId),
+    foreignKey({
+      name: 'stock_deficit_movement_fk',
+      columns: [table.deficitMovementId],
+      foreignColumns: [stockMovements.id],
+    }),
+    foreignKey({
+      name: 'stock_deficit_batch_fk',
+      columns: [table.batchId],
+      foreignColumns: [stockBatches.id],
+    }),
+  ],
 );

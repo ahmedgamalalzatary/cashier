@@ -1,4 +1,5 @@
 import type { Role, Session } from "@cashier/shared";
+import { ADMIN_PATHS } from "./navigation";
 export type { AuthUser, Role, Session } from "@cashier/shared";
 
 export const SESSION_KEY = "cashier.session";
@@ -13,12 +14,33 @@ export function readSession(): Session | null {
     if (
       !value?.token ||
       !value.user?.id ||
-      !["admin", "cashier"].includes(value.user.role)
-    )
+      !["admin", "cashier"].includes(value.user.role) ||
+      !hasUnexpiredToken(value.token)
+    ) {
+      window.localStorage.removeItem(SESSION_KEY);
       return null;
+    }
     return value;
   } catch {
     return null;
+  }
+}
+
+function hasUnexpiredToken(token: string) {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return false;
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = JSON.parse(
+      globalThis.atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "=")),
+    ) as { exp?: unknown };
+    return (
+      typeof decoded.exp === "number" &&
+      Number.isFinite(decoded.exp) &&
+      decoded.exp * 1000 > Date.now()
+    );
+  } catch {
+    return false;
   }
 }
 
@@ -44,18 +66,30 @@ export function subscribeToSessionChanges(listener: () => void) {
 }
 
 export function canOpenPath(role: Role, pathname: string) {
-  const adminPaths = [
-    "/categories",
-    "/warehouse",
-    "/suppliers",
-    "/employees",
-    "/salaries",
-    "/reports",
-  ];
   return (
     role === "admin" ||
-    !adminPaths.some(
+    !ADMIN_PATHS.some(
       (path) => pathname === path || pathname.startsWith(`${path}/`),
     )
   );
+}
+
+export function loginPathFor(pathname: string) {
+  return pathname === "/login"
+    ? "/login"
+    : `/login?next=${encodeURIComponent(pathname)}`;
+}
+
+export function postLoginPath(search: string, role: Role) {
+  const destination = new URLSearchParams(search).get("next");
+  if (
+    !destination ||
+    !destination.startsWith("/") ||
+    destination.startsWith("//") ||
+    destination.includes("\\") ||
+    !canOpenPath(role, destination)
+  ) {
+    return "/";
+  }
+  return destination;
 }

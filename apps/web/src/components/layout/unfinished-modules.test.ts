@@ -13,7 +13,6 @@ describe("unfinished module routes", () => {
         "reports",
         "salaries",
         "shifts",
-        "warehouse",
         "waste",
       ].sort(),
     );

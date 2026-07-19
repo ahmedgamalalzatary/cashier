@@ -1,9 +1,4 @@
 export const unfinishedModules = {
-  warehouse: {
-    code: "WH",
-    title: "المخزن الرئيسي",
-    description: "إدارة الأصناف وحركات الاستلام والصرف ستتوفر هنا.",
-  },
   cafe: {
     code: "CF",
     title: "الكافيه",

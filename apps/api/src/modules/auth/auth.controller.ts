@@ -1,6 +1,6 @@
-import type { Request, Response } from 'express';
-import type { AuthService } from './auth.service.js';
-import { loginInput } from './auth.schemas.js';
+import type { Request, Response } from "express";
+import type { AuthService } from "./auth.service.js";
+import { changePasswordInput, loginInput } from "./auth.schemas.js";
 
 export class AuthController {
   constructor(private service: AuthService) {}
@@ -11,5 +11,13 @@ export class AuthController {
 
   me = async (req: Request, res: Response) => {
     res.json(req.user);
+  };
+
+  changePassword = async (req: Request, res: Response) => {
+    await this.service.changePassword(
+      req.user!.id,
+      changePasswordInput.parse(req.body),
+    );
+    res.json({ ok: true });
   };
 }
