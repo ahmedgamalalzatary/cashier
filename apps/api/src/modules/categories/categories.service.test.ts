@@ -49,3 +49,74 @@ describe('CategoriesService lock ordering', () => {
     expect(repo.deactivateMany).toHaveBeenCalledWith([2, 1]);
   });
 });
+
+describe('CategoriesService deadlock retries', () => {
+  it('retries an update transaction once after a MySQL deadlock', async () => {
+    const deadlock = Object.assign(new Error('deadlock'), {
+      code: 'ER_LOCK_DEADLOCK',
+    });
+    const repo = {
+      transaction: vi
+        .fn()
+        .mockRejectedValueOnce(deadlock)
+        .mockImplementationOnce(
+          async (run: (value: CategoriesRepository) => Promise<void>) =>
+            run(repo as unknown as CategoriesRepository),
+        ),
+      lockForUpdate: vi.fn().mockResolvedValue([
+        { id: 1, name: 'Category', parentId: null, isActive: true },
+      ]),
+      update: vi.fn().mockResolvedValue(true),
+    };
+    const service = new CategoriesService(
+      repo as unknown as CategoriesRepository,
+    );
+
+    await service.update(1, { name: 'Renamed' });
+
+    expect(repo.transaction).toHaveBeenCalledTimes(2);
+    expect(repo.update).toHaveBeenCalledWith(1, { name: 'Renamed' });
+  });
+
+  it('retries a deactivate transaction once after a MySQL deadlock', async () => {
+    const deadlock = Object.assign(new Error('deadlock'), {
+      code: 'ER_LOCK_DEADLOCK',
+    });
+    const repo = {
+      transaction: vi
+        .fn()
+        .mockRejectedValueOnce(deadlock)
+        .mockImplementationOnce(
+          async (run: (value: CategoriesRepository) => Promise<void>) =>
+            run(repo as unknown as CategoriesRepository),
+        ),
+      lockForUpdate: vi.fn().mockResolvedValue([
+        { id: 1, name: 'Category', parentId: null, isActive: true },
+      ]),
+      deactivateMany: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = new CategoriesService(
+      repo as unknown as CategoriesRepository,
+    );
+
+    await service.deactivate(1);
+
+    expect(repo.transaction).toHaveBeenCalledTimes(2);
+    expect(repo.deactivateMany).toHaveBeenCalledWith([1]);
+  });
+
+  it('does not retry a non-deadlock transaction failure', async () => {
+    const failure = Object.assign(new Error('connection lost'), {
+      code: 'PROTOCOL_CONNECTION_LOST',
+    });
+    const repo = {
+      transaction: vi.fn().mockRejectedValue(failure),
+    };
+    const service = new CategoriesService(
+      repo as unknown as CategoriesRepository,
+    );
+
+    await expect(service.deactivate(1)).rejects.toBe(failure);
+    expect(repo.transaction).toHaveBeenCalledOnce();
+  });
+});

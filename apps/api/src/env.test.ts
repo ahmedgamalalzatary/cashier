@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parseRuntimeEnv } from './env.js';
+import path from 'node:path';
+import { loadRuntimeEnv, parseRuntimeEnv, rootDir } from './env.js';
 
 const valid = {
   DATABASE_URL: 'mysql://cashier:password@localhost:3306/cashier',
@@ -9,6 +10,20 @@ const valid = {
 };
 
 describe('runtime environment', () => {
+  it('loads injected environment variables when the env file is absent', () => {
+    expect(
+      loadRuntimeEnv({
+        envFile: path.join(rootDir, '.env.docker-missing-test'),
+        environment: { ...valid, PORT: '4321' },
+      }),
+    ).toMatchObject({
+      DATABASE_URL: valid.DATABASE_URL,
+      JWT_SECRET: valid.JWT_SECRET,
+      PORT: 4321,
+      CORS_ORIGIN: valid.CORS_ORIGIN,
+    });
+  });
+
   it('parses and normalizes a complete valid configuration', () => {
     expect(parseRuntimeEnv(valid)).toMatchObject({
       DATABASE_URL: valid.DATABASE_URL,

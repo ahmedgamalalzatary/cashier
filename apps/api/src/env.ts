@@ -57,9 +57,27 @@ export function parseRuntimeEnv(
   throw new Error(`Invalid environment configuration: ${details}`);
 }
 
-export function loadRuntimeEnv() {
-  const loaded = config({ path: path.join(rootDir, '.env') });
-  if (loaded.error)
-    throw new Error(`Unable to load root .env: ${loaded.error.message}`);
-  return parseRuntimeEnv(process.env);
+type LoadRuntimeEnvOptions = {
+  envFile?: string;
+  environment?: Record<string, string | undefined>;
+};
+
+export function loadRuntimeEnv({
+  envFile = path.join(rootDir, '.env'),
+  environment,
+}: LoadRuntimeEnvOptions = {}) {
+  const injectedEnvironment = environment
+    ? Object.fromEntries(
+        Object.entries(environment).filter(
+          (entry): entry is [string, string] => entry[1] !== undefined,
+        ),
+      )
+    : undefined;
+  const loaded = injectedEnvironment
+    ? config({ path: envFile, processEnv: injectedEnvironment })
+    : config({ path: envFile });
+  const loadError = loaded.error as NodeJS.ErrnoException | undefined;
+  if (loadError && loadError.code !== 'ENOENT')
+    throw new Error(`Unable to load environment file: ${loadError.message}`);
+  return parseRuntimeEnv(injectedEnvironment ?? process.env);
 }

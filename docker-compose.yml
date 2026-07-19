@@ -1,0 +1,129 @@
+name: minikoshk
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-cashier}
+      MYSQL_USER: ${MYSQL_USER:-cashier}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+    command:
+      - --innodb-buffer-pool-size=256M
+      - --max-connections=50
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    mem_limit: 768m
+    stop_grace_period: 30s
+    logging: *default-logging
+    networks:
+      - application
+
+  migrate:
+    build:
+      context: .
+      dockerfile: dockerfile.api
+      target: migrate
+    restart: "no"
+    env_file:
+      - .env.production
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    mem_limit: 768m
+    logging: *default-logging
+    networks:
+      - application
+
+  api:
+    build:
+      context: .
+      dockerfile: dockerfile.api
+      target: runtime
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env.production
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      PORT: "4000"
+      CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required}
+      TRUST_PROXY: "true"
+    ports:
+      - 127.0.0.1:4010:4000
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    mem_limit: 384m
+    stop_grace_period: 15s
+    logging: *default-logging
+    networks:
+      - application
+
+  web:
+    build:
+      context: .
+      dockerfile: dockerfile.web
+      target: runtime
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+    ports:
+      - 127.0.0.1:3010:3000
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    mem_limit: 512m
+    stop_grace_period: 15s
+    logging: *default-logging
+    networks:
+      - application
+
+volumes:
+  mysql_data:
+
+networks:
+  application:
+    driver: bridge

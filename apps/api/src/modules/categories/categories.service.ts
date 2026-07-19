@@ -8,6 +8,24 @@ import type {
 export class CategoriesService {
   constructor(private repo: CategoriesRepository) {}
 
+  private async transactionWithDeadlockRetry<T>(
+    fn: (repo: CategoriesRepository) => Promise<T>,
+  ) {
+    try {
+      return await this.repo.transaction(fn);
+    } catch (error) {
+      if (
+        typeof error !== 'object' ||
+        error === null ||
+        !('code' in error) ||
+        error.code !== 'ER_LOCK_DEADLOCK'
+      ) {
+        throw error;
+      }
+      return this.repo.transaction(fn);
+    }
+  }
+
   list() {
     return this.repo.list();
   }
@@ -44,7 +62,7 @@ export class CategoriesService {
   }
 
   update(id: number, data: CategoryUpdateInput) {
-    return this.repo.transaction(async (repo) => {
+    return this.transactionWithDeadlockRetry(async (repo) => {
       const requestedParentId = data.parentId;
       const lockedRows = await repo.lockForUpdate(
         id,
@@ -71,7 +89,7 @@ export class CategoriesService {
 
   // soft delete; a main category takes its sub-categories with it
   deactivate(id: number) {
-    return this.repo.transaction(async (repo) => {
+    return this.transactionWithDeadlockRetry(async (repo) => {
       const lockedRows = await repo.lockForUpdate(id);
       const category = lockedRows.find((row) => row.id === id);
       if (!category) throw new HttpError(404, 'التصنيف غير موجود');
