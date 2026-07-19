@@ -1,5 +1,8 @@
-import 'dotenv/config';
+import { config } from 'dotenv';
+import path from 'node:path';
 import { defineConfig } from 'drizzle-kit';
+
+config({ path: path.resolve(import.meta.dirname, '../../.env') });
 
 export default defineConfig({
   dialect: 'mysql',

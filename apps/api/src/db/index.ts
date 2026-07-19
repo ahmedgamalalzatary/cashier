@@ -6,3 +6,5 @@ export function createDb(url = process.env.DATABASE_URL!) {
   const pool = mysql.createPool(url);
   return drizzle(pool, { schema, mode: 'default' });
 }
+
+export type Db = ReturnType<typeof createDb>;

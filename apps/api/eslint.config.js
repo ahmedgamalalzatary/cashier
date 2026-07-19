@@ -5,4 +5,12 @@ export default tseslint.config(
   {
     ignores: ['dist/', 'drizzle/'],
   },
+  {
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
 );
