@@ -30,7 +30,10 @@ export class AuthService {
       name: user.name,
       role: user.role,
     };
-    return { token: signToken(authUser, this.jwtSecret), user: authUser };
+    return {
+      token: signToken(authUser, user.tokenVersion, this.jwtSecret),
+      user: authUser,
+    };
   }
 
   async changePassword(userId: number, input: ChangePasswordInput) {
@@ -46,5 +49,20 @@ export class AuthService {
       userId,
       await bcrypt.hash(input.newPassword, 10),
     );
+    const updatedUser = await this.repo.findById(userId);
+    if (!updatedUser?.isActive)
+      throw new HttpError(
+        401,
+        "انتهت الجلسة — سجّل الدخول من جديد",
+      );
+    const authUser: AuthUser = {
+      id: updatedUser.id,
+      name: updatedUser.name,
+      role: updatedUser.role,
+    };
+    return {
+      token: signToken(authUser, updatedUser.tokenVersion, this.jwtSecret),
+      user: authUser,
+    };
   }
 }

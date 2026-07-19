@@ -65,6 +65,35 @@ describe('suppliers CRUD', () => {
     expect(list.body[0].isActive).toBeFalsy();
   });
 
+  it('reactivates a deactivated supplier', async () => {
+    const { body } = await createSupplier();
+    expect((await api().delete(`/api/suppliers/${body.id}`)).status).toBe(200);
+
+    const restored = await api()
+      .put(`/api/suppliers/${body.id}`)
+      .send({ isActive: true });
+
+    expect(restored.status).toBe(200);
+    const list = await api().get('/api/suppliers');
+    expect(list.body[0].isActive).toBe(true);
+  });
+
+  it('normalizes blank optional supplier fields to null', async () => {
+    const { body } = await createSupplier({
+      phone: '   ',
+      address: '',
+      notes: ' ',
+    });
+
+    const list = await api().get('/api/suppliers');
+    expect(list.body[0]).toMatchObject({
+      id: body.id,
+      phone: null,
+      address: null,
+      notes: null,
+    });
+  });
+
   it('rejects an empty update body', async () => {
     const { body } = await createSupplier();
     const res = await api().put(`/api/suppliers/${body.id}`).send({});
@@ -92,6 +121,16 @@ describe('supplier payments & statement', () => {
 
     const list = await api().get('/api/suppliers');
     expect(Number(list.body[0].balance)).toBe(300);
+  });
+
+  it('normalizes blank payment notes to null', async () => {
+    const pay = await api()
+      .post(`/api/suppliers/${supplierId}/payments`)
+      .send({ amount: 20, paidAt: '2026-07-19', notes: '   ' });
+    expect(pay.status).toBe(201);
+
+    const statement = await api().get(`/api/suppliers/${supplierId}/statement`);
+    expect(statement.body.payments[0].notes).toBeNull();
   });
 
   it('rejects an amount with more than two fractional digits', async () => {

@@ -6,6 +6,7 @@ type Options = {
   windowMs?: number;
   maxTrackedKeys?: number;
   now?: () => number;
+  identity?: (req: Request) => string;
 };
 
 type Attempt = { count: number; resetAt: number };
@@ -16,6 +17,7 @@ export function createLoginRateLimiter({
   windowMs = 15 * 60_000,
   maxTrackedKeys = 10_000,
   now = Date.now,
+  identity,
 }: Options = {}) {
   const usernames = new Map<string, Attempt>();
   const clientIps = new Map<string, Attempt>();
@@ -51,8 +53,9 @@ export function createLoginRateLimiter({
   };
 
   return (req: Request, res: Response, next: NextFunction) => {
-    const username =
-      typeof req.body?.username === "string"
+    const username = identity
+      ? identity(req)
+      : typeof req.body?.username === "string"
         ? req.body.username.trim().toLowerCase()
         : "<invalid>";
     const ip = req.ip ?? "<unknown>";

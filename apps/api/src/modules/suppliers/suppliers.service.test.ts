@@ -8,7 +8,11 @@ function repository(overrides: Record<string, unknown> = {}) {
       async (run: (value: SuppliersRepository) => Promise<unknown>) =>
         run(repo as unknown as SuppliersRepository),
     ),
-    findByIdForUpdate: vi.fn().mockResolvedValue({ id: 1, isActive: true }),
+    findByIdForUpdate: vi.fn().mockResolvedValue({
+      id: 1,
+      openingBalance: '200.00',
+      isActive: true,
+    }),
     hasPayments: vi.fn().mockResolvedValue(false),
     update: vi.fn().mockResolvedValue(true),
     createPayment: vi.fn().mockResolvedValue(9),
@@ -25,9 +29,24 @@ describe('SuppliersService financial consistency', () => {
     );
 
     await expect(
-      service.update(1, { openingBalance: 200 }),
+      service.update(1, { openingBalance: 201 }),
     ).rejects.toMatchObject({ status: 409 });
     expect(repo.update).not.toHaveBeenCalled();
+  });
+
+  it('allows an unchanged opening balance after the first payment', async () => {
+    const repo = repository({ hasPayments: vi.fn().mockResolvedValue(true) });
+    const service = new SuppliersService(
+      repo as unknown as SuppliersRepository,
+    );
+
+    await expect(
+      service.update(1, { name: 'Renamed', openingBalance: 200 }),
+    ).resolves.toBeUndefined();
+    expect(repo.update).toHaveBeenCalledWith(1, {
+      name: 'Renamed',
+      openingBalance: 200,
+    });
   });
 
   it('validates and creates a payment within one repository transaction', async () => {

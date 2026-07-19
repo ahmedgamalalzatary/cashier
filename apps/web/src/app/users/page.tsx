@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { Ban, Pencil, Plus, Power } from "lucide-react";
 import type { ManagedUser } from "@cashier/shared";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Table } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import { UserModal } from "./user-modal";
+import { IconButton } from "./icon-button";
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
@@ -159,32 +160,5 @@ export default function UsersPage() {
         />
       )}
     </div>
-  );
-}
-
-function IconButton({
-  title,
-  onClick,
-  danger = false,
-  children,
-}: {
-  title: string;
-  onClick: () => void;
-  danger?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      className={`rounded-md p-1.5 transition-colors ${
-        danger
-          ? "text-danger hover:bg-danger/10"
-          : "text-muted hover:bg-line/50 hover:text-ink"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

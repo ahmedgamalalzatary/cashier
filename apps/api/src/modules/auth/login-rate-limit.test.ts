@@ -22,6 +22,26 @@ function testApp() {
 }
 
 describe("login rate limiting", () => {
+  it("can use an authenticated identity instead of a login username", async () => {
+    const app = express();
+    app.use(express.json());
+    app.post(
+      "/password",
+      createLoginRateLimiter({
+        maxUsernameAttempts: 1,
+        maxIpAttempts: 10,
+        identity: (req) => req.get("x-user") ?? "<missing>",
+      }),
+      (_req, res) => res.status(400).end(),
+    );
+
+    const guess = (user: string) =>
+      request(app).post("/password").set("x-user", user);
+    expect((await guess("1")).status).toBe(400);
+    expect((await guess("1")).status).toBe(429);
+    expect((await guess("2")).status).toBe(400);
+  });
+
   it("blocks repeated attempts for the same IP and username", async () => {
     const app = testApp();
     const login = () =>

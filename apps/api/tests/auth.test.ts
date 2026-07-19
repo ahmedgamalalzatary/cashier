@@ -97,6 +97,20 @@ describe("authentication", () => {
         newPassword: "new-secret-456",
       });
     expect(changed.status).toBe(200);
+    expect(changed.body.token).toBeTypeOf("string");
+    expect(changed.body.user).toEqual(login.body.user);
+
+    expect(
+      (await request(app()).get("/api/auth/me").set(authorization)).status,
+    ).toBe(401);
+
+    expect(
+      (
+        await request(app())
+          .get("/api/auth/me")
+          .set("Authorization", `Bearer ${changed.body.token}`)
+      ).status,
+    ).toBe(200);
 
     expect(
       (await request(app()).post("/api/auth/login").send(credentials)).status,
@@ -119,6 +133,21 @@ describe("authentication", () => {
       .send({ currentPassword: "wrong", newPassword: "new-secret-456" });
 
     expect(response.status).toBe(400);
+  });
+
+  it("throttles repeated current-password guesses", async () => {
+    const server = app();
+    const authorization = await loginAs(server, "cashier");
+    const guess = () =>
+      request(server)
+        .put("/api/auth/password")
+        .set(authorization)
+        .send({ currentPassword: "wrong", newPassword: "new-secret-456" });
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      expect((await guess()).status).toBe(400);
+    }
+    expect((await guess()).status).toBe(429);
   });
 });
 

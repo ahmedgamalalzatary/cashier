@@ -16,8 +16,14 @@ declare global {
   }
 }
 
-export function signToken(user: AuthUser, jwtSecret: string) {
-  return jwt.sign(user, jwtSecret, { expiresIn: '12h' });
+type AuthToken = AuthUser & { tokenVersion: number };
+
+export function signToken(
+  user: AuthUser,
+  tokenVersion: number,
+  jwtSecret: string,
+) {
+  return jwt.sign({ ...user, tokenVersion }, jwtSecret, { expiresIn: '12h' });
 }
 
 export function authenticate(db: Db, jwtSecret: string) {
@@ -26,9 +32,9 @@ export function authenticate(db: Db, jwtSecret: string) {
     const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
     if (!token) throw new HttpError(401, 'يجب تسجيل الدخول');
 
-    let payload: AuthUser;
+    let payload: AuthToken;
     try {
-      payload = jwt.verify(token, jwtSecret) as AuthUser;
+      payload = jwt.verify(token, jwtSecret) as AuthToken;
     } catch {
       throw new HttpError(401, 'انتهت الجلسة — سجّل الدخول من جديد');
     }
@@ -38,7 +44,7 @@ export function authenticate(db: Db, jwtSecret: string) {
       .from(users)
       .where(eq(users.id, payload.id))
       .limit(1);
-    if (!user?.isActive)
+    if (!user?.isActive || payload.tokenVersion !== user.tokenVersion)
       throw new HttpError(401, 'انتهت الجلسة — سجّل الدخول من جديد');
     req.user = { id: user.id, name: user.name, role: user.role };
     next();

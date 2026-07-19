@@ -19,6 +19,7 @@ export const users = mysqlTable('users', {
   name: varchar('name', { length: 191 }).notNull(),
   username: varchar('username', { length: 100 }).notNull().unique(),
   passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+  tokenVersion: int('token_version').notNull().default(0),
   role: mysqlEnum('role', ['admin', 'cashier']).notNull(),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at').notNull().defaultNow(),

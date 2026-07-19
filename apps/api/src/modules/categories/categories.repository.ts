@@ -78,7 +78,10 @@ export class CategoriesRepository {
     return result.insertId;
   }
 
-  async update(id: number, data: { name?: string; parentId?: number | null }) {
+  async update(
+    id: number,
+    data: { name?: string; parentId?: number | null; isActive?: boolean },
+  ) {
     const [result] = await this.db
       .update(categories)
       .set(data)

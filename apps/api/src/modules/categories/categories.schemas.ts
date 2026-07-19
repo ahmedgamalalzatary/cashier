@@ -7,7 +7,10 @@ export const categoryInput = z.object({
 
 export const categoryUpdateInput = categoryInput
   .partial()
-  .refine((data) => Object.keys(data).length > 0, { message: 'لا توجد بيانات للتعديل' });
+  .extend({ isActive: z.boolean().optional() })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: 'لا توجد بيانات للتعديل',
+  });
 
 export type CategoryInput = z.infer<typeof categoryInput>;
 export type CategoryUpdateInput = z.infer<typeof categoryUpdateInput>;

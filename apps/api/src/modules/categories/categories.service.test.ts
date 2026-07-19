@@ -50,6 +50,30 @@ describe('CategoriesService lock ordering', () => {
     expect(repo.lockForUpdate).toHaveBeenCalledWith(2);
     expect(repo.deactivateMany).toHaveBeenCalledWith([2, 1]);
   });
+
+  it('checks active items only on the category being deactivated and its children', async () => {
+    const repo = {
+      transaction: vi.fn(
+        async (run: (value: CategoriesRepository) => Promise<void>) =>
+          run(repo as unknown as CategoriesRepository),
+      ),
+      lockForUpdate: vi.fn().mockResolvedValue([
+        { id: 1, name: 'Parent', parentId: null, isActive: true },
+        { id: 2, name: 'Category', parentId: 1, isActive: true },
+        { id: 3, name: 'Child', parentId: 2, isActive: true },
+      ]),
+      hasActiveItems: vi.fn().mockResolvedValue(false),
+      deactivateMany: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = new CategoriesService(
+      repo as unknown as CategoriesRepository,
+    );
+
+    await service.deactivate(2);
+
+    expect(repo.hasActiveItems).toHaveBeenCalledWith([2, 3]);
+    expect(repo.deactivateMany).toHaveBeenCalledWith([2, 3]);
+  });
 });
 
 describe('CategoriesService deadlock retries', () => {

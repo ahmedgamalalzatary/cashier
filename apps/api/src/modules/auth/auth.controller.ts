@@ -14,10 +14,11 @@ export class AuthController {
   };
 
   changePassword = async (req: Request, res: Response) => {
-    await this.service.changePassword(
-      req.user!.id,
-      changePasswordInput.parse(req.body),
+    res.json(
+      await this.service.changePassword(
+        req.user!.id,
+        changePasswordInput.parse(req.body),
+      ),
     );
-    res.json({ ok: true });
   };
 }

@@ -6,8 +6,8 @@ import {
   postLoginPath,
   readSession,
   subscribeToSessionChanges,
-} from "./auth";
-import { ADMIN_PATHS } from "./navigation";
+} from "../../src/lib/auth";
+import { ADMIN_PATHS } from "../../src/lib/navigation";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -82,6 +82,19 @@ describe("session validity", () => {
     browserWithSession(tokenWithExpiration(Math.floor(Date.now() / 1000) + 60));
 
     expect(readSession()?.user.role).toBe("admin");
+  });
+
+  it("removes malformed JSON from local storage", () => {
+    const browser = Object.assign(new EventTarget(), {
+      localStorage: {
+        getItem: vi.fn(() => "{broken"),
+        removeItem: vi.fn(),
+      },
+    });
+    vi.stubGlobal("window", browser);
+
+    expect(readSession()).toBeNull();
+    expect(browser.localStorage.removeItem).toHaveBeenCalledWith(SESSION_KEY);
   });
 });
 

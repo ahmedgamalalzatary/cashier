@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { userRequestBody } from "./user-model";
+import { userRequestBody } from "../../../src/app/users/user-model";
 
 const form = {
   name: "  كاشير مسائي  ",
@@ -26,5 +26,11 @@ describe("user form model", () => {
         password: "secret-456",
       },
     );
+  });
+
+  it("preserves leading and trailing spaces in passwords", () => {
+    expect(
+      userRequestBody({ ...form, password: "  exact secret  " }, false),
+    ).toMatchObject({ password: "  exact secret  " });
   });
 });

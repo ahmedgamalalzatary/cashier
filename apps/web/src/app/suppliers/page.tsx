@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Pencil, Ban, HandCoins, FileText } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Ban,
+  HandCoins,
+  FileText,
+  RotateCcw,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -14,6 +21,7 @@ import {
   PaymentModal,
   type Supplier,
 } from "./supplier-modals";
+import { supplierBalanceClass } from "./supplier-model";
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -55,6 +63,18 @@ export default function SuppliersPage() {
     }
   }
 
+  async function reactivate(s: Supplier) {
+    try {
+      await api(`/api/suppliers/${s.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ isActive: true }),
+      });
+      reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "تعذر إعادة تفعيل المورد");
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -92,13 +112,7 @@ export default function SuppliersPage() {
               <td className="px-4 py-3 font-medium">{s.name}</td>
               <td className="px-4 py-3 tnum">{s.phone || "—"}</td>
               <td className="px-4 py-3 tnum">
-                <span
-                  className={
-                    Number(s.balance) > 0
-                      ? "text-danger font-medium"
-                      : "text-success"
-                  }
-                >
+                <span className={supplierBalanceClass(s.balance)}>
                   {formatMoney(s.balance)}
                 </span>
               </td>
@@ -131,9 +145,16 @@ export default function SuppliersPage() {
                   >
                     <Pencil className="size-4" />
                   </IconBtn>
-                  {s.isActive && (
+                  {s.isActive ? (
                     <IconBtn title="إيقاف" onClick={() => deactivate(s)} danger>
                       <Ban className="size-4" />
+                    </IconBtn>
+                  ) : (
+                    <IconBtn
+                      title="إعادة التفعيل"
+                      onClick={() => reactivate(s)}
+                    >
+                      <RotateCcw className="size-4" />
                     </IconBtn>
                   )}
                 </div>

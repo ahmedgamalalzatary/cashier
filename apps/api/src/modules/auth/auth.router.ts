@@ -12,9 +12,13 @@ export function authRouter(
   const router = Router();
   router.post("/login", createLoginRateLimiter(), controller.login);
   router.get("/me", authenticate(db, jwtSecret), controller.me);
+  const passwordRateLimiter = createLoginRateLimiter({
+    identity: (req) => String(req.user!.id),
+  });
   router.put(
     "/password",
     authenticate(db, jwtSecret),
+    passwordRateLimiter,
     controller.changePassword,
   );
   return router;

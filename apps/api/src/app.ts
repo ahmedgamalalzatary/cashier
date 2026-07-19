@@ -43,7 +43,11 @@ export function createApp(
   ] as const;
   app.use("/api/suppliers", ...adminOnly, createSuppliersModule(db));
   app.use("/api/categories", ...adminOnly, createCategoriesModule(db));
-  app.use("/api/items", ...adminOnly, createItemsModule(db));
+  app.use(
+    "/api/items",
+    authenticate(db, jwtSecret),
+    createItemsModule(db, requireRole("admin")),
+  );
   app.use("/api/users", ...adminOnly, createUsersModule(db));
   app.use(
     "/api/inventory",

@@ -27,7 +27,10 @@ export class SuppliersService {
     return this.repo.transaction(async (repo) => {
       const supplier = await repo.findByIdForUpdate(id);
       if (!supplier) throw new HttpError(404, 'المورد غير موجود');
-      if (data.openingBalance !== undefined && (await repo.hasPayments(id))) {
+      const changesOpeningBalance =
+        data.openingBalance !== undefined &&
+        data.openingBalance.toFixed(2) !== supplier.openingBalance;
+      if (changesOpeningBalance && (await repo.hasPayments(id))) {
         throw new HttpError(
           409,
           'لا يمكن تعديل الرصيد الافتتاحي بعد تسجيل دفعة',

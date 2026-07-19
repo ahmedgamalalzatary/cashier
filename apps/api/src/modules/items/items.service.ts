@@ -41,11 +41,10 @@ export class ItemsService {
       const item = await repo.findByIdForUpdate(id);
       if (!item) throw new HttpError(404, "الصنف غير موجود");
 
-      if (
-        data.categoryId !== undefined &&
-        data.categoryId !== item.categoryId
-      ) {
-        await this.validateCategory(repo, data.categoryId);
+      const categoryChanged =
+        data.categoryId !== undefined && data.categoryId !== item.categoryId;
+      if (categoryChanged || data.isActive === true) {
+        await this.validateCategory(repo, data.categoryId ?? item.categoryId);
       }
 
       const purchaseUnit =

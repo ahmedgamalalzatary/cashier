@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Db } from './index.js';
 import { users } from './schema.js';
 
@@ -11,7 +11,22 @@ type AdminSeedConfig = {
 
 export async function seedAdmin(db: Db, admin: AdminSeedConfig) {
   const passwordHash = await bcrypt.hash(admin.password, 10);
-  const [existingAdmin] = await db.select({ id: users.id }).from(users).where(eq(users.role, 'admin')).limit(1);
+  const [existingAdmin] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.role, 'admin'))
+    .limit(1);
+  const [usernameOwner] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.username, admin.username))
+    .limit(1);
+
+  if (usernameOwner && usernameOwner.id !== existingAdmin?.id) {
+    throw new Error(
+      `Cannot seed admin: username "${admin.username}" belongs to another user`,
+    );
+  }
 
   if (existingAdmin) {
     await db
@@ -20,6 +35,7 @@ export async function seedAdmin(db: Db, admin: AdminSeedConfig) {
         name: admin.name,
         username: admin.username,
         passwordHash,
+        tokenVersion: sql`${users.tokenVersion} + 1`,
         isActive: true,
       })
       .where(eq(users.id, existingAdmin.id));

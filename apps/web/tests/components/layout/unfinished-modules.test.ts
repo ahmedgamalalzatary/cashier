@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { unfinishedModules } from "./unfinished-modules";
+import { unfinishedModules } from "../../../src/components/layout/unfinished-modules";
 
 describe("unfinished module routes", () => {
   it("defines an intentional placeholder for every advertised unfinished route", () => {

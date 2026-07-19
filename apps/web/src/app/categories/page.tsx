@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Plus, Pencil, Ban, CornerDownLeft } from "lucide-react";
+import { Plus, Pencil, Ban, CornerDownLeft, RotateCcw } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,9 +12,10 @@ export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [modal, setModal] = useState<{ editing: Category | null; parent: Category | null } | null>(
-    null,
-  );
+  const [modal, setModal] = useState<{
+    editing: Category | null;
+    parent: Category | null;
+  } | null>(null);
 
   const [reloadKey, setReloadKey] = useState(0);
   const reload = () => setReloadKey((k) => k + 1);
@@ -51,6 +52,18 @@ export default function CategoriesPage() {
     }
   }
 
+  async function reactivate(c: Category) {
+    try {
+      await api(`/api/categories/${c.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ isActive: true }),
+      });
+      reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "تعذر إعادة تفعيل التصنيف");
+    }
+  }
+
   const mains = categories.filter((c) => c.parentId === null);
   const subsOf = (id: number) => categories.filter((c) => c.parentId === id);
 
@@ -65,7 +78,11 @@ export default function CategoriesPage() {
         }
       />
 
-      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
+      {error && (
+        <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">
+          {error}
+        </p>
+      )}
 
       {loading ? (
         <p className="text-muted">جارِ التحميل…</p>
@@ -92,19 +109,35 @@ export default function CategoriesPage() {
                   >
                     <Plus className="size-4" />
                   </IconBtn>
-                  <IconBtn title="تعديل" onClick={() => setModal({ editing: main, parent: null })}>
+                  <IconBtn
+                    title="تعديل"
+                    onClick={() => setModal({ editing: main, parent: null })}
+                  >
                     <Pencil className="size-4" />
                   </IconBtn>
-                  {main.isActive && (
-                    <IconBtn title="إيقاف" onClick={() => deactivate(main)} danger>
+                  {main.isActive ? (
+                    <IconBtn
+                      title="إيقاف"
+                      onClick={() => deactivate(main)}
+                      danger
+                    >
                       <Ban className="size-4" />
+                    </IconBtn>
+                  ) : (
+                    <IconBtn
+                      title="إعادة التفعيل"
+                      onClick={() => reactivate(main)}
+                    >
+                      <RotateCcw className="size-4" />
                     </IconBtn>
                   )}
                 </div>
               </div>
               <ul className="px-4 py-2">
                 {subsOf(main.id).length === 0 && (
-                  <li className="py-2 text-sm text-muted">لا توجد تصنيفات فرعية</li>
+                  <li className="py-2 text-sm text-muted">
+                    لا توجد تصنيفات فرعية
+                  </li>
                 )}
                 {subsOf(main.id).map((sub) => (
                   <li
@@ -123,9 +156,20 @@ export default function CategoriesPage() {
                       >
                         <Pencil className="size-4" />
                       </IconBtn>
-                      {sub.isActive && (
-                        <IconBtn title="إيقاف" onClick={() => deactivate(sub)} danger>
+                      {sub.isActive ? (
+                        <IconBtn
+                          title="إيقاف"
+                          onClick={() => deactivate(sub)}
+                          danger
+                        >
                           <Ban className="size-4" />
+                        </IconBtn>
+                      ) : (
+                        <IconBtn
+                          title="إعادة التفعيل"
+                          onClick={() => reactivate(sub)}
+                        >
+                          <RotateCcw className="size-4" />
                         </IconBtn>
                       )}
                     </span>
@@ -142,6 +186,7 @@ export default function CategoriesPage() {
           key={modal.editing?.id ?? `new-${modal.parent?.id ?? "main"}`}
           editing={modal.editing}
           parent={modal.parent}
+          categories={categories}
           onClose={() => setModal(null)}
           onSaved={() => {
             setModal(null);
@@ -170,7 +215,9 @@ function IconBtn({
       title={title}
       onClick={onClick}
       className={`rounded-md p-1.5 transition-colors ${
-        danger ? "text-danger hover:bg-danger/10" : "text-muted hover:bg-line/50 hover:text-ink"
+        danger
+          ? "text-danger hover:bg-danger/10"
+          : "text-muted hover:bg-line/50 hover:text-ink"
       }`}
     >
       {children}

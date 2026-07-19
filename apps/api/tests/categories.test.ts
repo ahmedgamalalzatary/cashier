@@ -147,6 +147,42 @@ describe('categories', () => {
     expect(subRow?.isActive).toBeFalsy();
   });
 
+  it('reactivates a main category and then one of its children', async () => {
+    const main = await createCategory('Main');
+    const sub = await createCategory('Child', main.body.id);
+    expect((await api().delete(`/api/categories/${main.body.id}`)).status).toBe(
+      200,
+    );
+
+    const childWhileParentInactive = await api()
+      .put(`/api/categories/${sub.body.id}`)
+      .send({ isActive: true });
+    expect(childWhileParentInactive.status).toBe(400);
+
+    expect(
+      (
+        await api()
+          .put(`/api/categories/${main.body.id}`)
+          .send({ isActive: true })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await api()
+          .put(`/api/categories/${sub.body.id}`)
+          .send({ isActive: true })
+      ).status,
+    ).toBe(200);
+
+    const rows = (await api().get('/api/categories')).body;
+    expect(
+      rows.find((row: { id: number }) => row.id === main.body.id).isActive,
+    ).toBe(true);
+    expect(
+      rows.find((row: { id: number }) => row.id === sub.body.id).isActive,
+    ).toBe(true);
+  });
+
   it('rejects creating a sub under a deactivated main', async () => {
     const main = await createCategory('مخبوزات');
     await api().delete(`/api/categories/${main.body.id}`);

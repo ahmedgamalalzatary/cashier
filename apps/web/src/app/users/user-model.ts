@@ -8,7 +8,7 @@ export type UserFormState = {
 };
 
 export function userRequestBody(form: UserFormState, editing: boolean) {
-  const password = form.password.trim();
+  const password = form.password;
   return {
     name: form.name.trim(),
     username: form.username.trim(),

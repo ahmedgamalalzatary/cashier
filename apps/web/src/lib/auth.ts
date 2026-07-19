@@ -22,6 +22,7 @@ export function readSession(): Session | null {
     }
     return value;
   } catch {
+    window.localStorage.removeItem(SESSION_KEY);
     return null;
   }
 }

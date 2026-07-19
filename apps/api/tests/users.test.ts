@@ -83,6 +83,33 @@ describe("user management", () => {
     ).toBe(200);
   });
 
+  it("invalidates a user's existing token when an admin resets the password", async () => {
+    const adminAuthorization = await loginAs(app(), "admin");
+    const credentials = await createUser("cashier", "reset-target");
+    const login = await request(app())
+      .post("/api/auth/login")
+      .send(credentials);
+    const userAuthorization = {
+      Authorization: `Bearer ${login.body.token}`,
+    };
+    const list = await request(app()).get("/api/users").set(adminAuthorization);
+    const cashier = list.body.find(
+      (user: { username: string }) => user.username === "reset-target",
+    );
+
+    expect(
+      (
+        await request(app())
+          .put(`/api/users/${cashier.id}`)
+          .set(adminAuthorization)
+          .send({ password: "replacement-789" })
+      ).status,
+    ).toBe(200);
+    expect(
+      (await request(app()).get("/api/auth/me").set(userAuthorization)).status,
+    ).toBe(401);
+  });
+
   it("rejects duplicate usernames and cashier access", async () => {
     const adminAuthorization = await loginAs(app(), "admin");
     await createUser("cashier", "existing");

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import { users } from "../../db/schema.js";
 import type { UserInput, UserUpdateInput } from "./users.schemas.js";
@@ -48,6 +48,14 @@ export class UsersRepository {
     id: number,
     data: Omit<UserUpdateInput, "password"> & { passwordHash?: string },
   ) {
-    await this.db.update(users).set(data).where(eq(users.id, id));
+    await this.db
+      .update(users)
+      .set({
+        ...data,
+        ...(data.passwordHash
+          ? { tokenVersion: sql`${users.tokenVersion} + 1` }
+          : {}),
+      })
+      .where(eq(users.id, id));
   }
 }

@@ -17,8 +17,14 @@ describe('seedAdmin', () => {
     const [user] = await db.select().from(users).where(eq(users.role, 'admin'));
 
     expect(result).toBe('created');
-    expect(user).toMatchObject({ name: configuredAdmin.name, username: configuredAdmin.username, role: 'admin' });
-    expect(await bcrypt.compare(configuredAdmin.password, user.passwordHash)).toBe(true);
+    expect(user).toMatchObject({
+      name: configuredAdmin.name,
+      username: configuredAdmin.username,
+      role: 'admin',
+    });
+    expect(
+      await bcrypt.compare(configuredAdmin.password, user.passwordHash),
+    ).toBe(true);
   });
 
   it('updates the existing admin from the configured environment values', async () => {
@@ -26,6 +32,7 @@ describe('seedAdmin', () => {
       name: 'Old admin',
       username: 'old-admin',
       passwordHash: await bcrypt.hash('old-password', 4),
+      tokenVersion: 3,
       role: 'admin',
       isActive: false,
     });
@@ -39,7 +46,31 @@ describe('seedAdmin', () => {
       name: configuredAdmin.name,
       username: configuredAdmin.username,
       isActive: true,
+      tokenVersion: 4,
     });
-    expect(await bcrypt.compare(configuredAdmin.password, rows[0].passwordHash)).toBe(true);
+    expect(
+      await bcrypt.compare(configuredAdmin.password, rows[0].passwordHash),
+    ).toBe(true);
+  });
+
+  it('reports a clear error when another user owns the configured username', async () => {
+    await db.insert(users).values([
+      {
+        name: 'Existing admin',
+        username: 'old-admin',
+        passwordHash: await bcrypt.hash('old-password', 4),
+        role: 'admin',
+      },
+      {
+        name: 'Conflicting cashier',
+        username: configuredAdmin.username,
+        passwordHash: await bcrypt.hash('cashier-password', 4),
+        role: 'cashier',
+      },
+    ]);
+
+    await expect(seedAdmin(db, configuredAdmin)).rejects.toThrow(
+      `Cannot seed admin: username "${configuredAdmin.username}" belongs to another user`,
+    );
   });
 });

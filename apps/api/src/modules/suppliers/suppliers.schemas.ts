@@ -27,16 +27,24 @@ const calendarDate = z
     { message: 'تاريخ غير صالح' },
   );
 
+const optionalText = (maximum: number) =>
+  z.preprocess(
+    (value) =>
+      typeof value === 'string' && value.trim() === '' ? null : value,
+    z.string().trim().min(1).max(maximum).nullish(),
+  );
+
 export const supplierInput = z.object({
   name: z.string().trim().min(1).max(191),
-  phone: z.string().trim().max(50).nullish(),
-  address: z.string().trim().max(255).nullish(),
-  notes: z.string().trim().max(2000).nullish(),
+  phone: optionalText(50),
+  address: optionalText(255),
+  notes: optionalText(2000),
   openingBalance: money(0).default(0),
 });
 
 export const supplierUpdateInput = supplierInput
   .partial()
+  .extend({ isActive: z.boolean().optional() })
   .refine((data) => Object.keys(data).length > 0, {
     message: 'لا توجد بيانات للتعديل',
   });
@@ -44,7 +52,7 @@ export const supplierUpdateInput = supplierInput
 export const paymentInput = z.object({
   amount: money(0.01),
   paidAt: calendarDate,
-  notes: z.string().trim().max(255).nullish(),
+  notes: optionalText(255),
 });
 
 export type SupplierInput = z.infer<typeof supplierInput>;

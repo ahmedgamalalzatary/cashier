@@ -7,6 +7,7 @@ import {
   PackageOpen,
   Pencil,
   Plus,
+  RotateCcw,
   Search,
   TriangleAlert,
   WalletCards,
@@ -18,7 +19,7 @@ import type {
   ItemType,
 } from "@cashier/shared";
 import { api } from "@/lib/api";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, sumDecimalValues } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -88,10 +89,7 @@ export default function WarehousePage() {
   const activeItems = stock.filter((row) => row.isActive).length;
   const lowStock = stock.filter((row) => row.isLowStock).length;
   const negativeStock = stock.filter((row) => row.isNegativeStock).length;
-  const totalValue = stock.reduce(
-    (sum, row) => sum + Number(row.stockValue),
-    0,
-  );
+  const totalValue = sumDecimalValues(stock.map((row) => row.stockValue));
 
   async function deactivate(item: Item) {
     if (!confirm(`إيقاف الصنف "${item.name}"؟ سيظل رصيده ظاهراً في المخزن.`))
@@ -101,6 +99,20 @@ export default function WarehousePage() {
       setReloadKey((current) => current + 1);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "تعذر إيقاف الصنف");
+    }
+  }
+
+  async function reactivate(item: Item) {
+    try {
+      await api(`/api/items/${item.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ isActive: true }),
+      });
+      setReloadKey((current) => current + 1);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "تعذر إعادة تفعيل الصنف",
+      );
     }
   }
 
@@ -266,13 +278,20 @@ export default function WarehousePage() {
                       >
                         <Pencil className="size-4" />
                       </IconButton>
-                      {item.isActive && (
+                      {item.isActive ? (
                         <IconButton
                           title="إيقاف"
                           danger
                           onClick={() => deactivate(item)}
                         >
                           <Ban className="size-4" />
+                        </IconButton>
+                      ) : (
+                        <IconButton
+                          title="إعادة التفعيل"
+                          onClick={() => reactivate(item)}
+                        >
+                          <RotateCcw className="size-4" />
                         </IconButton>
                       )}
                     </div>

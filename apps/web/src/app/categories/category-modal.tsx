@@ -7,6 +7,7 @@ import { Field } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 
 import type { Category } from "@cashier/shared";
+import { categoryParentOptions, categoryUpdateBody } from "./category-model";
 
 export type { Category };
 
@@ -14,15 +15,20 @@ export type { Category };
 export function CategoryFormModal({
   editing,
   parent,
+  categories,
   onClose,
   onSaved,
 }: {
   editing: Category | null;
   parent: Category | null; // when creating a sub, the main it belongs to
+  categories: Category[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [name, setName] = useState(editing?.name ?? "");
+  const [parentId, setParentId] = useState(
+    String(editing?.parentId ?? parent?.id ?? ""),
+  );
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -45,7 +51,7 @@ export function CategoryFormModal({
       if (editing) {
         await api(`/api/categories/${editing.id}`, {
           method: "PUT",
-          body: JSON.stringify({ name: trimmed }),
+          body: JSON.stringify(categoryUpdateBody(trimmed, parentId)),
         });
       } else {
         await api("/api/categories", {
@@ -70,6 +76,27 @@ export function CategoryFormModal({
           onChange={(e) => setName(e.target.value)}
           required
         />
+        {editing && (
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium">التصنيف الرئيسي</span>
+            <select
+              value={parentId}
+              onChange={(event) => setParentId(event.target.value)}
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="">بدون — تصنيف رئيسي</option>
+              {categoryParentOptions(
+                categories,
+                editing.id,
+                editing.parentId,
+              ).map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {error && <p className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end gap-2 pt-1">
           <Button type="button" variant="ghost" onClick={onClose}>

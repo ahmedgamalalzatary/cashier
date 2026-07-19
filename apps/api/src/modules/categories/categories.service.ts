@@ -96,6 +96,13 @@ export class CategoriesService {
           );
         }
       }
+      if (
+        data.isActive === true &&
+        requestedParentId === undefined &&
+        category.parentId !== null
+      ) {
+        this.validateParent(locked.get(category.parentId));
+      }
       await repo.update(id, data);
     });
   }
@@ -107,10 +114,11 @@ export class CategoriesService {
       const category = lockedRows.find((row) => row.id === id);
       if (!category) throw new HttpError(404, 'التصنيف غير موجود');
       const children = lockedRows.filter((row) => row.parentId === id);
-      if (await repo.hasActiveItems(lockedRows.map((row) => row.id))) {
+      const categoryIds = [id, ...children.map((row) => row.id)];
+      if (await repo.hasActiveItems(categoryIds)) {
         throw new HttpError(409, 'لا يمكن إيقاف تصنيف مرتبط بأصناف نشطة');
       }
-      await repo.deactivateMany([id, ...children.map((c) => c.id)]);
+      await repo.deactivateMany(categoryIds);
     });
   }
 }

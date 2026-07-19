@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildHeaders } from "./api";
+import { buildHeaders } from "../../src/lib/api";
 
 describe("buildHeaders", () => {
   it("preserves Headers input and caller precedence", () => {

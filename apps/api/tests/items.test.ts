@@ -95,6 +95,37 @@ describe("items CRUD", () => {
     });
   });
 
+  it("reactivates an item only while its category is active", async () => {
+    const categoryId = await createCategory();
+    const created = await createItem(categoryId);
+    expect(created.status).toBe(201);
+    expect((await api().delete(`/api/items/${created.body.id}`)).status).toBe(
+      200,
+    );
+
+    expect(
+      (
+        await api()
+          .put(`/api/items/${created.body.id}`)
+          .send({ isActive: true })
+      ).status,
+    ).toBe(200);
+
+    expect((await api().delete(`/api/items/${created.body.id}`)).status).toBe(
+      200,
+    );
+    expect((await api().delete(`/api/categories/${categoryId}`)).status).toBe(
+      200,
+    );
+    expect(
+      (
+        await api()
+          .put(`/api/items/${created.body.id}`)
+          .send({ isActive: true })
+      ).status,
+    ).toBe(409);
+  });
+
   it("prevents adding a sub-category beneath a category used by an active item", async () => {
     const categoryId = await createCategory();
     const created = await createItem(categoryId);

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import { users } from "../../db/schema.js";
 
@@ -24,6 +24,12 @@ export class AuthRepository {
   }
 
   async updatePassword(id: number, passwordHash: string) {
-    await this.db.update(users).set({ passwordHash }).where(eq(users.id, id));
+    await this.db
+      .update(users)
+      .set({
+        passwordHash,
+        tokenVersion: sql`${users.tokenVersion} + 1`,
+      })
+      .where(eq(users.id, id));
   }
 }

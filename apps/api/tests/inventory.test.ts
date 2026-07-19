@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { categories, items, stockBatches } from '../src/db/schema.js';
 import { InventoryRepository } from '../src/modules/inventory/inventory.repository.js';
+import type { InventoryRepositoryPort } from '../src/modules/inventory/inventory.repository.js';
 import { InventoryService } from '../src/modules/inventory/inventory.service.js';
 import { db } from './setup.js';
 
@@ -155,5 +156,77 @@ describe('MySQL FIFO inventory', () => {
       .from(stockBatches)
       .where(eq(stockBatches.id, receipt.batchId));
     expect(batch.remainingQuantity).toBe('2.000');
+  });
+
+  it('serializes concurrent receipts while allocating an outstanding deficit', async () => {
+    await service.consume({
+      itemId,
+      warehouse: 'cafe',
+      quantity: 1,
+      movementType: 'sale',
+      allowNegative: true,
+    });
+
+    let deficitReads = 0;
+    const delayFirstDeficitRead = (repo: InventoryRepositoryPort) =>
+      new Proxy(repo, {
+        get(target, property, receiver) {
+          if (property === 'outstandingDeficits') {
+            return async (
+              ...args: Parameters<typeof target.outstandingDeficits>
+            ) => {
+              const rows = await target.outstandingDeficits(...args);
+              deficitReads += 1;
+              if (deficitReads === 1) {
+                await new Promise((resolve) => setTimeout(resolve, 100));
+              }
+              return rows;
+            };
+          }
+          const value = Reflect.get(target, property, receiver);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    const repository = new InventoryRepository(db);
+    const concurrentService = new InventoryService(
+      new Proxy(repository, {
+        get(target, property, receiver) {
+          if (property === 'transaction') {
+            return <T>(run: (repo: InventoryRepositoryPort) => Promise<T>) =>
+              target.transaction((repo) => run(delayFirstDeficitRead(repo)));
+          }
+          const value = Reflect.get(target, property, receiver);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      }),
+    );
+
+    const receipts = await Promise.all([
+      concurrentService.receive({
+        itemId,
+        warehouse: 'cafe',
+        quantity: 1,
+        unitCost: '8',
+        movementType: 'transfer_in',
+      }),
+      concurrentService.receive({
+        itemId,
+        warehouse: 'cafe',
+        quantity: 1,
+        unitCost: '9',
+        movementType: 'transfer_in',
+      }),
+    ]);
+
+    expect(
+      receipts.flatMap((receipt) => receipt.deficitAllocations),
+    ).toHaveLength(1);
+    const batches = await db.select().from(stockBatches);
+    expect(
+      batches.reduce(
+        (total, batch) => total + Number(batch.remainingQuantity),
+        0,
+      ),
+    ).toBe(1);
   });
 });

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
+import { changePasswordAndRefreshSession } from "./change-password";
 
 export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const [saving, setSaving] = useState(false);
@@ -22,10 +22,7 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
     }
     setSaving(true);
     try {
-      await api("/api/auth/password", {
-        method: "PUT",
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
+      await changePasswordAndRefreshSession(currentPassword, newPassword);
       onClose();
     } catch (cause) {
       setError(

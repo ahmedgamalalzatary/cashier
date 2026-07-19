@@ -5,7 +5,7 @@ import {
   eligibleItemCategories,
   filterStockRows,
   stockMeaningFieldsLocked,
-} from "./warehouse-model";
+} from "../../../src/app/warehouse/warehouse-model";
 
 const categories: Category[] = [
   { id: 1, name: "خامات", parentId: null, isActive: true, createdAt: "" },

@@ -136,7 +136,8 @@ export class InventoryRepository implements InventoryRepositoryPort {
           sql`${remainingQuantity} > 0`,
         ),
       )
-      .orderBy(stockMovements.occurredAt, stockMovements.id);
+      .orderBy(stockMovements.occurredAt, stockMovements.id)
+      .for("update");
   }
 
   async createDeficitAllocation(data: StockDeficitAllocationWrite) {
