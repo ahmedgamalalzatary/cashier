@@ -1,6 +1,6 @@
 # Docker operations runbook
 
-MiniKoshk runs as the `minikoshk` Compose project with four services:
+MiniKoshk runs as the `cashier-app` Compose project with four services:
 
 - `web`: Next.js on `127.0.0.1:3010`
 - `api`: Express on `127.0.0.1:4010`
