@@ -75,6 +75,22 @@ describe('categories', () => {
     expect(res.status).toBe(400);
   });
 
+  it('serializes simultaneous inverse moves without deadlocking', async () => {
+    const a = await createCategory('أ');
+    const b = await createCategory('ب');
+
+    const results = await Promise.all([
+      api().put(`/api/categories/${a.body.id}`).send({ parentId: b.body.id }),
+      api().put(`/api/categories/${b.body.id}`).send({ parentId: a.body.id }),
+    ]);
+
+    expect(results.map((result) => result.status).sort()).toEqual([200, 400]);
+    const rows: Array<{ id: number; parentId: number | null }> = (await api().get('/api/categories')).body;
+    const rowA = rows.find((row) => row.id === a.body.id);
+    const rowB = rows.find((row) => row.id === b.body.id);
+    expect(rowA?.parentId === b.body.id && rowB?.parentId === a.body.id).toBe(false);
+  });
+
   it('deactivating a main deactivates its subs', async () => {
     const main = await createCategory('مثلجات');
     const sub = await createCategory('آيس كريم', main.body.id);

@@ -19,7 +19,7 @@ export function createApp(db: Db) {
   app.use('/api/auth', createAuthModule(db));
 
   // admin-only sections per spec §2 permission matrix
-  const adminOnly = [authenticate, requireRole('admin')] as const;
+  const adminOnly = [authenticate(db), requireRole('admin')] as const;
   app.use('/api/suppliers', ...adminOnly, createSuppliersModule(db));
   app.use('/api/categories', ...adminOnly, createCategoriesModule(db));
 

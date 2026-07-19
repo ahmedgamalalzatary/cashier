@@ -32,6 +32,19 @@ export function writeSession(session: Session | null) {
   window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 }
 
+export function subscribeToSessionChanges(listener: () => void) {
+  if (typeof window === "undefined") return () => {};
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === SESSION_KEY) listener();
+  };
+  window.addEventListener(AUTH_CHANGED_EVENT, listener);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener(AUTH_CHANGED_EVENT, listener);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
 export function canOpenPath(role: Role, pathname: string) {
   const adminPaths = ["/categories", "/warehouse", "/suppliers", "/employees", "/salaries", "/reports"];
   return role === "admin" || !adminPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`));

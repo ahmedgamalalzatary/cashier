@@ -39,6 +39,22 @@ describe('authentication', () => {
     expect(response.body).toMatchObject({ name: 'كاشير', role: 'cashier' });
   });
 
+  it('rejects a valid token after its user is deactivated', async () => {
+    const authorization = await loginAs(app(), 'cashier');
+    await db.update(users).set({ isActive: false });
+
+    const response = await request(app()).get('/api/auth/me').set(authorization);
+    expect(response.status).toBe(401);
+  });
+
+  it('rejects a valid token after its user is removed', async () => {
+    const authorization = await loginAs(app(), 'cashier');
+    await db.delete(users);
+
+    const response = await request(app()).get('/api/auth/me').set(authorization);
+    expect(response.status).toBe(401);
+  });
+
   it('rejects missing and invalid bearer tokens', async () => {
     expect((await request(app()).get('/api/auth/me')).status).toBe(401);
     expect((await request(app()).get('/api/auth/me').set('Authorization', 'Bearer invalid')).status).toBe(401);

@@ -10,13 +10,16 @@ export class CategoriesService {
   }
 
   // locks the parent row so it can't be deactivated/re-parented mid-operation
-  private async assertValidParent(repo: CategoriesRepository, parentId: number) {
-    const parent = await repo.findByIdForUpdate(parentId);
+  private validateParent(parent: Awaited<ReturnType<CategoriesRepository['findByIdForUpdate']>> | undefined) {
     if (!parent) throw new HttpError(400, 'التصنيف الرئيسي غير موجود');
     if (!parent.isActive) throw new HttpError(400, 'التصنيف الرئيسي موقوف');
     if (parent.parentId !== null)
       throw new HttpError(400, 'مستويان فقط: لا يمكن إضافة فرعي تحت تصنيف فرعي');
     return parent;
+  }
+
+  private async assertValidParent(repo: CategoriesRepository, parentId: number) {
+    return this.validateParent(await repo.findByIdForUpdate(parentId));
   }
 
   create(data: CategoryInput) {
@@ -28,14 +31,19 @@ export class CategoriesService {
 
   update(id: number, data: CategoryUpdateInput) {
     return this.repo.transaction(async (repo) => {
-      const category = await repo.findByIdForUpdate(id);
+      const requestedParentId = data.parentId;
+      const locked = new Map<number, Awaited<ReturnType<CategoriesRepository['findByIdForUpdate']>>>();
+      const idsToLock = requestedParentId != null ? [...new Set([id, requestedParentId])].sort((a, b) => a - b) : [id];
+      for (const categoryId of idsToLock) locked.set(categoryId, await repo.findByIdForUpdate(categoryId));
+
+      const category = locked.get(id);
       if (!category) throw new HttpError(404, 'التصنيف غير موجود');
-      if (data.parentId !== undefined && data.parentId !== null) {
-        if (data.parentId === id) throw new HttpError(400, 'لا يمكن جعل التصنيف تابعاً لنفسه');
+      if (requestedParentId != null) {
+        if (requestedParentId === id) throw new HttpError(400, 'لا يمكن جعل التصنيف تابعاً لنفسه');
         const children = await repo.childrenForUpdate(id);
         if (children.length > 0)
           throw new HttpError(400, 'لا يمكن نقل تصنيف رئيسي له فروع تحت تصنيف آخر');
-        await this.assertValidParent(repo, data.parentId);
+        this.validateParent(locked.get(requestedParentId));
       }
       await repo.update(id, data);
     });

@@ -8,5 +8,5 @@ export function createAuthModule(db: Db) {
   const repository = new AuthRepository(db);
   const service = new AuthService(repository);
   const controller = new AuthController(service);
-  return authRouter(controller);
+  return authRouter(controller, db);
 }

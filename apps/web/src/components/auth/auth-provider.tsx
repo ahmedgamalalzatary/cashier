@@ -4,9 +4,9 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import {
-  AUTH_CHANGED_EVENT,
   canOpenPath,
   readSession,
+  subscribeToSessionChanges,
   writeSession,
   type AuthUser,
   type Session,
@@ -28,8 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const sync = () => setSession(readSession());
     sync();
-    window.addEventListener(AUTH_CHANGED_EVENT, sync);
-    return () => window.removeEventListener(AUTH_CHANGED_EVENT, sync);
+    return subscribeToSessionChanges(sync);
   }, []);
 
   useEffect(() => {
