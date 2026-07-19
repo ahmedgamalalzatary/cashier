@@ -1,7 +1,11 @@
 import { eq, sql } from 'drizzle-orm';
 import type { Db } from '../../db/index.js';
 import { supplierPayments, suppliers } from '../../db/schema.js';
-import type { PaymentInput, SupplierInput, SupplierUpdateInput } from './suppliers.schemas.js';
+import type {
+  PaymentInput,
+  SupplierInput,
+  SupplierUpdateInput,
+} from './suppliers.schemas.js';
 
 // balance = opening balance + purchase credit (later) − payments.
 // Qualified names are spelled out because drizzle strips table prefixes
@@ -25,13 +29,43 @@ const supplierColumns = {
 export class SuppliersRepository {
   constructor(private db: Db) {}
 
+  transaction<T>(fn: (repo: SuppliersRepository) => Promise<T>): Promise<T> {
+    return this.db.transaction((tx) =>
+      fn(new SuppliersRepository(tx as unknown as Db)),
+    );
+  }
+
   list() {
-    return this.db.select(supplierColumns).from(suppliers).orderBy(suppliers.name);
+    return this.db
+      .select(supplierColumns)
+      .from(suppliers)
+      .orderBy(suppliers.name);
   }
 
   async findById(id: number) {
-    const [row] = await this.db.select(supplierColumns).from(suppliers).where(eq(suppliers.id, id));
+    const [row] = await this.db
+      .select(supplierColumns)
+      .from(suppliers)
+      .where(eq(suppliers.id, id));
     return row;
+  }
+
+  async findByIdForUpdate(id: number) {
+    const [row] = await this.db
+      .select(supplierColumns)
+      .from(suppliers)
+      .where(eq(suppliers.id, id))
+      .for('update');
+    return row;
+  }
+
+  async hasPayments(supplierId: number) {
+    const [row] = await this.db
+      .select({ id: supplierPayments.id })
+      .from(supplierPayments)
+      .where(eq(supplierPayments.supplierId, supplierId))
+      .limit(1);
+    return Boolean(row);
   }
 
   async create(data: SupplierInput) {
@@ -47,7 +81,9 @@ export class SuppliersRepository {
       .update(suppliers)
       .set({
         ...rest,
-        ...(openingBalance !== undefined ? { openingBalance: openingBalance.toFixed(2) } : {}),
+        ...(openingBalance !== undefined
+          ? { openingBalance: openingBalance.toFixed(2) }
+          : {}),
       })
       .where(eq(suppliers.id, id));
     return result.affectedRows > 0;

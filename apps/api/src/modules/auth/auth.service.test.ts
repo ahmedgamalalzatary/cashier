@@ -5,11 +5,19 @@ import { AuthService } from './auth.service.js';
 
 describe('AuthService credential work', () => {
   it('compares unknown users against a production-cost dummy hash', async () => {
-    const repo = { findByUsername: vi.fn().mockResolvedValue(undefined) } as unknown as AuthRepository;
+    const repo = {
+      findByUsername: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AuthRepository;
     const compare = vi.fn().mockResolvedValue(false);
-    const service = Reflect.construct(AuthService, [repo, compare]) as AuthService;
+    const service = new AuthService(
+      repo,
+      'test-only-jwt-secret-at-least-32-characters',
+      compare,
+    );
 
-    await expect(service.login({ username: 'missing', password: 'guess' })).rejects.toMatchObject({ status: 401 });
+    await expect(
+      service.login({ username: 'missing', password: 'guess' }),
+    ).rejects.toMatchObject({ status: 401 });
     expect(compare).toHaveBeenCalledOnce();
     expect(bcrypt.getRounds(compare.mock.calls[0][1])).toBe(10);
   });
@@ -27,9 +35,15 @@ describe('AuthService credential work', () => {
       }),
     } as unknown as AuthRepository;
     const compare = vi.fn().mockResolvedValue(true);
-    const service = Reflect.construct(AuthService, [repo, compare]) as AuthService;
+    const service = new AuthService(
+      repo,
+      'test-only-jwt-secret-at-least-32-characters',
+      compare,
+    );
 
-    await expect(service.login({ username: 'inactive', password: 'secret123' })).rejects.toMatchObject({ status: 401 });
+    await expect(
+      service.login({ username: 'inactive', password: 'secret123' }),
+    ).rejects.toMatchObject({ status: 401 });
     expect(compare).toHaveBeenCalledWith('secret123', storedHash);
   });
 });

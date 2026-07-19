@@ -7,19 +7,37 @@ import { createAuthModule } from './modules/auth/auth.module.js';
 import { createSuppliersModule } from './modules/suppliers/suppliers.module.js';
 import { createCategoriesModule } from './modules/categories/categories.module.js';
 
-export function createApp(db: Db) {
+export type AppOptions = {
+  jwtSecret: string;
+  corsOrigin: string;
+  trustProxy?: boolean;
+};
+
+export function createApp(
+  db: Db,
+  { jwtSecret, corsOrigin, trustProxy = false }: AppOptions,
+) {
   const app = express();
-  app.use(cors());
+  app.set('trust proxy', trustProxy ? 1 : false);
+  app.use(
+    cors({
+      origin: (origin, callback) =>
+        callback(null, !origin || origin === corsOrigin),
+    }),
+  );
   app.use(express.json());
 
   app.get('/health', (_req, res) => {
     res.json({ ok: true });
   });
 
-  app.use('/api/auth', createAuthModule(db));
+  app.use('/api/auth', createAuthModule(db, jwtSecret));
 
   // admin-only sections per spec §2 permission matrix
-  const adminOnly = [authenticate(db), requireRole('admin')] as const;
+  const adminOnly = [
+    authenticate(db, jwtSecret),
+    requireRole('admin'),
+  ] as const;
   app.use('/api/suppliers', ...adminOnly, createSuppliersModule(db));
   app.use('/api/categories', ...adminOnly, createCategoriesModule(db));
 

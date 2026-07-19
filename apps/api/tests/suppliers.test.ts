@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
-import { db } from './setup.js';
+import { appOptions, db } from './setup.js';
 import { loginAs } from './helpers.js';
 
-const app = () => createApp(db);
+const app = () => createApp(db, appOptions);
 let authorization: { readonly Authorization: string };
 const api = () => ({
   get: (url: string) => request(app()).get(url).set(authorization),
@@ -20,7 +20,12 @@ beforeEach(async () => {
 async function createSupplier(overrides = {}) {
   const res = await api()
     .post('/api/suppliers')
-    .send({ name: 'مورد الألبان', phone: '01000000000', openingBalance: 500, ...overrides });
+    .send({
+      name: 'مورد الألبان',
+      phone: '01000000000',
+      openingBalance: 500,
+      ...overrides,
+    });
   return res;
 }
 
@@ -44,7 +49,9 @@ describe('suppliers CRUD', () => {
 
   it('updates a supplier', async () => {
     const { body } = await createSupplier();
-    const res = await api().put(`/api/suppliers/${body.id}`).send({ name: 'مورد جديد' });
+    const res = await api()
+      .put(`/api/suppliers/${body.id}`)
+      .send({ name: 'مورد جديد' });
     expect(res.status).toBe(200);
     const list = await api().get('/api/suppliers');
     expect(list.body[0].name).toBe('مورد جديد');

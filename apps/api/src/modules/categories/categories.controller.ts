@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import type { CategoriesService } from './categories.service.js';
 import { categoryInput, categoryUpdateInput } from './categories.schemas.js';
-import { idParam } from '../suppliers/suppliers.schemas.js';
+import { idParam } from '../../middleware/validation.js';
 
 export class CategoriesController {
   constructor(private service: CategoriesService) {}
@@ -16,7 +16,10 @@ export class CategoriesController {
   };
 
   update = async (req: Request, res: Response) => {
-    await this.service.update(idParam.parse(req.params.id), categoryUpdateInput.parse(req.body));
+    await this.service.update(
+      idParam.parse(req.params.id),
+      categoryUpdateInput.parse(req.body),
+    );
     res.json({ ok: true });
   };
 

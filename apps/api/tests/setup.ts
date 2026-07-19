@@ -6,19 +6,33 @@ import { beforeAll, beforeEach } from 'vitest';
 import { createDb } from '../src/db/index.js';
 
 // fail closed: tests truncate tables, so never fall back to the dev DATABASE_URL
-const loaded = config({ path: path.resolve(import.meta.dirname, '../../../.env.test'), override: true });
-if (loaded.error) throw new Error('.env.test not found at repo root — refusing to run destructive test setup');
+const loaded = config({
+  path: path.resolve(import.meta.dirname, '../../../.env.test'),
+  override: true,
+});
+if (loaded.error)
+  throw new Error(
+    '.env.test not found at repo root — refusing to run destructive test setup',
+  );
 const testUrl = process.env.DATABASE_URL;
 const dbName = testUrl ? new URL(testUrl).pathname.replace(/^\//, '') : '';
-if (!dbName.includes('test')) {
-  throw new Error(`DATABASE_URL in .env.test must point to a test database (got "${dbName}")`);
+if (!/(^test_|_test$)/i.test(dbName)) {
+  throw new Error(
+    `DATABASE_URL in .env.test must point to a database named test_* or *_test (got "${dbName}")`,
+  );
 }
 process.env.JWT_SECRET = 'test-only-jwt-secret-at-least-32-characters';
 
 export const db = createDb(testUrl!);
+export const appOptions = {
+  jwtSecret: process.env.JWT_SECRET,
+  corsOrigin: 'http://localhost:3000',
+};
 
 beforeAll(async () => {
-  await migrate(db, { migrationsFolder: path.resolve(import.meta.dirname, '../drizzle') });
+  await migrate(db, {
+    migrationsFolder: path.resolve(import.meta.dirname, '../drizzle'),
+  });
 });
 
 beforeEach(async () => {

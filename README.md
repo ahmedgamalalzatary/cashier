@@ -23,7 +23,7 @@ packages/
 
 ```bash
 pnpm install
-cp apps/api/.env.example apps/api/.env   # then edit DATABASE_URL, JWT_SECRET
+cp .env.example .env   # then edit DATABASE_URL, JWT_SECRET and deployment origins
 ```
 
 ## Commands (run from repo root — build/lint/test/typecheck go through Turborepo)

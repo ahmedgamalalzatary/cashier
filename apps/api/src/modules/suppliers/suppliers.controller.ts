@@ -1,6 +1,11 @@
 import type { Request, Response } from 'express';
 import type { SuppliersService } from './suppliers.service.js';
-import { idParam, paymentInput, supplierInput, supplierUpdateInput } from './suppliers.schemas.js';
+import {
+  paymentInput,
+  supplierInput,
+  supplierUpdateInput,
+} from './suppliers.schemas.js';
+import { idParam } from '../../middleware/validation.js';
 
 export class SuppliersController {
   constructor(private service: SuppliersService) {}
@@ -19,7 +24,10 @@ export class SuppliersController {
   };
 
   update = async (req: Request, res: Response) => {
-    await this.service.update(idParam.parse(req.params.id), supplierUpdateInput.parse(req.body));
+    await this.service.update(
+      idParam.parse(req.params.id),
+      supplierUpdateInput.parse(req.body),
+    );
     res.json({ ok: true });
   };
 

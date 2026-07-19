@@ -1,9 +1,13 @@
-import './env.js';
+import { loadRuntimeEnv } from './env.js';
 import { createApp } from './app.js';
 import { createDb } from './db/index.js';
 
-const port = Number(process.env.PORT) || 4000;
+const environment = loadRuntimeEnv();
 
-createApp(createDb()).listen(port, () => {
-  console.log(`API listening on http://localhost:${port}`);
+createApp(createDb(environment.DATABASE_URL), {
+  jwtSecret: environment.JWT_SECRET,
+  corsOrigin: environment.CORS_ORIGIN,
+  trustProxy: environment.TRUST_PROXY,
+}).listen(environment.PORT, () => {
+  console.log(`API listening on http://localhost:${environment.PORT}`);
 });

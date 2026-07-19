@@ -1,6 +1,10 @@
 import { HttpError } from '../../middleware/error.js';
 import type { SuppliersRepository } from './suppliers.repository.js';
-import type { PaymentInput, SupplierInput, SupplierUpdateInput } from './suppliers.schemas.js';
+import type {
+  PaymentInput,
+  SupplierInput,
+  SupplierUpdateInput,
+} from './suppliers.schemas.js';
 
 export class SuppliersService {
   constructor(private repo: SuppliersRepository) {}
@@ -20,8 +24,17 @@ export class SuppliersService {
   }
 
   async update(id: number, data: SupplierUpdateInput) {
-    const ok = await this.repo.update(id, data);
-    if (!ok) throw new HttpError(404, 'المورد غير موجود');
+    return this.repo.transaction(async (repo) => {
+      const supplier = await repo.findByIdForUpdate(id);
+      if (!supplier) throw new HttpError(404, 'المورد غير موجود');
+      if (data.openingBalance !== undefined && (await repo.hasPayments(id))) {
+        throw new HttpError(
+          409,
+          'لا يمكن تعديل الرصيد الافتتاحي بعد تسجيل دفعة',
+        );
+      }
+      await repo.update(id, data);
+    });
   }
 
   async deactivate(id: number) {
@@ -30,8 +43,11 @@ export class SuppliersService {
   }
 
   async addPayment(supplierId: number, data: PaymentInput) {
-    await this.getOrFail(supplierId);
-    return this.repo.createPayment(supplierId, data);
+    return this.repo.transaction(async (repo) => {
+      const supplier = await repo.findByIdForUpdate(supplierId);
+      if (!supplier) throw new HttpError(404, 'المورد غير موجود');
+      return repo.createPayment(supplierId, data);
+    });
   }
 
   async statement(supplierId: number) {

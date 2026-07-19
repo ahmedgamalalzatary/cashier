@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
-import { db } from './setup.js';
+import { appOptions, db } from './setup.js';
 import { loginAs } from './helpers.js';
 
-const app = () => createApp(db);
+const app = () => createApp(db, appOptions);
 let authorization: { readonly Authorization: string };
 const api = () => ({
   get: (url: string) => request(app()).get(url).set(authorization),
@@ -85,10 +85,53 @@ describe('categories', () => {
     ]);
 
     expect(results.map((result) => result.status).sort()).toEqual([200, 400]);
-    const rows: Array<{ id: number; parentId: number | null }> = (await api().get('/api/categories')).body;
+    const rows: Array<{ id: number; parentId: number | null }> = (
+      await api().get('/api/categories')
+    ).body;
     const rowA = rows.find((row) => row.id === a.body.id);
     const rowB = rows.find((row) => row.id === b.body.id);
-    expect(rowA?.parentId === b.body.id && rowB?.parentId === a.body.id).toBe(false);
+    expect(rowA).toBeDefined();
+    expect(rowB).toBeDefined();
+    expect(
+      [
+        rowA!.parentId === b.body.id && rowB!.parentId === null,
+        rowB!.parentId === a.body.id && rowA!.parentId === null,
+      ].filter(Boolean),
+    ).toHaveLength(1);
+  });
+
+  it('serializes child updates with deactivation when the child id is lower', async () => {
+    const child = await createCategory('فرع مبكر');
+    const parent = await createCategory('رئيسي متأخر');
+    expect(
+      (
+        await api()
+          .put(`/api/categories/${child.body.id}`)
+          .send({ parentId: parent.body.id })
+      ).status,
+    ).toBe(200);
+
+    const [update, deactivate] = await Promise.all([
+      api()
+        .put(`/api/categories/${child.body.id}`)
+        .send({ parentId: parent.body.id }),
+      api().delete(`/api/categories/${parent.body.id}`),
+    ]);
+
+    expect([200, 400]).toContain(update.status);
+    expect(deactivate.status).toBe(200);
+    const rows: Array<{
+      id: number;
+      parentId: number | null;
+      isActive: boolean;
+    }> = (await api().get('/api/categories')).body;
+    const childRow = rows.find((row) => row.id === child.body.id);
+    const parentRow = rows.find((row) => row.id === parent.body.id);
+    expect(childRow).toMatchObject({
+      parentId: parent.body.id,
+      isActive: false,
+    });
+    expect(parentRow).toMatchObject({ parentId: null, isActive: false });
   });
 
   it('deactivating a main deactivates its subs', async () => {

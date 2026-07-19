@@ -9,7 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
-import { SupplierFormModal, PaymentModal, type Supplier } from "./supplier-modals";
+import {
+  SupplierFormModal,
+  PaymentModal,
+  type Supplier,
+} from "./supplier-modals";
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -67,7 +71,11 @@ export default function SuppliersPage() {
         }
       />
 
-      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
+      {error && (
+        <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">
+          {error}
+        </p>
+      )}
 
       {loading ? (
         <p className="text-muted">جارِ التحميل…</p>
@@ -76,13 +84,21 @@ export default function SuppliersPage() {
           لا يوجد موردون بعد — أضف أول مورد بزر «مورد جديد».
         </p>
       ) : (
-        <Table headers={["المورد", "الهاتف", "الرصيد المستحق", "الحالة", "إجراءات"]}>
+        <Table
+          headers={["المورد", "الهاتف", "الرصيد المستحق", "الحالة", "إجراءات"]}
+        >
           {suppliers.map((s) => (
             <tr key={s.id} className={s.isActive ? "" : "opacity-50"}>
               <td className="px-4 py-3 font-medium">{s.name}</td>
               <td className="px-4 py-3 tnum">{s.phone || "—"}</td>
               <td className="px-4 py-3 tnum">
-                <span className={Number(s.balance) > 0 ? "text-danger font-medium" : "text-success"}>
+                <span
+                  className={
+                    Number(s.balance) > 0
+                      ? "text-danger font-medium"
+                      : "text-success"
+                  }
+                >
                   {formatMoney(s.balance)}
                 </span>
               </td>
@@ -100,7 +116,10 @@ export default function SuppliersPage() {
                   >
                     <FileText className="size-4" />
                   </Link>
-                  <IconBtn title="تسجيل دفعة" onClick={() => setPayingSupplier(s)}>
+                  <IconBtn
+                    title="تسجيل دفعة"
+                    onClick={() => setPayingSupplier(s)}
+                  >
                     <HandCoins className="size-4" />
                   </IconBtn>
                   <IconBtn
@@ -163,10 +182,13 @@ function IconBtn({
 }) {
   return (
     <button
+      type="button"
       title={title}
       onClick={onClick}
       className={`rounded-md p-1.5 transition-colors ${
-        danger ? "text-danger hover:bg-danger/10" : "text-muted hover:bg-line/50 hover:text-ink"
+        danger
+          ? "text-danger hover:bg-danger/10"
+          : "text-muted hover:bg-line/50 hover:text-ink"
       }`}
     >
       {children}

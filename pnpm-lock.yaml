@@ -17,6 +17,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@cashier/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       bcryptjs:
         specifier: ^3.0.2
         version: 3.0.3

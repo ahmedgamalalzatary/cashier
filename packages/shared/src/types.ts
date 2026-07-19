@@ -1,5 +1,18 @@
 // API response shapes shared between apps/api and apps/web
 
+export type Role = 'admin' | 'cashier';
+
+export type AuthUser = {
+  id: number;
+  name: string;
+  role: Role;
+};
+
+export type Session = {
+  token: string;
+  user: AuthUser;
+};
+
 export type Supplier = {
   id: number;
   name: string;
