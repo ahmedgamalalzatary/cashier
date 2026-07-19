@@ -43,8 +43,12 @@ export default function SuppliersPage() {
 
   async function deactivate(s: Supplier) {
     if (!confirm(`إيقاف التعامل مع "${s.name}"؟`)) return;
-    await api(`/api/suppliers/${s.id}`, { method: "DELETE" });
-    reload();
+    try {
+      await api(`/api/suppliers/${s.id}`, { method: "DELETE" });
+      reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "تعذر إيقاف المورد");
+    }
   }
 
   return (

@@ -46,6 +46,12 @@ describe('suppliers CRUD', () => {
     expect(list.body[0].isActive).toBeFalsy();
   });
 
+  it('rejects an empty update body', async () => {
+    const { body } = await createSupplier();
+    const res = await request(app()).put(`/api/suppliers/${body.id}`).send({});
+    expect(res.status).toBe(400);
+  });
+
   it('404s on missing supplier', async () => {
     const res = await request(app()).put('/api/suppliers/999').send({ name: 'x' });
     expect(res.status).toBe(404);
@@ -67,6 +73,13 @@ describe('supplier payments & statement', () => {
 
     const list = await request(app()).get('/api/suppliers');
     expect(Number(list.body[0].balance)).toBe(300);
+  });
+
+  it('rejects an amount with more than two fractional digits', async () => {
+    const res = await request(app())
+      .post(`/api/suppliers/${supplierId}/payments`)
+      .send({ amount: 0.004, paidAt: '2026-07-19' });
+    expect(res.status).toBe(400);
   });
 
   it('rejects a non-positive payment', async () => {

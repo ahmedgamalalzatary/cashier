@@ -5,9 +5,16 @@ import { sql } from 'drizzle-orm';
 import { beforeAll, beforeEach } from 'vitest';
 import { createDb } from '../src/db/index.js';
 
-config({ path: path.resolve(import.meta.dirname, '../../../.env.test'), override: true });
+// fail closed: tests truncate tables, so never fall back to the dev DATABASE_URL
+const loaded = config({ path: path.resolve(import.meta.dirname, '../../../.env.test'), override: true });
+if (loaded.error) throw new Error('.env.test not found at repo root — refusing to run destructive test setup');
+const testUrl = process.env.DATABASE_URL;
+const dbName = testUrl ? new URL(testUrl).pathname.replace(/^\//, '') : '';
+if (!dbName.includes('test')) {
+  throw new Error(`DATABASE_URL in .env.test must point to a test database (got "${dbName}")`);
+}
 
-export const db = createDb(process.env.DATABASE_URL!);
+export const db = createDb(testUrl!);
 
 beforeAll(async () => {
   await migrate(db, { migrationsFolder: path.resolve(import.meta.dirname, '../drizzle') });

@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { InputHTMLAttributes, TextareaHTMLAttributes } from "react";
 
 const inputCls =
@@ -8,11 +9,21 @@ export function Field({
   error,
   ...props
 }: InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string }) {
+  const errorId = useId();
   return (
     <label className="block space-y-1.5">
       <span className="text-sm font-medium">{label}</span>
-      <input className={inputCls} {...props} />
-      {error && <span className="text-xs text-danger">{error}</span>}
+      <input
+        className={inputCls}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        {...props}
+      />
+      {error && (
+        <span id={errorId} className="text-xs text-danger">
+          {error}
+        </span>
+      )}
     </label>
   );
 }

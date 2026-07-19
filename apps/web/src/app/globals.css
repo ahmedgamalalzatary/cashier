@@ -4,7 +4,7 @@
   --paper: #f7f4ef;
   --surface: #ffffff;
   --ink: #2b2118;
-  --muted: #8a7b6c;
+  --muted: #6b5d4f; /* ≥4.5:1 on --surface and --paper */
   --border: #e7dfd4;
   --primary: #a05c17;
   --primary-strong: #814a10;

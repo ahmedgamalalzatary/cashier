@@ -10,9 +10,10 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: keyof typeof variants;
 };
 
-export function Button({ variant = "primary", className = "", ...props }: Props) {
+export function Button({ variant = "primary", className = "", type = "button", ...props }: Props) {
   return (
     <button
+      type={type}
       className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${className}`}
       {...props}
     />
