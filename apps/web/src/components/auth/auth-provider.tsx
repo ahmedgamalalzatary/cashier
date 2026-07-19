@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { login as loginRequest } from "@/services/auth-service";
 import {
   canOpenPath,
   loginPathFor,
@@ -50,10 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [pathname, router, session]);
 
   async function login(username: string, password: string) {
-    const next = await api<Session>("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ username, password }),
-    });
+    const next = await loginRequest(username, password);
     writeSession(next);
     setSession(next);
     router.replace(postLoginPath(window.location.search, next.user.role));

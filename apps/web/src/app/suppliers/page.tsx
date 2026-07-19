@@ -10,18 +10,21 @@ import {
   FileText,
   RotateCcw,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import type { Supplier } from "@cashier/shared";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { IconButton as IconBtn } from "@/components/ui/icon-button";
 import { Table } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
+import { SupplierFormModal } from "@/components/suppliers/supplier-form-modal";
+import { PaymentModal } from "@/components/suppliers/payment-modal";
+import { supplierBalanceClass } from "@/models/supplier-model";
 import {
-  SupplierFormModal,
-  PaymentModal,
-  type Supplier,
-} from "./supplier-modals";
-import { supplierBalanceClass } from "./supplier-model";
+  deactivateSupplier,
+  listSuppliers,
+  reactivateSupplier,
+} from "@/services/suppliers-service";
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -36,7 +39,7 @@ export default function SuppliersPage() {
 
   useEffect(() => {
     let cancelled = false;
-    api<Supplier[]>("/api/suppliers")
+    listSuppliers()
       .then((rows) => {
         if (cancelled) return;
         setSuppliers(rows);
@@ -56,7 +59,7 @@ export default function SuppliersPage() {
   async function deactivate(s: Supplier) {
     if (!confirm(`إيقاف التعامل مع "${s.name}"؟`)) return;
     try {
-      await api(`/api/suppliers/${s.id}`, { method: "DELETE" });
+      await deactivateSupplier(s.id);
       reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "تعذر إيقاف المورد");
@@ -65,10 +68,7 @@ export default function SuppliersPage() {
 
   async function reactivate(s: Supplier) {
     try {
-      await api(`/api/suppliers/${s.id}`, {
-        method: "PUT",
-        body: JSON.stringify({ isActive: true }),
-      });
+      await reactivateSupplier(s.id);
       reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "تعذر إعادة تفعيل المورد");
@@ -187,32 +187,5 @@ export default function SuppliersPage() {
         />
       )}
     </div>
-  );
-}
-
-function IconBtn({
-  title,
-  onClick,
-  danger,
-  children,
-}: {
-  title: string;
-  onClick?: () => void;
-  danger?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      className={`rounded-md p-1.5 transition-colors ${
-        danger
-          ? "text-danger hover:bg-danger/10"
-          : "text-muted hover:bg-line/50 hover:text-ink"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

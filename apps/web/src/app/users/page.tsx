@@ -8,9 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table } from "@/components/ui/table";
-import { api } from "@/lib/api";
-import { UserModal } from "./user-modal";
-import { IconButton } from "./icon-button";
+import { IconButton } from "@/components/ui/icon-button";
+import { UserModal } from "@/components/users/user-modal";
+import { listUsers, setUserActive } from "@/services/users-service";
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
@@ -23,7 +23,7 @@ export default function UsersPage() {
 
   useEffect(() => {
     let cancelled = false;
-    api<ManagedUser[]>("/api/users")
+    listUsers()
       .then((rows) => {
         if (cancelled) return;
         setUsers(rows);
@@ -47,10 +47,7 @@ export default function UsersPage() {
     const action = isActive ? "إعادة تفعيل" : "إيقاف";
     if (!confirm(`${action} حساب "${user.name}"؟`)) return;
     try {
-      await api(`/api/users/${user.id}`, {
-        method: "PUT",
-        body: JSON.stringify({ isActive }),
-      });
+      await setUserActive(user.id, isActive);
       setReloadKey((current) => current + 1);
     } catch (cause) {
       setError(

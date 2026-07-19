@@ -3,13 +3,11 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { api } from "@/lib/api";
+import type { Supplier, SupplierPayment as Payment } from "@cashier/shared";
 import { formatMoney } from "@/lib/format";
 import { Table } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
-import type { Supplier } from "../supplier-modals";
-
-import type { SupplierPayment as Payment } from "@cashier/shared";
+import { getSupplierStatement } from "@/services/suppliers-service";
 
 export default function SupplierStatementPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -17,7 +15,7 @@ export default function SupplierStatementPage({ params }: { params: Promise<{ id
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api<{ supplier: Supplier; payments: Payment[] }>(`/api/suppliers/${id}/statement`)
+    getSupplierStatement(Number(id))
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : "تعذر تحميل كشف الحساب"));
   }, [id]);

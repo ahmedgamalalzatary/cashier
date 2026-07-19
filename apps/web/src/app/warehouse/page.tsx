@@ -18,18 +18,25 @@ import type {
   Item,
   ItemType,
 } from "@cashier/shared";
-import { api } from "@/lib/api";
 import { formatMoney, sumDecimalValues } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table } from "@/components/ui/table";
-import { ItemFormModal } from "./item-modal";
+import { ItemFormModal } from "@/components/warehouse/item-form-modal";
 import {
   categoryFilterOptions,
   filterStockRows,
   type StockFilter,
-} from "./warehouse-model";
+} from "@/models/warehouse-model";
+import { listCategories } from "@/services/categories-service";
+import { getMainWarehouseStock } from "@/services/inventory-service";
+import {
+  deactivateItem,
+  listItems,
+  reactivateItem,
+} from "@/services/items-service";
 
 const typeLabels: Record<ItemType, string> = {
   raw: "خامة",
@@ -53,9 +60,9 @@ export default function WarehousePage() {
   useEffect(() => {
     let cancelled = false;
     Promise.all([
-      api<Item[]>("/api/items"),
-      api<Category[]>("/api/categories"),
-      api<InventoryStockRow[]>("/api/inventory/main/stock"),
+      listItems(),
+      listCategories(),
+      getMainWarehouseStock(),
     ])
       .then(([itemRows, categoryRows, stockRows]) => {
         if (cancelled) return;
@@ -95,7 +102,7 @@ export default function WarehousePage() {
     if (!confirm(`إيقاف الصنف "${item.name}"؟ سيظل رصيده ظاهراً في المخزن.`))
       return;
     try {
-      await api(`/api/items/${item.id}`, { method: "DELETE" });
+      await deactivateItem(item.id);
       setReloadKey((current) => current + 1);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "تعذر إيقاف الصنف");
@@ -104,10 +111,7 @@ export default function WarehousePage() {
 
   async function reactivate(item: Item) {
     try {
-      await api(`/api/items/${item.id}`, {
-        method: "PUT",
-        body: JSON.stringify({ isActive: true }),
-      });
+      await reactivateItem(item.id);
       setReloadKey((current) => current + 1);
     } catch (caught) {
       setError(
@@ -342,32 +346,5 @@ function Summary({
         </p>
       </div>
     </div>
-  );
-}
-
-function IconButton({
-  title,
-  onClick,
-  danger,
-  children,
-}: {
-  title: string;
-  onClick: () => void;
-  danger?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      className={`rounded-md p-1.5 transition-colors ${
-        danger
-          ? "text-danger hover:bg-danger/10"
-          : "text-muted hover:bg-line/50 hover:text-ink"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

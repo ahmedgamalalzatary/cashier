@@ -1,12 +1,18 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Pencil, Ban, CornerDownLeft, RotateCcw } from "lucide-react";
-import { api } from "@/lib/api";
+import type { Category } from "@cashier/shared";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { IconButton as IconBtn } from "@/components/ui/icon-button";
 import { PageHeader } from "@/components/ui/page-header";
-import { CategoryFormModal, type Category } from "./category-modal";
+import { CategoryFormModal } from "@/components/categories/category-form-modal";
+import {
+  deactivateCategory,
+  listCategories,
+  reactivateCategory,
+} from "@/services/categories-service";
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -22,7 +28,7 @@ export default function CategoriesPage() {
 
   useEffect(() => {
     let cancelled = false;
-    api<Category[]>("/api/categories")
+    listCategories()
       .then((rows) => {
         if (cancelled) return;
         setCategories(rows);
@@ -45,7 +51,7 @@ export default function CategoriesPage() {
       : `إيقاف التصنيف "${c.name}" وجميع فروعه؟`;
     if (!confirm(warning)) return;
     try {
-      await api(`/api/categories/${c.id}`, { method: "DELETE" });
+      await deactivateCategory(c.id);
       reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "تعذر إيقاف التصنيف");
@@ -54,10 +60,7 @@ export default function CategoriesPage() {
 
   async function reactivate(c: Category) {
     try {
-      await api(`/api/categories/${c.id}`, {
-        method: "PUT",
-        body: JSON.stringify({ isActive: true }),
-      });
+      await reactivateCategory(c.id);
       reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "تعذر إعادة تفعيل التصنيف");
@@ -195,32 +198,5 @@ export default function CategoriesPage() {
         />
       )}
     </div>
-  );
-}
-
-function IconBtn({
-  title,
-  onClick,
-  danger,
-  children,
-}: {
-  title: string;
-  onClick?: () => void;
-  danger?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      className={`rounded-md p-1.5 transition-colors ${
-        danger
-          ? "text-danger hover:bg-danger/10"
-          : "text-muted hover:bg-line/50 hover:text-ink"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

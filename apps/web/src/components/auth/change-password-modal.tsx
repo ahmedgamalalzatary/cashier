@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
-import { changePasswordAndRefreshSession } from "./change-password";
+import { changePasswordAndRefreshSession } from "@/services/auth-service";
 
 export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const [saving, setSaving] = useState(false);
