@@ -11,22 +11,32 @@ type AdminSeedConfig = {
 
 export async function seedAdmin(db: Db, admin: AdminSeedConfig) {
   const passwordHash = await bcrypt.hash(admin.password, 10);
-  const [existingAdmin] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.role, 'admin'))
-    .limit(1);
   const [usernameOwner] = await db
-    .select({ id: users.id })
+    .select({ id: users.id, role: users.role })
     .from(users)
     .where(eq(users.username, admin.username))
     .limit(1);
 
-  if (usernameOwner && usernameOwner.id !== existingAdmin?.id) {
+  if (usernameOwner && usernameOwner.role !== 'admin') {
     throw new Error(
       `Cannot seed admin: username "${admin.username}" belongs to another user`,
     );
   }
+
+  const existingAdmins = usernameOwner
+    ? [usernameOwner]
+    : await db
+        .select({ id: users.id, role: users.role })
+        .from(users)
+        .where(eq(users.role, 'admin'))
+        .orderBy(users.id)
+        .limit(2);
+  if (!usernameOwner && existingAdmins.length > 1) {
+    throw new Error(
+      'Cannot seed admin: multiple admin accounts exist and none matches the configured username',
+    );
+  }
+  const [existingAdmin] = existingAdmins;
 
   if (existingAdmin) {
     await db

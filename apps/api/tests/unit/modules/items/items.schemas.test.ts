@@ -43,4 +43,9 @@ describe('item schemas', () => {
   it('rejects an empty update', () => {
     expect(() => itemUpdateInput.parse({})).toThrow();
   });
+
+  it('allows reactivation but rejects deactivation through PUT', () => {
+    expect(itemUpdateInput.safeParse({ isActive: true }).success).toBe(true);
+    expect(itemUpdateInput.safeParse({ isActive: false }).success).toBe(false);
+  });
 });

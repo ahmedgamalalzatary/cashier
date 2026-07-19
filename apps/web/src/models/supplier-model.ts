@@ -12,13 +12,19 @@ export function supplierRequestBody(
   form: SupplierFormState,
   supplier: Supplier | null,
 ) {
-  const openingBalance = Number(form.openingBalance) || 0;
+  const rawOpeningBalance = form.openingBalance.trim();
+  const openingBalance =
+    rawOpeningBalance === "" ? undefined : Number(rawOpeningBalance);
+  if (openingBalance !== undefined && !Number.isFinite(openingBalance)) {
+    throw new Error("الرصيد الافتتاحي غير صالح");
+  }
   return {
     name: form.name,
     phone: form.phone,
     address: form.address,
     notes: form.notes,
-    ...(!supplier || openingBalance.toFixed(2) !== supplier.openingBalance
+    ...(openingBalance !== undefined &&
+    (!supplier || openingBalance.toFixed(2) !== supplier.openingBalance)
       ? { openingBalance }
       : {}),
   };

@@ -10,7 +10,23 @@ export class HttpError extends Error {
   }
 }
 
+function isMalformedJson(error: unknown) {
+  return (
+    error instanceof SyntaxError &&
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    error.status === 400 &&
+    'type' in error &&
+    error.type === 'entity.parse.failed'
+  );
+}
+
 export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
+  if (isMalformedJson(err)) {
+    res.status(400).json({ error: 'بيانات JSON غير صالحة' });
+    return;
+  }
   if (err instanceof ZodError) {
     res.status(400).json({ error: 'بيانات غير صالحة', details: err.issues });
     return;

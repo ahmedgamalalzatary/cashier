@@ -12,6 +12,7 @@ const categories: Category[] = [
   { id: 2, name: "مشروبات", parentId: null, isActive: true, createdAt: "" },
   { id: 3, name: "قهوة", parentId: 2, isActive: true, createdAt: "" },
   { id: 4, name: "قديم", parentId: null, isActive: false, createdAt: "" },
+  { id: 5, name: "قديم فارغ", parentId: null, isActive: false, createdAt: "" },
 ];
 
 const rows: InventoryStockRow[] = [
@@ -43,6 +44,20 @@ const rows: InventoryStockRow[] = [
     isLowStock: false,
     isNegativeStock: false,
   },
+  {
+    itemId: 3,
+    name: "مخزون قديم",
+    categoryId: 4,
+    categoryName: "قديم",
+    type: "raw",
+    stockUnit: "كجم",
+    isActive: false,
+    quantity: "1.000",
+    stockValue: "10.000000000",
+    minimumLevel: "0.000",
+    isLowStock: false,
+    isNegativeStock: false,
+  },
 ];
 
 describe("warehouse view model", () => {
@@ -70,7 +85,7 @@ describe("warehouse view model", () => {
         { query: "", categoryId: null, state: "inactive" },
         categories,
       ),
-    ).toEqual([rows[1]]);
+    ).toEqual([rows[1], rows[2]]);
   });
 
   it("includes child items when filtering by a main category", () => {
@@ -83,11 +98,12 @@ describe("warehouse view model", () => {
     ).toEqual([1]);
   });
 
-  it("offers only active categories with hierarchical child labels", () => {
-    expect(categoryFilterOptions(categories)).toEqual([
+  it("offers inactive categories too so visible stock remains filterable", () => {
+    expect(categoryFilterOptions(categories, rows)).toEqual([
       { id: 1, label: "خامات" },
       { id: 2, label: "مشروبات" },
       { id: 3, label: "مشروبات ← قهوة" },
+      { id: 4, label: "قديم (موقوف)" },
     ]);
   });
 

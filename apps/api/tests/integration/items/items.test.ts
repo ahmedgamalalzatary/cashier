@@ -178,18 +178,19 @@ describe("main warehouse stock view", () => {
     const created = await createItem(categoryId, { mainMinimumLevel: 4 });
     expect(created.status).toBe(201);
 
-    await db.execute(sql`
+    const [batchResult] = await db.execute(sql`
       INSERT INTO stock_batches
         (item_id, warehouse, initial_quantity, remaining_quantity, unit_cost, received_at, source_type)
       VALUES
         (${created.body.id}, 'main', 5, 3, 2.5, '2026-07-19 09:00:00', 'purchase')
     `);
+    const batchId = batchResult.insertId;
     await db.execute(sql`
       INSERT INTO stock_movements
         (item_id, warehouse, batch_id, movement_type, quantity, unit_cost, occurred_at)
       VALUES
-        (${created.body.id}, 'main', LAST_INSERT_ID(), 'purchase', 5, 2.5, '2026-07-19 09:00:00'),
-        (${created.body.id}, 'main', LAST_INSERT_ID(), 'transfer_out', -2, 2.5, '2026-07-19 10:00:00')
+        (${created.body.id}, 'main', ${batchId}, 'purchase', 5, 2.5, '2026-07-19 09:00:00'),
+        (${created.body.id}, 'main', ${batchId}, 'transfer_out', -2, 2.5, '2026-07-19 10:00:00')
     `);
 
     const response = await api().get("/api/inventory/main/stock");

@@ -12,6 +12,11 @@ function filesUnder(directory: string): string[] {
 }
 
 describe("web source boundaries", () => {
+  it("does not describe completed sections as under construction", () => {
+    const source = readFileSync(join(sourceRoot, "app/page.tsx"), "utf8");
+    expect(source).not.toContain("باقي الأقسام قيد الإنشاء");
+  });
+
   it("keeps only Next.js route modules in the app directory", () => {
     const routeModuleNames = new Set([
       "default.tsx",

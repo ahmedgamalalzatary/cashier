@@ -160,5 +160,16 @@ describe("user management", () => {
           .send({ role: "cashier" })
       ).status,
     ).toBe(409);
+    expect(
+      (
+        await request(app())
+          .put(`/api/users/${admin.id}`)
+          .set(authorization)
+          .send({ password: "replacement-789" })
+      ).status,
+    ).toBe(409);
+    expect(
+      (await request(app()).get("/api/auth/me").set(authorization)).status,
+    ).toBe(200);
   });
 });

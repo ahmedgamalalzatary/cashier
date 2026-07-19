@@ -12,7 +12,7 @@ export type CategoryCreateBody = {
 export type CategoryUpdateBody = {
   name?: string;
   parentId?: number | null;
-  isActive?: boolean;
+  isActive?: true;
 };
 
 export function listCategories() {

@@ -41,14 +41,22 @@ export class SuppliersService {
   }
 
   async deactivate(id: number) {
-    const ok = await this.repo.deactivate(id);
-    if (!ok) throw new HttpError(404, 'المورد غير موجود');
+    return this.repo.transaction(async (repo) => {
+      const supplier = await repo.findByIdForUpdate(id);
+      if (!supplier) throw new HttpError(404, 'المورد غير موجود');
+      if (!supplier.isActive) return;
+      if (Number(supplier.balance) !== 0) {
+        throw new HttpError(409, 'لا يمكن إيقاف مورد لديه رصيد مستحق');
+      }
+      await repo.deactivate(id);
+    });
   }
 
   async addPayment(supplierId: number, data: PaymentInput) {
     return this.repo.transaction(async (repo) => {
       const supplier = await repo.findByIdForUpdate(supplierId);
       if (!supplier) throw new HttpError(404, 'المورد غير موجود');
+      if (!supplier.isActive) throw new HttpError(409, 'المورد موقوف');
       return repo.createPayment(supplierId, data);
     });
   }

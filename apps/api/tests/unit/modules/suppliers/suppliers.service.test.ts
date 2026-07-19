@@ -11,11 +11,13 @@ function repository(overrides: Record<string, unknown> = {}) {
     findByIdForUpdate: vi.fn().mockResolvedValue({
       id: 1,
       openingBalance: '200.00',
+      balance: '0.00',
       isActive: true,
     }),
     hasPayments: vi.fn().mockResolvedValue(false),
     update: vi.fn().mockResolvedValue(true),
     createPayment: vi.fn().mockResolvedValue(9),
+    deactivate: vi.fn().mockResolvedValue(true),
     ...overrides,
   };
   return repo;
@@ -64,5 +66,62 @@ describe('SuppliersService financial consistency', () => {
       amount: 25,
       paidAt: '2026-07-19',
     });
+  });
+
+  it('rejects payments for an inactive supplier', async () => {
+    const repo = repository({
+      findByIdForUpdate: vi.fn().mockResolvedValue({
+        id: 1,
+        openingBalance: '0.00',
+        balance: '0.00',
+        isActive: false,
+      }),
+    });
+    const service = new SuppliersService(
+      repo as unknown as SuppliersRepository,
+    );
+
+    await expect(
+      service.addPayment(1, { amount: 25, paidAt: '2026-07-19' }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(repo.createPayment).not.toHaveBeenCalled();
+  });
+
+  it.each(['1.00', '-1.00'])(
+    'rejects deactivation while the supplier balance is %s',
+    async (balance) => {
+      const repo = repository({
+        findByIdForUpdate: vi.fn().mockResolvedValue({
+          id: 1,
+          openingBalance: '0.00',
+          balance,
+          isActive: true,
+        }),
+      });
+      const service = new SuppliersService(
+        repo as unknown as SuppliersRepository,
+      );
+
+      await expect(service.deactivate(1)).rejects.toMatchObject({ status: 409 });
+      expect(repo.deactivate).not.toHaveBeenCalled();
+    },
+  );
+
+  it('treats deactivating an already-inactive supplier as successful', async () => {
+    const repo = repository({
+      findByIdForUpdate: vi.fn().mockResolvedValue({
+        id: 1,
+        openingBalance: '0.00',
+        balance: '0.00',
+        isActive: false,
+      }),
+    });
+    const service = new SuppliersService(
+      repo as unknown as SuppliersRepository,
+    );
+
+    await expect(service.deactivate(1)).resolves.toBeUndefined();
+    expect(repo.transaction).toHaveBeenCalledOnce();
+    expect(repo.deactivate).not.toHaveBeenCalled();
   });
 });

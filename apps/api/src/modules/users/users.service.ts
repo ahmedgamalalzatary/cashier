@@ -30,6 +30,12 @@ export class UsersService {
   }
 
   async update(actorId: number, id: number, data: UserUpdateInput) {
+    if (id === actorId && data.password) {
+      throw new HttpError(
+        409,
+        "غيّر كلمة مرور حسابك من خيار تغيير كلمة المرور",
+      );
+    }
     const passwordHash = data.password
       ? await bcrypt.hash(data.password, 10)
       : undefined;

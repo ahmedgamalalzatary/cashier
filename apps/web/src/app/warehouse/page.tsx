@@ -90,8 +90,8 @@ export default function WarehousePage() {
     [stock, query, categoryId, state, categories],
   );
   const categoryOptions = useMemo(
-    () => categoryFilterOptions(categories),
-    [categories],
+    () => categoryFilterOptions(categories, stock),
+    [categories, stock],
   );
   const activeItems = stock.filter((row) => row.isActive).length;
   const lowStock = stock.filter((row) => row.isLowStock).length;

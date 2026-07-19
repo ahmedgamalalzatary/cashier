@@ -73,4 +73,51 @@ describe('seedAdmin', () => {
       `Cannot seed admin: username "${configuredAdmin.username}" belongs to another user`,
     );
   });
+
+  it('updates the admin matching the configured username when several admins exist', async () => {
+    await db.insert(users).values([
+      {
+        name: 'First admin',
+        username: 'first-admin',
+        passwordHash: await bcrypt.hash('first-password', 4),
+        role: 'admin',
+      },
+      {
+        name: 'Configured admin before seed',
+        username: configuredAdmin.username,
+        passwordHash: await bcrypt.hash('old-password', 4),
+        role: 'admin',
+      },
+    ]);
+
+    await expect(seedAdmin(db, configuredAdmin)).resolves.toBe('updated');
+    const rows = await db.select().from(users).where(eq(users.role, 'admin'));
+    expect(rows.find((row) => row.username === 'first-admin')?.name).toBe(
+      'First admin',
+    );
+    expect(
+      rows.find((row) => row.username === configuredAdmin.username),
+    ).toMatchObject({ name: configuredAdmin.name });
+  });
+
+  it('refuses to choose an arbitrary admin when no username matches', async () => {
+    await db.insert(users).values([
+      {
+        name: 'First admin',
+        username: 'first-admin',
+        passwordHash: await bcrypt.hash('first-password', 4),
+        role: 'admin',
+      },
+      {
+        name: 'Second admin',
+        username: 'second-admin',
+        passwordHash: await bcrypt.hash('second-password', 4),
+        role: 'admin',
+      },
+    ]);
+
+    await expect(seedAdmin(db, configuredAdmin)).rejects.toThrow(
+      'Cannot seed admin: multiple admin accounts exist',
+    );
+  });
 });

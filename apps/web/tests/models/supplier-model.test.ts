@@ -49,6 +49,38 @@ describe("supplier form model", () => {
       250,
     );
   });
+
+  it("omits a cleared opening balance instead of silently converting it to zero", () => {
+    const form = {
+      name: "Supplier",
+      phone: "",
+      address: "",
+      notes: "",
+      openingBalance: "",
+    };
+
+    expect(supplierRequestBody(form, supplier)).not.toHaveProperty(
+      "openingBalance",
+    );
+    expect(supplierRequestBody(form, null)).not.toHaveProperty(
+      "openingBalance",
+    );
+  });
+
+  it("rejects a non-numeric opening balance instead of coercing it to zero", () => {
+    expect(() =>
+      supplierRequestBody(
+        {
+          name: "Supplier",
+          phone: "",
+          address: "",
+          notes: "",
+          openingBalance: "invalid",
+        },
+        supplier,
+      ),
+    ).toThrow();
+  });
 });
 
 describe("supplier balance presentation", () => {

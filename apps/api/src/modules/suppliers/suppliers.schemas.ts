@@ -1,8 +1,9 @@
 import { z } from 'zod';
 
 const MAX_MONEY = 9_999_999_999.99;
+const MONEY_EPSILON = 1e-9;
 const hasTwoDecimalPlaces = (value: number) =>
-  Math.abs(value * 100 - Math.round(value * 100)) < 1e-6;
+  Math.abs(Number(value.toFixed(2)) - value) <= MONEY_EPSILON;
 const money = (minimum: number) =>
   z.coerce
     .number()
@@ -44,7 +45,7 @@ export const supplierInput = z.object({
 
 export const supplierUpdateInput = supplierInput
   .partial()
-  .extend({ isActive: z.boolean().optional() })
+  .extend({ isActive: z.literal(true).optional() })
   .refine((data) => Object.keys(data).length > 0, {
     message: 'لا توجد بيانات للتعديل',
   });

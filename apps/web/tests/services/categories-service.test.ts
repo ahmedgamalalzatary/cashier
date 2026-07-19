@@ -1,12 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../src/lib/api";
 import {
+  type CategoryUpdateBody,
   createCategory,
   deactivateCategory,
   listCategories,
   reactivateCategory,
   updateCategory,
 } from "../../src/services/categories-service";
+
+const validReactivation: CategoryUpdateBody = { isActive: true };
+// @ts-expect-error Deactivation must use deactivateCategory/DELETE.
+const invalidPutDeactivation: CategoryUpdateBody = { isActive: false };
+void validReactivation;
+void invalidPutDeactivation;
 
 vi.mock("../../src/lib/api", () => ({ api: vi.fn() }));
 

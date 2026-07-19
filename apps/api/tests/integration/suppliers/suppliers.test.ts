@@ -58,15 +58,16 @@ describe('suppliers CRUD', () => {
   });
 
   it('soft-deletes a supplier (kept in list as inactive)', async () => {
-    const { body } = await createSupplier();
+    const { body } = await createSupplier({ openingBalance: 0 });
     const res = await api().delete(`/api/suppliers/${body.id}`);
     expect(res.status).toBe(200);
+    expect((await api().delete(`/api/suppliers/${body.id}`)).status).toBe(200);
     const list = await api().get('/api/suppliers');
     expect(list.body[0].isActive).toBeFalsy();
   });
 
   it('reactivates a deactivated supplier', async () => {
-    const { body } = await createSupplier();
+    const { body } = await createSupplier({ openingBalance: 0 });
     expect((await api().delete(`/api/suppliers/${body.id}`)).status).toBe(200);
 
     const restored = await api()
@@ -76,6 +77,12 @@ describe('suppliers CRUD', () => {
     expect(restored.status).toBe(200);
     const list = await api().get('/api/suppliers');
     expect(list.body[0].isActive).toBe(true);
+  });
+
+  it('rejects deactivation while the supplier has an outstanding balance', async () => {
+    const { body } = await createSupplier({ openingBalance: 10 });
+
+    expect((await api().delete(`/api/suppliers/${body.id}`)).status).toBe(409);
   });
 
   it('normalizes blank optional supplier fields to null', async () => {
@@ -121,6 +128,58 @@ describe('supplier payments & statement', () => {
 
     const list = await api().get('/api/suppliers');
     expect(Number(list.body[0].balance)).toBe(300);
+  });
+
+  it('rejects payments for an inactive supplier', async () => {
+    const zeroBalanceSupplier = await createSupplier({
+      name: 'Inactive supplier',
+      openingBalance: 0,
+    });
+    expect(
+      (await api().delete(`/api/suppliers/${zeroBalanceSupplier.body.id}`))
+        .status,
+    ).toBe(200);
+
+    const payment = await api()
+      .post(`/api/suppliers/${zeroBalanceSupplier.body.id}/payments`)
+      .send({ amount: 1, paidAt: '2026-07-19' });
+    expect(payment.status).toBe(409);
+  });
+
+  it('serializes simultaneous payment and deactivation consistently', async () => {
+    const created = await createSupplier({
+      name: 'Concurrent supplier',
+      openingBalance: 0,
+    });
+    const id = created.body.id as number;
+
+    const [payment, deactivation] = await Promise.all([
+      api()
+        .post(`/api/suppliers/${id}/payments`)
+        .send({ amount: 1, paidAt: '2026-07-19' }),
+      api().delete(`/api/suppliers/${id}`),
+    ]);
+
+    expect([201, 409]).toContain(payment.status);
+    expect([200, 409]).toContain(deactivation.status);
+    expect(
+      [payment.status, deactivation.status].filter((status) => status === 409),
+    ).toHaveLength(1);
+
+    const statement = await api().get(`/api/suppliers/${id}/statement`);
+    if (payment.status === 201) {
+      expect(statement.body.supplier).toMatchObject({
+        isActive: true,
+        balance: '-1.00',
+      });
+      expect(statement.body.payments).toHaveLength(1);
+    } else {
+      expect(statement.body.supplier).toMatchObject({
+        isActive: false,
+        balance: '0.00',
+      });
+      expect(statement.body.payments).toHaveLength(0);
+    }
   });
 
   it('normalizes blank payment notes to null', async () => {

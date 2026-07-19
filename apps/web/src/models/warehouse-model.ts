@@ -11,19 +11,29 @@ export function eligibleItemCategories(categories: Category[]) {
   );
 }
 
-export function categoryFilterOptions(categories: Category[]) {
+export function categoryFilterOptions(
+  categories: Category[],
+  rows: InventoryStockRow[],
+) {
   const names = new Map(
     categories.map((category) => [category.id, category.name]),
   );
+  const stockedCategoryIds = new Set(rows.map((row) => row.categoryId));
   return categories
-    .filter((category) => category.isActive)
-    .map((category) => ({
-      id: category.id,
-      label:
+    .filter(
+      (category) =>
+        category.isActive || stockedCategoryIds.has(category.id),
+    )
+    .map((category) => {
+      const label =
         category.parentId === null
           ? category.name
-          : `${names.get(category.parentId) ?? ""} ← ${category.name}`,
-    }));
+          : `${names.get(category.parentId) ?? ""} ← ${category.name}`;
+      return {
+        id: category.id,
+        label: category.isActive ? label : `${label} (موقوف)`,
+      };
+    });
 }
 
 export function stockMeaningFieldsLocked(item: { hasStockHistory: boolean }) {

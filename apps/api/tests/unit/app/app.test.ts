@@ -29,4 +29,14 @@ describe('health check', () => {
       .set('Origin', 'https://evil.example');
     expect(res.headers['access-control-allow-origin']).toBeUndefined();
   });
+
+  it('returns 400 for malformed JSON request bodies', async () => {
+    const res = await request(createApp(db, options))
+      .post('/api/auth/login')
+      .set('Content-Type', 'application/json')
+      .send('{"username":');
+
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty('error');
+  });
 });

@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { Db } from '../../db/index.js';
 import { supplierPayments, suppliers } from '../../db/schema.js';
 import type {
@@ -93,7 +93,7 @@ export class SuppliersRepository {
     const [result] = await this.db
       .update(suppliers)
       .set({ isActive: false })
-      .where(eq(suppliers.id, id));
+      .where(and(eq(suppliers.id, id), eq(suppliers.isActive, true)));
     return result.affectedRows > 0;
   }
 
