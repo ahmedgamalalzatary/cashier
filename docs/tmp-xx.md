@@ -67,12 +67,12 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 
 ## 7. POS (Sales)
 
-- [ ] `orders` + `order_lines` (price + FIFO cost snapshot)
-- [ ] POS screen: category tabs → product grid → cart → cash + change
-- [ ] Discounts (percent / fixed, logged per cashier)
-- [ ] Stock deduction from cafe (recipes → ingredients, as-is → item)
-- [ ] Negative-stock flag (sale never blocked)
-- [ ] 80mm Arabic thermal receipt (auto-print + reprint)
+- [x] `orders` + `order_lines` (price + FIFO cost snapshot)
+- [x] POS screen: category tabs → product grid → cart → cash + change
+- [x] Discounts (percent / fixed, logged per cashier)
+- [x] Stock deduction from cafe (recipes → ingredients, as-is → item)
+- [x] Negative-stock flag (sale never blocked)
+- [x] 80mm Arabic thermal receipt (auto-print + reprint)
 
 ## 8. Shifts
 

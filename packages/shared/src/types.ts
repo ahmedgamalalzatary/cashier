@@ -68,6 +68,7 @@ export type Item = {
   categoryId: number;
   categoryName: string;
   type: ItemType;
+  sellingPrice: string | null;
   stockUnit: string;
   purchaseUnit: string | null;
   purchaseToStockFactor: string | null;
@@ -159,7 +160,10 @@ export type TransferRequestLine = {
   quantity: string;
 };
 
-export type TransferRequestDetail = Omit<TransferRequestSummary, "lineCount"> & {
+export type TransferRequestDetail = Omit<
+  TransferRequestSummary,
+  "lineCount"
+> & {
   lines: TransferRequestLine[];
 };
 
@@ -282,4 +286,83 @@ export type PreparationAllocation = {
 
 export type PreparationDetail = PreparationSummary & {
   allocations: PreparationAllocation[];
+};
+
+type PosCatalogBase = {
+  name: string;
+  categoryId: number;
+  mainCategoryId: number;
+  mainCategoryName: string;
+  subCategoryId: number | null;
+  subCategoryName: string | null;
+};
+
+export type PosRecipeCatalogProduct = PosCatalogBase & {
+  type: "recipe";
+  recipeId: number;
+  sizes: Array<{
+    id: number;
+    name: string;
+    sellingPrice: string;
+  }>;
+};
+
+export type PosItemCatalogProduct = PosCatalogBase & {
+  type: "item";
+  itemId: number;
+  sellingPrice: string;
+  stockUnit: string;
+};
+
+export type PosCatalogProduct = PosRecipeCatalogProduct | PosItemCatalogProduct;
+
+export type OrderDiscountType = "percent" | "fixed";
+
+export type OrderSummary = {
+  id: number;
+  orderNumber: string;
+  cashierId: number;
+  cashierName: string;
+  shiftId: number | null;
+  subtotal: string;
+  discountType: OrderDiscountType | null;
+  discountValue: string | null;
+  discountAmount: string;
+  total: string;
+  cashReceived: string;
+  changeAmount: string;
+  totalCost: string;
+  isNegativeStock: boolean;
+  createdAt: string;
+};
+
+export type OrderLineAllocation = {
+  id: number;
+  itemId: number;
+  itemName: string;
+  batchId: number | null;
+  stockMovementId: number;
+  quantity: string;
+  unitCost: string;
+  lineCost: string;
+};
+
+export type OrderLine = {
+  id: number;
+  type: "recipe" | "item";
+  recipeId: number | null;
+  recipeSizeId: number | null;
+  itemId: number | null;
+  productName: string;
+  sizeName: string | null;
+  quantity: string;
+  unitPrice: string;
+  lineSubtotal: string;
+  totalCost: string;
+  hasStockDeficit: boolean;
+  allocations: OrderLineAllocation[];
+};
+
+export type OrderDetail = OrderSummary & {
+  lines: OrderLine[];
 };

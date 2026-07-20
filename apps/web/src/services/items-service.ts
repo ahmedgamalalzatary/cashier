@@ -8,6 +8,7 @@ export type ItemSaveBody = {
   name?: string;
   categoryId?: number;
   type?: ItemType;
+  sellingPrice?: number | null;
   stockUnit?: string;
   purchaseUnit?: string | null;
   purchaseToStockFactor?: number | null;

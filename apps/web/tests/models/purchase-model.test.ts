@@ -13,6 +13,7 @@ const item: Item = {
   categoryId: 1,
   categoryName: "خامات",
   type: "raw",
+  sellingPrice: null,
   stockUnit: "كجم",
   purchaseUnit: "شيكارة",
   purchaseToStockFactor: "25.000000",

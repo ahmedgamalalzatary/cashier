@@ -71,6 +71,27 @@
       "when": 1784496737051,
       "tag": "0009_exotic_amazoness",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1784563217756,
+      "tag": "0010_nebulous_scalphunter",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1784568326059,
+      "tag": "0011_motionless_calypso",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1784569091880,
+      "tag": "0012_early_hammerhead",
+      "breakpoints": true
     }
   ]
 }

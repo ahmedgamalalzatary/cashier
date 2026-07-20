@@ -24,6 +24,15 @@ const conversionFactor = z.coerce
     message: "معامل التحويل يقبل ست خانات عشرية كحد أقصى",
   });
 
+const sellingPrice = z.coerce
+  .number()
+  .finite()
+  .positive()
+  .max(9_999_999_999.99)
+  .refine(hasDecimalPlaces(2), {
+    message: "سعر البيع يقبل خانتين عشريتين كحد أقصى",
+  });
+
 const optionalText = (maximum: number) =>
   z.preprocess(
     (value) =>
@@ -35,6 +44,7 @@ const itemFields = z.object({
   name: z.string().trim().min(1).max(191),
   categoryId: z.coerce.number().int().positive(),
   type: z.enum(ITEM_TYPES),
+  sellingPrice: sellingPrice.nullish(),
   stockUnit: z.string().trim().min(1).max(50),
   purchaseUnit: optionalText(50),
   purchaseToStockFactor: conversionFactor.nullish(),
@@ -49,10 +59,21 @@ export function hasValidPurchaseUnitConfiguration(data: {
   return Boolean(data.purchaseUnit) === (data.purchaseToStockFactor != null);
 }
 
-export const itemInput = itemFields.refine(hasValidPurchaseUnitConfiguration, {
-  message: "وحدة الشراء ومعامل التحويل مطلوبان معاً",
-  path: ["purchaseUnit"],
-});
+export const itemInput = itemFields
+  .refine(hasValidPurchaseUnitConfiguration, {
+    message: "وحدة الشراء ومعامل التحويل مطلوبان معاً",
+    path: ["purchaseUnit"],
+  })
+  .refine(
+    (data) =>
+      data.type === "resale"
+        ? data.sellingPrice != null
+        : data.sellingPrice == null,
+    {
+      message: "سعر البيع مطلوب لصنف إعادة البيع",
+      path: ["sellingPrice"],
+    },
+  );
 
 export const itemUpdateInput = itemFields
   .partial()

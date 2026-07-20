@@ -165,6 +165,33 @@ describe("items CRUD", () => {
     expect(response.status).toBe(400);
   });
 
+  it("requires an explicit resale price and never preserves it on non-resale items", async () => {
+    const categoryId = await createCategory();
+    const rawWithPrice = await createItem(categoryId, { sellingPrice: 20 });
+    expect(rawWithPrice.status).toBe(400);
+
+    const raw = await createItem(categoryId);
+    expect(raw.status).toBe(201);
+    const missingTransitionPrice = await api()
+      .put(`/api/items/${raw.body.id}`)
+      .send({ type: "resale" });
+    expect(missingTransitionPrice.status).toBe(400);
+
+    const pricedTransition = await api()
+      .put(`/api/items/${raw.body.id}`)
+      .send({ type: "resale", sellingPrice: 25 });
+    expect(pricedTransition.status).toBe(200);
+    const backToRaw = await api()
+      .put(`/api/items/${raw.body.id}`)
+      .send({ type: "raw" });
+    expect(backToRaw.status).toBe(200);
+    const listed = await api().get("/api/items");
+    expect(listed.body[0]).toMatchObject({
+      type: "raw",
+      sellingPrice: null,
+    });
+  });
+
   it("rejects cashier access", async () => {
     authorization = await loginAs(app(), "cashier");
     const response = await api().get("/api/items");

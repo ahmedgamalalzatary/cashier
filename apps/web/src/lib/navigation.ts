@@ -1,5 +1,6 @@
 export const NAV_ITEMS = [
   { href: "/", label: "الرئيسية" },
+  { href: "/pos", label: "نقطة البيع" },
   { href: "/categories", label: "التصنيفات", adminOnly: true },
   { href: "/warehouse", label: "المخزن الرئيسي", adminOnly: true },
   { href: "/cafe", label: "الكافيه" },

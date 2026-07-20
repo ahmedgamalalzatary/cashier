@@ -27,6 +27,7 @@ export type ConsumeStockInput = MovementContext & {
 
 export type FifoAllocation = {
   batchId: number | null;
+  movementId: number;
   quantity: string;
   unitCost: string;
 };
@@ -203,9 +204,10 @@ export class InventoryTransaction {
         batch.id,
         formatScaled(newRemaining, 3),
       );
-      await this.repo.createMovement(movement);
+      const movementId = await this.repo.createMovement(movement);
       allocations.push({
         batchId: batch.id,
+        movementId,
         quantity: consumedQuantity,
         unitCost: batch.unitCost,
       });
@@ -218,7 +220,7 @@ export class InventoryTransaction {
     }
     if (remaining > 0n) {
       const shortfall = formatScaled(remaining, 3);
-      await this.repo.createMovement({
+      const movementId = await this.repo.createMovement({
         itemId: input.itemId,
         warehouse: input.warehouse,
         batchId: null,
@@ -232,6 +234,7 @@ export class InventoryTransaction {
       });
       allocations.push({
         batchId: null,
+        movementId,
         quantity: shortfall,
         unitCost: "0.000000",
       });

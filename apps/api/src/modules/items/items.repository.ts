@@ -16,6 +16,7 @@ const itemColumns = {
   categoryId: items.categoryId,
   categoryName: categories.name,
   type: items.type,
+  sellingPrice: items.sellingPrice,
   stockUnit: items.stockUnit,
   purchaseUnit: items.purchaseUnit,
   purchaseToStockFactor: items.purchaseToStockFactor,
@@ -30,10 +31,18 @@ const itemColumns = {
 };
 
 function toDatabaseValues(data: ItemUpdateInput) {
-  const { purchaseToStockFactor, mainMinimumLevel, cafeMinimumLevel, ...rest } =
-    data;
+  const {
+    sellingPrice,
+    purchaseToStockFactor,
+    mainMinimumLevel,
+    cafeMinimumLevel,
+    ...rest
+  } = data;
   return {
     ...rest,
+    ...(sellingPrice !== undefined
+      ? { sellingPrice: sellingPrice === null ? null : sellingPrice.toFixed(2) }
+      : {}),
     ...(purchaseToStockFactor !== undefined
       ? {
           purchaseToStockFactor:
@@ -145,6 +154,10 @@ export class ItemsRepository {
       name: data.name,
       categoryId: data.categoryId,
       type: data.type,
+      sellingPrice:
+        data.sellingPrice === null || data.sellingPrice === undefined
+          ? null
+          : data.sellingPrice.toFixed(2),
       stockUnit: data.stockUnit,
       purchaseUnit: data.purchaseUnit,
       purchaseToStockFactor:

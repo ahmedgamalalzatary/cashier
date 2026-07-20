@@ -65,6 +65,27 @@ export class ItemsService {
         throw new HttpError(400, "وحدة الشراء ومعامل التحويل مطلوبان معاً");
       }
 
+      const resultingType = data.type ?? item.type;
+      const resultingSellingPrice =
+        data.sellingPrice !== undefined
+          ? data.sellingPrice
+          : item.sellingPrice === null
+            ? null
+            : Number(item.sellingPrice);
+      if (
+        resultingType === "resale" &&
+        item.type !== "resale" &&
+        data.sellingPrice == null
+      ) {
+        throw new HttpError(400, "سعر البيع مطلوب عند التحويل إلى إعادة البيع");
+      }
+      if (resultingType === "resale" && resultingSellingPrice == null) {
+        throw new HttpError(400, "سعر البيع مطلوب لصنف إعادة البيع");
+      }
+      if (resultingType !== "resale" && data.sellingPrice != null) {
+        throw new HttpError(400, "سعر البيع متاح فقط لصنف إعادة البيع");
+      }
+
       const changesStockMeaning =
         (data.stockUnit !== undefined && data.stockUnit !== item.stockUnit) ||
         (data.type !== undefined && data.type !== item.type);
@@ -78,7 +99,10 @@ export class ItemsService {
           "لا يمكن تغيير نوع الصنف أو وحدة المخزون بعد تسجيل حركة مخزون أو ربطه بوصفة نشطة",
         );
       }
-      await repo.update(id, data);
+      await repo.update(
+        id,
+        resultingType === "resale" ? data : { ...data, sellingPrice: null },
+      );
     });
   }
 

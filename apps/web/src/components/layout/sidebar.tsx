@@ -22,6 +22,7 @@ import {
   KeyRound,
   UserCog,
   ShoppingCart,
+  ShoppingBag,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -32,6 +33,7 @@ type NavHref = (typeof NAV_ITEMS)[number]["href"];
 
 const navIcons: Record<NavHref, LucideIcon> = {
   "/": LayoutDashboard,
+  "/pos": ShoppingBag,
   "/categories": Tags,
   "/warehouse": Warehouse,
   "/cafe": CupSoda,

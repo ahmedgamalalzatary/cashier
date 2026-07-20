@@ -21,6 +21,7 @@ const emptyForm = {
   name: "",
   categoryId: "",
   type: "raw" as ItemType,
+  sellingPrice: "",
   stockUnit: "",
   purchaseUnit: "",
   purchaseToStockFactor: "",
@@ -45,6 +46,7 @@ export function ItemFormModal({
           name: item.name,
           categoryId: String(item.categoryId),
           type: item.type,
+          sellingPrice: item.sellingPrice ?? "",
           stockUnit: item.stockUnit,
           purchaseUnit: item.purchaseUnit ?? "",
           purchaseToStockFactor: item.purchaseToStockFactor ?? "",
@@ -85,6 +87,7 @@ export function ItemFormModal({
       name: form.name,
       categoryId: Number(form.categoryId),
       type: form.type,
+      sellingPrice: form.type === "resale" ? Number(form.sellingPrice) : null,
       stockUnit: form.stockUnit,
       purchaseUnit,
       purchaseToStockFactor: purchaseUnit
@@ -157,6 +160,18 @@ export function ItemFormModal({
             disabled={stockMeaningLocked}
           />
         </div>
+        {form.type === "resale" && (
+          <Field
+            label="سعر البيع"
+            type="number"
+            min="0.01"
+            step="0.01"
+            value={form.sellingPrice}
+            onChange={set("sellingPrice")}
+            required
+            dir="ltr"
+          />
+        )}
         {stockMeaningLocked && (
           <p className="text-xs text-muted">
             لا يمكن تغيير نوع الصنف أو وحدة المخزون بعد تسجيل حركة مخزون.
