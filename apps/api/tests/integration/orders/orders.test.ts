@@ -18,10 +18,16 @@ import { loginAs } from "../../support/helpers.js";
 const app = () => createApp(db, appOptions);
 let cashierAuthorization: { readonly Authorization: string };
 let adminAuthorization: { readonly Authorization: string };
+let openedShiftId: number;
 
 beforeEach(async () => {
   cashierAuthorization = await loginAs(app(), "cashier");
   adminAuthorization = await loginAs(app(), "admin");
+  const opened = await request(app())
+    .post("/api/shifts/open")
+    .set(cashierAuthorization)
+    .send({ openingFloat: 0 });
+  openedShiftId = opened.body.id;
 });
 
 async function createProductFixture() {
@@ -102,6 +108,44 @@ describe("POS orders", () => {
         })
       ).status,
     ).toBe(401);
+  });
+
+  it("does not let an admin record a cashier sale", async () => {
+    const response = await request(app())
+      .post("/api/orders")
+      .set(adminAuthorization)
+      .send({
+        clientRequestId: randomUUID(),
+        lines: [],
+        cashReceived: 0,
+      });
+
+    expect(response.status).toBe(403);
+  });
+
+  it("blocks a sale when the cashier has no open shift", async () => {
+    await request(app())
+      .post(`/api/shifts/${openedShiftId}/close`)
+      .set(cashierAuthorization)
+      .send({ actualCash: 0 });
+    const fixture = await createProductFixture();
+    await receiveCafeBatch(
+      fixture.ingredientId,
+      "1.000",
+      "10.000000",
+      new Date("2026-07-18T08:00:00.000Z"),
+    );
+
+    const response = await request(app())
+      .post("/api/orders")
+      .set(cashierAuthorization)
+      .send({
+        clientRequestId: randomUUID(),
+        lines: [{ type: "recipe", recipeSizeId: fixture.sizeId, quantity: 1 }],
+        cashReceived: 40,
+      });
+
+    expect(response.status).toBe(409);
   });
 
   it("lists the active recipe-product catalog for a cashier with category hierarchy", async () => {
@@ -217,7 +261,7 @@ describe("POS orders", () => {
       id: created.body.id,
       orderNumber: created.body.orderNumber,
       cashierName: "كاشير",
-      shiftId: null,
+      shiftId: openedShiftId,
       subtotal: "80.00",
       discountType: "percent",
       discountValue: "10.00",

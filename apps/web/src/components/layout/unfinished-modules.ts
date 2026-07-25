@@ -1,14 +1,4 @@
 export const unfinishedModules = {
-  shifts: {
-    code: "SH",
-    title: "الورديات",
-    description: "فتح الورديات وإغلاقها ومراجعة النقدية ستتوفر هنا.",
-  },
-  employees: {
-    code: "EM",
-    title: "الموظفون",
-    description: "ملفات الموظفين والحضور وبيانات العمل قيد التجهيز.",
-  },
   salaries: {
     code: "SA",
     title: "المرتبات",

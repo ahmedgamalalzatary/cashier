@@ -43,6 +43,12 @@ export class UsersService {
       await this.repo.transaction(async (repo) => {
         const user = await repo.findByIdForUpdate(id);
         if (!user) throw new HttpError(404, "المستخدم غير موجود");
+        if (user.role === "cashier" || data.role === "cashier") {
+          throw new HttpError(
+            409,
+            "تُدار حسابات الكاشير وصلاحية الدخول من سجل الموظف",
+          );
+        }
         if (
           id === actorId &&
           (data.isActive === false ||

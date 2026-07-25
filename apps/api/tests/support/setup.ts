@@ -40,6 +40,8 @@ beforeEach(async () => {
   await db.execute(sql`TRUNCATE TABLE order_line_allocations`);
   await db.execute(sql`TRUNCATE TABLE order_lines`);
   await db.execute(sql`TRUNCATE TABLE orders`);
+  await db.execute(sql`TRUNCATE TABLE shift_events`);
+  await db.execute(sql`TRUNCATE TABLE shifts`);
   await db.execute(sql`TRUNCATE TABLE preparation_allocations`);
   await db.execute(sql`TRUNCATE TABLE preparations`);
   await db.execute(sql`TRUNCATE TABLE recipe_ingredients`);
@@ -59,5 +61,6 @@ beforeEach(async () => {
   await db.execute(sql`TRUNCATE TABLE suppliers`);
   await db.execute(sql`TRUNCATE TABLE categories`);
   await db.execute(sql`TRUNCATE TABLE users`);
+  await db.execute(sql`TRUNCATE TABLE employees`);
   await db.execute(sql`SET FOREIGN_KEY_CHECKS = 1`);
 });

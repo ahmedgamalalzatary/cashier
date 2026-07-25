@@ -1,0 +1,1 @@
+ALTER TABLE `orders` ADD CONSTRAINT `orders_shift_id_shifts_id_fk` FOREIGN KEY (`shift_id`) REFERENCES `shifts`(`id`) ON DELETE no action ON UPDATE no action;

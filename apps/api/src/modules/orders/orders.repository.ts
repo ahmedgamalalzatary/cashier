@@ -22,6 +22,7 @@ import {
   recipeSizes,
   stockBatches,
   stockMovements,
+  shifts,
   users,
 } from "../../db/schema.js";
 import { InventoryRepository } from "../inventory/inventory.repository.js";
@@ -192,6 +193,17 @@ export class OrdersRepository {
   async createOrder(data: typeof orders.$inferInsert) {
     const [result] = await this.db.insert(orders).values(data);
     return result.insertId;
+  }
+
+  async findOpenShiftForCashier(cashierUserId: number) {
+    const [row] = await this.db
+      .select({ id: shifts.id })
+      .from(shifts)
+      .where(
+        and(eq(shifts.openSlot, 1), eq(shifts.cashierUserId, cashierUserId)),
+      )
+      .for("update");
+    return row;
   }
 
   async findByClientRequestId(clientRequestId: string) {

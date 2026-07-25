@@ -1,11 +1,11 @@
-import type { Request, Response } from 'express';
-import { idParam } from '../../middleware/validation.js';
-import type { TransfersService } from './transfers.service.js';
+import type { Request, Response } from "express";
+import { idParam } from "../../middleware/validation.js";
+import type { TransfersService } from "./transfers.service.js";
 import {
   transferApprovalInput,
   transferRejectionInput,
   transferRequestInput,
-} from './transfers.schemas.js';
+} from "./transfers.schemas.js";
 
 export class TransfersController {
   constructor(private service: TransfersService) {}
@@ -21,7 +21,7 @@ export class TransfersController {
   createRequest = async (req: Request, res: Response) => {
     const id = await this.service.createRequest(
       transferRequestInput.parse(req.body),
-      req.user!.id,
+      req.user!,
     );
     res.status(201).json({ id });
   };

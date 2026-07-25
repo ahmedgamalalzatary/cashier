@@ -1,9 +1,7 @@
-import type { Role } from "@cashier/shared";
-
 export type UserFormState = {
   name: string;
   username: string;
-  role: Role;
+  role?: "admin";
   password: string;
 };
 
@@ -12,7 +10,7 @@ export function userRequestBody(form: UserFormState, editing: boolean) {
   return {
     name: form.name.trim(),
     username: form.username.trim(),
-    role: form.role,
+    ...(!editing ? { role: form.role ?? "admin" } : {}),
     ...(!editing || password ? { password } : {}),
   };
 }

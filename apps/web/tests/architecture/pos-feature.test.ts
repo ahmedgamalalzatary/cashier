@@ -9,6 +9,7 @@ describe("POS feature boundaries", () => {
     expect(fs.existsSync(pagePath)).toBe(true);
     const page = fs.readFileSync(pagePath, "utf8");
     expect(page).toContain("listCatalog");
+    expect(page).toContain("getCurrentShift");
     expect(page).toContain("createOrder");
     expect(page).toContain("OrderReceipt");
     expect(page).toContain("<Modal");

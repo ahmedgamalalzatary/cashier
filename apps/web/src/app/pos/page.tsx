@@ -12,12 +12,15 @@ import {
   ShoppingBasket,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import type {
   OrderDetail,
   OrderDiscountType,
   OrderSummary,
   PosCatalogProduct,
+  CurrentShift,
 } from "@cashier/shared";
+import { useAuth } from "@/components/auth/auth-provider";
 import { OrderReceipt } from "@/components/pos/order-receipt";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -37,10 +40,13 @@ import {
   listCatalog,
   listOrders,
 } from "@/services/orders-service";
+import { getCurrentShift } from "@/services/shifts-service";
 
 export default function PosPage() {
+  const { user } = useAuth();
   const [catalog, setCatalog] = useState<PosCatalogProduct[]>([]);
   const [recentOrders, setRecentOrders] = useState<OrderSummary[]>([]);
+  const [currentShift, setCurrentShift] = useState<CurrentShift | null>(null);
   const [cart, setCart] = useState<PosCartLine[]>([]);
   const [mainCategoryId, setMainCategoryId] = useState<number | null>(null);
   const [subCategoryId, setSubCategoryId] = useState<number | null>(null);
@@ -67,11 +73,12 @@ export default function PosPage() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([listCatalog(), listOrders()])
-      .then(([catalogRows, orderRows]) => {
+    Promise.all([listCatalog(), listOrders(), getCurrentShift()])
+      .then(([catalogRows, orderRows, shift]) => {
         if (cancelled) return;
         setCatalog(catalogRows);
         setRecentOrders(orderRows);
+        setCurrentShift(shift);
       })
       .catch((caught) => {
         if (!cancelled)
@@ -109,8 +116,16 @@ export default function PosPage() {
     { type: discountType, value: discountValue },
     cashReceived,
   );
+  const detailedCurrentShift =
+    currentShift && !("occupied" in currentShift) ? currentShift : null;
+  const hasOwnOpenShift =
+    user?.role === "cashier" && detailedCurrentShift?.cashierUserId === user.id;
   const canComplete =
-    cart.length > 0 && totals.discountValid && totals.hasEnoughCash && !saving;
+    hasOwnOpenShift &&
+    cart.length > 0 &&
+    totals.discountValid &&
+    totals.hasEnoughCash &&
+    !saving;
 
   function chooseMainCategory(id: number | null) {
     setMainCategoryId(id);
@@ -195,6 +210,29 @@ export default function PosPage() {
         >
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           {error}
+        </div>
+      )}
+
+      {!loading && !hasOwnOpenShift && (
+        <div className="mx-2 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/35 bg-accent/10 px-4 py-3 text-sm lg:mx-4">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-primary" />
+            <span>
+              {detailedCurrentShift
+                ? `البيع متوقف لأن الوردية المفتوحة تخص ${detailedCurrentShift.cashierName}.`
+                : currentShift
+                  ? "البيع متوقف لأن درج النقدية مستخدم في وردية كاشير آخر."
+                  : user?.role === "cashier"
+                    ? "يجب فتح وردية قبل تسجيل أي عملية بيع."
+                    : "المدير لا يفتح ورديات أو يسجل مبيعات؛ استخدم حساب كاشير."}
+            </span>
+          </div>
+          <Link
+            href="/shifts"
+            className="rounded-lg bg-sidebar px-3 py-2 font-medium text-white hover:bg-ink"
+          >
+            الذهاب إلى الورديات
+          </Link>
         </div>
       )}
 

@@ -20,7 +20,7 @@ export function UserModal({
   const [form, setForm] = useState<UserFormState>({
     name: user?.name ?? "",
     username: user?.username ?? "",
-    role: user?.role ?? "cashier",
+    ...(!user ? { role: "admin" as const } : {}),
     password: "",
   });
   const [saving, setSaving] = useState(false);
@@ -71,17 +71,11 @@ export function UserModal({
           required
           dir="ltr"
         />
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium">الصلاحية</span>
-          <select
-            value={form.role}
-            onChange={set("role")}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-          >
-            <option value="cashier">كاشير</option>
-            <option value="admin">مدير نظام</option>
-          </select>
-        </label>
+        {!user && (
+          <p className="rounded-lg bg-primary/5 p-3 text-sm text-muted">
+            هذه الشاشة تنشئ حساب مدير فقط. حساب الكاشير يُمنح من سجل الموظف.
+          </p>
+        )}
         <Field
           label={user ? "كلمة مرور جديدة (اختياري)" : "كلمة المرور"}
           value={form.password}

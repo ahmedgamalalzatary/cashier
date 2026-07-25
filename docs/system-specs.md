@@ -8,17 +8,17 @@
 
 ## 1. Overview
 
-A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inventory management. Goods are purchased from suppliers into the **main warehouse**, transferred on request to the **cafe**, and sold there either as **recipe products** (deducting ingredients) or **as-is items**. The system also manages shifts, employees, attendance, salaries, expenses, waste, refunds, and full reporting.
+A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inventory management. Goods are purchased from suppliers into the **main warehouse**, transferred on request to the **cafe**, and sold there either as **recipe products** (deducting ingredients) or **as-is items**. The system also manages shifts, employee records, salaries, expenses, waste, refunds, and full reporting.
 
-| Decision | Locked choice |
-|---|---|
-| Deployment | Cloud web app (internet required at shop) |
-| Roles | Admin + Cashier |
-| Language | Arabic only, RTL layout |
-| Currency | EGP |
-| Branches | One branch (main warehouse + one cafe) |
-| Costing | FIFO with purchase batches |
-| Stack | Next.js frontend + Express.js backend + MySQL (Drizzle ORM) |
+| Decision   | Locked choice                                               |
+| ---------- | ----------------------------------------------------------- |
+| Deployment | Cloud web app (internet required at shop)                   |
+| Roles      | Admin + Cashier                                             |
+| Language   | Arabic only, RTL layout                                     |
+| Currency   | EGP                                                         |
+| Branches   | One branch (main warehouse + one cafe)                      |
+| Costing    | FIFO with purchase batches                                  |
+| Stack      | Next.js frontend + Express.js backend + MySQL (Drizzle ORM) |
 
 ---
 
@@ -32,21 +32,30 @@ A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inv
 
 ### Roles & permissions
 
-| Capability | Admin | Cashier |
-|---|---|---|
-| POS sales, discounts, refunds | ✔ | ✔ |
-| Open/close shift, shift expenses | ✔ | ✔ (own shift) |
-| Transfer requests (cafe → ask main) | ✔ | ✔ (create request) |
-| Approve transfers / direct transfers | ✔ | ✘ |
-| Cafe waste entry | ✔ | ✔ |
-| Main-warehouse waste, stocktake | ✔ | ✘ |
-| Items, categories, recipes, prices | ✔ | ✘ |
-| Application users and roles | ✔ | ✘ |
-| Purchases, suppliers, payments | ✔ | ✘ |
-| Employees, salaries, advances | ✔ | ✘ |
-| General expenses, expense categories | ✔ | ✘ |
-| Reports & dashboard | ✔ | ✘ |
-| Attendance screen (PIN clock-in/out) | shared screen — any employee with their personal PIN | |
+Only admins and cashiers can sign in. An employee record is a staff/HR record and has no system access by default.
+
+- An admin can grant an employee cashier access ("promote to cashier"). This creates one linked `users` account with the `cashier` role and login credentials.
+- Every cashier user must be linked one-to-one to an employee record. Employees without a linked user remain staff/payroll records only.
+- The employee keeps the same salary, advance, adjustment, and cashier shift history after cashier access is granted or revoked.
+- Revoking or deactivating the linked user blocks login without deleting or deactivating the employee record.
+- Cashier actions are stored against the authenticated user and are reportable through the linked employee, including shifts, orders, discounts, refunds, shift expenses, waste entries, and transfer requests where applicable.
+- There is no employee PIN or standalone attendance clock. Only cashiers have worked-time tracking, derived from their shift open and close times.
+
+| Capability                              | Admin | Cashier            |
+| --------------------------------------- | ----- | ------------------ |
+| POS sales, discounts, refunds           | ✘     | ✔                  |
+| Open/close shift, shift expenses        | ✘     | ✔ (own shift)      |
+| Force-close, reopen, or correct a shift | ✔     | ✘                  |
+| Transfer requests (cafe → ask main)     | ✔     | ✔ (create request) |
+| Approve transfers / direct transfers    | ✔     | ✘                  |
+| Cafe waste entry                        | ✔     | ✔                  |
+| Main-warehouse waste, stocktake         | ✔     | ✘                  |
+| Items, categories, recipes, prices      | ✔     | ✘                  |
+| Application users and roles             | ✔     | ✘                  |
+| Purchases, suppliers, payments          | ✔     | ✘                  |
+| Employees, salaries, advances           | ✔     | ✘                  |
+| General expenses, expense categories    | ✔     | ✘                  |
+| Reports & dashboard                     | ✔     | ✘                  |
 
 ---
 
@@ -64,19 +73,23 @@ A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inv
 ## 4. Items & Stock (Main Warehouse)
 
 ### Items
+
 - Fields: name (Arabic), category (main/sub), **stock unit** (kg, g, L, ml, piece, box, …), optional **purchase unit** with conversion factor (e.g. box = 12 pieces; bag = 25 kg), minimum stock level per warehouse, active flag.
 - Item types: **raw/resale item** (bought from suppliers) and **prepared item** (produced by a sub-recipe — see §10).
 
 ### FIFO batch costing
+
 - Every stock inflow creates a **batch**: quantity + unit cost + date + source (purchase, transfer-in, preparation, refund return, stocktake surplus).
 - Every outflow (sale, transfer-out, waste, stocktake shortage) consumes from the **oldest batch first**; the consumed cost is recorded on the movement.
 - Transfers move quantities **with their batch costs** from main warehouse batches into cafe batches.
 - Stock value at any time = Σ(remaining batch qty × batch cost) per warehouse.
 
 ### Alerts
+
 - Low-stock alert per item per warehouse when quantity ≤ minimum level. Shown on dashboard and items list. No expiry-date tracking.
 
 ### Stocktake (جرد)
+
 - Admin starts a stocktake session for a warehouse (all items or a selected category).
 - Enters actual counted quantities; system shows difference vs. recorded stock.
 - Confirming saves an **adjustment document** (with reason note): shortages consume FIFO batches and are reported as **shrinkage**; surpluses create a batch at current FIFO cost and are reported as **surplus**.
@@ -87,10 +100,12 @@ A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inv
 ## 5. Suppliers & Purchases
 
 ### Suppliers
+
 - Fields: name, phone, address/notes, opening balance, active flag.
 - **Account statement** per supplier: invoices, payments, running balance.
 
 ### Purchase invoices (into main warehouse only)
+
 - Header: supplier, date, invoice number (supplier's paper ref), notes.
 - Lines: item, quantity (in purchase or stock unit), unit price → each line creates a FIFO batch.
 - **Payment on invoice:** paid in full, partial, or fully on credit (آجل). Unpaid remainder increases the supplier's balance.
@@ -132,29 +147,32 @@ A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inv
 
 - **One open shift at a time** (single drawer). Orders, refunds, and shift expenses can only be recorded while a shift is open, and attach to it.
 - **Open:** cashier logs in and enters the counted **starting float**.
-- **During:** shift screen shows running totals (orders count, sales, discounts, refunds, expenses).
+- Each shift records the authenticated cashier user and, through that user's required employee link, the employee who operated it.
+- A cashier's worked time is the shift duration from open to close. Non-cashier employees have no attendance or worked-hours tracking.
+- **During:** shift screen shows running totals (orders count, sales, discounts, transfer requests, refunds, expenses, and waste actions).
 - **Close:** cashier counts the drawer and enters **actual cash**. System computes:
   - `expected = float + cash sales − cash refunds − shift expenses`
   - `over/short = actual − expected`
 - Over/short is stored against the shift and cashier, with full history in reports.
-- Admin can view and close a shift left open, and can reopen/correct a closed shift with an audit note.
+- Admin can view shifts, force-close a shift left open, and reopen/correct a closed shift with an audit note. Admin cannot open a shift.
 
 ---
 
-## 9. Employees, Attendance & Salaries
+## 9. Employees & Salaries
 
 ### Employee records
-- Fields: name, phone, job title, hire date, pay type + rate, personal attendance **PIN**, notes, active flag.
 
-### Attendance (check-in/out)
-- A dedicated attendance screen on the cafe device: employee taps their name, enters their PIN → clock in or out.
-- System computes daily hours and days present; admin can correct entries with an audit note.
+- Fields: name, phone, job title, hire date, pay type + rate, notes, active flag.
+- Employees are static HR/payroll records with no login permission by default. Admin can grant or revoke cashier access from an employee record without replacing that record or losing its history.
+- Non-cashier employees have no PIN, system login, attendance, or worked-hours tracking.
+- For a cashier, each shift records worked duration and all actions performed during that shift.
 
 ### Salaries
+
 - **Pay types (per employee):**
   - Monthly: fixed amount per month.
-  - Daily: rate × days present (from attendance).
-  - Hourly: rate × hours worked (from check-in/out).
+  - Daily: stored daily rate; worked days are not automatically tracked for non-cashiers.
+  - Hourly: stored hourly rate; automatic worked hours are available only for cashiers from their shifts.
 - **Advances (سلف):** recorded any time; cash out immediately (appears in cash-flow); accumulates against the employee until payday.
 - **Bonuses / deductions:** dated entries with amounts and notes.
 - **Payday screen:** for a chosen period per employee —
@@ -211,16 +229,18 @@ A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inv
 ## 14. Reports & Dashboard
 
 ### Dashboard (Admin home)
+
 - Today: sales, refunds, discounts, gross profit, orders count.
 - Open shift status (cashier, float, running totals).
 - Low-stock alerts (both warehouses) and negative-stock flags.
 - Pending transfer requests.
 
 ### Reports (all filterable by date range; all printable / exportable to PDF)
+
 1. **Sales & profit:** by day/period, by product, by category (main/sub), by shift, by cashier — revenue, FIFO COGS, gross profit, discounts, refunds.
 2. **Stock & movement:** current stock with FIFO value (main + cafe), full item movement ledger (purchases, transfers, sales, waste, adjustments, preparations), low-stock list, stocktake difference history.
 3. **Money & expenses:** cash flow (sales in; supplier payments, expenses, salaries, advances out), expense breakdown by category, shift over/short history, supplier outstanding balances.
-4. **Employees & attendance:** hours/days per employee, attendance log, salary history with advances/bonuses/deductions.
+4. **Employees & worked time:** cashier shift hours and actions by employee; salary history with advances/bonuses/deductions for all employees.
 5. **Waste & refunds:** totals and detail by item/product, reason, warehouse, period, recorded-by.
 6. **Suppliers:** account statements, purchases by supplier, balances summary.
 
@@ -228,12 +248,12 @@ A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inv
 
 ## 15. Data Model (core tables)
 
-`users` (admin/cashier, credentials) · `employees` (profile, pay type/rate, PIN) · `attendance_logs` · `salary_advances` · `salary_adjustments` (bonus/deduction) · `salary_payments`
+`users` (admin/cashier, credentials, one-to-one employee link required for cashiers) · `employees` (profile, pay type/rate; no PIN/login by default) · `salary_advances` · `salary_adjustments` (bonus/deduction) · `salary_payments`
 `categories` (self-referencing main/sub) · `items` (unit, conversion, type, minimums) · `stock_batches` (warehouse, item, qty remaining, unit cost, source) · `stock_movements` (ledger: type, warehouse, item, qty, cost, reference)
 `suppliers` · `purchase_invoices` + `purchase_lines` · `supplier_payments`
 `transfer_requests` + `transfers` + `transfer_lines`
 `recipes` (product/sub-recipe) + `recipe_sizes` + `recipe_ingredients` · `preparations` (batch runs)
-`shifts` · `orders` + `order_lines` (price + FIFO cost snapshot) · `refunds` + `refund_lines`
+`shifts` + `shift_events` · `orders` + `order_lines` (price + FIFO cost snapshot) · `refunds` + `refund_lines`
 `waste_entries` · `expenses` + `expense_categories` · `stocktakes` + `stocktake_lines`
 
 All stock changes go through `stock_movements` + `stock_batches` so every quantity and cost is traceable to a document.

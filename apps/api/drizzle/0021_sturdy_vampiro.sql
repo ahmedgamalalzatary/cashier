@@ -1,0 +1,2 @@
+ALTER TABLE `transfer_requests` ADD `shift_id` int;--> statement-breakpoint
+ALTER TABLE `transfer_requests` ADD CONSTRAINT `transfer_requests_shift_id_shifts_id_fk` FOREIGN KEY (`shift_id`) REFERENCES `shifts`(`id`) ON DELETE no action ON UPDATE no action;

@@ -148,6 +148,9 @@ export class OrdersService {
           return existing.id;
         }
 
+        const shift = await repo.findOpenShiftForCashier(cashierId);
+        if (!shift) throw new HttpError(409, "يجب فتح وردية قبل تسجيل البيع");
+
         const normalized = normalizeLines(data.lines);
         const recipeInputs = normalized.filter(
           (line): line is Extract<NormalizedLine, { type: "recipe" }> =>
@@ -278,7 +281,7 @@ export class OrdersService {
           clientRequestId: data.clientRequestId,
           requestFingerprint: fingerprint,
           cashierId,
-          shiftId: null,
+          shiftId: shift.id,
           subtotal: formatScaled(subtotal, 2),
           discountType: data.discount?.type ?? null,
           discountValue:

@@ -76,12 +76,16 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 
 ## 8. Shifts
 
-- [ ] `shifts` table (one open at a time)
-- [ ] Open with counted float
-- [ ] Shift screen: running totals (orders, sales, discounts, refunds, expenses)
-- [ ] Close with counted drawer → expected vs actual → over/short per cashier
-- [ ] Orders/refunds/expenses blocked unless a shift is open
-- [ ] Admin: close-left-open / reopen with audit note
+- [x] `shifts` table (one open at a time)
+- [x] Each shift records the authenticated cashier user and linked employee
+- [x] Cashier-only open with counted float; admin cannot open
+- [x] Shift screen: worked duration and running order, sales, discount, and transfer-request totals
+- [x] Refund, expense, and waste total fields are ready for their later modules
+- [x] Close with counted drawer → expected vs actual → over/short per cashier
+- [x] Orders blocked unless the authenticated cashier owns the open shift
+- [x] Cashier transfer requests blocked without the cashier's open shift and linked to it
+- [ ] Refunds/expenses blocked unless a shift is open (complete with those later modules)
+- [x] Admin: force-close / reopen / correct with audit note
 
 ## 9. Refunds
 
@@ -102,15 +106,19 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 - [ ] Shift expenses (cashier, from drawer → reduces expected cash)
 - [ ] General expenses (admin, anytime)
 
-## 12. Employees & Attendance
+## 12. Employees & Cashier Work Time
 
-- [ ] `employees` (profile, pay type/rate, PIN)
-- [ ] Attendance screen (name + PIN clock in/out) + `attendance_logs`
-- [ ] Hours/days computation + admin corrections with audit note
+- [x] `employees` (profile, pay type/rate, notes, active flag; no PIN)
+- [x] Employees have no login access by default; admin can grant/revoke cashier access
+- [x] One-to-one employee ↔ user link (required for cashier users) with preserved employee history
+- [x] Existing cashier users are migrated to linked employee records
+- [x] Cashier actions remain audited by user and reportable through the linked employee
+- [x] Cashier shift open/close provides worked-time tracking
+- [x] Non-cashier employees have no login, PIN, attendance, or worked-hours tracking
 
 ## 13. Salaries
 
-- [ ] Pay types: monthly / daily / hourly (from attendance)
+- [ ] Salary calculations for monthly / daily / hourly pay types (automatic worked hours only for cashiers from shifts)
 - [ ] `salary_advances` (cash out immediately) + `salary_adjustments` (bonus/deduction)
 - [ ] Payday screen: net = pay + bonuses − deductions − advances → `salary_payments`
 - [ ] Salary history per employee
@@ -127,7 +135,7 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 - [ ] Sales & profit (day/product/category/shift/cashier, COGS, discounts, refunds)
 - [ ] Stock & movement ledger + stocktake history
 - [ ] Money & expenses (cash flow, category breakdown, over/short, supplier balances)
-- [ ] Employees & attendance + salary history
+- [ ] Employees, cashier worked-time, cashier actions + salary history
 - [ ] Waste & refunds report
 - [ ] Suppliers report (statements, purchases, balances)
 - [ ] PDF export (Arabic) for every report

@@ -1,11 +1,12 @@
 import { Router } from "express";
+import { requireRole } from "../../middleware/auth.js";
 import type { OrdersController } from "./orders.controller.js";
 
 export function ordersRouter(controller: OrdersController) {
   const router = Router();
   router.get("/catalog", controller.catalog);
   router.get("/", controller.list);
-  router.post("/", controller.create);
+  router.post("/", requireRole("cashier"), controller.create);
   router.get("/:id", controller.get);
   return router;
 }

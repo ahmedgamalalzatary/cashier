@@ -1,20 +1,29 @@
-import { HttpError } from '../../middleware/error.js';
-import type { TransfersRepository } from './transfers.repository.js';
+import { HttpError } from "../../middleware/error.js";
+import type { AuthUser } from "@cashier/shared";
+import type { TransfersRepository } from "./transfers.repository.js";
 import type {
   TransferApprovalInput,
   TransferRequestInput,
-} from './transfers.schemas.js';
+} from "./transfers.schemas.js";
 
 const quantityText = (quantity: number) => quantity.toFixed(3);
 
 export class TransfersService {
   constructor(private repo: TransfersRepository) {}
 
-  createRequest(data: TransferRequestInput, requestedBy: number) {
+  createRequest(data: TransferRequestInput, actor: AuthUser) {
     return this.repo.transaction(async (repo) => {
+      const shift =
+        actor.role === "cashier"
+          ? await repo.findOpenShiftForCashier(actor.id)
+          : null;
+      if (actor.role === "cashier" && !shift) {
+        throw new HttpError(409, "يجب فتح وردية قبل تسجيل طلب التحويل");
+      }
       await this.validateItems(repo, data.lines);
       const requestId = await repo.createRequest({
-        requestedBy,
+        requestedBy: actor.id,
+        shiftId: shift?.id ?? null,
         notes: data.notes ?? null,
       });
       for (const line of data.lines) {
@@ -34,16 +43,16 @@ export class TransfersService {
 
   async getRequest(id: number) {
     const row = await this.repo.findRequestById(id);
-    if (!row) throw new HttpError(404, 'طلب التحويل غير موجود');
+    if (!row) throw new HttpError(404, "طلب التحويل غير موجود");
     return { ...row, lines: await this.repo.listRequestLines(id) };
   }
 
   approveRequest(id: number, data: TransferApprovalInput, approvedBy: number) {
     return this.repo.transaction(async (repo, inventory) => {
       const request = await repo.lockRequest(id);
-      if (!request) throw new HttpError(404, 'طلب التحويل غير موجود');
-      if (request.status !== 'pending')
-        throw new HttpError(409, 'تمت مراجعة طلب التحويل من قبل');
+      if (!request) throw new HttpError(404, "طلب التحويل غير موجود");
+      if (request.status !== "pending")
+        throw new HttpError(409, "تمت مراجعة طلب التحويل من قبل");
 
       const requestedLines = await repo.listRequestLines(id);
       const requestedItemIds = new Set(
@@ -55,7 +64,7 @@ export class TransfersService {
       ) {
         throw new HttpError(
           400,
-          'يجب اعتماد جميع أصناف الطلب دون إضافة أو حذف أصناف',
+          "يجب اعتماد جميع أصناف الطلب دون إضافة أو حذف أصناف",
         );
       }
       await this.validateItems(repo, data.lines);
@@ -78,9 +87,9 @@ export class TransfersService {
   rejectRequest(id: number, reason: string, reviewedBy: number) {
     return this.repo.transaction(async (repo) => {
       const request = await repo.lockRequest(id);
-      if (!request) throw new HttpError(404, 'طلب التحويل غير موجود');
-      if (request.status !== 'pending')
-        throw new HttpError(409, 'تمت مراجعة طلب التحويل من قبل');
+      if (!request) throw new HttpError(404, "طلب التحويل غير موجود");
+      if (request.status !== "pending")
+        throw new HttpError(409, "تمت مراجعة طلب التحويل من قبل");
       await repo.rejectRequest(id, reviewedBy, reason);
     });
   }
@@ -108,7 +117,7 @@ export class TransfersService {
 
   async getTransfer(id: number) {
     const row = await this.repo.findTransferById(id);
-    if (!row) throw new HttpError(404, 'التحويل غير موجود');
+    if (!row) throw new HttpError(404, "التحويل غير موجود");
     return { ...row, lines: await this.repo.listTransferLines(id) };
   }
 
@@ -120,7 +129,7 @@ export class TransfersService {
     const rowsById = new Map(rows.map((row) => [row.id, row]));
     for (const line of lines) {
       const item = rowsById.get(line.itemId);
-      if (!item) throw new HttpError(404, 'أحد الأصناف غير موجود');
+      if (!item) throw new HttpError(404, "أحد الأصناف غير موجود");
       if (!item.isActive)
         throw new HttpError(409, `الصنف "${item.name}" موقوف`);
     }
@@ -128,9 +137,7 @@ export class TransfersService {
 
   private async moveStock(
     repo: TransfersRepository,
-    inventory: Parameters<
-      Parameters<TransfersRepository['transaction']>[0]
-    >[1],
+    inventory: Parameters<Parameters<TransfersRepository["transaction"]>[0]>[1],
     header: {
       requestId: number | null;
       createdBy: number;
@@ -145,24 +152,24 @@ export class TransfersService {
     for (const line of orderedLines) {
       const consumed = await inventory.consume({
         itemId: line.itemId,
-        warehouse: 'main',
+        warehouse: "main",
         quantity: line.quantity,
-        movementType: 'transfer_out',
-        referenceType: 'transfer',
+        movementType: "transfer_out",
+        referenceType: "transfer",
         referenceId: transferId,
         occurredAt,
       });
       for (const allocation of consumed.allocations) {
         if (allocation.batchId === null) {
-          throw new HttpError(409, 'الرصيد المتاح لا يكفي');
+          throw new HttpError(409, "الرصيد المتاح لا يكفي");
         }
         const received = await inventory.receive({
           itemId: line.itemId,
-          warehouse: 'cafe',
+          warehouse: "cafe",
           quantity: Number(allocation.quantity),
           unitCost: allocation.unitCost,
-          movementType: 'transfer_in',
-          referenceType: 'transfer',
+          movementType: "transfer_in",
+          referenceType: "transfer",
           referenceId: transferId,
           occurredAt,
         });

@@ -20,6 +20,73 @@ export type ManagedUser = AuthUser & {
   createdAt: string;
 };
 
+export type EmployeePayType = "monthly" | "daily" | "hourly";
+
+export type CashierAccess = {
+  userId: number;
+  username: string;
+  isActive: boolean;
+};
+
+export type Employee = {
+  id: number;
+  name: string;
+  phone: string | null;
+  jobTitle: string | null;
+  hireDate: string | null;
+  payType: EmployeePayType | null;
+  payRate: string | null;
+  notes: string | null;
+  isActive: boolean;
+  cashierAccess: CashierAccess | null;
+  createdAt: string;
+};
+
+export type ShiftTotals = {
+  ordersCount: number;
+  sales: string;
+  discounts: string;
+  transferRequests: number;
+  refunds: string;
+  expenses: string;
+  wasteEntries: number;
+};
+
+export type ShiftEventAction =
+  "open" | "close" | "admin_close" | "reopen" | "correction";
+
+export type ShiftEvent = {
+  id: number;
+  action: ShiftEventAction;
+  actorUserId: number;
+  note: string | null;
+  openingFloat: string | null;
+  actualCash: string | null;
+  expectedCash: string | null;
+  overShort: string | null;
+  occurredAt: string;
+};
+
+export type Shift = {
+  id: number;
+  status: "open" | "closed";
+  cashierUserId: number;
+  employeeId: number;
+  cashierName: string;
+  openingFloat: string;
+  openedAt: string;
+  closedAt: string | null;
+  closedByUserId: number | null;
+  actualCash: string | null;
+  expectedCash: string | null;
+  overShort: string | null;
+  workedMinutes: number;
+  totals: ShiftTotals;
+  events: ShiftEvent[];
+};
+
+export type CurrentShift = Shift | { occupied: true };
+
 export type Supplier = {
   id: number;
   name: string;
@@ -139,6 +206,7 @@ export type TransferRequestStatus = "pending" | "approved" | "rejected";
 export type TransferRequestSummary = {
   id: number;
   requestedBy: number;
+  shiftId: number | null;
   requestedByName: string;
   notes: string | null;
   status: TransferRequestStatus;

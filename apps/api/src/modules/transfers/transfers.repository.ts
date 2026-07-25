@@ -1,21 +1,22 @@
-import { asc, desc, eq, inArray, sql } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/mysql-core';
-import type { Db } from '../../db/index.js';
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/mysql-core";
+import type { Db } from "../../db/index.js";
 import {
   items,
+  shifts,
   transferLines,
   transferRequestLines,
   transferRequests,
   transfers,
   users,
-} from '../../db/schema.js';
-import { InventoryRepository } from '../inventory/inventory.repository.js';
-import { InventoryTransaction } from '../inventory/inventory.service.js';
+} from "../../db/schema.js";
+import { InventoryRepository } from "../inventory/inventory.repository.js";
+import { InventoryTransaction } from "../inventory/inventory.service.js";
 
-const requester = alias(users, 'transfer_requester');
-const reviewer = alias(users, 'transfer_reviewer');
-const transferCreator = alias(users, 'transfer_creator');
-const transferApprover = alias(users, 'transfer_approver');
+const requester = alias(users, "transfer_requester");
+const reviewer = alias(users, "transfer_reviewer");
+const transferCreator = alias(users, "transfer_creator");
+const transferApprover = alias(users, "transfer_approver");
 
 export class TransfersRepository {
   constructor(private db: Db) {}
@@ -46,10 +47,25 @@ export class TransfersRepository {
         ),
       )
       .orderBy(asc(items.id))
-      .for('update');
+      .for("update");
   }
 
-  async createRequest(data: { requestedBy: number; notes: string | null }) {
+  async findOpenShiftForCashier(cashierUserId: number) {
+    const [row] = await this.db
+      .select({ id: shifts.id })
+      .from(shifts)
+      .where(
+        and(eq(shifts.openSlot, 1), eq(shifts.cashierUserId, cashierUserId)),
+      )
+      .for("update");
+    return row;
+  }
+
+  async createRequest(data: {
+    requestedBy: number;
+    shiftId: number | null;
+    notes: string | null;
+  }) {
     const [result] = await this.db.insert(transferRequests).values(data);
     return result.insertId;
   }
@@ -72,6 +88,7 @@ export class TransfersRepository {
       .select({
         id: transferRequests.id,
         requestedBy: transferRequests.requestedBy,
+        shiftId: transferRequests.shiftId,
         requestedByName: requester.name,
         notes: transferRequests.notes,
         status: transferRequests.status,
@@ -93,6 +110,7 @@ export class TransfersRepository {
       .select({
         id: transferRequests.id,
         requestedBy: transferRequests.requestedBy,
+        shiftId: transferRequests.shiftId,
         requestedByName: requester.name,
         notes: transferRequests.notes,
         status: transferRequests.status,
@@ -114,7 +132,7 @@ export class TransfersRepository {
       .select()
       .from(transferRequests)
       .where(eq(transferRequests.id, id))
-      .for('update');
+      .for("update");
     return row;
   }
 
@@ -157,7 +175,7 @@ export class TransfersRepository {
   async approveRequest(id: number, reviewedBy: number) {
     await this.db
       .update(transferRequests)
-      .set({ status: 'approved', reviewedBy, reviewedAt: new Date() })
+      .set({ status: "approved", reviewedBy, reviewedAt: new Date() })
       .where(eq(transferRequests.id, id));
   }
 
@@ -165,7 +183,7 @@ export class TransfersRepository {
     await this.db
       .update(transferRequests)
       .set({
-        status: 'rejected',
+        status: "rejected",
         reviewedBy,
         rejectionReason: reason,
         reviewedAt: new Date(),

@@ -1,9 +1,9 @@
-import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
 import { IconButton } from "../../../src/components/ui/icon-button";
 
-describe('users icon actions', () => {
-  it('uses the action title as the accessible button name', () => {
+describe("users icon actions", () => {
+  it("uses the action title as the accessible button name", () => {
     const markup = renderToStaticMarkup(
       <IconButton title="Edit user" onClick={() => undefined}>
         icon
@@ -12,5 +12,15 @@ describe('users icon actions', () => {
 
     expect(markup).toContain('title="Edit user"');
     expect(markup).toContain('aria-label="Edit user"');
+  });
+
+  it("forwards the disabled state to unavailable icon actions", () => {
+    const markup = renderToStaticMarkup(
+      <IconButton title="Unavailable" onClick={() => undefined} disabled>
+        icon
+      </IconButton>,
+    );
+
+    expect(markup).toContain('disabled=""');
   });
 });

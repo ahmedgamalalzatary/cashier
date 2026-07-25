@@ -15,16 +15,34 @@ import {
   type AnyMySqlColumn,
 } from "drizzle-orm/mysql-core";
 
-export const users = mysqlTable("users", {
+export const employees = mysqlTable("employees", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 191 }).notNull(),
-  username: varchar("username", { length: 100 }).notNull().unique(),
-  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
-  tokenVersion: int("token_version").notNull().default(0),
-  role: mysqlEnum("role", ["admin", "cashier"]).notNull(),
+  phone: varchar("phone", { length: 50 }),
+  jobTitle: varchar("job_title", { length: 100 }),
+  hireDate: date("hire_date", { mode: "string" }),
+  payType: mysqlEnum("pay_type", ["monthly", "daily", "hourly"]),
+  payRate: decimal("pay_rate", { precision: 12, scale: 2 }),
+  notes: text("notes"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export const users = mysqlTable(
+  "users",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    employeeId: int("employee_id").references(() => employees.id),
+    name: varchar("name", { length: 191 }).notNull(),
+    username: varchar("username", { length: 100 }).notNull().unique(),
+    passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+    tokenVersion: int("token_version").notNull().default(0),
+    role: mysqlEnum("role", ["admin", "cashier"]).notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("users_employee_id_uidx").on(table.employeeId)],
+);
 
 // two levels only: main (parentId null) → sub (parentId = a main category)
 export const categories = mysqlTable(
@@ -199,6 +217,7 @@ export const transferRequests = mysqlTable(
     requestedBy: int("requested_by")
       .notNull()
       .references(() => users.id),
+    shiftId: int("shift_id").references((): AnyMySqlColumn => shifts.id),
     notes: text("notes"),
     status: mysqlEnum("status", ["pending", "approved", "rejected"])
       .notNull()
@@ -402,6 +421,69 @@ export const preparationAllocations = mysqlTable(
   ],
 );
 
+export const shifts = mysqlTable(
+  "shifts",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    cashierUserId: int("cashier_user_id")
+      .notNull()
+      .references(() => users.id),
+    employeeId: int("employee_id")
+      .notNull()
+      .references(() => employees.id),
+    status: mysqlEnum("status", ["open", "closed"]).notNull().default("open"),
+    openSlot: int("open_slot"),
+    openingFloat: decimal("opening_float", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    openedAt: timestamp("opened_at").notNull(),
+    closedAt: timestamp("closed_at"),
+    closedByUserId: int("closed_by_user_id").references(() => users.id),
+    actualCash: decimal("actual_cash", { precision: 12, scale: 2 }),
+    expectedCash: decimal("expected_cash", { precision: 12, scale: 2 }),
+    overShort: decimal("over_short", { precision: 12, scale: 2 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("shifts_open_slot_uidx").on(table.openSlot),
+    index("shifts_cashier_opened_idx").on(table.cashierUserId, table.openedAt),
+    index("shifts_employee_opened_idx").on(table.employeeId, table.openedAt),
+  ],
+);
+
+export const shiftEvents = mysqlTable(
+  "shift_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    shiftId: int("shift_id")
+      .notNull()
+      .references(() => shifts.id),
+    action: mysqlEnum("action", [
+      "open",
+      "close",
+      "admin_close",
+      "reopen",
+      "correction",
+    ]).notNull(),
+    actorUserId: int("actor_user_id")
+      .notNull()
+      .references(() => users.id),
+    note: varchar("note", { length: 500 }),
+    openingFloat: decimal("opening_float", { precision: 12, scale: 2 }),
+    actualCash: decimal("actual_cash", { precision: 12, scale: 2 }),
+    expectedCash: decimal("expected_cash", { precision: 12, scale: 2 }),
+    overShort: decimal("over_short", { precision: 12, scale: 2 }),
+    occurredAt: timestamp("occurred_at").notNull(),
+  },
+  (table) => [
+    index("shift_events_shift_occurred_idx").on(
+      table.shiftId,
+      table.occurredAt,
+    ),
+  ],
+);
+
 export const orders = mysqlTable(
   "orders",
   {
@@ -416,8 +498,7 @@ export const orders = mysqlTable(
     cashierId: int("cashier_id")
       .notNull()
       .references(() => users.id),
-    // Phase 8 adds the shifts table, FK, and open-shift enforcement.
-    shiftId: int("shift_id"),
+    shiftId: int("shift_id").references(() => shifts.id),
     subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
     discountType: mysqlEnum("discount_type", ["percent", "fixed"]),
     discountValue: decimal("discount_value", {

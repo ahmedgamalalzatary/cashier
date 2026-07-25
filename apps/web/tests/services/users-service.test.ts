@@ -25,9 +25,9 @@ describe("users service", () => {
 
   it("creates and updates users", async () => {
     const createBody = {
-      name: "Cashier",
-      username: "cashier",
-      role: "cashier" as const,
+      name: "Admin",
+      username: "admin-two",
+      role: "admin" as const,
       password: "secret-123",
     };
     const updateBody = { name: "Evening cashier" };

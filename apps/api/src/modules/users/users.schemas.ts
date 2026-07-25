@@ -14,7 +14,10 @@ export const userInput = editableFields
     username: true,
     role: true,
   })
-  .extend({ password });
+  .extend({
+    role: z.literal("admin"),
+    password,
+  });
 
 export const userUpdateInput = editableFields
   .partial()

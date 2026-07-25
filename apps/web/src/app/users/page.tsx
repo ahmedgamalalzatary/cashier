@@ -67,14 +67,14 @@ export default function UsersPage() {
               setFormOpen(true);
             }}
           >
-            <Plus className="size-4" /> مستخدم جديد
+            <Plus className="size-4" /> مدير جديد
           </Button>
         }
       />
 
       <p className="mb-5 max-w-2xl text-sm leading-6 text-muted">
-        أنشئ حساباً مستقلاً لكل كاشير، وحدد صلاحياته، وأوقف الحساب فور انتهاء
-        عمله.
+        إدارة حسابات النظام. أنشئ المديرين هنا، وامنح دخول الكاشير من شاشة
+        الموظفين حتى تظل وردياته وساعات عمله مرتبطة بسجله.
       </p>
 
       {error && (
@@ -115,30 +115,36 @@ export default function UsersPage() {
                 </Badge>
               </td>
               <td className="px-4 py-3">
-                <div className="flex items-center gap-1">
-                  <IconButton
-                    title="تعديل الحساب أو كلمة المرور"
-                    onClick={() => {
-                      setEditing(user);
-                      setFormOpen(true);
-                    }}
-                  >
-                    <Pencil className="size-4" />
-                  </IconButton>
-                  {user.id !== currentUser?.id && (
+                {user.role === "admin" ? (
+                  <div className="flex items-center gap-1">
                     <IconButton
-                      title={user.isActive ? "إيقاف الحساب" : "تفعيل الحساب"}
-                      danger={user.isActive}
-                      onClick={() => setActive(user, !user.isActive)}
+                      title="تعديل الحساب أو كلمة المرور"
+                      onClick={() => {
+                        setEditing(user);
+                        setFormOpen(true);
+                      }}
                     >
-                      {user.isActive ? (
-                        <Ban className="size-4" />
-                      ) : (
-                        <Power className="size-4" />
-                      )}
+                      <Pencil className="size-4" />
                     </IconButton>
-                  )}
-                </div>
+                    {user.id !== currentUser?.id && (
+                      <IconButton
+                        title={user.isActive ? "إيقاف الحساب" : "تفعيل الحساب"}
+                        danger={user.isActive}
+                        onClick={() => setActive(user, !user.isActive)}
+                      >
+                        {user.isActive ? (
+                          <Ban className="size-4" />
+                        ) : (
+                          <Power className="size-4" />
+                        )}
+                      </IconButton>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-xs text-muted">
+                    يُدار من سجل الموظف
+                  </span>
+                )}
               </td>
             </tr>
           ))}
