@@ -107,7 +107,8 @@ export function PurchaseInvoiceForm() {
           purchasedAt,
           paidAmount,
           notes,
-          lines,
+          // displayed newest-first; save in entry order
+          lines: [...lines].reverse(),
         }),
       );
       router.push(`/purchases/${created.id}`);
@@ -186,8 +187,8 @@ export function PurchaseInvoiceForm() {
               variant="ghost"
               onClick={() =>
                 setLines((current) => [
-                  ...current,
                   newPurchaseLine(nextKey.current++),
+                  ...current,
                 ])
               }
             >
@@ -197,6 +198,9 @@ export function PurchaseInvoiceForm() {
 
           <div className="space-y-3">
             {lines.map((line, index) => {
+              // lines are newest-first, so number them from the bottom up to
+              // keep each line's number stable as new ones are added on top
+              const lineNumber = lines.length - index;
               const item = itemMap.get(Number(line.itemId));
               const amounts = purchaseLineAmounts(line, item);
               const selectedElsewhere = new Set(
@@ -211,11 +215,11 @@ export function PurchaseInvoiceForm() {
                 >
                   <div className="mb-3 flex items-center justify-between">
                     <span className="flex size-7 items-center justify-center rounded-full bg-sidebar text-xs font-bold text-accent">
-                      {index + 1}
+                      {lineNumber}
                     </span>
                     <button
                       type="button"
-                      aria-label={`حذف الصنف رقم ${index + 1}`}
+                      aria-label={`حذف الصنف رقم ${lineNumber}`}
                       title="حذف الصنف"
                       disabled={lines.length === 1}
                       onClick={() =>
