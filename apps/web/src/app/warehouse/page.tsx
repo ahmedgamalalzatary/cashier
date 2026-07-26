@@ -18,7 +18,7 @@ import type {
   Item,
   ItemType,
 } from "@cashier/shared";
-import { formatMoney, sumDecimalValues } from "@/lib/format";
+import { formatItemCode, formatMoney, sumDecimalValues } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -226,6 +226,7 @@ export default function WarehousePage() {
       ) : (
         <Table
           headers={[
+            "الكود",
             "الصنف",
             "التصنيف",
             "النوع",
@@ -240,6 +241,9 @@ export default function WarehousePage() {
             const item = items.find((candidate) => candidate.id === row.itemId);
             return (
               <tr key={row.itemId} className={row.isActive ? "" : "opacity-55"}>
+                <td className="px-4 py-3 tnum text-muted">
+                  {formatItemCode(row.code)}
+                </td>
                 <td className="px-4 py-3 font-medium">{row.name}</td>
                 <td className="px-4 py-3 text-muted">{row.categoryName}</td>
                 <td className="px-4 py-3">{typeLabels[row.type]}</td>

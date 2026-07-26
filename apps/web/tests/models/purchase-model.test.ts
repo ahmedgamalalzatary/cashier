@@ -9,6 +9,7 @@ import {
 
 const item: Item = {
   id: 4,
+  code: 4,
   name: "بن",
   categoryId: 1,
   categoryName: "خامات",

@@ -141,6 +141,7 @@ export class TransfersRepository {
       .select({
         id: transferRequestLines.id,
         itemId: transferRequestLines.itemId,
+        itemCode: items.code,
         itemName: items.name,
         stockUnit: items.stockUnit,
         quantity: transferRequestLines.quantity,
@@ -251,6 +252,7 @@ export class TransfersRepository {
       .select({
         id: transferLines.id,
         itemId: transferLines.itemId,
+        itemCode: items.code,
         itemName: items.name,
         stockUnit: items.stockUnit,
         quantity: transferLines.quantity,

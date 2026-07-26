@@ -32,7 +32,9 @@ export class ItemsService {
   create(data: ItemInput) {
     return this.repo.transaction(async (repo) => {
       await this.validateCategory(repo, data.categoryId);
-      return repo.create(data);
+      // codes are system-assigned; nextItemCode locks the table it reads, so
+      // concurrent creates queue up rather than racing for the same number
+      return repo.create(data, await repo.nextItemCode());
     });
   }
 

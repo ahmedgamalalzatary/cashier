@@ -9,7 +9,7 @@ import {
   stockMovements,
   transferRequests,
 } from "../../../src/db/schema.js";
-import { appOptions, db } from "../../support/setup.js";
+import { appOptions, db, nextTestItemCode } from "../../support/setup.js";
 import { createUser, loginAs } from "../../support/helpers.js";
 
 const app = () => createApp(db, appOptions);
@@ -38,6 +38,7 @@ async function loginSecondCashier() {
 async function createItem(name = "بن") {
   const [category] = await db.insert(categories).values({ name: "خامات" });
   const [item] = await db.insert(items).values({
+    code: nextTestItemCode(),
     name,
     categoryId: category.insertId,
     type: "raw",

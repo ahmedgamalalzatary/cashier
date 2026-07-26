@@ -28,7 +28,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table } from "@/components/ui/table";
-import { formatMoney, sumDecimalValues } from "@/lib/format";
+import { formatItemCode, formatMoney, sumDecimalValues } from "@/lib/format";
 import {
   getCafeWarehouseStock,
   getMainWarehouseStock,
@@ -159,9 +159,10 @@ function StockTable({ rows }: { rows: InventoryStockRow[] }) {
   if (rows.length === 0)
     return <Empty icon={<Boxes className="size-8" />} title="لا يوجد رصيد في الكافيه بعد" description="أنشئ طلب تحويل، ثم يعتمد المدير الكميات المتاحة من المخزن الرئيسي." />;
   return (
-    <Table headers={["الصنف", "التصنيف", "الرصيد", "حد التنبيه", "قيمة FIFO", "الحالة"]}>
+    <Table headers={["الكود", "الصنف", "التصنيف", "الرصيد", "حد التنبيه", "قيمة FIFO", "الحالة"]}>
       {rows.map((row) => (
         <tr key={row.itemId} className={row.isActive ? "" : "opacity-55"}>
+          <td className="px-4 py-3 tnum text-muted">{formatItemCode(row.code)}</td>
           <td className="px-4 py-3 font-medium">{row.name}</td>
           <td className="px-4 py-3 text-muted">{row.categoryName}</td>
           <td className="px-4 py-3 tnum font-medium">{Number(row.quantity).toLocaleString("ar-EG", { maximumFractionDigits: 3 })} {row.stockUnit}</td>

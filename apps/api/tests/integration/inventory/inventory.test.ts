@@ -4,7 +4,7 @@ import { categories, items, stockBatches } from "../../../src/db/schema.js";
 import { InventoryRepository } from "../../../src/modules/inventory/inventory.repository.js";
 import type { InventoryRepositoryPort } from "../../../src/modules/inventory/inventory.repository.js";
 import { InventoryService } from "../../../src/modules/inventory/inventory.service.js";
-import { db } from "../../support/setup.js";
+import { db, nextTestItemCode } from "../../support/setup.js";
 
 let itemId: number;
 let service: InventoryService;
@@ -12,6 +12,7 @@ let service: InventoryService;
 beforeEach(async () => {
   const [category] = await db.insert(categories).values({ name: "خامات" });
   const [item] = await db.insert(items).values({
+    code: nextTestItemCode(),
     name: "بن",
     categoryId: category.insertId,
     type: "raw",

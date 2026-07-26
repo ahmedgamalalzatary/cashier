@@ -8,6 +8,14 @@ export function formatMoney(value: number | string) {
   return egp.format(Number(value));
 }
 
+export function formatItemCode(code: number) {
+  return String(code).padStart(4, "0");
+}
+
+export function itemLabel(code: number, name: string) {
+  return `${formatItemCode(code)} · ${name}`;
+}
+
 export function sumDecimalValues(values: string[]) {
   if (values.length === 0) return "0";
   const scale = Math.max(

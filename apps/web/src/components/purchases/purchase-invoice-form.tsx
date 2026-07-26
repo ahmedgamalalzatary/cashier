@@ -6,7 +6,7 @@ import { Plus, ReceiptText, Trash2 } from "lucide-react";
 import type { Item, Supplier } from "@cashier/shared";
 import { Button } from "@/components/ui/button";
 import { Field, TextAreaField } from "@/components/ui/field";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, itemLabel } from "@/lib/format";
 import {
   newPurchaseLine,
   purchaseLineAmounts,
@@ -250,7 +250,7 @@ export function PurchaseInvoiceForm() {
                           value={candidate.id}
                           disabled={selectedElsewhere.has(candidate.id)}
                         >
-                          {candidate.name}
+                          {itemLabel(candidate.code, candidate.name)}
                         </option>
                       ))}
                     </SelectField>

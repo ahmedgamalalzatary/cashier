@@ -12,7 +12,7 @@ import {
   stockBatches,
   stockMovements,
 } from "../../../src/db/schema.js";
-import { appOptions, db } from "../../support/setup.js";
+import { appOptions, db, nextTestItemCode } from "../../support/setup.js";
 import { loginAs } from "../../support/helpers.js";
 
 const app = () => createApp(db, appOptions);
@@ -39,6 +39,7 @@ async function createProductFixture() {
     parentId: mainCategory.insertId,
   });
   const [ingredient] = await db.insert(items).values({
+    code: nextTestItemCode(),
     name: "بن",
     categoryId: subCategory.insertId,
     type: "raw",
@@ -202,6 +203,7 @@ describe("POS orders", () => {
       parentId: parentCategory.insertId,
     });
     await db.insert(items).values({
+      code: nextTestItemCode(),
       name: "Hidden resale item",
       categoryId: leafCategory.insertId,
       type: "resale",
@@ -328,6 +330,7 @@ describe("POS orders", () => {
       .insert(categories)
       .values({ name: "منتجات جاهزة" });
     const [item] = await db.insert(items).values({
+      code: nextTestItemCode(),
       name: "بن معبأ",
       categoryId: category.insertId,
       type: "resale",
@@ -640,6 +643,7 @@ describe("POS orders", () => {
       .insert(categories)
       .values({ name: "بيع مباشر" });
     const [firstItem] = await db.insert(items).values({
+      code: nextTestItemCode(),
       name: "نقطة أ",
       categoryId: category.insertId,
       type: "resale",
@@ -647,6 +651,7 @@ describe("POS orders", () => {
       stockUnit: "كجم",
     });
     const [secondItem] = await db.insert(items).values({
+      code: nextTestItemCode(),
       name: "نقطة ب",
       categoryId: category.insertId,
       type: "resale",

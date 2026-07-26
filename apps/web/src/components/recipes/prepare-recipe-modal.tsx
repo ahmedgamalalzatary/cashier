@@ -7,6 +7,7 @@ import { createPreparation } from "@/services/recipes-service";
 import { Button } from "../ui/button";
 import { Field, TextAreaField } from "../ui/field";
 import { Modal } from "../ui/modal";
+import { itemLabel } from "@/lib/format";
 import { RecipeFlowRail } from "./recipe-controls";
 
 export function PrepareRecipeModal({
@@ -82,7 +83,7 @@ export function PrepareRecipeModal({
           <ul className="space-y-1.5 text-sm">
             {scaledIngredients.map((ingredient) => (
               <li key={ingredient.itemId} className="flex justify-between gap-3">
-                <span>{ingredient.itemName}</span>
+                <span>{itemLabel(ingredient.itemCode, ingredient.itemName)}</span>
                 <span className="tnum font-medium">
                   {ingredient.scaledQuantity.toLocaleString("ar-EG", {
                     maximumFractionDigits: 3,

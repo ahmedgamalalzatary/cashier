@@ -122,6 +122,8 @@ export const items = mysqlTable(
   "items",
   {
     id: int("id").autoincrement().primaryKey(),
+    // system-assigned sequential display code (0001, 0002, …); never reused
+    code: int("code").notNull(),
     name: varchar("name", { length: 191 }).notNull(),
     categoryId: int("category_id")
       .notNull()
@@ -149,7 +151,10 @@ export const items = mysqlTable(
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (table) => [index("items_category_id_idx").on(table.categoryId)],
+  (table) => [
+    index("items_category_id_idx").on(table.categoryId),
+    uniqueIndex("items_code_uidx").on(table.code),
+  ],
 );
 
 export const purchaseLines = mysqlTable(

@@ -7,7 +7,7 @@ import type { PurchaseInvoiceDetail } from "@cashier/shared";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table } from "@/components/ui/table";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, itemLabel } from "@/lib/format";
 import { getPurchase } from "@/services/purchases-service";
 
 export default function PurchaseDetailPage({
@@ -88,7 +88,7 @@ export default function PurchaseDetailPage({
       >
         {invoice.lines.map((line) => (
           <tr key={line.id}>
-            <td className="px-4 py-3 font-medium">{line.itemName}</td>
+            <td className="px-4 py-3 font-medium">{itemLabel(line.itemCode, line.itemName)}</td>
             <td className="px-4 py-3 tnum">
               {Number(line.quantity).toLocaleString("ar-EG", {
                 maximumFractionDigits: 3,

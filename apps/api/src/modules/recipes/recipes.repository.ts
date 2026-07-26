@@ -1,12 +1,6 @@
-import {
-  asc,
-  desc,
-  eq,
-  inArray,
-  sql,
-} from 'drizzle-orm';
-import { alias } from 'drizzle-orm/mysql-core';
-import type { Db } from '../../db/index.js';
+import { asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/mysql-core";
+import type { Db } from "../../db/index.js";
 import {
   categories,
   items,
@@ -17,12 +11,12 @@ import {
   recipeSizes,
   stockBatches,
   users,
-} from '../../db/schema.js';
-import { InventoryRepository } from '../inventory/inventory.repository.js';
-import { InventoryTransaction } from '../inventory/inventory.service.js';
+} from "../../db/schema.js";
+import { InventoryRepository } from "../inventory/inventory.repository.js";
+import { InventoryTransaction } from "../inventory/inventory.service.js";
 
-const outputItem = alias(items, 'recipe_output_item');
-const preparer = alias(users, 'preparation_preparer');
+const outputItem = alias(items, "recipe_output_item");
+const preparer = alias(users, "preparation_preparer");
 
 export class RecipesRepository {
   constructor(private db: Db) {}
@@ -90,7 +84,7 @@ export class RecipesRepository {
       .select()
       .from(recipes)
       .where(eq(recipes.id, id))
-      .for('update');
+      .for("update");
     return row;
   }
 
@@ -106,7 +100,7 @@ export class RecipesRepository {
       })
       .from(categories)
       .where(eq(categories.id, id))
-      .for('update');
+      .for("update");
     return row;
   }
 
@@ -123,7 +117,7 @@ export class RecipesRepository {
       .from(items)
       .where(inArray(items.id, orderedIds))
       .orderBy(asc(items.id))
-      .for('update');
+      .for("update");
   }
 
   async findRecipeByOutputItem(outputItemId: number, exceptId?: number) {
@@ -151,12 +145,12 @@ export class RecipesRepository {
         recipeIngredients,
         eq(recipeIngredients.recipeSizeId, recipeSizes.id),
       )
-      .where(eq(recipes.type, 'prepared'));
+      .where(eq(recipes.type, "prepared"));
   }
 
   async createRecipe(data: {
     name: string;
-    type: 'product' | 'prepared';
+    type: "product" | "prepared";
     categoryId: number;
     outputItemId: number | null;
   }) {
@@ -168,7 +162,7 @@ export class RecipesRepository {
     id: number,
     data: {
       name: string;
-      type: 'product' | 'prepared';
+      type: "product" | "prepared";
       categoryId: number;
       outputItemId: number | null;
     },
@@ -223,6 +217,7 @@ export class RecipesRepository {
         id: recipeIngredients.id,
         recipeSizeId: recipeIngredients.recipeSizeId,
         itemId: recipeIngredients.itemId,
+        itemCode: items.code,
         itemName: items.name,
         itemType: items.type,
         stockUnit: items.stockUnit,
@@ -269,8 +264,8 @@ export class RecipesRepository {
   }) {
     const [result] = await this.db.insert(preparations).values({
       ...data,
-      totalCost: '0.00',
-      unitCost: '0.000000',
+      totalCost: "0.00",
+      unitCost: "0.000000",
       outputBatchId: null,
     });
     return result.insertId;
@@ -350,6 +345,8 @@ export class RecipesRepository {
       .select({
         id: preparationAllocations.id,
         ingredientItemId: preparationAllocations.ingredientItemId,
+        // name is snapshotted (items can be renamed); the code never changes
+        ingredientItemCode: items.code,
         ingredientItemName: preparationAllocations.ingredientItemName,
         stockUnit: items.stockUnit,
         quantity: preparationAllocations.quantity,

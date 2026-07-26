@@ -29,6 +29,12 @@ export const appOptions = {
   corsOrigin: "http://localhost:3000",
 };
 
+// items.code is system-assigned and unique; fixtures that insert straight into
+// the table have to supply their own. A monotonic counter stays unique across
+// the truncation that runs before every test.
+let itemCodeCounter = 0;
+export const nextTestItemCode = () => (itemCodeCounter += 1);
+
 beforeAll(async () => {
   await migrate(db, {
     migrationsFolder: path.resolve(import.meta.dirname, "../../drizzle"),

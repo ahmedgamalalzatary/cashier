@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import request from 'supertest';
-import { createApp } from '../../../src/app.js';
-import { appOptions, db } from '../../support/setup.js';
-import { loginAs } from '../../support/helpers.js';
+import { beforeEach, describe, expect, it } from "vitest";
+import request from "supertest";
+import { createApp } from "../../../src/app.js";
+import { appOptions, db } from "../../support/setup.js";
+import { loginAs } from "../../support/helpers.js";
 
 const app = () => createApp(db, appOptions);
 let authorization: { readonly Authorization: string };
@@ -14,70 +14,70 @@ const api = () => ({
 });
 
 beforeEach(async () => {
-  authorization = await loginAs(app(), 'admin');
+  authorization = await loginAs(app(), "admin");
 });
 
 async function createCategory(name: string, parentId?: number) {
-  return api().post('/api/categories').send({ name, parentId });
+  return api().post("/api/categories").send({ name, parentId });
 }
 
-describe('categories', () => {
-  it('creates a main category and a sub under it', async () => {
-    const main = await createCategory('مشروبات ساخنة');
+describe("categories", () => {
+  it("creates a main category and a sub under it", async () => {
+    const main = await createCategory("مشروبات ساخنة");
     expect(main.status).toBe(201);
 
-    const sub = await createCategory('قهوة', main.body.id);
+    const sub = await createCategory("قهوة", main.body.id);
     expect(sub.status).toBe(201);
 
-    const list = await api().get('/api/categories');
+    const list = await api().get("/api/categories");
     expect(list.body).toHaveLength(2);
-    const subRow = list.body.find((c: { name: string }) => c.name === 'قهوة');
+    const subRow = list.body.find((c: { name: string }) => c.name === "قهوة");
     expect(subRow.parentId).toBe(main.body.id);
   });
 
-  it('rejects a sub under a sub (two levels max)', async () => {
-    const main = await createCategory('مشروبات');
-    const sub = await createCategory('عصائر', main.body.id);
-    const res = await createCategory('برتقال', sub.body.id);
+  it("rejects a sub under a sub (two levels max)", async () => {
+    const main = await createCategory("مشروبات");
+    const sub = await createCategory("عصائر", main.body.id);
+    const res = await createCategory("برتقال", sub.body.id);
     expect(res.status).toBe(400);
   });
 
-  it('rejects a missing parent', async () => {
-    const res = await createCategory('يتيم', 999);
+  it("rejects a missing parent", async () => {
+    const res = await createCategory("يتيم", 999);
     expect(res.status).toBe(400);
   });
 
-  it('renames a category', async () => {
-    const main = await createCategory('حلويات');
+  it("renames a category", async () => {
+    const main = await createCategory("حلويات");
     const res = await api()
       .put(`/api/categories/${main.body.id}`)
-      .send({ name: 'حلويات شرقية' });
+      .send({ name: "حلويات شرقية" });
     expect(res.status).toBe(200);
-    const list = await api().get('/api/categories');
-    expect(list.body[0].name).toBe('حلويات شرقية');
+    const list = await api().get("/api/categories");
+    expect(list.body[0].name).toBe("حلويات شرقية");
   });
 
-  it('rejects making a category its own parent', async () => {
-    const main = await createCategory('مأكولات');
+  it("rejects making a category its own parent", async () => {
+    const main = await createCategory("مأكولات");
     const res = await api()
       .put(`/api/categories/${main.body.id}`)
       .send({ parentId: main.body.id });
     expect(res.status).toBe(400);
   });
 
-  it('rejects moving a main with subs under another category', async () => {
-    const a = await createCategory('أ');
-    await createCategory('أ-فرعي', a.body.id);
-    const b = await createCategory('ب');
+  it("rejects moving a main with subs under another category", async () => {
+    const a = await createCategory("أ");
+    await createCategory("أ-فرعي", a.body.id);
+    const b = await createCategory("ب");
     const res = await api()
       .put(`/api/categories/${a.body.id}`)
       .send({ parentId: b.body.id });
     expect(res.status).toBe(400);
   });
 
-  it('serializes simultaneous inverse moves without deadlocking', async () => {
-    const a = await createCategory('أ');
-    const b = await createCategory('ب');
+  it("serializes simultaneous inverse moves without deadlocking", async () => {
+    const a = await createCategory("أ");
+    const b = await createCategory("ب");
 
     const results = await Promise.all([
       api().put(`/api/categories/${a.body.id}`).send({ parentId: b.body.id }),
@@ -86,7 +86,7 @@ describe('categories', () => {
 
     expect(results.map((result) => result.status).sort()).toEqual([200, 400]);
     const rows: Array<{ id: number; parentId: number | null }> = (
-      await api().get('/api/categories')
+      await api().get("/api/categories")
     ).body;
     const rowA = rows.find((row) => row.id === a.body.id);
     const rowB = rows.find((row) => row.id === b.body.id);
@@ -100,9 +100,9 @@ describe('categories', () => {
     ).toHaveLength(1);
   });
 
-  it('serializes child updates with deactivation when the child id is lower', async () => {
-    const child = await createCategory('فرع مبكر');
-    const parent = await createCategory('رئيسي متأخر');
+  it("serializes child updates with deactivation when the child id is lower", async () => {
+    const child = await createCategory("فرع مبكر");
+    const parent = await createCategory("رئيسي متأخر");
     expect(
       (
         await api()
@@ -124,7 +124,7 @@ describe('categories', () => {
       id: number;
       parentId: number | null;
       isActive: boolean;
-    }> = (await api().get('/api/categories')).body;
+    }> = (await api().get("/api/categories")).body;
     const childRow = rows.find((row) => row.id === child.body.id);
     const parentRow = rows.find((row) => row.id === parent.body.id);
     expect(childRow).toMatchObject({
@@ -134,12 +134,12 @@ describe('categories', () => {
     expect(parentRow).toMatchObject({ parentId: null, isActive: false });
   });
 
-  it('deactivating a main deactivates its subs', async () => {
-    const main = await createCategory('مثلجات');
-    const sub = await createCategory('آيس كريم', main.body.id);
+  it("deactivating a main deactivates its subs", async () => {
+    const main = await createCategory("مثلجات");
+    const sub = await createCategory("آيس كريم", main.body.id);
     const res = await api().delete(`/api/categories/${main.body.id}`);
     expect(res.status).toBe(200);
-    const list = await api().get('/api/categories');
+    const list = await api().get("/api/categories");
     const rows: Array<{ id: number; isActive: boolean }> = list.body;
     const mainRow = rows.find((c) => c.id === main.body.id);
     const subRow = rows.find((c) => c.id === sub.body.id);
@@ -147,9 +147,9 @@ describe('categories', () => {
     expect(subRow?.isActive).toBeFalsy();
   });
 
-  it('reactivates a main category and then one of its children', async () => {
-    const main = await createCategory('Main');
-    const sub = await createCategory('Child', main.body.id);
+  it("reactivates a main category and then one of its children", async () => {
+    const main = await createCategory("Main");
+    const sub = await createCategory("Child", main.body.id);
     expect((await api().delete(`/api/categories/${main.body.id}`)).status).toBe(
       200,
     );
@@ -174,7 +174,7 @@ describe('categories', () => {
       ).status,
     ).toBe(200);
 
-    const rows = (await api().get('/api/categories')).body;
+    const rows = (await api().get("/api/categories")).body;
     expect(
       rows.find((row: { id: number }) => row.id === main.body.id).isActive,
     ).toBe(true);
@@ -183,15 +183,15 @@ describe('categories', () => {
     ).toBe(true);
   });
 
-  it('rejects creating a sub under a deactivated main', async () => {
-    const main = await createCategory('مخبوزات');
+  it("rejects creating a sub under a deactivated main", async () => {
+    const main = await createCategory("مخبوزات");
     await api().delete(`/api/categories/${main.body.id}`);
-    const res = await createCategory('كرواسون', main.body.id);
+    const res = await createCategory("كرواسون", main.body.id);
     expect(res.status).toBe(400);
   });
 
-  it('404s on a missing category', async () => {
-    const res = await api().delete('/api/categories/999');
+  it("404s on a missing category", async () => {
+    const res = await api().delete("/api/categories/999");
     expect(res.status).toBe(404);
   });
 });

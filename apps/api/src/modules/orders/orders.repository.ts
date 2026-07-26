@@ -319,6 +319,8 @@ export class OrdersRepository {
         id: orderLineAllocations.id,
         orderLineId: orderLineAllocations.orderLineId,
         itemId: orderLineAllocations.itemId,
+        // name is snapshotted (items can be renamed); the code never changes
+        itemCode: items.code,
         itemName: orderLineAllocations.itemName,
         batchId: orderLineAllocations.batchId,
         stockMovementId: orderLineAllocations.stockMovementId,
@@ -330,6 +332,7 @@ export class OrdersRepository {
         )`,
       })
       .from(orderLineAllocations)
+      .innerJoin(items, eq(orderLineAllocations.itemId, items.id))
       .leftJoin(stockBatches, eq(orderLineAllocations.batchId, stockBatches.id))
       .innerJoin(
         stockMovements,

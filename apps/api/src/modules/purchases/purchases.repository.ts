@@ -160,6 +160,7 @@ export class PurchasesRepository {
       .select({
         id: purchaseLines.id,
         itemId: purchaseLines.itemId,
+        itemCode: items.code,
         itemName: items.name,
         quantity: purchaseLines.quantity,
         unitMode: purchaseLines.unitMode,

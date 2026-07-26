@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, TextAreaField } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
+import { itemLabel } from "@/lib/format";
 import {
   approveTransferRequest,
   getTransferRequest,
@@ -114,7 +115,7 @@ export function TransferReviewModal({
               return (
                 <div key={line.id} className="rounded-xl border border-line p-3">
                   <div className="mb-2 flex justify-between gap-3">
-                    <p className="font-medium">{line.itemName}</p>
+                    <p className="font-medium">{itemLabel(line.itemCode, line.itemName)}</p>
                     <span className="text-xs text-muted">
                       المطلوب: {Number(line.quantity).toLocaleString("ar-EG", {
                         maximumFractionDigits: 3,

@@ -73,6 +73,7 @@ export interface InventoryRepositoryPort {
 
 export type InventoryStockRecord = {
   itemId: number;
+  code: number;
   name: string;
   categoryId: number;
   categoryName: string;
@@ -193,6 +194,7 @@ export class InventoryRepository implements InventoryRepositoryPort {
     return this.db
       .select({
         itemId: items.id,
+        code: items.code,
         name: items.name,
         categoryId: items.categoryId,
         categoryName: categories.name,

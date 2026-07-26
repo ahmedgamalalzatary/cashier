@@ -25,6 +25,7 @@ import { createRecipe, updateRecipe } from "@/services/recipes-service";
 import { Button } from "../ui/button";
 import { Field } from "../ui/field";
 import { Modal } from "../ui/modal";
+import { itemLabel } from "@/lib/format";
 
 export function RecipeFormModal({
   type,
@@ -150,7 +151,7 @@ export function RecipeFormModal({
                 <option value="">اختر الصنف الناتج</option>
                 {preparedItems.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.name} ({item.stockUnit})
+                    {itemLabel(item.code, item.name)} ({item.stockUnit})
                   </option>
                 ))}
               </SelectField>
@@ -348,7 +349,7 @@ function IngredientEditor({
               <option value="">اختر الصنف</option>
               {items.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.name}
+                  {itemLabel(item.code, item.name)}
                 </option>
               ))}
             </SelectField>

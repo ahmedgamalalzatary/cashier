@@ -8,7 +8,7 @@ import type { PreparationDetail } from "@cashier/shared";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table } from "@/components/ui/table";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, itemLabel } from "@/lib/format";
 import { getPreparation } from "@/services/recipes-service";
 
 export default function PreparationDetailPage() {
@@ -121,7 +121,10 @@ export default function PreparationDetailPage() {
           {preparation.allocations.map((allocation) => (
             <tr key={allocation.id}>
               <td className="px-4 py-3 font-medium">
-                {allocation.ingredientItemName}
+                {itemLabel(
+                  allocation.ingredientItemCode,
+                  allocation.ingredientItemName,
+                )}
               </td>
               <td className="tnum px-4 py-3">
                 {Number(allocation.quantity).toLocaleString("ar-EG", {

@@ -131,6 +131,8 @@ export type ItemType = (typeof ITEM_TYPES)[number];
 
 export type Item = {
   id: number;
+  /** system-assigned sequential code; display with formatItemCode */
+  code: number;
   name: string;
   categoryId: number;
   categoryName: string;
@@ -152,6 +154,7 @@ export type Warehouse = (typeof WAREHOUSES)[number];
 
 export type InventoryStockRow = {
   itemId: number;
+  code: number;
   name: string;
   categoryId: number;
   categoryName: string;
@@ -186,6 +189,7 @@ export type PurchaseInvoiceSummary = {
 export type PurchaseInvoiceLine = {
   id: number;
   itemId: number;
+  itemCode: number;
   itemName: string;
   quantity: string;
   unitMode: PurchaseUnitMode;
@@ -223,6 +227,7 @@ export type TransferRequestSummary = {
 export type TransferRequestLine = {
   id: number;
   itemId: number;
+  itemCode: number;
   itemName: string;
   stockUnit: string;
   quantity: string;
@@ -251,6 +256,7 @@ export type TransferSummary = {
 export type TransferLine = {
   id: number;
   itemId: number;
+  itemCode: number;
   itemName: string;
   stockUnit: string;
   quantity: string;
@@ -269,6 +275,7 @@ export type RecipeType = "product" | "prepared";
 export type RecipeIngredientCost = {
   id: number;
   itemId: number;
+  itemCode: number;
   itemName: string;
   itemType: ItemType;
   stockUnit: string;
@@ -344,6 +351,7 @@ export type PreparationSummary = {
 export type PreparationAllocation = {
   id: number;
   ingredientItemId: number;
+  ingredientItemCode: number;
   ingredientItemName: string;
   stockUnit: string;
   quantity: string;
@@ -407,6 +415,7 @@ export type OrderSummary = {
 export type OrderLineAllocation = {
   id: number;
   itemId: number;
+  itemCode: number;
   itemName: string;
   batchId: number | null;
   stockMovementId: number;

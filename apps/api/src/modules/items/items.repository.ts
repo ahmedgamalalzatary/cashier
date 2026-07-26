@@ -12,6 +12,7 @@ import type { ItemInput, ItemUpdateInput } from "./items.schemas.js";
 
 const itemColumns = {
   id: items.id,
+  code: items.code,
   name: items.name,
   categoryId: items.categoryId,
   categoryName: categories.name,
@@ -149,8 +150,19 @@ export class ItemsRepository {
     return Boolean(row);
   }
 
-  async create(data: ItemInput) {
+  async nextItemCode() {
+    // a locking read: under REPEATABLE READ a plain SELECT would return the
+    // transaction's snapshot, so two concurrent creates would pick the same code
+    const [row] = await this.db
+      .select({ maximum: sql<number | null>`MAX(${items.code})` })
+      .from(items)
+      .for("update");
+    return (row?.maximum ?? 0) + 1;
+  }
+
+  async create(data: ItemInput, code: number) {
     const [result] = await this.db.insert(items).values({
+      code,
       name: data.name,
       categoryId: data.categoryId,
       type: data.type,

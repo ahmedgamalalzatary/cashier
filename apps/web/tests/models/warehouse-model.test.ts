@@ -18,6 +18,7 @@ const categories: Category[] = [
 const rows: InventoryStockRow[] = [
   {
     itemId: 1,
+    code: 1,
     name: "بن برازيلي",
     categoryId: 3,
     categoryName: "قهوة",
@@ -32,6 +33,7 @@ const rows: InventoryStockRow[] = [
   },
   {
     itemId: 2,
+    code: 2,
     name: "أكواب ورق",
     categoryId: 1,
     categoryName: "خامات",
@@ -46,6 +48,7 @@ const rows: InventoryStockRow[] = [
   },
   {
     itemId: 3,
+    code: 3,
     name: "مخزون قديم",
     categoryId: 4,
     categoryName: "قديم",

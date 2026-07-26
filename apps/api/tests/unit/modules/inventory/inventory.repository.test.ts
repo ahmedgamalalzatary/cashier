@@ -4,6 +4,24 @@ import type { Db } from '../../../../src/db/index.js';
 import * as schema from '../../../../src/db/schema.js';
 import { InventoryRepository } from '../../../../src/modules/inventory/inventory.repository.js';
 
+function proxyDb() {
+  return drizzle(async () => ({ rows: [] }), {
+    schema,
+    mode: 'default',
+  }) as unknown as Db;
+}
+
+describe('InventoryRepository stock rows', () => {
+  it('exposes the item code so the warehouse can label rows', () => {
+    const generated = new InventoryRepository(proxyDb())
+      .listStock('main')
+      .toSQL()
+      .sql.toLowerCase();
+
+    expect(generated).toContain('`items`.`code`');
+  });
+});
+
 describe('InventoryRepository deficit locking', () => {
   it('locks the outer stock movement rows while retaining the allocation subquery', () => {
     const db = drizzle(async () => ({ rows: [] }), {

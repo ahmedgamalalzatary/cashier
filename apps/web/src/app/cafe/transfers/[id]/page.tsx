@@ -6,7 +6,7 @@ import { ArrowRight } from "lucide-react";
 import type { TransferDetail } from "@cashier/shared";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table } from "@/components/ui/table";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, itemLabel } from "@/lib/format";
 import { getTransfer } from "@/services/transfers-service";
 
 export default function TransferDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -44,7 +44,7 @@ export default function TransferDetailPage({ params }: { params: Promise<{ id: s
       <Table headers={["الصنف", "الكمية", "تكلفة الوحدة", "تكلفة الدفعة", "دفعة الرئيسي", "دفعة الكافيه"]}>
         {transfer.lines.map((line) => (
           <tr key={line.id}>
-            <td className="px-4 py-3 font-medium">{line.itemName}</td>
+            <td className="px-4 py-3 font-medium">{itemLabel(line.itemCode, line.itemName)}</td>
             <td className="px-4 py-3 tnum">{Number(line.quantity).toLocaleString("ar-EG", { maximumFractionDigits: 3 })} {line.stockUnit}</td>
             <td className="px-4 py-3 tnum">{formatMoney(line.unitCost)}</td>
             <td className="px-4 py-3 tnum font-medium">{formatMoney(line.lineCost)}</td>

@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table } from "@/components/ui/table";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, itemLabel } from "@/lib/format";
 import { recipeStats } from "@/models/recipe-model";
 import { listCategories } from "@/services/categories-service";
 import { listItems } from "@/services/items-service";
@@ -114,7 +114,7 @@ function ProductCard({ recipe, onEdit, onToggle }: { recipe: ProductRecipe; onEd
     <CardHeader recipe={recipe} onEdit={onEdit} onToggle={onToggle} />
     <div className="space-y-3 p-4">{recipe.sizes.map((size) => <div key={size.id} className="space-y-2">
       <RecipeFlowRail ingredientLabel={`${size.ingredients.length} مكوّن`} outputLabel={`${size.name} · ${formatMoney(size.sellingPrice)}`} costLabel={size.currentCost === null ? "—" : formatMoney(size.currentCost)} available={size.hasSufficientStock} />
-      <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted"><span>{size.ingredients.map((ingredient) => ingredient.itemName).join("، ")}</span>{size.marginAmount !== null && size.marginPercentage !== null && size.costPercentage !== null && <RecipeMargin marginAmount={size.marginAmount} marginPercentage={size.marginPercentage} costPercentage={size.costPercentage} />}</div>
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted"><span>{size.ingredients.map((ingredient) => itemLabel(ingredient.itemCode, ingredient.itemName)).join("، ")}</span>{size.marginAmount !== null && size.marginPercentage !== null && size.costPercentage !== null && <RecipeMargin marginAmount={size.marginAmount} marginPercentage={size.marginPercentage} costPercentage={size.costPercentage} />}</div>
     </div>)}</div>
   </article>;
 }
@@ -124,7 +124,7 @@ function PreparedCard({ recipe, onEdit, onToggle, onPrepare }: { recipe: Prepare
     <CardHeader recipe={recipe} onEdit={onEdit} onToggle={onToggle} />
     <div className="space-y-3 p-4">
       <RecipeFlowRail ingredientLabel={`${recipe.ingredients.length} مكوّن`} outputLabel={`${Number(recipe.baseYield).toLocaleString("ar-EG", { maximumFractionDigits: 3 })} ${recipe.outputStockUnit}`} costLabel={recipe.currentCost === null ? "—" : formatMoney(recipe.currentCost)} available={recipe.hasSufficientStock} />
-      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted"><span>{recipe.ingredients.map((ingredient) => ingredient.itemName).join("، ")}</span><span className="tnum">تكلفة الوحدة: {recipe.estimatedUnitCost === null ? "—" : formatMoney(recipe.estimatedUnitCost)}</span></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted"><span>{recipe.ingredients.map((ingredient) => itemLabel(ingredient.itemCode, ingredient.itemName)).join("، ")}</span><span className="tnum">تكلفة الوحدة: {recipe.estimatedUnitCost === null ? "—" : formatMoney(recipe.estimatedUnitCost)}</span></div>
       <Button className="w-full justify-center" onClick={onPrepare} disabled={!recipe.isActive}><ChefHat className="size-4" /> تحضير دفعة</Button>
     </div>
   </article>;

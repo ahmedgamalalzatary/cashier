@@ -67,6 +67,7 @@ describe("recipe model", () => {
         {
           id: 1,
           itemId: 2,
+          itemCode: 2,
           itemName: "مكوّن",
           itemType: "raw",
           stockUnit: "كجم",

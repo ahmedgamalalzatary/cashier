@@ -5,6 +5,7 @@ import type { Category, Item, ItemType } from "@cashier/shared";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
+import { formatItemCode } from "@/lib/format";
 import { createItem, updateItem } from "@/services/items-service";
 import {
   eligibleItemCategories,
@@ -113,6 +114,16 @@ export function ItemFormModal({
   return (
     <Modal title={item ? "تعديل الصنف" : "صنف جديد"} open onClose={onClose}>
       <form onSubmit={save} className="space-y-4">
+        {item ? (
+          <div className="rounded-lg border border-line bg-paper/55 px-3 py-2">
+            <p className="text-xs text-muted">كود الصنف</p>
+            <p className="tnum mt-0.5 font-bold">{formatItemCode(item.code)}</p>
+          </div>
+        ) : (
+          <p className="text-xs text-muted">
+            يمنح النظام الصنف كوداً تسلسلياً تلقائياً بعد الحفظ.
+          </p>
+        )}
         <Field
           label="اسم الصنف"
           value={form.name}
