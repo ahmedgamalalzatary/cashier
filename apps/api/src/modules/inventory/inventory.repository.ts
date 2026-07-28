@@ -2,12 +2,15 @@ import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import {
   categories,
+  categoryColors,
+  categorySizes,
   items,
+  products,
   stockBatches,
   stockDeficitAllocations,
   stockMovements,
 } from "../../db/schema.js";
-import type { ItemType, Warehouse } from "@cashier/shared";
+import type { Warehouse } from "@cashier/shared";
 export type { Warehouse } from "@cashier/shared";
 
 export type StockBatchRecord = {
@@ -72,13 +75,14 @@ export interface InventoryRepositoryPort {
 }
 
 export type InventoryStockRecord = {
-  itemId: number;
+  variantId: number;
   code: number;
-  name: string;
+  barcode: string | null;
+  productName: string;
+  colorName: string;
+  sizeName: string;
   categoryId: number;
   categoryName: string;
-  type: ItemType;
-  stockUnit: string;
   isActive: boolean;
   quantity: string;
   stockValue: string;
@@ -181,32 +185,40 @@ export class InventoryRepository implements InventoryRepositoryPort {
     const quantity = sql<string>`COALESCE((
       SELECT SUM(sm.quantity)
       FROM stock_movements sm
-      WHERE sm.item_id = items.id AND sm.warehouse = ${warehouse}
+      WHERE sm.variant_id = ${items.id} AND sm.warehouse = ${warehouse}
     ), 0)`;
     const stockValue = sql<string>`COALESCE((
       SELECT SUM(sb.remaining_quantity * sb.unit_cost)
       FROM stock_batches sb
-      WHERE sb.item_id = items.id AND sb.warehouse = ${warehouse}
+      WHERE sb.variant_id = ${items.id} AND sb.warehouse = ${warehouse}
     ), 0)`;
     const minimumLevel =
-      warehouse === "main" ? items.mainMinimumLevel : items.cafeMinimumLevel;
+      warehouse === "main" ? items.mainMinimumLevel : items.shopMinimumLevel;
 
     return this.db
       .select({
+        variantId: items.id,
         itemId: items.id,
         code: items.code,
-        name: items.name,
-        categoryId: items.categoryId,
+        barcode: items.barcode,
+        productName: products.name,
+        name: sql<string>`CONCAT(${products.name}, ' - ', ${categoryColors.name}, ' - ', ${categorySizes.name})`,
+        colorName: categoryColors.name,
+        sizeName: categorySizes.name,
+        categoryId: products.categoryId,
         categoryName: categories.name,
-        type: items.type,
-        stockUnit: items.stockUnit,
-        isActive: items.isActive,
+        type: sql<"product">`'product'`,
+        stockUnit: sql<"قطعة">`'قطعة'`,
+        isActive: sql<boolean>`${items.isActive} AND ${products.isActive}`,
         quantity,
         stockValue,
         minimumLevel,
       })
       .from(items)
-      .innerJoin(categories, eq(items.categoryId, categories.id))
-      .orderBy(items.name);
+      .innerJoin(products, eq(items.productId, products.id))
+      .innerJoin(categories, eq(products.categoryId, categories.id))
+      .innerJoin(categoryColors, eq(items.colorId, categoryColors.id))
+      .innerJoin(categorySizes, eq(items.sizeId, categorySizes.id))
+      .orderBy(products.name, categoryColors.name, categorySizes.name);
   }
 }

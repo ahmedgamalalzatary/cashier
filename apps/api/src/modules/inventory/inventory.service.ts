@@ -93,7 +93,7 @@ function costFromProduct(productAtScaleNine: bigint) {
 
 /**
  * Repository-bound primitives that do not open their own transaction.
- * Purchase/transfer/recipe services can construct this with a repository
+ * Purchase, transfer, and order services can construct this with a repository
  * bound to their outer DB transaction and keep document + stock writes atomic.
  */
 export class InventoryTransaction {

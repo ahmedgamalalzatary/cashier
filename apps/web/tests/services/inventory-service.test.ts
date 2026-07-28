@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { api } from "../../src/lib/api";
 import {
-  getCafeWarehouseStock,
+  getShopWarehouseStock,
   getMainWarehouseStock,
 } from "../../src/services/inventory-service";
 
@@ -14,9 +14,9 @@ describe("inventory service", () => {
     expect(api).toHaveBeenCalledWith("/api/inventory/main/stock");
   });
 
-  it("loads cafe warehouse stock", async () => {
+  it("loads shop warehouse stock", async () => {
     vi.mocked(api).mockResolvedValue(undefined as never);
-    await getCafeWarehouseStock();
-    expect(api).toHaveBeenCalledWith("/api/inventory/cafe/stock");
+    await getShopWarehouseStock();
+    expect(api).toHaveBeenCalledWith("/api/inventory/shop/stock");
   });
 });

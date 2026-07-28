@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type {
-  InventoryStockRow,
-  TransferRequestDetail,
-} from "@cashier/shared";
+import type { InventoryStockRow, TransferRequestDetail } from "@cashier/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, TextAreaField } from "@/components/ui/field";
@@ -45,7 +42,10 @@ export function TransferReviewModal({
         setRequest(row);
         setQuantities(
           Object.fromEntries(
-            row.lines.map((line) => [line.itemId, String(Number(line.quantity))]),
+            row.lines.map((line) => [
+              line.itemId,
+              String(Number(line.quantity)),
+            ]),
           ),
         );
       })
@@ -64,7 +64,7 @@ export function TransferReviewModal({
       await approveTransferRequest(
         request.id,
         request.lines.map((line) => ({
-          itemId: line.itemId,
+          variantId: line.itemId,
           quantity: Number(quantities[line.itemId]),
         })),
       );
@@ -113,11 +113,17 @@ export function TransferReviewModal({
             {request.lines.map((line) => {
               const stock = stockByItem.get(line.itemId);
               return (
-                <div key={line.id} className="rounded-xl border border-line p-3">
+                <div
+                  key={line.id}
+                  className="rounded-xl border border-line p-3"
+                >
                   <div className="mb-2 flex justify-between gap-3">
-                    <p className="font-medium">{itemLabel(line.itemCode, line.itemName)}</p>
+                    <p className="font-medium">
+                      {itemLabel(line.itemCode, line.itemName)}
+                    </p>
                     <span className="text-xs text-muted">
-                      المطلوب: {Number(line.quantity).toLocaleString("ar-EG", {
+                      المطلوب:{" "}
+                      {Number(line.quantity).toLocaleString("ar-EG", {
                         maximumFractionDigits: 3,
                       })}{" "}
                       {line.stockUnit}
@@ -142,7 +148,8 @@ export function TransferReviewModal({
                   )}
                   {isAdmin && request.status === "pending" && (
                     <p className="mt-2 text-xs text-muted">
-                      المتاح في الرئيسي: {Number(stock?.quantity ?? 0).toLocaleString("ar-EG", {
+                      المتاح في الرئيسي:{" "}
+                      {Number(stock?.quantity ?? 0).toLocaleString("ar-EG", {
                         maximumFractionDigits: 3,
                       })}{" "}
                       {line.stockUnit}
@@ -210,7 +217,11 @@ function StatusBadge({ status }: { status: TransferRequestDetail["status"] }) {
             : "neutral"
       }
     >
-      {status === "approved" ? "معتمد" : status === "rejected" ? "مرفوض" : "قيد المراجعة"}
+      {status === "approved"
+        ? "معتمد"
+        : status === "rejected"
+          ? "مرفوض"
+          : "قيد المراجعة"}
     </Badge>
   );
 }

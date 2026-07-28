@@ -59,8 +59,8 @@ describe("transfer model", () => {
     ).toEqual({
       notes: "للوردية",
       lines: [
-        { itemId: 3, quantity: 2.5 },
-        { itemId: 7, quantity: 1 },
+        { variantId: 3, quantity: 2.5 },
+        { variantId: 7, quantity: 1 },
       ],
     });
   });

@@ -88,19 +88,19 @@ export default function PurchaseDetailPage({
       >
         {invoice.lines.map((line) => (
           <tr key={line.id}>
-            <td className="px-4 py-3 font-medium">{itemLabel(line.itemCode, line.itemName)}</td>
+            <td className="px-4 py-3 font-medium">{itemLabel(line.variantCode ?? line.itemCode, `${line.productName ?? line.itemName} — ${line.colorName ?? ""} — ${line.sizeName ?? ""}`)}</td>
             <td className="px-4 py-3 tnum">
               {Number(line.quantity).toLocaleString("ar-EG", {
                 maximumFractionDigits: 3,
               })}{" "}
-              {line.unitName}
+              قطعة
             </td>
             <td className="px-4 py-3 tnum">{formatMoney(line.unitPrice)}</td>
             <td className="px-4 py-3 tnum">
-              {Number(line.stockQuantity).toLocaleString("ar-EG", {
+              {Number(line.quantity).toLocaleString("ar-EG", {
                 maximumFractionDigits: 3,
               })}{" "}
-              {line.stockUnit}
+              قطعة
             </td>
             <td className="px-4 py-3 tnum text-muted">
               {formatMoney(line.unitCost)}

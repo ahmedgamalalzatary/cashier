@@ -1,33 +1,22 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
-import type { Category, Item, ItemType } from "@cashier/shared";
+import type { Category, Item } from "@cashier/shared";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
-import { formatItemCode } from "@/lib/format";
 import { createItem, updateItem } from "@/services/items-service";
-import {
-  eligibleItemCategories,
-  stockMeaningFieldsLocked,
-} from "@/models/warehouse-model";
 
-const typeOptions: { value: ItemType; label: string }[] = [
-  { value: "raw", label: "خامة" },
-  { value: "resale", label: "إعادة بيع" },
-  { value: "prepared", label: "مُحضّر" },
-];
-
-const emptyForm = {
-  name: "",
-  categoryId: "",
-  type: "raw" as ItemType,
-  sellingPrice: "",
-  stockUnit: "",
-  purchaseUnit: "",
-  purchaseToStockFactor: "",
-  mainMinimumLevel: "0",
-  cafeMinimumLevel: "0",
+type Draft = {
+  key: string;
+  id?: number;
+  colorId: number;
+  sizeId: number;
+  colorName: string;
+  sizeName: string;
+  enabled: boolean;
+  barcode: string;
+  sellingPrice: string;
 };
 
 export function ItemFormModal({
@@ -41,205 +30,248 @@ export function ItemFormModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [form, setForm] = useState(
-    item
-      ? {
-          name: item.name,
-          categoryId: String(item.categoryId),
-          type: item.type,
-          sellingPrice: item.sellingPrice ?? "",
-          stockUnit: item.stockUnit,
-          purchaseUnit: item.purchaseUnit ?? "",
-          purchaseToStockFactor: item.purchaseToStockFactor ?? "",
-          mainMinimumLevel: item.mainMinimumLevel,
-          cafeMinimumLevel: item.cafeMinimumLevel,
-        }
-      : emptyForm,
+  const [name, setName] = useState(item?.name ?? "");
+  const [categoryId, setCategoryId] = useState(String(item?.categoryId ?? ""));
+  const [selectedColors, setSelectedColors] = useState<number[]>(
+    item ? [...new Set(item.variants.map((variant) => variant.colorId))] : [],
+  );
+  const [selectedSizes, setSelectedSizes] = useState<number[]>(
+    item ? [...new Set(item.variants.map((variant) => variant.sizeId))] : [],
+  );
+  const [drafts, setDrafts] = useState<Draft[]>(
+    item?.variants.map((variant) => ({
+      key: `${variant.colorId}:${variant.sizeId}`,
+      id: variant.id,
+      colorId: variant.colorId,
+      sizeId: variant.sizeId,
+      colorName: variant.colorName,
+      sizeName: variant.sizeName,
+      enabled: variant.isActive,
+      barcode: variant.barcode ?? "",
+      sellingPrice: variant.sellingPrice,
+    })) ?? [],
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const stockMeaningLocked = item ? stockMeaningFieldsLocked(item) : false;
-
-  const categoryOptions = useMemo(() => {
-    const eligible = eligibleItemCategories(categories);
-    if (item && !eligible.some((category) => category.id === item.categoryId)) {
-      const current = categories.find(
-        (category) => category.id === item.categoryId,
-      );
-      if (current) return [...eligible, current];
-    }
-    return eligible;
-  }, [categories, item]);
-  const categoryNames = new Map(
-    categories.map((category) => [category.id, category.name]),
+  const category = categories.find((row) => row.id === Number(categoryId));
+  const eligible = categories.filter(
+    (row) =>
+      row.isActive &&
+      !categories.some(
+        (candidate) => candidate.parentId === row.id && candidate.isActive,
+      ),
   );
 
-  const set =
-    (key: keyof typeof emptyForm) =>
-    (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-      setForm((current) => ({ ...current, [key]: event.target.value }));
+  const generated = useMemo(() => {
+    if (!category) return drafts;
+    const existing = new Map(drafts.map((draft) => [draft.key, draft]));
+    return selectedColors.flatMap((colorId) =>
+      selectedSizes.map((sizeId) => {
+        const key = `${colorId}:${sizeId}`;
+        return (
+          existing.get(key) ?? {
+            key,
+            colorId,
+            sizeId,
+            colorName:
+              category.colors?.find((option) => option.id === colorId)?.name ??
+              "",
+            sizeName:
+              category.sizes?.find((option) => option.id === sizeId)?.name ??
+              "",
+            enabled: true,
+            barcode: "",
+            sellingPrice: "",
+          }
+        );
+      }),
+    );
+  }, [category, drafts, selectedColors, selectedSizes]);
+
+  function toggle(
+    list: number[],
+    value: number,
+    setter: (next: number[]) => void,
+  ) {
+    setter(
+      list.includes(value)
+        ? list.filter((id) => id !== value)
+        : [...list, value],
+    );
+  }
+  function updateDraft(key: string, patch: Partial<Draft>) {
+    const base = generated.find((row) => row.key === key)!;
+    setDrafts((current) => [
+      ...current.filter((row) => row.key !== key),
+      { ...base, ...patch },
+    ]);
+  }
 
   async function save(event: FormEvent) {
     event.preventDefault();
+    const enabled = generated.filter((row) => row.enabled);
+    if (!item && !enabled.length) {
+      setError("اختر متغيراً واحداً على الأقل");
+      return;
+    }
     setSaving(true);
     setError("");
-    const purchaseUnit = form.purchaseUnit.trim() || null;
-    const body = {
-      name: form.name,
-      categoryId: Number(form.categoryId),
-      type: form.type,
-      sellingPrice: form.type === "resale" ? Number(form.sellingPrice) : null,
-      stockUnit: form.stockUnit,
-      purchaseUnit,
-      purchaseToStockFactor: purchaseUnit
-        ? Number(form.purchaseToStockFactor)
-        : null,
-      mainMinimumLevel: Number(form.mainMinimumLevel),
-      cafeMinimumLevel: Number(form.cafeMinimumLevel),
-    };
     try {
-      if (item) {
-        await updateItem(item.id, body);
-      } else {
-        await createItem(body);
-      }
+      const body = {
+        name: name.trim(),
+        categoryId: Number(categoryId),
+        variants: [
+          ...generated.filter((row) => row.id || row.enabled),
+          ...(item?.variants ?? [])
+            .filter(
+              (variant) => !generated.some((row) => row.id === variant.id),
+            )
+            .map((variant) => ({
+              key: `${variant.colorId}:${variant.sizeId}`,
+              id: variant.id,
+              colorId: variant.colorId,
+              sizeId: variant.sizeId,
+              colorName: variant.colorName,
+              sizeName: variant.sizeName,
+              barcode: variant.barcode ?? "",
+              sellingPrice: variant.sellingPrice,
+              enabled: false,
+            })),
+        ].map((row) => ({
+          id: row.id,
+          colorId: row.colorId,
+          sizeId: row.sizeId,
+          barcode: row.barcode.trim() || null,
+          sellingPrice: Number(row.sellingPrice),
+          isActive: row.enabled,
+        })),
+      };
+      if (item) await updateItem(item.id, body);
+      else await createItem(body);
       onSaved();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "تعذر حفظ الصنف");
+      setError(caught instanceof Error ? caught.message : "تعذر حفظ المنتج");
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <Modal title={item ? "تعديل الصنف" : "صنف جديد"} open onClose={onClose}>
+    <Modal
+      title={item ? "تعديل المنتج" : "منتج جديد"}
+      open
+      onClose={onClose}
+      size="xl"
+    >
       <form onSubmit={save} className="space-y-4">
-        {item ? (
-          <div className="rounded-lg border border-line bg-paper/55 px-3 py-2">
-            <p className="text-xs text-muted">كود الصنف</p>
-            <p className="tnum mt-0.5 font-bold">{formatItemCode(item.code)}</p>
-          </div>
-        ) : (
-          <p className="text-xs text-muted">
-            يمنح النظام الصنف كوداً تسلسلياً تلقائياً بعد الحفظ.
-          </p>
-        )}
         <Field
-          label="اسم الصنف"
-          value={form.name}
-          onChange={set("name")}
-          maxLength={191}
+          label="اسم المنتج"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
           required
         />
-        <SelectField
-          label="التصنيف"
-          value={form.categoryId}
-          onChange={set("categoryId")}
-          required
-        >
-          <option value="" disabled>
-            اختر التصنيف
-          </option>
-          {categoryOptions.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.parentId === null
-                ? category.name
-                : `${categoryNames.get(category.parentId)} ← ${category.name}`}
-            </option>
-          ))}
-        </SelectField>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <SelectField
-            label="نوع الصنف"
-            value={form.type}
-            onChange={set("type")}
-            disabled={stockMeaningLocked}
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium">التصنيف</span>
+          <select
+            value={categoryId}
+            onChange={(event) => {
+              setCategoryId(event.target.value);
+              setSelectedColors([]);
+              setSelectedSizes([]);
+              setDrafts([]);
+            }}
+            required
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2"
           >
-            {typeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
+            <option value="">اختر التصنيف</option>
+            {eligible.map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.name}
               </option>
             ))}
-          </SelectField>
-          <Field
-            label="وحدة المخزون"
-            value={form.stockUnit}
-            onChange={set("stockUnit")}
-            placeholder="كجم، لتر، قطعة…"
-            maxLength={50}
-            required
-            disabled={stockMeaningLocked}
-          />
-        </div>
-        {form.type === "resale" && (
-          <Field
-            label="سعر البيع"
-            type="number"
-            min="0.01"
-            step="0.01"
-            value={form.sellingPrice}
-            onChange={set("sellingPrice")}
-            required
-            dir="ltr"
-          />
-        )}
-        {stockMeaningLocked && (
-          <p className="text-xs text-muted">
-            لا يمكن تغيير نوع الصنف أو وحدة المخزون بعد تسجيل حركة مخزون.
-          </p>
-        )}
-        <div className="rounded-xl border border-line bg-paper/55 p-4">
-          <p className="mb-3 text-sm font-medium">وحدة الشراء (اختياري)</p>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label="اسم وحدة الشراء"
-              value={form.purchaseUnit}
-              onChange={set("purchaseUnit")}
-              placeholder="شيكارة، كرتونة…"
-              maxLength={50}
+          </select>
+        </label>
+        {category && (
+          <>
+            <OptionPicker
+              title="الألوان"
+              options={(category.colors ?? []).filter((row) => row.isActive)}
+              selected={selectedColors}
+              onToggle={(id) => toggle(selectedColors, id, setSelectedColors)}
             />
-            <Field
-              label={`كم ${form.stockUnit || "وحدة مخزون"} في وحدة الشراء؟`}
-              type="number"
-              min="0.000001"
-              step="0.000001"
-              value={form.purchaseToStockFactor}
-              onChange={set("purchaseToStockFactor")}
-              required={Boolean(form.purchaseUnit.trim())}
-              disabled={!form.purchaseUnit.trim()}
-              dir="ltr"
+            <OptionPicker
+              title="المقاسات"
+              options={(category.sizes ?? []).filter((row) => row.isActive)}
+              selected={selectedSizes}
+              onToggle={(id) => toggle(selectedSizes, id, setSelectedSizes)}
             />
-          </div>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            label="حد التنبيه — المخزن الرئيسي"
-            type="number"
-            min="0"
-            step="0.001"
-            value={form.mainMinimumLevel}
-            onChange={set("mainMinimumLevel")}
-            required
-            dir="ltr"
-          />
-          <Field
-            label="حد التنبيه — الكافيه"
-            type="number"
-            min="0"
-            step="0.001"
-            value={form.cafeMinimumLevel}
-            onChange={set("cafeMinimumLevel")}
-            required
-            dir="ltr"
-          />
-        </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr>
+                    <th>تفعيل</th>
+                    <th>اللون</th>
+                    <th>المقاس</th>
+                    <th>سعر البيع</th>
+                    <th>الباركود</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {generated.map((row) => (
+                    <tr key={row.key}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={row.enabled}
+                          onChange={(event) =>
+                            updateDraft(row.key, {
+                              enabled: event.target.checked,
+                            })
+                          }
+                        />
+                      </td>
+                      <td>{row.colorName}</td>
+                      <td>{row.sizeName}</td>
+                      <td>
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={row.sellingPrice}
+                          onChange={(event) =>
+                            updateDraft(row.key, {
+                              sellingPrice: event.target.value,
+                            })
+                          }
+                          required={row.enabled}
+                          className="w-28 rounded border p-1"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          value={row.barcode}
+                          onChange={(event) =>
+                            updateDraft(row.key, {
+                              barcode: event.target.value,
+                            })
+                          }
+                          className="w-40 rounded border p-1"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
         {error && <p className="text-sm text-danger">{error}</p>}
-        <div className="flex justify-end gap-2 pt-1">
+        <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>
             إلغاء
           </Button>
           <Button type="submit" disabled={saving}>
-            {saving ? "جارِ الحفظ…" : "حفظ الصنف"}
+            {saving ? "جارِ الحفظ…" : "حفظ المنتج"}
           </Button>
         </div>
       </form>
@@ -247,23 +279,32 @@ export function ItemFormModal({
   );
 }
 
-function SelectField({
-  label,
-  children,
-  ...props
-}: React.SelectHTMLAttributes<HTMLSelectElement> & {
-  label: string;
-  children: React.ReactNode;
+function OptionPicker({
+  title,
+  options,
+  selected,
+  onToggle,
+}: {
+  title: string;
+  options: Array<{ id: number; name: string }>;
+  selected: number[];
+  onToggle: (id: number) => void;
 }) {
   return (
-    <label className="block space-y-1.5">
-      <span className="text-sm font-medium">{label}</span>
-      <select
-        className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
-        {...props}
-      >
-        {children}
-      </select>
-    </label>
+    <fieldset className="rounded-lg border border-line p-3">
+      <legend>{title}</legend>
+      <div className="flex flex-wrap gap-3">
+        {options.map((option) => (
+          <label key={option.id} className="flex gap-1">
+            <input
+              type="checkbox"
+              checked={selected.includes(option.id)}
+              onChange={() => onToggle(option.id)}
+            />
+            {option.name}
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }

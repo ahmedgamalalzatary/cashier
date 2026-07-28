@@ -6,7 +6,7 @@ import type {
 } from "@cashier/shared";
 import { api } from "../lib/api";
 
-export type TransferLineBody = { itemId: number; quantity: number };
+export type TransferLineBody = { variantId: number; quantity: number };
 export type TransferRequestBody = {
   notes: string | null;
   lines: TransferLineBody[];

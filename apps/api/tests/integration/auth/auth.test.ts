@@ -170,11 +170,11 @@ describe("role protection", () => {
     expect((await request(app()).get("/api/suppliers")).status).toBe(401);
   });
 
-  it("lets cashiers read cafe stock but not main-warehouse stock", async () => {
+  it("lets cashiers read shop stock but not main-warehouse stock", async () => {
     const authorization = await loginAs(app(), "cashier");
 
     expect(
-      (await request(app()).get("/api/inventory/cafe/stock").set(authorization))
+      (await request(app()).get("/api/inventory/shop/stock").set(authorization))
         .status,
     ).toBe(200);
     expect(

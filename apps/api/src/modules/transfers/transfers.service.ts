@@ -29,7 +29,7 @@ export class TransfersService {
       for (const line of data.lines) {
         await repo.createRequestLine({
           requestId,
-          itemId: line.itemId,
+          itemId: line.variantId,
           quantity: quantityText(line.quantity),
         });
       }
@@ -60,7 +60,7 @@ export class TransfersService {
       );
       if (
         data.lines.length !== requestedItemIds.size ||
-        data.lines.some((line) => !requestedItemIds.has(line.itemId))
+        data.lines.some((line) => !requestedItemIds.has(line.variantId))
       ) {
         throw new HttpError(
           400,
@@ -123,12 +123,12 @@ export class TransfersService {
 
   private async validateItems(
     repo: TransfersRepository,
-    lines: Array<{ itemId: number }>,
+    lines: Array<{ variantId: number }>,
   ) {
-    const rows = await repo.lockItems(lines.map((line) => line.itemId));
+    const rows = await repo.lockItems(lines.map((line) => line.variantId));
     const rowsById = new Map(rows.map((row) => [row.id, row]));
     for (const line of lines) {
-      const item = rowsById.get(line.itemId);
+      const item = rowsById.get(line.variantId);
       if (!item) throw new HttpError(404, "أحد الأصناف غير موجود");
       if (!item.isActive)
         throw new HttpError(409, `الصنف "${item.name}" موقوف`);
@@ -144,14 +144,14 @@ export class TransfersService {
       approvedBy: number;
       notes: string | null;
     },
-    lines: Array<{ itemId: number; quantity: number }>,
+    lines: Array<{ variantId: number; quantity: number }>,
   ) {
     const transferId = await repo.createTransfer(header);
     const occurredAt = new Date();
-    const orderedLines = [...lines].sort((a, b) => a.itemId - b.itemId);
+    const orderedLines = [...lines].sort((a, b) => a.variantId - b.variantId);
     for (const line of orderedLines) {
       const consumed = await inventory.consume({
-        itemId: line.itemId,
+        itemId: line.variantId,
         warehouse: "main",
         quantity: line.quantity,
         movementType: "transfer_out",
@@ -164,8 +164,8 @@ export class TransfersService {
           throw new HttpError(409, "الرصيد المتاح لا يكفي");
         }
         const received = await inventory.receive({
-          itemId: line.itemId,
-          warehouse: "cafe",
+          itemId: line.variantId,
+          warehouse: "shop",
           quantity: Number(allocation.quantity),
           unitCost: allocation.unitCost,
           movementType: "transfer_in",
@@ -175,11 +175,11 @@ export class TransfersService {
         });
         await repo.createTransferLine({
           transferId,
-          itemId: line.itemId,
+          itemId: line.variantId,
           quantity: allocation.quantity,
           unitCost: allocation.unitCost,
           sourceBatchId: allocation.batchId,
-          cafeBatchId: received.batchId,
+          shopBatchId: received.batchId,
         });
       }
     }

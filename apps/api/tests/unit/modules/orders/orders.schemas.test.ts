@@ -2,51 +2,34 @@ import { describe, expect, it } from "vitest";
 import { orderInput } from "../../../../src/modules/orders/orders.schemas.js";
 
 const valid = {
-  clientRequestId: "3f7797a2-16a4-4dd9-bd42-dd3f75af5d7a",
-  lines: [{ type: "recipe", recipeSizeId: 2, quantity: 1 }],
-  cashReceived: 50,
+  clientRequestId: "90f2d7c2-2f4f-4de6-9abf-42eaba11e2cf",
+  lines: [{ variantId: 4, quantity: 2 }],
+  discount: null,
+  cashReceived: 500,
 };
 
 describe("order schemas", () => {
-  it("accepts recipe and fractional resale lines with optional discounts", () => {
+  it("accepts exact clothing variants with integer quantities", () => {
     expect(orderInput.safeParse(valid).success).toBe(true);
     expect(
       orderInput.safeParse({
         ...valid,
-        lines: [{ type: "item", itemId: 3, quantity: 0.125 }],
-        discount: { type: "fixed", value: 2.5 },
-        cashReceived: 20,
+        lines: [{ variantId: 4, quantity: 1.5 }],
       }).success,
-    ).toBe(true);
+    ).toBe(false);
   });
-
-  it("rejects empty carts, fractional recipe counts, and over-100 percent discounts", () => {
+  it("rejects empty carts and invalid discounts", () => {
     expect(orderInput.safeParse({ ...valid, lines: [] }).success).toBe(false);
     expect(
       orderInput.safeParse({
         ...valid,
-        lines: [{ type: "recipe", recipeSizeId: 2, quantity: 1.5 }],
-      }).success,
-    ).toBe(false);
-    expect(
-      orderInput.safeParse({
-        ...valid,
-        discount: { type: "percent", value: 100.01 },
+        discount: { type: "percent", value: 101 },
       }).success,
     ).toBe(false);
   });
-
-  it("rejects money with more than two decimal places", () => {
+  it("requires a valid idempotency UUID", () => {
     expect(
-      orderInput.safeParse({ ...valid, cashReceived: 50.001 }).success,
-    ).toBe(false);
-  });
-
-  it("requires a valid client idempotency UUID", () => {
-    const { clientRequestId: _clientRequestId, ...withoutRequestId } = valid;
-    expect(orderInput.safeParse(withoutRequestId).success).toBe(false);
-    expect(
-      orderInput.safeParse({ ...valid, clientRequestId: "not-a-uuid" }).success,
+      orderInput.safeParse({ ...valid, clientRequestId: "invalid" }).success,
     ).toBe(false);
   });
 });

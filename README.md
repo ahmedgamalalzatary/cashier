@@ -1,6 +1,6 @@
 # Cashier + Warehouse System
 
-POS + inventory system for a cafe with a main warehouse and a cafe sub-warehouse.
+Arabic RTL clothing-store POS and inventory system with a main warehouse and shop stock.
 Full specification: [docs/system-specs.md](docs/system-specs.md).
 
 ## Structure

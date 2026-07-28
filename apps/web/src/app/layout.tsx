@@ -12,7 +12,7 @@ const plexArabic = IBM_Plex_Sans_Arabic({
 
 export const metadata: Metadata = {
   title: "نظام الكاشير والمخازن",
-  description: "نظام إدارة الكافيه: كاشير، مخازن، موردين، ورديات",
+  description: "نظام إدارة متجر الملابس: كاشير، مخازن، موردين، ورديات",
 };
 
 export default function RootLayout({

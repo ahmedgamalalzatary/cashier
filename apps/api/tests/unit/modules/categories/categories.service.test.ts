@@ -15,8 +15,8 @@ describe('CategoriesService lock ordering', () => {
       ),
       lockForUpdate: vi.fn().mockResolvedValue([...rows.values()]),
       hasActiveItems: vi.fn().mockResolvedValue(false),
-      hasActiveRecipes: vi.fn().mockResolvedValue(false),
       update: vi.fn().mockResolvedValue(true),
+      replaceOptions: vi.fn().mockResolvedValue(undefined),
     };
     const service = new CategoriesService(
       repo as unknown as CategoriesRepository,
@@ -39,7 +39,6 @@ describe('CategoriesService lock ordering', () => {
         { id: 2, name: 'Parent', parentId: null, isActive: true },
       ]),
       hasActiveItems: vi.fn().mockResolvedValue(false),
-      hasActiveRecipes: vi.fn().mockResolvedValue(false),
       deactivateMany: vi.fn().mockResolvedValue(undefined),
     };
     const service = new CategoriesService(
@@ -65,7 +64,6 @@ describe('CategoriesService lock ordering', () => {
         { id: 3, name: 'Child', parentId: 2, isActive: true },
       ]),
       hasActiveItems: vi.fn().mockResolvedValue(false),
-      hasActiveRecipes: vi.fn().mockResolvedValue(false),
       deactivateMany: vi.fn().mockResolvedValue(undefined),
     };
     const service = new CategoriesService(
@@ -98,6 +96,7 @@ describe('CategoriesService deadlock retries', () => {
           { id: 1, name: 'Category', parentId: null, isActive: true },
         ]),
       update: vi.fn().mockResolvedValue(true),
+      replaceOptions: vi.fn().mockResolvedValue(undefined),
     };
     const service = new CategoriesService(
       repo as unknown as CategoriesRepository,
@@ -127,7 +126,6 @@ describe('CategoriesService deadlock retries', () => {
           { id: 1, name: 'Category', parentId: null, isActive: true },
         ]),
       hasActiveItems: vi.fn().mockResolvedValue(false),
-      hasActiveRecipes: vi.fn().mockResolvedValue(false),
       deactivateMany: vi.fn().mockResolvedValue(undefined),
     };
     const service = new CategoriesService(

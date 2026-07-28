@@ -2,21 +2,21 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Modal } from "../../../src/components/ui/modal";
 import {
-  CafeHeaderActions,
-  CafeTabs,
-} from "../../../src/components/transfers/cafe-controls";
+  ShopHeaderActions,
+  ShopTabs,
+} from "../../../src/components/transfers/shop-controls";
 
 describe("transfer UI accessibility", () => {
   it("shows direct transfers only to admins", () => {
     const cashier = renderToStaticMarkup(
-      <CafeHeaderActions
+      <ShopHeaderActions
         isAdmin={false}
         onRequest={() => undefined}
         onDirect={() => undefined}
       />,
     );
     const admin = renderToStaticMarkup(
-      <CafeHeaderActions
+      <ShopHeaderActions
         isAdmin
         onRequest={() => undefined}
         onDirect={() => undefined}
@@ -28,15 +28,15 @@ describe("transfer UI accessibility", () => {
     expect(admin).toContain("تحويل مباشر");
   });
 
-  it("exposes the selected cafe section as an accessible tab", () => {
+  it("exposes the selected shop section as an accessible tab", () => {
     const html = renderToStaticMarkup(
-      <CafeTabs active="requests" pendingRequests={2} onChange={() => undefined} />,
+      <ShopTabs active="requests" pendingRequests={2} onChange={() => undefined} />,
     );
 
     expect(html).toContain('role="tablist"');
     expect(html).toContain('role="tab"');
     expect(html).toContain('aria-selected="true"');
-    expect(html).toContain('aria-controls="cafe-requests-panel"');
+    expect(html).toContain('aria-controls="shop-requests-panel"');
   });
 
   it("keeps modal content scrollable within a short viewport", () => {

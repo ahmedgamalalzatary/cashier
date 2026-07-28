@@ -11,19 +11,31 @@ describe("transfers service", () => {
 
     service.listTransferRequests();
     service.getTransferRequest(4);
-    service.createTransferRequest({ notes: null, lines: [{ itemId: 2, quantity: 3 }] });
-    service.approveTransferRequest(4, [{ itemId: 2, quantity: 2.5 }]);
+    service.createTransferRequest({
+      notes: null,
+      lines: [{ variantId: 2, quantity: 3 }],
+    });
+    service.approveTransferRequest(4, [{ variantId: 2, quantity: 2.5 }]);
     service.rejectTransferRequest(4, "غير مطلوب");
     service.listTransfers();
     service.getTransfer(9);
-    service.createDirectTransfer({ notes: "مباشر", lines: [{ itemId: 2, quantity: 1 }] });
+    service.createDirectTransfer({
+      notes: "مباشر",
+      lines: [{ variantId: 2, quantity: 1 }],
+    });
 
     expect(api.mock.calls).toEqual([
       ["/api/transfers/requests"],
       ["/api/transfers/requests/4"],
       ["/api/transfers/requests", expect.objectContaining({ method: "POST" })],
-      ["/api/transfers/requests/4/approve", expect.objectContaining({ method: "POST" })],
-      ["/api/transfers/requests/4/reject", expect.objectContaining({ method: "POST" })],
+      [
+        "/api/transfers/requests/4/approve",
+        expect.objectContaining({ method: "POST" }),
+      ],
+      [
+        "/api/transfers/requests/4/reject",
+        expect.objectContaining({ method: "POST" }),
+      ],
       ["/api/transfers"],
       ["/api/transfers/9"],
       ["/api/transfers/direct", expect.objectContaining({ method: "POST" })],

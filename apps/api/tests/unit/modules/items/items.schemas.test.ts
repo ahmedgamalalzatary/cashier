@@ -4,90 +4,61 @@ import {
   itemUpdateInput,
 } from "../../../../src/modules/items/items.schemas.js";
 
-const validItem = {
-  name: "بن برازيلي",
+const validProduct = {
+  name: "تي شيرت قطن",
   categoryId: 1,
-  type: "raw",
-  stockUnit: "كجم",
-  mainMinimumLevel: 2,
-  cafeMinimumLevel: 1,
+  variants: [
+    { colorId: 2, sizeId: 3, barcode: "6221234567890", sellingPrice: 250 },
+  ],
 } as const;
 
-describe("item schemas", () => {
-  it("accepts an item with stock and purchase units", () => {
-    const parsed = itemInput.parse({
-      ...validItem,
-      purchaseUnit: "شيكارة",
-      purchaseToStockFactor: 25,
-    });
-
-    expect(parsed.purchaseUnit).toBe("شيكارة");
-    expect(parsed.purchaseToStockFactor).toBe(25);
+describe("product schemas", () => {
+  it("accepts independently priced color-size variants", () => {
+    const parsed = itemInput.parse(validProduct);
+    expect(parsed.variants[0]).toEqual(validProduct.variants[0]);
   });
 
-  it("requires a conversion factor when a purchase unit is supplied", () => {
-    expect(() =>
-      itemInput.parse({ ...validItem, purchaseUnit: "شيكارة" }),
-    ).toThrow();
+  it("requires at least one variant and rejects duplicate combinations", () => {
+    expect(
+      itemInput.safeParse({ ...validProduct, variants: [] }).success,
+    ).toBe(false);
+    expect(
+      itemInput.safeParse({
+        ...validProduct,
+        variants: [
+          validProduct.variants[0],
+          { ...validProduct.variants[0], barcode: "DIFFERENT" },
+        ],
+      }).success,
+    ).toBe(false);
   });
 
-  it("rejects a conversion factor without a purchase unit", () => {
-    expect(() =>
-      itemInput.parse({ ...validItem, purchaseToStockFactor: 12 }),
-    ).toThrow();
+  it("rejects duplicate non-empty barcodes and invalid selling prices", () => {
+    expect(
+      itemInput.safeParse({
+        ...validProduct,
+        variants: [
+          validProduct.variants[0],
+          {
+            colorId: 4,
+            sizeId: 3,
+            barcode: validProduct.variants[0].barcode,
+            sellingPrice: 200,
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      itemInput.safeParse({
+        ...validProduct,
+        variants: [{ colorId: 2, sizeId: 3, sellingPrice: 20.555 }],
+      }).success,
+    ).toBe(false);
   });
 
-  it("rejects quantities with more than three decimal places", () => {
-    expect(() =>
-      itemInput.parse({ ...validItem, mainMinimumLevel: 0.0001 }),
-    ).toThrow();
-  });
-
-  it("rejects an empty update", () => {
+  it("rejects an empty update and permits reactivation only", () => {
     expect(() => itemUpdateInput.parse({})).toThrow();
-  });
-
-  it("allows reactivation but rejects deactivation through PUT", () => {
     expect(itemUpdateInput.safeParse({ isActive: true }).success).toBe(true);
     expect(itemUpdateInput.safeParse({ isActive: false }).success).toBe(false);
-  });
-
-  it("requires a positive two-decimal selling price for resale items", () => {
-    expect(itemInput.safeParse({ ...validItem, type: "resale" }).success).toBe(
-      false,
-    );
-    expect(
-      itemInput.safeParse({
-        ...validItem,
-        type: "resale",
-        sellingPrice: 27.5,
-      }).success,
-    ).toBe(true);
-    expect(
-      itemInput.safeParse({
-        ...validItem,
-        type: "resale",
-        sellingPrice: 27.555,
-      }).success,
-    ).toBe(false);
-  });
-
-  it("allows selling-price updates for existing resale items", () => {
-    expect(itemUpdateInput.safeParse({ sellingPrice: 31.25 }).success).toBe(
-      true,
-    );
-  });
-
-  it("rejects a selling price on raw and prepared items", () => {
-    expect(
-      itemInput.safeParse({ ...validItem, sellingPrice: 20 }).success,
-    ).toBe(false);
-    expect(
-      itemInput.safeParse({
-        ...validItem,
-        type: "prepared",
-        sellingPrice: 20,
-      }).success,
-    ).toBe(false);
   });
 });

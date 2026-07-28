@@ -14,7 +14,7 @@ export function OrderReceipt({ order }: { order: OrderDetail }) {
       aria-label={`إيصال الطلب ${order.orderNumber}`}
     >
       <header className="border-b-2 border-dotted border-ink/30 pb-4 text-center">
-        <p className="text-2xl font-bold">الكافيه</p>
+        <p className="text-2xl font-bold">متجر الملابس</p>
         <p className="mt-1 text-xs">إيصال بيع نقدي · تيك أواي</p>
       </header>
 
@@ -45,7 +45,8 @@ export function OrderReceipt({ order }: { order: OrderDetail }) {
               <td className="py-2 pe-2">
                 <span className="font-medium">{line.productName}</span>
                 <span className="block text-[10px] text-muted">
-                  {line.sizeName ? `${line.sizeName} · ` : ""}
+                  {[line.colorName, line.sizeName].filter(Boolean).join(" · ")}
+                  {line.colorName || line.sizeName ? " · " : ""}
                   {formatMoney(line.unitPrice)}
                 </span>
               </td>

@@ -2,7 +2,7 @@
   "name": "cashier",
   "private": true,
   "version": "0.1.0",
-  "description": "Cashier + warehouse system (POS, main warehouse, cafe sub-warehouse) — see docs/system-specs.md",
+  "description": "Clothing shop cashier and warehouse system with independent color-size variants",
   "packageManager": "pnpm@11.17.0",
   "scripts": {
     "dev": "turbo run dev",

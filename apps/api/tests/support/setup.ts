@@ -16,9 +16,9 @@ if (loaded.error)
   );
 const testUrl = process.env.DATABASE_URL;
 const dbName = testUrl ? new URL(testUrl).pathname.replace(/^\//, "") : "";
-if (!/(^test_|_test$)/i.test(dbName)) {
+if (!/(^test[-_]|[-_]test$)/i.test(dbName)) {
   throw new Error(
-    `DATABASE_URL in .env.test must point to a database named test_* or *_test (got "${dbName}")`,
+    `DATABASE_URL in .env.test must point to a database named test-*, test_*, *-test, or *_test (got "${dbName}")`,
   );
 }
 process.env.JWT_SECRET = "test-only-jwt-secret-at-least-32-characters";
@@ -29,8 +29,8 @@ export const appOptions = {
   corsOrigin: "http://localhost:3000",
 };
 
-// items.code is system-assigned and unique; fixtures that insert straight into
-// the table have to supply their own. A monotonic counter stays unique across
+// Variant codes are system-assigned and unique; fixtures that insert straight
+// into the table need unique values. A monotonic counter stays unique across
 // the truncation that runs before every test.
 let itemCodeCounter = 0;
 export const nextTestItemCode = () => (itemCodeCounter += 1);
@@ -48,11 +48,10 @@ beforeEach(async () => {
   await db.execute(sql`TRUNCATE TABLE orders`);
   await db.execute(sql`TRUNCATE TABLE shift_events`);
   await db.execute(sql`TRUNCATE TABLE shifts`);
-  await db.execute(sql`TRUNCATE TABLE preparation_allocations`);
-  await db.execute(sql`TRUNCATE TABLE preparations`);
-  await db.execute(sql`TRUNCATE TABLE recipe_ingredients`);
-  await db.execute(sql`TRUNCATE TABLE recipe_sizes`);
-  await db.execute(sql`TRUNCATE TABLE recipes`);
+  await db.execute(sql`TRUNCATE TABLE product_variants`);
+  await db.execute(sql`TRUNCATE TABLE products`);
+  await db.execute(sql`TRUNCATE TABLE category_colors`);
+  await db.execute(sql`TRUNCATE TABLE category_sizes`);
   await db.execute(sql`TRUNCATE TABLE transfer_lines`);
   await db.execute(sql`TRUNCATE TABLE transfers`);
   await db.execute(sql`TRUNCATE TABLE transfer_request_lines`);
@@ -62,7 +61,6 @@ beforeEach(async () => {
   await db.execute(sql`TRUNCATE TABLE stock_deficit_allocations`);
   await db.execute(sql`TRUNCATE TABLE stock_movements`);
   await db.execute(sql`TRUNCATE TABLE stock_batches`);
-  await db.execute(sql`TRUNCATE TABLE items`);
   await db.execute(sql`TRUNCATE TABLE supplier_payments`);
   await db.execute(sql`TRUNCATE TABLE suppliers`);
   await db.execute(sql`TRUNCATE TABLE categories`);

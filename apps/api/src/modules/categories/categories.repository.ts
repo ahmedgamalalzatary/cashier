@@ -1,28 +1,32 @@
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
-import type { Db } from '../../db/index.js';
-import { categories, items, recipes } from '../../db/schema.js';
+import { and, eq, inArray, or, sql } from "drizzle-orm";
+import type { Db } from "../../db/index.js";
+import {
+  categories,
+  categoryColors,
+  categorySizes,
+  products,
+} from "../../db/schema.js";
 
 export class CategoriesRepository {
   constructor(private db: Db) {}
 
-  // runs fn with a repository bound to a transaction, so hierarchy checks
-  // and their mutation see one consistent state
   transaction<T>(fn: (repo: CategoriesRepository) => Promise<T>): Promise<T> {
     return this.db.transaction((tx) =>
       fn(new CategoriesRepository(tx as unknown as Db)),
     );
   }
 
-  list() {
-    return this.db.select().from(categories).orderBy(categories.name);
-  }
-
-  async findById(id: number) {
-    const [row] = await this.db
-      .select()
-      .from(categories)
-      .where(eq(categories.id, id));
-    return row;
+  async list() {
+    const [categoryRows, colors, sizes] = await Promise.all([
+      this.db.select().from(categories).orderBy(categories.name),
+      this.db.select().from(categoryColors).orderBy(categoryColors.name),
+      this.db.select().from(categorySizes).orderBy(categorySizes.name),
+    ]);
+    return categoryRows.map((category) => ({
+      ...category,
+      colors: colors.filter((option) => option.categoryId === category.id),
+      sizes: sizes.filter((option) => option.categoryId === category.id),
+    }));
   }
 
   async findByIdForUpdate(id: number) {
@@ -30,7 +34,7 @@ export class CategoriesRepository {
       .select()
       .from(categories)
       .where(eq(categories.id, id))
-      .for('update');
+      .for("update");
     return row;
   }
 
@@ -52,35 +56,17 @@ export class CategoriesRepository {
         ),
       )
       .orderBy(categories.id)
-      .for('update');
-  }
-
-  children(parentId: number) {
-    return this.db
-      .select()
-      .from(categories)
-      .where(eq(categories.parentId, parentId));
+      .for("update");
   }
 
   async hasActiveItems(categoryIds: number[]) {
     const [row] = await this.db
-      .select({ id: items.id })
-      .from(items)
-      .where(
-        and(inArray(items.categoryId, categoryIds), eq(items.isActive, true)),
-      )
-      .limit(1);
-    return Boolean(row);
-  }
-
-  async hasActiveRecipes(categoryIds: number[]) {
-    const [row] = await this.db
-      .select({ id: recipes.id })
-      .from(recipes)
+      .select({ id: products.id })
+      .from(products)
       .where(
         and(
-          inArray(recipes.categoryId, categoryIds),
-          eq(recipes.isActive, true),
+          inArray(products.categoryId, categoryIds),
+          eq(products.isActive, true),
         ),
       )
       .limit(1);
@@ -90,6 +76,37 @@ export class CategoriesRepository {
   async create(data: { name: string; parentId?: number | null }) {
     const [result] = await this.db.insert(categories).values(data);
     return result.insertId;
+  }
+
+  async replaceOptions(
+    categoryId: number,
+    colors?: string[],
+    sizes?: string[],
+  ) {
+    if (colors) {
+      await this.db
+        .update(categoryColors)
+        .set({ isActive: false })
+        .where(eq(categoryColors.categoryId, categoryId));
+      for (const name of colors) {
+        await this.db
+          .insert(categoryColors)
+          .values({ categoryId, name, isActive: true })
+          .onDuplicateKeyUpdate({ set: { isActive: true } });
+      }
+    }
+    if (sizes) {
+      await this.db
+        .update(categorySizes)
+        .set({ isActive: false })
+        .where(eq(categorySizes.categoryId, categoryId));
+      for (const name of sizes) {
+        await this.db
+          .insert(categorySizes)
+          .values({ categoryId, name, isActive: true })
+          .onDuplicateKeyUpdate({ set: { isActive: true } });
+      }
+    }
   }
 
   async update(

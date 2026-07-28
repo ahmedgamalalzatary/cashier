@@ -3,7 +3,7 @@ export const NAV_ITEMS = [
   { href: "/pos", label: "نقطة البيع" },
   { href: "/categories", label: "التصنيفات", adminOnly: true },
   { href: "/warehouse", label: "المخزن الرئيسي", adminOnly: true },
-  { href: "/cafe", label: "الكافيه" },
+  { href: "/shop", label: "المحل" },
   { href: "/suppliers", label: "الموردين", adminOnly: true },
   { href: "/purchases", label: "المشتريات", adminOnly: true },
   { href: "/users", label: "مستخدمو النظام", adminOnly: true },
@@ -13,7 +13,6 @@ export const NAV_ITEMS = [
   { href: "/expenses", label: "المصروفات" },
   { href: "/waste", label: "الهالك" },
   { href: "/refunds", label: "المرتجع" },
-  { href: "/recipes", label: "الوصفات", adminOnly: true },
   { href: "/reports", label: "التقارير", adminOnly: true },
 ] as const;
 

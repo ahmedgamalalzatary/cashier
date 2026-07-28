@@ -8,6 +8,6 @@ export function inventoryRouter(
 ) {
   const router = Router();
   router.get("/main/stock", requireAdmin, controller.stock("main"));
-  router.get("/cafe/stock", controller.stock("cafe"));
+  router.get("/shop/stock", controller.stock("shop"));
   return router;
 }

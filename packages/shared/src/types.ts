@@ -124,41 +124,59 @@ export type Category = {
   isActive: boolean;
   /** ISO timestamp — Date on the server, serialized to string over JSON */
   createdAt: string;
+  colors?: CategoryOption[];
+  sizes?: CategoryOption[];
 };
 
-export const ITEM_TYPES = ["raw", "resale", "prepared"] as const;
-export type ItemType = (typeof ITEM_TYPES)[number];
+export type CategoryOption = {
+  id: number;
+  categoryId: number;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+};
+
+export type ProductVariant = {
+  id: number;
+  code: number;
+  barcode: string | null;
+  colorId: number;
+  colorName: string;
+  sizeId: number;
+  sizeName: string;
+  sellingPrice: string;
+  mainMinimumLevel: string;
+  shopMinimumLevel: string;
+  hasStockHistory: boolean;
+  isActive: boolean;
+};
 
 export type Item = {
   id: number;
-  /** system-assigned sequential code; display with formatItemCode */
-  code: number;
   name: string;
   categoryId: number;
   categoryName: string;
-  type: ItemType;
-  sellingPrice: string | null;
-  stockUnit: string;
-  purchaseUnit: string | null;
-  purchaseToStockFactor: string | null;
-  mainMinimumLevel: string;
-  cafeMinimumLevel: string;
-  hasStockHistory: boolean;
+  variants: ProductVariant[];
   isActive: boolean;
   /** ISO timestamp — Date on the server, serialized to string over JSON */
   createdAt: string;
 };
 
-export const WAREHOUSES = ["main", "cafe"] as const;
+export const WAREHOUSES = ["main", "shop"] as const;
 export type Warehouse = (typeof WAREHOUSES)[number];
 
 export type InventoryStockRow = {
+  variantId?: number;
   itemId: number;
   code: number;
+  barcode?: string | null;
+  productName?: string;
   name: string;
+  colorName?: string;
+  sizeName?: string;
   categoryId: number;
   categoryName: string;
-  type: ItemType;
+  type: string;
   stockUnit: string;
   isActive: boolean;
   quantity: string;
@@ -167,8 +185,6 @@ export type InventoryStockRow = {
   isLowStock: boolean;
   isNegativeStock: boolean;
 };
-
-export type PurchaseUnitMode = "stock" | "purchase";
 
 export type PurchaseInvoiceSummary = {
   id: number;
@@ -188,12 +204,18 @@ export type PurchaseInvoiceSummary = {
 
 export type PurchaseInvoiceLine = {
   id: number;
+  variantId?: number;
+  variantCode?: number;
   itemId: number;
   itemCode: number;
   itemName: string;
+  barcode?: string | null;
+  productName?: string;
+  colorName?: string;
+  sizeName?: string;
   quantity: string;
-  unitMode: PurchaseUnitMode;
-  unitName: string;
+  unitMode?: "stock" | "purchase";
+  unitName?: string;
   stockQuantity: string;
   stockUnit: string;
   unitPrice: string;
@@ -263,109 +285,15 @@ export type TransferLine = {
   unitCost: string;
   lineCost: string;
   sourceBatchId: number;
-  cafeBatchId: number;
+  shopBatchId: number;
 };
 
 export type TransferDetail = TransferSummary & {
   lines: TransferLine[];
 };
 
-export type RecipeType = "product" | "prepared";
-
-export type RecipeIngredientCost = {
-  id: number;
-  itemId: number;
-  itemCode: number;
-  itemName: string;
-  itemType: ItemType;
-  stockUnit: string;
-  requiredQuantity: string;
-  availableQuantity: string;
-  currentCost: string | null;
-  hasSufficientStock: boolean;
-  itemIsActive: boolean;
-};
-
-type RecipeCommon = {
-  id: number;
-  name: string;
-  categoryId: number;
-  categoryName: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type ProductRecipeSize = {
-  id: number;
-  name: string;
-  sellingPrice: string;
-  currentCost: string | null;
-  marginAmount: string | null;
-  marginPercentage: string | null;
-  costPercentage: string | null;
-  hasSufficientStock: boolean;
-  ingredients: RecipeIngredientCost[];
-};
-
-export type ProductRecipe = RecipeCommon & {
-  type: "product";
-  outputItemId: null;
-  outputItemName: null;
-  outputStockUnit: null;
-  sizes: ProductRecipeSize[];
-};
-
-export type PreparedRecipe = RecipeCommon & {
-  type: "prepared";
-  outputItemId: number;
-  outputItemName: string;
-  outputStockUnit: string;
-  baseYield: string;
-  currentCost: string | null;
-  estimatedUnitCost: string | null;
-  hasSufficientStock: boolean;
-  ingredients: RecipeIngredientCost[];
-};
-
-export type Recipe = ProductRecipe | PreparedRecipe;
-
-export type PreparationSummary = {
-  id: number;
-  recipeId: number;
-  recipeName: string;
-  outputItemId: number;
-  outputItemName: string;
-  outputStockUnit: string;
-  producedQuantity: string;
-  totalCost: string;
-  unitCost: string;
-  outputBatchId: number;
-  preparedBy: number;
-  preparedByName: string;
-  notes: string | null;
-  occurredAt: string;
-  createdAt: string;
-};
-
-export type PreparationAllocation = {
-  id: number;
-  ingredientItemId: number;
-  ingredientItemCode: number;
-  ingredientItemName: string;
-  stockUnit: string;
-  quantity: string;
-  unitCost: string;
-  lineCost: string;
-  sourceBatchId: number;
-};
-
-export type PreparationDetail = PreparationSummary & {
-  allocations: PreparationAllocation[];
-};
-
 type PosCatalogBase = {
-  name: string;
+  productName: string;
   categoryId: number;
   mainCategoryId: number;
   mainCategoryName: string;
@@ -373,24 +301,17 @@ type PosCatalogBase = {
   subCategoryName: string | null;
 };
 
-export type PosRecipeCatalogProduct = PosCatalogBase & {
-  type: "recipe";
-  recipeId: number;
-  sizes: Array<{
-    id: number;
-    name: string;
-    sellingPrice: string;
-  }>;
-};
-
-export type PosItemCatalogProduct = PosCatalogBase & {
-  type: "item";
-  itemId: number;
+export type PosCatalogProduct = PosCatalogBase & {
+  variantId: number;
+  productId: number;
+  code: number;
+  barcode: string | null;
+  colorId: number;
+  colorName: string;
+  sizeId: number;
+  sizeName: string;
   sellingPrice: string;
-  stockUnit: string;
 };
-
-export type PosCatalogProduct = PosRecipeCatalogProduct | PosItemCatalogProduct;
 
 export type OrderDiscountType = "percent" | "fixed";
 
@@ -414,9 +335,9 @@ export type OrderSummary = {
 
 export type OrderLineAllocation = {
   id: number;
-  itemId: number;
-  itemCode: number;
-  itemName: string;
+  variantId: number;
+  variantCode: number;
+  variantName: string;
   batchId: number | null;
   stockMovementId: number;
   quantity: string;
@@ -426,12 +347,12 @@ export type OrderLineAllocation = {
 
 export type OrderLine = {
   id: number;
-  type: "recipe" | "item";
-  recipeId: number | null;
-  recipeSizeId: number | null;
-  itemId: number | null;
+  variantId: number;
   productName: string;
-  sizeName: string | null;
+  colorName: string;
+  sizeName: string;
+  variantCode: number;
+  barcode: string | null;
   quantity: string;
   unitPrice: string;
   lineSubtotal: string;

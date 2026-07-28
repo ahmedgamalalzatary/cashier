@@ -151,7 +151,7 @@ export function TransferFormModal({
     <Modal
       open
       onClose={onClose}
-      title={mode === "direct" ? "تحويل مباشر إلى الكافيه" : "طلب رصيد للكافيه"}
+      title={mode === "direct" ? "تحويل مباشر إلى المحل" : "طلب رصيد للمحل"}
     >
       <form onSubmit={submit} className="space-y-4">
         <div className="rounded-lg bg-paper/70 px-3 py-2 text-xs leading-5 text-muted">

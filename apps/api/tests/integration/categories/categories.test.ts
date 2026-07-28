@@ -18,7 +18,9 @@ beforeEach(async () => {
 });
 
 async function createCategory(name: string, parentId?: number) {
-  return api().post("/api/categories").send({ name, parentId });
+  return api()
+    .post("/api/categories")
+    .send({ name, parentId, colors: ["أسود"], sizes: ["M"] });
 }
 
 describe("categories", () => {

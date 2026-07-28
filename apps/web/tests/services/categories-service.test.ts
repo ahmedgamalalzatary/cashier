@@ -39,10 +39,10 @@ describe("categories service", () => {
   });
 
   it("updates a category", async () => {
-    await updateCategory(4, { name: "Coffee", parentId: 2 });
+    await updateCategory(4, { name: "T-Shirts", parentId: 2 });
     expect(request).toHaveBeenCalledWith("/api/categories/4", {
       method: "PUT",
-      body: JSON.stringify({ name: "Coffee", parentId: 2 }),
+      body: JSON.stringify({ name: "T-Shirts", parentId: 2 }),
     });
   });
 

@@ -2,7 +2,10 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import type { Db } from "../../db/index.js";
 import {
+  categoryColors,
+  categorySizes,
   items,
+  products,
   shifts,
   transferLines,
   transferRequestLines,
@@ -38,8 +41,15 @@ export class TransfersRepository {
 
   lockItems(ids: number[]) {
     return this.db
-      .select({ id: items.id, name: items.name, isActive: items.isActive })
+      .select({
+        id: items.id,
+        name: sql<string>`CONCAT(${products.name}, ' - ', ${categoryColors.name}, ' - ', ${categorySizes.name})`,
+        isActive: items.isActive,
+      })
       .from(items)
+      .innerJoin(products, eq(items.productId, products.id))
+      .innerJoin(categoryColors, eq(items.colorId, categoryColors.id))
+      .innerJoin(categorySizes, eq(items.sizeId, categorySizes.id))
       .where(
         inArray(
           items.id,
@@ -142,12 +152,15 @@ export class TransfersRepository {
         id: transferRequestLines.id,
         itemId: transferRequestLines.itemId,
         itemCode: items.code,
-        itemName: items.name,
-        stockUnit: items.stockUnit,
+        itemName: sql<string>`CONCAT(${products.name}, ' - ', ${categoryColors.name}, ' - ', ${categorySizes.name})`,
+        stockUnit: sql<string>`'قطعة'`,
         quantity: transferRequestLines.quantity,
       })
       .from(transferRequestLines)
       .innerJoin(items, eq(transferRequestLines.itemId, items.id))
+      .innerJoin(products, eq(items.productId, products.id))
+      .innerJoin(categoryColors, eq(items.colorId, categoryColors.id))
+      .innerJoin(categorySizes, eq(items.sizeId, categorySizes.id))
       .where(eq(transferRequestLines.requestId, requestId))
       .orderBy(transferRequestLines.id);
   }
@@ -168,7 +181,7 @@ export class TransfersRepository {
     quantity: string;
     unitCost: string;
     sourceBatchId: number;
-    cafeBatchId: number;
+    shopBatchId: number;
   }) {
     await this.db.insert(transferLines).values(data);
   }
@@ -253,16 +266,19 @@ export class TransfersRepository {
         id: transferLines.id,
         itemId: transferLines.itemId,
         itemCode: items.code,
-        itemName: items.name,
-        stockUnit: items.stockUnit,
+        itemName: sql<string>`CONCAT(${products.name}, ' - ', ${categoryColors.name}, ' - ', ${categorySizes.name})`,
+        stockUnit: sql<string>`'قطعة'`,
         quantity: transferLines.quantity,
         unitCost: transferLines.unitCost,
         lineCost: sql<string>`CAST(ROUND(${transferLines.quantity} * ${transferLines.unitCost}, 2) AS DECIMAL(30,2))`,
         sourceBatchId: transferLines.sourceBatchId,
-        cafeBatchId: transferLines.cafeBatchId,
+        shopBatchId: transferLines.shopBatchId,
       })
       .from(transferLines)
       .innerJoin(items, eq(transferLines.itemId, items.id))
+      .innerJoin(products, eq(items.productId, products.id))
+      .innerJoin(categoryColors, eq(items.colorId, categoryColors.id))
+      .innerJoin(categorySizes, eq(items.sizeId, categorySizes.id))
       .where(eq(transferLines.transferId, transferId))
       .orderBy(transferLines.id);
   }

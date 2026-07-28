@@ -27,6 +27,12 @@ export function CategoryFormModal({
   const [parentId, setParentId] = useState(
     String(editing?.parentId ?? parent?.id ?? ""),
   );
+  const [colors, setColors] = useState(
+    editing?.colors?.filter((option) => option.isActive).map((option) => option.name).join("، ") ?? "",
+  );
+  const [sizes, setSizes] = useState(
+    editing?.sizes?.filter((option) => option.isActive).map((option) => option.name).join("، ") ?? "",
+  );
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -46,13 +52,34 @@ export function CategoryFormModal({
     setSaving(true);
     setError("");
     try {
+      const optionList = (value: string) =>
+        value
+          .split(/[,،]/)
+          .map((option) => option.trim())
+          .filter(Boolean);
+      const colorList = optionList(colors);
+      const sizeList = optionList(sizes);
+      if (!colorList.length || !sizeList.length) {
+        setError("أدخل لوناً ومقاساً واحداً على الأقل");
+        setSaving(false);
+        return;
+      }
       if (editing) {
         await updateCategory(
           editing.id,
-          categoryUpdateBody(trimmed, parentId, editing.parentId),
+          {
+            ...categoryUpdateBody(trimmed, parentId, editing.parentId),
+            colors: colorList,
+            sizes: sizeList,
+          },
         );
       } else {
-        await createCategory({ name: trimmed, parentId: parent?.id ?? null });
+        await createCategory({
+          name: trimmed,
+          parentId: parent?.id ?? null,
+          colors: colorList,
+          sizes: sizeList,
+        });
       }
       onSaved();
     } catch (err) {
@@ -69,6 +96,20 @@ export function CategoryFormModal({
           label="اسم التصنيف"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          required
+        />
+        <Field
+          label="الألوان (افصل بينها بفاصلة)"
+          value={colors}
+          onChange={(event) => setColors(event.target.value)}
+          placeholder="أسود، أبيض، أحمر"
+          required
+        />
+        <Field
+          label="المقاسات (افصل بينها بفاصلة)"
+          value={sizes}
+          onChange={(event) => setSizes(event.target.value)}
+          placeholder="S، M، L، XL"
           required
         />
         {editing && (

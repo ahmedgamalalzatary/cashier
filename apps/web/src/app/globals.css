@@ -51,7 +51,7 @@ body {
   );
 }
 
-.steam-lines {
+.fabric-rings {
   position: absolute;
   inset: -10% -15% auto auto;
   width: 34rem;

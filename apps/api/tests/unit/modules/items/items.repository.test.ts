@@ -17,15 +17,11 @@ function recordingDb() {
 }
 
 describe("ItemsRepository code allocation", () => {
-  it("locks the items it reads the next code from", async () => {
+  it("locks product variants while reserving a range of codes", async () => {
     const { db, statements } = recordingDb();
-
-    await new ItemsRepository(db).nextItemCode();
-
+    await new ItemsRepository(db).nextItemCodes(2);
     const generated = statements.join("\n").toLowerCase();
-    // without the lock, a concurrent create inside REPEATABLE READ would read
-    // the same snapshot and hand out a code that is already taken
-    expect(generated).toContain("max(`code`)");
-    expect(generated).toMatch(/for update\s*$/);
+    expect(generated).toContain("product_variants");
+    expect(generated).toContain("for update");
   });
 });

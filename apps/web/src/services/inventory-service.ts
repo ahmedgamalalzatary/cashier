@@ -5,6 +5,6 @@ export function getMainWarehouseStock() {
   return api<InventoryStockRow[]>("/api/inventory/main/stock");
 }
 
-export function getCafeWarehouseStock() {
-  return api<InventoryStockRow[]>("/api/inventory/cafe/stock");
+export function getShopWarehouseStock() {
+  return api<InventoryStockRow[]>("/api/inventory/shop/stock");
 }

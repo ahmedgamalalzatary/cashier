@@ -34,9 +34,8 @@ describe("purchases service", () => {
       notes: null,
       lines: [
         {
-          itemId: 3,
+          variantId: 3,
           quantity: 2,
-          unitMode: "purchase",
           unitPrice: 50,
         },
       ],

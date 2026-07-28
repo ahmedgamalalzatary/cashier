@@ -12,11 +12,9 @@ describe("POS feature boundaries", () => {
     expect(page).toContain("getCurrentShift");
     expect(page).toContain("createOrder");
     expect(page).toContain("OrderReceipt");
-    expect(page).toContain("<Modal");
-    expect(page).toContain('aria-label="ابحث باسم المنتج"');
-    expect(page).toContain('aria-label="النقد المستلم"');
-    expect(page).toContain("تم حفظ الطلب، لكن تعذر تحديث قائمة الطلبات");
-    expect(page).toContain('panelClassName="pos-receipt-dialog"');
+    expect(page).toContain("مسح الباركود");
+    expect(page).toContain("variant.variantId");
+    expect(page).toContain("المبلغ المستلم");
     expect(NAV_ITEMS).toContainEqual({ href: "/pos", label: "نقطة البيع" });
   });
 

@@ -9,8 +9,7 @@ import { api } from "../lib/api";
 export type CreateOrderBody = {
   clientRequestId: string;
   lines: Array<
-    | { type: "recipe"; recipeSizeId: number; quantity: number }
-    | { type: "item"; itemId: number; quantity: number }
+    { variantId: number; quantity: number }
   >;
   discount: { type: OrderDiscountType; value: number } | null;
   cashReceived: number;

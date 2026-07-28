@@ -18,7 +18,7 @@ describe('InventoryRepository stock rows', () => {
       .toSQL()
       .sql.toLowerCase();
 
-    expect(generated).toContain('`items`.`code`');
+    expect(generated).toContain('`product_variants`.`code`');
   });
 });
 

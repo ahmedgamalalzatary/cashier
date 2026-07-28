@@ -1,1 +1,0 @@
-ALTER TABLE `shift_events` ADD `opening_float` decimal(12,2);

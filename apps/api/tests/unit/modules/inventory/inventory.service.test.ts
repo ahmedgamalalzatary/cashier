@@ -51,7 +51,7 @@ class FakeInventoryRepository implements InventoryRepositoryPort {
     return this.movements.length;
   }
 
-  async outstandingDeficits(itemId: number, warehouse: "main" | "cafe") {
+  async outstandingDeficits(itemId: number, warehouse: "main" | "shop") {
     return this.movements.flatMap((movement, index) => {
       if (
         movement.itemId !== itemId ||
@@ -80,7 +80,7 @@ class FakeInventoryRepository implements InventoryRepositoryPort {
     this.deficitAllocations.push(data);
   }
 
-  async lockAvailableBatches(itemId: number, warehouse: "main" | "cafe") {
+  async lockAvailableBatches(itemId: number, warehouse: "main" | "shop") {
     return this.batches.filter(
       (batch) =>
         batch.itemId === itemId &&
@@ -147,7 +147,7 @@ describe("FIFO inventory service", () => {
     const repo = new FakeInventoryRepository();
     repo.movements.push({
       itemId: 1,
-      warehouse: "cafe",
+      warehouse: "shop",
       batchId: null,
       movementType: "sale",
       quantity: "-1.000",
@@ -161,7 +161,7 @@ describe("FIFO inventory service", () => {
 
     await service.receive({
       itemId: 1,
-      warehouse: "cafe",
+      warehouse: "shop",
       quantity: 3,
       unitCost: "8",
       movementType: "transfer_in",
@@ -305,7 +305,7 @@ describe("FIFO inventory service", () => {
       {
         id: 1,
         itemId: 1,
-        warehouse: "cafe",
+        warehouse: "shop",
         initialQuantity: "1.000",
         remainingQuantity: "1.000",
         unitCost: "8.000000",
@@ -318,7 +318,7 @@ describe("FIFO inventory service", () => {
 
     const result = await service.consume({
       itemId: 1,
-      warehouse: "cafe",
+      warehouse: "shop",
       quantity: 2,
       movementType: "sale",
       allowNegative: true,

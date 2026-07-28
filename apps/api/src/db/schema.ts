@@ -57,6 +57,46 @@ export const categories = mysqlTable(
   (table) => [index("categories_parent_id_idx").on(table.parentId)],
 );
 
+export const categoryColors = mysqlTable(
+  "category_colors",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    categoryId: int("category_id")
+      .notNull()
+      .references(() => categories.id),
+    name: varchar("name", { length: 100 }).notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("category_colors_category_name_uidx").on(
+      table.categoryId,
+      table.name,
+    ),
+    index("category_colors_category_idx").on(table.categoryId),
+  ],
+);
+
+export const categorySizes = mysqlTable(
+  "category_sizes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    categoryId: int("category_id")
+      .notNull()
+      .references(() => categories.id),
+    name: varchar("name", { length: 100 }).notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("category_sizes_category_name_uidx").on(
+      table.categoryId,
+      table.name,
+    ),
+    index("category_sizes_category_idx").on(table.categoryId),
+  ],
+);
+
 export const suppliers = mysqlTable("suppliers", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 191 }).notNull(),
@@ -118,31 +158,44 @@ export const supplierPayments = mysqlTable(
   ],
 );
 
-export const items = mysqlTable(
-  "items",
+export const products = mysqlTable(
+  "products",
   {
     id: int("id").autoincrement().primaryKey(),
-    // system-assigned sequential display code (0001, 0002, …); never reused
-    code: int("code").notNull(),
     name: varchar("name", { length: 191 }).notNull(),
     categoryId: int("category_id")
       .notNull()
       .references(() => categories.id),
-    type: mysqlEnum("type", ["raw", "resale", "prepared"]).notNull(),
-    sellingPrice: decimal("selling_price", { precision: 12, scale: 2 }),
-    stockUnit: varchar("stock_unit", { length: 50 }).notNull(),
-    purchaseUnit: varchar("purchase_unit", { length: 50 }),
-    purchaseToStockFactor: decimal("purchase_to_stock_factor", {
-      precision: 14,
-      scale: 6,
-    }),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => [index("products_category_id_idx").on(table.categoryId)],
+);
+
+export const items = mysqlTable(
+  "product_variants",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    productId: int("product_id")
+      .notNull()
+      .references(() => products.id),
+    colorId: int("color_id")
+      .notNull()
+      .references(() => categoryColors.id),
+    sizeId: int("size_id")
+      .notNull()
+      .references(() => categorySizes.id),
+    code: int("code").notNull(),
+    barcode: varchar("barcode", { length: 191 }),
+    sellingPrice: decimal("selling_price", { precision: 12, scale: 2 }).notNull(),
     mainMinimumLevel: decimal("main_minimum_level", {
       precision: 14,
       scale: 3,
     })
       .notNull()
       .default("0"),
-    cafeMinimumLevel: decimal("cafe_minimum_level", {
+    shopMinimumLevel: decimal("shop_minimum_level", {
       precision: 14,
       scale: 3,
     })
@@ -152,8 +205,14 @@ export const items = mysqlTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [
-    index("items_category_id_idx").on(table.categoryId),
-    uniqueIndex("items_code_uidx").on(table.code),
+    index("product_variants_product_idx").on(table.productId),
+    uniqueIndex("product_variants_combination_uidx").on(
+      table.productId,
+      table.colorId,
+      table.sizeId,
+    ),
+    uniqueIndex("product_variants_code_uidx").on(table.code),
+    uniqueIndex("product_variants_barcode_uidx").on(table.barcode),
   ],
 );
 
@@ -164,22 +223,17 @@ export const purchaseLines = mysqlTable(
     invoiceId: int("invoice_id")
       .notNull()
       .references(() => purchaseInvoices.id),
-    itemId: int("item_id")
+    itemId: int("variant_id")
       .notNull()
       .references(() => items.id),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
-    unitMode: mysqlEnum("unit_mode", ["stock", "purchase"]).notNull(),
-    stockQuantity: decimal("stock_quantity", {
-      precision: 14,
-      scale: 3,
-    }).notNull(),
     unitPrice: decimal("unit_price", { precision: 12, scale: 2 }).notNull(),
     unitCost: decimal("unit_cost", { precision: 16, scale: 6 }).notNull(),
     lineTotal: decimal("line_total", { precision: 12, scale: 2 }).notNull(),
   },
   (table) => [
     index("purchase_lines_invoice_id_idx").on(table.invoiceId),
-    index("purchase_lines_item_id_idx").on(table.itemId),
+    index("purchase_lines_variant_id_idx").on(table.itemId),
   ],
 );
 
@@ -187,10 +241,10 @@ export const stockBatches = mysqlTable(
   "stock_batches",
   {
     id: int("id").autoincrement().primaryKey(),
-    itemId: int("item_id")
+    itemId: int("variant_id")
       .notNull()
       .references(() => items.id),
-    warehouse: mysqlEnum("warehouse", ["main", "cafe"]).notNull(),
+    warehouse: mysqlEnum("warehouse", ["main", "shop"]).notNull(),
     initialQuantity: decimal("initial_quantity", {
       precision: 14,
       scale: 3,
@@ -248,7 +302,7 @@ export const transferRequestLines = mysqlTable(
     requestId: int("request_id")
       .notNull()
       .references(() => transferRequests.id),
-    itemId: int("item_id")
+    itemId: int("variant_id")
       .notNull()
       .references(() => items.id),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
@@ -290,7 +344,7 @@ export const transferLines = mysqlTable(
     transferId: int("transfer_id")
       .notNull()
       .references(() => transfers.id),
-    itemId: int("item_id")
+    itemId: int("variant_id")
       .notNull()
       .references(() => items.id),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
@@ -298,131 +352,14 @@ export const transferLines = mysqlTable(
     sourceBatchId: int("source_batch_id")
       .notNull()
       .references(() => stockBatches.id),
-    cafeBatchId: int("cafe_batch_id")
+    shopBatchId: int("shop_batch_id")
       .notNull()
       .references(() => stockBatches.id),
   },
   (table) => [
     index("transfer_lines_transfer_idx").on(table.transferId),
-    index("transfer_lines_item_idx").on(table.itemId),
-    uniqueIndex("transfer_lines_cafe_batch_uidx").on(table.cafeBatchId),
-  ],
-);
-
-export const recipes = mysqlTable(
-  "recipes",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    name: varchar("name", { length: 191 }).notNull(),
-    type: mysqlEnum("type", ["product", "prepared"]).notNull(),
-    categoryId: int("category_id")
-      .notNull()
-      .references(() => categories.id),
-    outputItemId: int("output_item_id").references(() => items.id),
-    isActive: boolean("is_active").notNull().default(true),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
-  },
-  (table) => [
-    index("recipes_category_id_idx").on(table.categoryId),
-    uniqueIndex("recipes_output_item_id_uidx").on(table.outputItemId),
-  ],
-);
-
-export const recipeSizes = mysqlTable(
-  "recipe_sizes",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    recipeId: int("recipe_id")
-      .notNull()
-      .references(() => recipes.id),
-    name: varchar("name", { length: 100 }).notNull(),
-    sellingPrice: decimal("selling_price", { precision: 12, scale: 2 }),
-    outputQuantity: decimal("output_quantity", { precision: 14, scale: 3 }),
-    sortOrder: int("sort_order").notNull().default(0),
-  },
-  (table) => [
-    uniqueIndex("recipe_sizes_recipe_name_uidx").on(table.recipeId, table.name),
-    index("recipe_sizes_recipe_id_idx").on(table.recipeId),
-  ],
-);
-
-export const recipeIngredients = mysqlTable(
-  "recipe_ingredients",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    recipeSizeId: int("recipe_size_id")
-      .notNull()
-      .references(() => recipeSizes.id),
-    itemId: int("item_id")
-      .notNull()
-      .references(() => items.id),
-    quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
-  },
-  (table) => [
-    uniqueIndex("recipe_ingredients_size_item_uidx").on(
-      table.recipeSizeId,
-      table.itemId,
-    ),
-    index("recipe_ingredients_item_id_idx").on(table.itemId),
-  ],
-);
-
-export const preparations = mysqlTable(
-  "preparations",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    recipeId: int("recipe_id")
-      .notNull()
-      .references(() => recipes.id),
-    recipeName: varchar("recipe_name", { length: 191 }).notNull(),
-    outputItemId: int("output_item_id")
-      .notNull()
-      .references(() => items.id),
-    outputItemName: varchar("output_item_name", { length: 191 }).notNull(),
-    producedQuantity: decimal("produced_quantity", {
-      precision: 14,
-      scale: 3,
-    }).notNull(),
-    totalCost: decimal("total_cost", { precision: 30, scale: 2 }).notNull(),
-    unitCost: decimal("unit_cost", { precision: 16, scale: 6 }).notNull(),
-    outputBatchId: int("output_batch_id").references(() => stockBatches.id),
-    preparedBy: int("prepared_by")
-      .notNull()
-      .references(() => users.id),
-    notes: text("notes"),
-    occurredAt: timestamp("occurred_at").notNull(),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-  },
-  (table) => [
-    index("preparations_recipe_id_idx").on(table.recipeId),
-    index("preparations_occurred_at_idx").on(table.occurredAt),
-    uniqueIndex("preparations_output_batch_uidx").on(table.outputBatchId),
-  ],
-);
-
-export const preparationAllocations = mysqlTable(
-  "preparation_allocations",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    preparationId: int("preparation_id")
-      .notNull()
-      .references(() => preparations.id),
-    ingredientItemId: int("ingredient_item_id")
-      .notNull()
-      .references(() => items.id),
-    ingredientItemName: varchar("ingredient_item_name", {
-      length: 191,
-    }).notNull(),
-    quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
-    unitCost: decimal("unit_cost", { precision: 16, scale: 6 }).notNull(),
-    sourceBatchId: int("source_batch_id")
-      .notNull()
-      .references(() => stockBatches.id),
-  },
-  (table) => [
-    index("preparation_allocations_preparation_idx").on(table.preparationId),
-    index("preparation_allocations_item_idx").on(table.ingredientItemId),
+    index("transfer_lines_variant_idx").on(table.itemId),
+    uniqueIndex("transfer_lines_shop_batch_uidx").on(table.shopBatchId),
   ],
 );
 
@@ -545,14 +482,14 @@ export const orderLines = mysqlTable(
     orderId: int("order_id")
       .notNull()
       .references(() => orders.id),
-    type: mysqlEnum("type", ["recipe", "item"]).notNull(),
-    recipeId: int("recipe_id").references(() => recipes.id),
-    recipeSizeId: int("recipe_size_id").references(() => recipeSizes.id, {
-      onDelete: "set null",
-    }),
-    itemId: int("item_id").references(() => items.id),
+    itemId: int("variant_id")
+      .notNull()
+      .references(() => items.id),
     productName: varchar("product_name", { length: 191 }).notNull(),
-    sizeName: varchar("size_name", { length: 100 }),
+    colorName: varchar("color_name", { length: 100 }).notNull(),
+    sizeName: varchar("size_name", { length: 100 }).notNull(),
+    variantCode: int("variant_code").notNull(),
+    barcode: varchar("barcode", { length: 191 }),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
     unitPrice: decimal("unit_price", { precision: 12, scale: 2 }).notNull(),
     lineSubtotal: decimal("line_subtotal", {
@@ -566,8 +503,7 @@ export const orderLines = mysqlTable(
   },
   (table) => [
     index("order_lines_order_id_idx").on(table.orderId),
-    index("order_lines_recipe_id_idx").on(table.recipeId),
-    index("order_lines_item_id_idx").on(table.itemId),
+    index("order_lines_variant_id_idx").on(table.itemId),
   ],
 );
 
@@ -575,10 +511,10 @@ export const stockMovements = mysqlTable(
   "stock_movements",
   {
     id: int("id").autoincrement().primaryKey(),
-    itemId: int("item_id")
+    itemId: int("variant_id")
       .notNull()
       .references(() => items.id),
-    warehouse: mysqlEnum("warehouse", ["main", "cafe"]).notNull(),
+    warehouse: mysqlEnum("warehouse", ["main", "shop"]).notNull(),
     batchId: int("batch_id").references(() => stockBatches.id),
     movementType: varchar("movement_type", { length: 50 }).notNull(),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
@@ -635,10 +571,10 @@ export const orderLineAllocations = mysqlTable(
     orderLineId: int("order_line_id")
       .notNull()
       .references(() => orderLines.id),
-    itemId: int("item_id")
+    itemId: int("variant_id")
       .notNull()
       .references(() => items.id),
-    itemName: varchar("item_name", { length: 191 }).notNull(),
+    itemName: varchar("variant_name", { length: 191 }).notNull(),
     batchId: int("batch_id").references(() => stockBatches.id),
     stockMovementId: int("stock_movement_id")
       .notNull()
@@ -648,7 +584,7 @@ export const orderLineAllocations = mysqlTable(
   },
   (table) => [
     index("order_line_allocations_line_idx").on(table.orderLineId),
-    index("order_line_allocations_item_idx").on(table.itemId),
+    index("order_line_allocations_variant_idx").on(table.itemId),
     uniqueIndex("order_line_allocations_movement_uidx").on(
       table.stockMovementId,
     ),

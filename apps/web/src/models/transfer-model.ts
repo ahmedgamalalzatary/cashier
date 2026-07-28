@@ -111,7 +111,7 @@ export function transferRequestBody(input: {
   return {
     notes: input.notes.trim() || null,
     lines: input.lines.map((line) => ({
-      itemId: Number(line.itemId),
+      variantId: Number(line.itemId),
       quantity: Number(line.quantity),
     })),
   };

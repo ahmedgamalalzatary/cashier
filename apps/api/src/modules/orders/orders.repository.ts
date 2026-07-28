@@ -1,27 +1,15 @@
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  inArray,
-  isNotNull,
-  isNull,
-  or,
-  sql,
-} from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import type { Db } from "../../db/index.js";
 import {
   categories,
+  categoryColors,
+  categorySizes,
   items,
   orderLineAllocations,
   orderLines,
   orders,
-  recipeIngredients,
-  recipes,
-  recipeSizes,
-  stockBatches,
-  stockMovements,
+  products,
   shifts,
   users,
 } from "../../db/schema.js";
@@ -45,148 +33,61 @@ export class OrdersRepository {
     });
   }
 
-  listCatalogRecipes() {
-    return this.db
-      .select({
-        recipeId: recipes.id,
-        name: recipes.name,
-        categoryId: categories.id,
-        categoryName: categories.name,
-        parentCategoryId: categories.parentId,
-        parentCategoryName: parentCategory.name,
-        sizeId: recipeSizes.id,
-        sizeName: recipeSizes.name,
-        sellingPrice: recipeSizes.sellingPrice,
-        sortOrder: recipeSizes.sortOrder,
-      })
-      .from(recipes)
-      .innerJoin(categories, eq(recipes.categoryId, categories.id))
-      .leftJoin(parentCategory, eq(categories.parentId, parentCategory.id))
-      .innerJoin(recipeSizes, eq(recipeSizes.recipeId, recipes.id))
-      .where(
-        and(
-          eq(recipes.type, "product"),
-          eq(recipes.isActive, true),
-          eq(categories.isActive, true),
-          or(isNull(categories.parentId), eq(parentCategory.isActive, true)),
-          isNotNull(recipeSizes.sellingPrice),
-        ),
-      )
-      .orderBy(
-        asc(parentCategory.name),
-        asc(categories.name),
-        asc(recipes.name),
-        asc(recipeSizes.sortOrder),
-        asc(recipeSizes.id),
-      );
-  }
-
   listCatalogItems() {
     return this.db
       .select({
-        itemId: items.id,
-        name: items.name,
+        variantId: items.id,
+        code: items.code,
+        barcode: items.barcode,
+        productId: products.id,
+        productName: products.name,
+        colorId: categoryColors.id,
+        colorName: categoryColors.name,
+        sizeId: categorySizes.id,
+        sizeName: categorySizes.name,
         categoryId: categories.id,
         categoryName: categories.name,
         parentCategoryId: categories.parentId,
         parentCategoryName: parentCategory.name,
         sellingPrice: items.sellingPrice,
-        stockUnit: items.stockUnit,
       })
       .from(items)
-      .innerJoin(categories, eq(items.categoryId, categories.id))
+      .innerJoin(products, eq(items.productId, products.id))
+      .innerJoin(categories, eq(products.categoryId, categories.id))
+      .innerJoin(categoryColors, eq(items.colorId, categoryColors.id))
+      .innerJoin(categorySizes, eq(items.sizeId, categorySizes.id))
       .leftJoin(parentCategory, eq(categories.parentId, parentCategory.id))
       .where(
         and(
-          eq(items.type, "resale"),
           eq(items.isActive, true),
+          eq(products.isActive, true),
           eq(categories.isActive, true),
           or(isNull(categories.parentId), eq(parentCategory.isActive, true)),
-          isNotNull(items.sellingPrice),
         ),
       )
-      .orderBy(asc(parentCategory.name), asc(categories.name), asc(items.name));
+      .orderBy(products.name, categoryColors.name, categorySizes.name);
   }
 
-  lockRecipeSizes(ids: number[]) {
-    if (ids.length === 0) return Promise.resolve([]);
-    return this.db
-      .select({
-        sizeId: recipeSizes.id,
-        sizeName: recipeSizes.name,
-        sellingPrice: recipeSizes.sellingPrice,
-        recipeId: recipes.id,
-        recipeName: recipes.name,
-        recipeType: recipes.type,
-        recipeIsActive: recipes.isActive,
-      })
-      .from(recipeSizes)
-      .innerJoin(recipes, eq(recipeSizes.recipeId, recipes.id))
-      .where(
-        inArray(
-          recipeSizes.id,
-          [...new Set(ids)].sort((a, b) => a - b),
-        ),
-      )
-      .orderBy(asc(recipeSizes.id))
-      .for("update");
-  }
-
-  listIngredientsForSizes(ids: number[]) {
-    if (ids.length === 0) return Promise.resolve([]);
-    return this.db
-      .select({
-        recipeSizeId: recipeIngredients.recipeSizeId,
-        itemId: recipeIngredients.itemId,
-        itemName: items.name,
-        quantity: recipeIngredients.quantity,
-      })
-      .from(recipeIngredients)
-      .innerJoin(items, eq(recipeIngredients.itemId, items.id))
-      .where(inArray(recipeIngredients.recipeSizeId, ids))
-      .orderBy(
-        asc(recipeIngredients.recipeSizeId),
-        asc(recipeIngredients.itemId),
-      );
-  }
-
-  lockResaleItems(ids: number[]) {
-    if (ids.length === 0) return Promise.resolve([]);
+  lockItems(ids: number[]) {
+    if (!ids.length) return Promise.resolve([]);
     return this.db
       .select({
         id: items.id,
-        name: items.name,
-        type: items.type,
+        code: items.code,
+        barcode: items.barcode,
         sellingPrice: items.sellingPrice,
         isActive: items.isActive,
+        productName: products.name,
+        productIsActive: products.isActive,
+        colorName: categoryColors.name,
+        sizeName: categorySizes.name,
       })
       .from(items)
-      .where(
-        inArray(
-          items.id,
-          [...new Set(ids)].sort((a, b) => a - b),
-        ),
-      )
-      .orderBy(asc(items.id))
-      .for("update");
-  }
-
-  lockStockItems(ids: number[]) {
-    if (ids.length === 0) return Promise.resolve([]);
-    return this.db
-      .select({
-        id: items.id,
-        name: items.name,
-        isActive: items.isActive,
-      })
-      .from(items)
-      .where(
-        inArray(
-          items.id,
-          [...new Set(ids)].sort((a, b) => a - b),
-        ),
-      )
-      .orderBy(asc(items.id))
+      .innerJoin(products, eq(items.productId, products.id))
+      .innerJoin(categoryColors, eq(items.colorId, categoryColors.id))
+      .innerJoin(categorySizes, eq(items.sizeId, categorySizes.id))
+      .where(inArray(items.id, [...new Set(ids)].sort((a, b) => a - b)))
+      .orderBy(items.id)
       .for("update");
   }
 
@@ -194,7 +95,6 @@ export class OrdersRepository {
     const [result] = await this.db.insert(orders).values(data);
     return result.insertId;
   }
-
   async findOpenShiftForCashier(cashierUserId: number) {
     const [row] = await this.db
       .select({ id: shifts.id })
@@ -205,7 +105,6 @@ export class OrdersRepository {
       .for("update");
     return row;
   }
-
   async findByClientRequestId(clientRequestId: string) {
     const [row] = await this.db
       .select({
@@ -217,26 +116,22 @@ export class OrdersRepository {
       .where(eq(orders.clientRequestId, clientRequestId));
     return row;
   }
-
   async createLine(data: typeof orderLines.$inferInsert) {
     const [result] = await this.db.insert(orderLines).values(data);
     return result.insertId;
   }
-
   async updateLine(
     id: number,
     data: Pick<typeof orderLines.$inferInsert, "totalCost" | "hasStockDeficit">,
   ) {
     await this.db.update(orderLines).set(data).where(eq(orderLines.id, id));
   }
-
   async updateOrder(
     id: number,
     data: Pick<typeof orders.$inferInsert, "totalCost" | "isNegativeStock">,
   ) {
     await this.db.update(orders).set(data).where(eq(orders.id, id));
   }
-
   async createAllocation(data: typeof orderLineAllocations.$inferInsert) {
     await this.db.insert(orderLineAllocations).values(data);
   }
@@ -265,7 +160,6 @@ export class OrdersRepository {
       .orderBy(desc(orders.createdAt), desc(orders.id))
       .limit(limit);
   }
-
   async findOrder(id: number) {
     const [row] = await this.db
       .select({
@@ -290,38 +184,22 @@ export class OrdersRepository {
       .where(eq(orders.id, id));
     return row;
   }
-
   listLines(orderId: number) {
     return this.db
-      .select({
-        id: orderLines.id,
-        type: orderLines.type,
-        recipeId: orderLines.recipeId,
-        recipeSizeId: orderLines.recipeSizeId,
-        itemId: orderLines.itemId,
-        productName: orderLines.productName,
-        sizeName: orderLines.sizeName,
-        quantity: orderLines.quantity,
-        unitPrice: orderLines.unitPrice,
-        lineSubtotal: orderLines.lineSubtotal,
-        totalCost: orderLines.totalCost,
-        hasStockDeficit: orderLines.hasStockDeficit,
-      })
+      .select()
       .from(orderLines)
       .where(eq(orderLines.orderId, orderId))
       .orderBy(asc(orderLines.id));
   }
-
   listAllocations(orderLineIds: number[]) {
-    if (orderLineIds.length === 0) return Promise.resolve([]);
+    if (!orderLineIds.length) return Promise.resolve([]);
     return this.db
       .select({
         id: orderLineAllocations.id,
         orderLineId: orderLineAllocations.orderLineId,
-        itemId: orderLineAllocations.itemId,
-        // name is snapshotted (items can be renamed); the code never changes
-        itemCode: items.code,
-        itemName: orderLineAllocations.itemName,
+        variantId: orderLineAllocations.itemId,
+        variantCode: items.code,
+        variantName: orderLineAllocations.itemName,
         batchId: orderLineAllocations.batchId,
         stockMovementId: orderLineAllocations.stockMovementId,
         quantity: orderLineAllocations.quantity,
@@ -333,12 +211,7 @@ export class OrdersRepository {
       })
       .from(orderLineAllocations)
       .innerJoin(items, eq(orderLineAllocations.itemId, items.id))
-      .leftJoin(stockBatches, eq(orderLineAllocations.batchId, stockBatches.id))
-      .innerJoin(
-        stockMovements,
-        eq(orderLineAllocations.stockMovementId, stockMovements.id),
-      )
       .where(inArray(orderLineAllocations.orderLineId, orderLineIds))
-      .orderBy(asc(orderLineAllocations.id));
+      .orderBy(orderLineAllocations.id);
   }
 }

@@ -29,7 +29,7 @@ describe("suppliers service", () => {
 
   it("creates and updates suppliers", async () => {
     const createBody = { name: "Beans", openingBalance: 10 };
-    const updateBody = { name: "Coffee Beans" };
+    const updateBody = { name: "Cotton Supplier" };
     await createSupplier(createBody);
     await updateSupplier(7, updateBody);
     expect(request).toHaveBeenNthCalledWith(1, "/api/suppliers", {

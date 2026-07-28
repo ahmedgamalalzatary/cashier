@@ -4,10 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
-  Coffee,
   LayoutDashboard,
   Warehouse,
-  CupSoda,
   Truck,
   Clock,
   Users,
@@ -15,7 +13,6 @@ import {
   Receipt,
   Trash2,
   RotateCcw,
-  BookOpen,
   BarChart3,
   Tags,
   LogOut,
@@ -36,7 +33,7 @@ const navIcons: Record<NavHref, LucideIcon> = {
   "/pos": ShoppingBag,
   "/categories": Tags,
   "/warehouse": Warehouse,
-  "/cafe": CupSoda,
+  "/shop": ShoppingBag,
   "/suppliers": Truck,
   "/purchases": ShoppingCart,
   "/users": UserCog,
@@ -46,7 +43,6 @@ const navIcons: Record<NavHref, LucideIcon> = {
   "/expenses": Receipt,
   "/waste": Trash2,
   "/refunds": RotateCcw,
-  "/recipes": BookOpen,
   "/reports": BarChart3,
 };
 
@@ -61,8 +57,8 @@ export function Sidebar() {
   return (
     <aside className="w-56 shrink-0 bg-sidebar text-sidebar-ink flex flex-col">
       <div className="flex items-center gap-2 px-5 py-5 text-accent">
-        <Coffee className="size-6" />
-        <span className="text-lg font-bold text-white">الكافيه</span>
+        <ShoppingBag className="size-6" />
+        <span className="text-lg font-bold text-white">متجر الملابس</span>
       </div>
       <nav className="flex-1 px-3 pb-6 space-y-0.5">
         {visibleNav.map(({ href, label }) => {

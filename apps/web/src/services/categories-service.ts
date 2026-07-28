@@ -7,12 +7,16 @@ type OkResponse = { ok: true };
 export type CategoryCreateBody = {
   name: string;
   parentId: number | null;
+  colors?: string[];
+  sizes?: string[];
 };
 
 export type CategoryUpdateBody = {
   name?: string;
   parentId?: number | null;
   isActive?: true;
+  colors?: string[];
+  sizes?: string[];
 };
 
 export function listCategories() {

@@ -17,7 +17,7 @@ describe("orders service", () => {
     mockedApi.mockResolvedValue(undefined as never);
     const body = {
       clientRequestId: "90f2d7c2-2f4f-4de6-9abf-42eaba11e2cf",
-      lines: [{ type: "recipe" as const, recipeSizeId: 4, quantity: 2 }],
+      lines: [{ variantId: 4, quantity: 2 }],
       discount: { type: "percent" as const, value: 10 },
       cashReceived: 100,
     };

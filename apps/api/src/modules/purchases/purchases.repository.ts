@@ -2,6 +2,9 @@ import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../../db/index.js';
 import {
   items,
+  products,
+  categoryColors,
+  categorySizes,
   purchaseInvoices,
   purchaseLines,
   supplierPayments,
@@ -15,8 +18,6 @@ export type PurchaseLineWrite = {
   invoiceId: number;
   itemId: number;
   quantity: string;
-  unitMode: 'stock' | 'purchase';
-  stockQuantity: string;
   unitPrice: string;
   unitCost: string;
   lineTotal: string;
@@ -53,13 +54,11 @@ export class PurchasesRepository {
     return this.db
       .select({
         id: items.id,
-        type: items.type,
         isActive: items.isActive,
-        stockUnit: items.stockUnit,
-        purchaseUnit: items.purchaseUnit,
-        purchaseToStockFactor: items.purchaseToStockFactor,
+        productIsActive: products.isActive,
       })
       .from(items)
+      .innerJoin(products, eq(items.productId, products.id))
       .where(
         inArray(
           items.id,
@@ -159,28 +158,29 @@ export class PurchasesRepository {
     const rows = await this.db
       .select({
         id: purchaseLines.id,
+        variantId: purchaseLines.itemId,
         itemId: purchaseLines.itemId,
+        variantCode: items.code,
         itemCode: items.code,
-        itemName: items.name,
+        barcode: items.barcode,
+        productName: products.name,
+        itemName: sql<string>`CONCAT(${products.name}, ' - ', ${categoryColors.name}, ' - ', ${categorySizes.name})`,
+        colorName: categoryColors.name,
+        sizeName: categorySizes.name,
         quantity: purchaseLines.quantity,
-        unitMode: purchaseLines.unitMode,
-        purchaseUnit: items.purchaseUnit,
-        stockQuantity: purchaseLines.stockQuantity,
-        stockUnit: items.stockUnit,
+        stockQuantity: purchaseLines.quantity,
+        stockUnit: sql<"قطعة">`'قطعة'`,
         unitPrice: purchaseLines.unitPrice,
         unitCost: purchaseLines.unitCost,
         lineTotal: purchaseLines.lineTotal,
       })
       .from(purchaseLines)
       .innerJoin(items, eq(purchaseLines.itemId, items.id))
+      .innerJoin(products, eq(items.productId, products.id))
+      .innerJoin(categoryColors, eq(items.colorId, categoryColors.id))
+      .innerJoin(categorySizes, eq(items.sizeId, categorySizes.id))
       .where(eq(purchaseLines.invoiceId, invoiceId))
       .orderBy(purchaseLines.id);
-    return rows.map(({ purchaseUnit, ...row }) => ({
-      ...row,
-      unitName:
-        row.unitMode === 'purchase'
-          ? (purchaseUnit ?? row.stockUnit)
-          : row.stockUnit,
-    }));
+    return rows;
   }
 }
