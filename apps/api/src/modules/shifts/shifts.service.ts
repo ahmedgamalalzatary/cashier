@@ -74,7 +74,7 @@ export class ShiftsService {
         sales: totals.sales,
         discounts: totals.discounts,
         transferRequests: Number(totals.transferRequests),
-        refunds: "0.00",
+        refunds: totals.refunds,
         expenses: "0.00",
         wasteEntries: 0,
       },
@@ -107,7 +107,10 @@ export class ShiftsService {
       if (shift.cashierUserId !== cashierUserId)
         throw new HttpError(403, "لا يمكنك إغلاق وردية كاشير آخر");
       const totals = await repo.totals(id);
-      const expected = toCents(shift.openingFloat) + toCents(totals.sales);
+      const expected =
+        toCents(shift.openingFloat) +
+        toCents(totals.sales) -
+        toCents(totals.refunds);
       const actual = BigInt(Math.round(data.actualCash * 100));
       const closedAt = new Date();
       const actualCash = fromCents(actual);
@@ -147,7 +150,10 @@ export class ShiftsService {
       if (shift.status !== "open")
         throw new HttpError(409, "الوردية مغلقة بالفعل");
       const totals = await repo.totals(id);
-      const expected = toCents(shift.openingFloat) + toCents(totals.sales);
+      const expected =
+        toCents(shift.openingFloat) +
+        toCents(totals.sales) -
+        toCents(totals.refunds);
       const actual = BigInt(Math.round(data.actualCash * 100));
       const occurredAt = new Date();
       const expectedCash = fromCents(expected);
@@ -232,7 +238,10 @@ export class ShiftsService {
         data.actualCash === undefined
           ? shift.actualCash
           : data.actualCash.toFixed(2);
-      const expected = toCents(openingFloat) + toCents(totals.sales);
+      const expected =
+        toCents(openingFloat) +
+        toCents(totals.sales) -
+        toCents(totals.refunds);
       const overShort = toCents(actualCash) - expected;
       const expectedCash = fromCents(expected);
       const overShortText = fromCents(overShort);

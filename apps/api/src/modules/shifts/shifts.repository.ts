@@ -3,6 +3,7 @@ import type { Db } from "../../db/index.js";
 import {
   employees,
   orders,
+  refunds,
   shiftEvents,
   shifts,
   transferRequests,
@@ -150,7 +151,7 @@ export class ShiftsRepository {
   }
 
   async totals(id: number) {
-    const [[orderTotals], [requestTotals]] = await Promise.all([
+    const [[orderTotals], [requestTotals], [refundTotals]] = await Promise.all([
       this.db
         .select({
           ordersCount: sql<number>`CAST(COUNT(${orders.id}) AS UNSIGNED)`,
@@ -165,8 +166,14 @@ export class ShiftsRepository {
         })
         .from(transferRequests)
         .where(eq(transferRequests.shiftId, id)),
+      this.db
+        .select({
+          refunds: sql<string>`CAST(COALESCE(SUM(${refunds.amount}), 0) AS DECIMAL(12,2))`,
+        })
+        .from(refunds)
+        .where(eq(refunds.shiftId, id)),
     ]);
-    return { ...orderTotals, ...requestTotals };
+    return { ...orderTotals, ...requestTotals, ...refundTotals };
   }
 
   events(shiftId: number) {

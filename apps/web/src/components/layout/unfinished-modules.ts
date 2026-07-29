@@ -14,11 +14,6 @@ export const unfinishedModules = {
     title: "الهالك",
     description: "تسجيل الهالك وأسبابه وتأثيره على المخزون سيتوفر هنا.",
   },
-  refunds: {
-    code: "RF",
-    title: "المرتجع",
-    description: "معالجة المرتجعات وربطها بالفواتير الأصلية قيد التجهيز.",
-  },
   reports: {
     code: "RP",
     title: "التقارير",

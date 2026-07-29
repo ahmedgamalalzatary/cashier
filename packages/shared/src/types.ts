@@ -443,3 +443,36 @@ export type OrderLine = {
 export type OrderDetail = OrderSummary & {
   lines: OrderLine[];
 };
+
+export type RefundStockAction = "return_to_stock" | "not_returnable";
+
+export type RefundSummary = {
+  id: number;
+  orderId: number;
+  orderNumber: string;
+  shiftId: number;
+  cashierId: number;
+  cashierName: string;
+  reason: string;
+  amount: string;
+  totalCostReturned: string;
+  createdAt: string;
+};
+
+export type RefundLine = {
+  id: number;
+  orderLineId: number;
+  type: "recipe" | "item";
+  itemCode: number | null;
+  productName: string;
+  sizeName: string | null;
+  quantity: string;
+  unitPrice: string;
+  refundAmount: string;
+  stockAction: RefundStockAction | null;
+  returnedCost: string;
+};
+
+export type RefundDetail = RefundSummary & {
+  lines: RefundLine[];
+};

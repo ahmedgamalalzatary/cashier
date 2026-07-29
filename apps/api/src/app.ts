@@ -15,6 +15,7 @@ import { createRecipesModule } from "./modules/recipes/recipes.module.js";
 import { createOrdersModule } from "./modules/orders/orders.module.js";
 import { createEmployeesModule } from "./modules/employees/employees.module.js";
 import { createShiftsModule } from "./modules/shifts/shifts.module.js";
+import { createRefundsModule } from "./modules/refunds/refunds.module.js";
 
 export type AppOptions = {
   jwtSecret: string;
@@ -43,6 +44,7 @@ export function createApp(
   app.use("/api/auth", createAuthModule(db, jwtSecret));
   app.use("/api/orders", authenticate(db, jwtSecret), createOrdersModule(db));
   app.use("/api/shifts", authenticate(db, jwtSecret), createShiftsModule(db));
+  app.use("/api/refunds", authenticate(db, jwtSecret), createRefundsModule(db));
 
   // admin-only sections per spec §2 permission matrix
   const adminOnly = [

@@ -13,7 +13,9 @@ import {
   uniqueIndex,
   foreignKey,
   type AnyMySqlColumn,
+  check,
 } from "drizzle-orm/mysql-core";
+import { sql } from "drizzle-orm";
 
 export const employees = mysqlTable("employees", {
   id: int("id").autoincrement().primaryKey(),
@@ -571,6 +573,88 @@ export const orderLines = mysqlTable(
   ],
 );
 
+export const refunds = mysqlTable(
+  "refunds",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    clientRequestId: varchar("client_request_id", { length: 36 })
+      .notNull()
+      .unique(),
+    requestFingerprint: varchar("request_fingerprint", { length: 64 }).notNull(),
+    orderId: int("order_id")
+      .notNull()
+      .references(() => orders.id),
+    shiftId: int("shift_id")
+      .notNull()
+      .references(() => shifts.id),
+    cashierId: int("cashier_id")
+      .notNull()
+      .references(() => users.id),
+    reason: varchar("reason", { length: 500 }).notNull(),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    totalCostReturned: decimal("total_cost_returned", {
+      precision: 30,
+      scale: 2,
+    })
+      .notNull()
+      .default("0"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("refunds_order_id_idx").on(table.orderId),
+    index("refunds_shift_id_idx").on(table.shiftId),
+    index("refunds_cashier_created_idx").on(table.cashierId, table.createdAt),
+    check("refunds_amount_positive_chk", sql`${table.amount} > 0`),
+    check("refunds_reason_nonblank_chk", sql`CHAR_LENGTH(TRIM(${table.reason})) > 0`),
+    check("refunds_cost_nonnegative_chk", sql`${table.totalCostReturned} >= 0`),
+  ],
+);
+
+export const refundLines = mysqlTable(
+  "refund_lines",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    refundId: int("refund_id")
+      .notNull()
+      .references(() => refunds.id),
+    orderLineId: int("order_line_id")
+      .notNull()
+      .references(() => orderLines.id),
+    type: mysqlEnum("type", ["recipe", "item"]).notNull(),
+    productName: varchar("product_name", { length: 191 }).notNull(),
+    sizeName: varchar("size_name", { length: 100 }),
+    quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
+    unitPrice: decimal("unit_price", { precision: 12, scale: 2 }).notNull(),
+    refundAmount: decimal("refund_amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    grossAmount: decimal("gross_amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    stockAction: mysqlEnum("stock_action", [
+      "return_to_stock",
+      "not_returnable",
+    ]),
+    returnedCost: decimal("returned_cost", { precision: 30, scale: 2 })
+      .notNull()
+      .default("0"),
+  },
+  (table) => [
+    index("refund_lines_refund_id_idx").on(table.refundId),
+    index("refund_lines_order_line_idx").on(table.orderLineId),
+    check("refund_lines_quantity_positive_chk", sql`${table.quantity} > 0`),
+    check("refund_lines_amount_nonnegative_chk", sql`${table.refundAmount} >= 0`),
+    check("refund_lines_gross_nonnegative_chk", sql`${table.grossAmount} >= 0`),
+    check("refund_lines_cost_nonnegative_chk", sql`${table.returnedCost} >= 0`),
+    check(
+      "refund_lines_action_type_chk",
+      sql`((${table.type} = 'item' AND ${table.stockAction} IS NOT NULL) OR (${table.type} = 'recipe' AND ${table.stockAction} IS NULL))`,
+    ),
+  ],
+);
+
 export const stockMovements = mysqlTable(
   "stock_movements",
   {
@@ -651,6 +735,74 @@ export const orderLineAllocations = mysqlTable(
     index("order_line_allocations_item_idx").on(table.itemId),
     uniqueIndex("order_line_allocations_movement_uidx").on(
       table.stockMovementId,
+    ),
+  ],
+);
+
+export const refundLineAllocations = mysqlTable(
+  "refund_line_allocations",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    refundLineId: int("refund_line_id")
+      .notNull()
+      .references(() => refundLines.id),
+    orderLineAllocationId: int("order_line_allocation_id")
+      .notNull(),
+    itemId: int("item_id")
+      .notNull()
+      .references(() => items.id),
+    quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
+    unitCost: decimal("unit_cost", { precision: 16, scale: 6 }).notNull(),
+    returnedBatchId: int("returned_batch_id"),
+  },
+  (table) => [
+    index("refund_line_allocations_refund_line_idx").on(table.refundLineId),
+    index("refund_line_allocations_order_allocation_idx").on(
+      table.orderLineAllocationId,
+    ),
+    foreignKey({
+      name: "refund_alloc_order_alloc_fk",
+      columns: [table.orderLineAllocationId],
+      foreignColumns: [orderLineAllocations.id],
+    }),
+    foreignKey({
+      name: "refund_alloc_batch_fk",
+      columns: [table.returnedBatchId],
+      foreignColumns: [stockBatches.id],
+    }),
+    check("refund_alloc_quantity_positive_chk", sql`${table.quantity} > 0`),
+    check("refund_alloc_cost_nonnegative_chk", sql`${table.unitCost} >= 0`),
+  ],
+);
+
+export const wasteEntries = mysqlTable(
+  "waste_entries",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    warehouse: mysqlEnum("warehouse", ["main", "cafe"]).notNull(),
+    itemId: int("item_id")
+      .notNull()
+      .references(() => items.id),
+    quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
+    reason: varchar("reason", { length: 500 }).notNull(),
+    totalCost: decimal("total_cost", { precision: 30, scale: 2 }).notNull(),
+    recordedBy: int("recorded_by")
+      .notNull()
+      .references(() => users.id),
+    refundLineId: int("refund_line_id")
+      .unique()
+      .references(() => refundLines.id),
+    occurredAt: timestamp("occurred_at").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("waste_entries_item_idx").on(table.itemId),
+    index("waste_entries_occurred_idx").on(table.occurredAt),
+    check("waste_entries_quantity_positive_chk", sql`${table.quantity} > 0`),
+    check("waste_entries_cost_nonnegative_chk", sql`${table.totalCost} >= 0`),
+    check(
+      "waste_entries_reason_nonblank_chk",
+      sql`CHAR_LENGTH(TRIM(${table.reason})) > 0`,
     ),
   ],
 );
