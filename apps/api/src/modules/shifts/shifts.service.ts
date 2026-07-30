@@ -76,7 +76,7 @@ export class ShiftsService {
         transferRequests: Number(totals.transferRequests),
         refunds: totals.refunds,
         expenses: "0.00",
-        wasteEntries: 0,
+        wasteEntries: Number(totals.wasteEntries),
       },
       events,
     };
@@ -239,9 +239,7 @@ export class ShiftsService {
           ? shift.actualCash
           : data.actualCash.toFixed(2);
       const expected =
-        toCents(openingFloat) +
-        toCents(totals.sales) -
-        toCents(totals.refunds);
+        toCents(openingFloat) + toCents(totals.sales) - toCents(totals.refunds);
       const overShort = toCents(actualCash) - expected;
       const expectedCash = fromCents(expected);
       const overShortText = fromCents(overShort);

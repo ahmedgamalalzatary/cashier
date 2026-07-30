@@ -9,11 +9,6 @@ export const unfinishedModules = {
     title: "المصروفات",
     description: "تسجيل المصروفات اليومية وتصنيفها قيد التجهيز.",
   },
-  waste: {
-    code: "WS",
-    title: "الهالك",
-    description: "تسجيل الهالك وأسبابه وتأثيره على المخزون سيتوفر هنا.",
-  },
   reports: {
     code: "RP",
     title: "التقارير",

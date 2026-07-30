@@ -580,7 +580,9 @@ export const refunds = mysqlTable(
     clientRequestId: varchar("client_request_id", { length: 36 })
       .notNull()
       .unique(),
-    requestFingerprint: varchar("request_fingerprint", { length: 64 }).notNull(),
+    requestFingerprint: varchar("request_fingerprint", {
+      length: 64,
+    }).notNull(),
     orderId: int("order_id")
       .notNull()
       .references(() => orders.id),
@@ -605,7 +607,10 @@ export const refunds = mysqlTable(
     index("refunds_shift_id_idx").on(table.shiftId),
     index("refunds_cashier_created_idx").on(table.cashierId, table.createdAt),
     check("refunds_amount_positive_chk", sql`${table.amount} > 0`),
-    check("refunds_reason_nonblank_chk", sql`CHAR_LENGTH(TRIM(${table.reason})) > 0`),
+    check(
+      "refunds_reason_nonblank_chk",
+      sql`CHAR_LENGTH(TRIM(${table.reason})) > 0`,
+    ),
     check("refunds_cost_nonnegative_chk", sql`${table.totalCostReturned} >= 0`),
   ],
 );
@@ -645,7 +650,10 @@ export const refundLines = mysqlTable(
     index("refund_lines_refund_id_idx").on(table.refundId),
     index("refund_lines_order_line_idx").on(table.orderLineId),
     check("refund_lines_quantity_positive_chk", sql`${table.quantity} > 0`),
-    check("refund_lines_amount_nonnegative_chk", sql`${table.refundAmount} >= 0`),
+    check(
+      "refund_lines_amount_nonnegative_chk",
+      sql`${table.refundAmount} >= 0`,
+    ),
     check("refund_lines_gross_nonnegative_chk", sql`${table.grossAmount} >= 0`),
     check("refund_lines_cost_nonnegative_chk", sql`${table.returnedCost} >= 0`),
     check(
@@ -746,8 +754,7 @@ export const refundLineAllocations = mysqlTable(
     refundLineId: int("refund_line_id")
       .notNull()
       .references(() => refundLines.id),
-    orderLineAllocationId: int("order_line_allocation_id")
-      .notNull(),
+    orderLineAllocationId: int("order_line_allocation_id").notNull(),
     itemId: int("item_id")
       .notNull()
       .references(() => items.id),
@@ -779,12 +786,26 @@ export const wasteEntries = mysqlTable(
   "waste_entries",
   {
     id: int("id").autoincrement().primaryKey(),
+    clientRequestId: varchar("client_request_id", { length: 36 }).unique(),
+    requestFingerprint: varchar("request_fingerprint", { length: 64 }),
+    shiftId: int("shift_id").references(() => shifts.id),
     warehouse: mysqlEnum("warehouse", ["main", "cafe"]).notNull(),
-    itemId: int("item_id")
-      .notNull()
-      .references(() => items.id),
+    targetType: mysqlEnum("target_type", ["item", "recipe"]),
+    itemId: int("item_id").references(() => items.id),
+    recipeId: int("recipe_id").references(() => recipes.id),
+    recipeSizeId: int("recipe_size_id").references(() => recipeSizes.id),
+    targetName: varchar("target_name", { length: 191 }),
+    sizeName: varchar("size_name", { length: 100 }),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
     reason: varchar("reason", { length: 500 }).notNull(),
+    reasonCode: mysqlEnum("reason_code", [
+      "expired",
+      "damaged",
+      "preparation_mistake",
+      "spill",
+      "other",
+    ]),
+    note: varchar("note", { length: 500 }),
     totalCost: decimal("total_cost", { precision: 30, scale: 2 }).notNull(),
     recordedBy: int("recorded_by")
       .notNull()
@@ -797,12 +818,68 @@ export const wasteEntries = mysqlTable(
   },
   (table) => [
     index("waste_entries_item_idx").on(table.itemId),
+    index("waste_entries_shift_idx").on(table.shiftId),
     index("waste_entries_occurred_idx").on(table.occurredAt),
     check("waste_entries_quantity_positive_chk", sql`${table.quantity} > 0`),
     check("waste_entries_cost_nonnegative_chk", sql`${table.totalCost} >= 0`),
     check(
       "waste_entries_reason_nonblank_chk",
       sql`CHAR_LENGTH(TRIM(${table.reason})) > 0`,
+    ),
+    check(
+      "waste_entries_direct_shape_chk",
+      sql`${table.refundLineId} IS NOT NULL OR (
+        ${table.clientRequestId} IS NOT NULL
+        AND ${table.reasonCode} IS NOT NULL
+        AND (
+          (
+            ${table.targetType} = 'item'
+            AND ${table.itemId} IS NOT NULL
+            AND ${table.recipeId} IS NULL
+            AND ${table.recipeSizeId} IS NULL
+          )
+          OR
+          (
+            ${table.targetType} = 'recipe'
+            AND ${table.itemId} IS NULL
+            AND ${table.recipeId} IS NOT NULL
+            AND ${table.recipeSizeId} IS NOT NULL
+          )
+        )
+      )`,
+    ),
+  ],
+);
+
+export const wasteAllocations = mysqlTable(
+  "waste_allocations",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    wasteEntryId: int("waste_entry_id")
+      .notNull()
+      .references(() => wasteEntries.id),
+    itemId: int("item_id")
+      .notNull()
+      .references(() => items.id),
+    itemName: varchar("item_name", { length: 191 }).notNull(),
+    batchId: int("batch_id").references(() => stockBatches.id),
+    stockMovementId: int("stock_movement_id")
+      .notNull()
+      .references(() => stockMovements.id),
+    quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
+    unitCost: decimal("unit_cost", { precision: 16, scale: 6 }).notNull(),
+  },
+  (table) => [
+    index("waste_allocations_entry_idx").on(table.wasteEntryId),
+    index("waste_allocations_item_idx").on(table.itemId),
+    uniqueIndex("waste_allocations_movement_uidx").on(table.stockMovementId),
+    check(
+      "waste_allocations_quantity_positive_chk",
+      sql`${table.quantity} > 0`,
+    ),
+    check(
+      "waste_allocations_cost_nonnegative_chk",
+      sql`${table.unitCost} >= 0`,
     ),
   ],
 );

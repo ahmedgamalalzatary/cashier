@@ -6,7 +6,9 @@ import type { RefundInput } from "./refunds.schemas.js";
 const scaled = (value: string | number, scale: number) => {
   const text = typeof value === "number" ? value.toFixed(scale) : value;
   const negative = text.startsWith("-");
-  const [whole = "0", fraction = ""] = (negative ? text.slice(1) : text).split(".");
+  const [whole = "0", fraction = ""] = (negative ? text.slice(1) : text).split(
+    ".",
+  );
   const result =
     BigInt(whole || "0") * 10n ** BigInt(scale) +
     BigInt(fraction.padEnd(scale, "0").slice(0, scale) || "0");
@@ -52,7 +54,7 @@ export class RefundsService {
   }
 
   async quantities(orderId: number) {
-    const order = await this.repo.lockOrder(orderId);
+    const order = await this.repo.findOrder(orderId);
     if (!order) throw new HttpError(404, "الطلب الأصلي غير موجود");
     return this.repo.refundedQuantitiesForOrder(orderId);
   }
@@ -85,10 +87,7 @@ export class RefundsService {
         }
         const existingRows = await repo.refundedQuantities(lineIds);
         const existing = new Map(
-          existingRows.map((row) => [
-            row.orderLineId,
-            scaled(row.quantity, 3),
-          ]),
+          existingRows.map((row) => [row.orderLineId, scaled(row.quantity, 3)]),
         );
         const existingGross = new Map(
           existingRows.map((row) => [
@@ -118,13 +117,19 @@ export class RefundsService {
               );
             }
             if (line.type === "recipe" && requestedQuantity % 1_000n !== 0n) {
-              throw new HttpError(400, "كمية منتج الوصفة المرتجعة يجب أن تكون عدداً صحيحاً");
+              throw new HttpError(
+                400,
+                "كمية منتج الوصفة المرتجعة يجب أن تكون عدداً صحيحاً",
+              );
             }
             if (line.type === "item" && requested.stockAction === null) {
               throw new HttpError(400, `اختر معالجة مخزون ${line.productName}`);
             }
             if (line.type === "recipe" && requested.stockAction !== null) {
-              throw new HttpError(400, "منتجات الوصفات لا تعاد مكوناتها إلى المخزون");
+              throw new HttpError(
+                400,
+                "منتجات الوصفات لا تعاد مكوناتها إلى المخزون",
+              );
             }
             const priorQuantity = existing.get(line.id) ?? 0n;
             const priorGross = existingGross.get(line.id) ?? 0n;
@@ -160,7 +165,10 @@ export class RefundsService {
         }
         const remainingCash = orderTotal - priorRefunded;
         if (refundAmount > remainingCash) {
-          throw new HttpError(409, "قيمة المرتجع تتجاوز الرصيد النقدي المتبقي للطلب");
+          throw new HttpError(
+            409,
+            "قيمة المرتجع تتجاوز الرصيد النقدي المتبقي للطلب",
+          );
         }
         if (refundAmount <= 0n) {
           throw new HttpError(409, "قيمة المرتجع تساوي صفراً");
@@ -179,14 +187,18 @@ export class RefundsService {
           createdAt: occurredAt,
         });
 
-        let returnedCostScaleNine = 0n;
+        let totalCostReturned = 0n;
         for (const entry of calculated) {
           const allocations =
-            entry.line.type === "item" ? await repo.allocations(entry.line.id) : [];
+            entry.line.type === "item"
+              ? await repo.allocations(entry.line.id)
+              : [];
           const priorReturns = new Map(
-            (await repo.returnedAllocationQuantities(
-              allocations.map((allocation) => allocation.id),
-            )).map((row) => [
+            (
+              await repo.returnedAllocationQuantities(
+                allocations.map((allocation) => allocation.id),
+              )
+            ).map((row) => [
               row.orderLineAllocationId,
               scaled(row.quantity, 3),
             ]),
@@ -211,9 +223,16 @@ export class RefundsService {
             }
           }
           if (entry.line.type === "item" && remainingToAllocate !== 0n) {
-            throw new HttpError(409, "تعذر مطابقة كمية المرتجع مع تكلفة البيع الأصلية");
+            throw new HttpError(
+              409,
+              "تعذر مطابقة كمية المرتجع مع تكلفة البيع الأصلية",
+            );
           }
           const returnedCost = roundDivide(lineCostScaleNine, 10_000_000n);
+          const storedReturnedCost =
+            entry.requested.stockAction === "return_to_stock"
+              ? returnedCost
+              : 0n;
           const refundLineId = await repo.createLine({
             refundId: id,
             orderLineId: entry.line.id,
@@ -225,10 +244,7 @@ export class RefundsService {
             grossAmount: format(entry.gross, 2),
             refundAmount: format(entry.cash, 2),
             stockAction: entry.requested.stockAction,
-            returnedCost:
-              entry.requested.stockAction === "return_to_stock"
-                ? format(returnedCost, 2)
-                : "0.00",
+            returnedCost: format(storedReturnedCost, 2),
           });
 
           if (entry.line.type === "item") {
@@ -254,7 +270,7 @@ export class RefundsService {
                   returnedBatchId: received.batchId,
                 });
               }
-              returnedCostScaleNine += lineCostScaleNine;
+              totalCostReturned += storedReturnedCost;
             } else {
               for (const planned of plannedReturns) {
                 await repo.createReturnAllocation({
@@ -267,10 +283,15 @@ export class RefundsService {
                 });
               }
               await repo.createWaste({
+                shiftId: shift.id,
                 warehouse: "cafe",
+                targetType: "item",
                 itemId: entry.line.itemId!,
+                targetName: entry.line.productName,
                 quantity: format(entry.requestedQuantity, 3),
                 reason: input.reason,
+                reasonCode: "other",
+                note: input.reason,
                 totalCost: format(returnedCost, 2),
                 recordedBy: cashierId,
                 refundLineId,
@@ -281,13 +302,15 @@ export class RefundsService {
         }
         await repo.updateTotalCost(
           id,
-          format(roundDivide(returnedCostScaleNine, 10_000_000n), 2),
+          format(totalCostReturned, 2),
         );
         return id;
       });
     } catch (error) {
       if (!isDuplicateEntry(error)) throw error;
-      const replay = await this.repo.findByClientRequestId(input.clientRequestId);
+      const replay = await this.repo.findByClientRequestId(
+        input.clientRequestId,
+      );
       if (!replay) throw error;
       this.assertReplay(replay, requestFingerprint, cashierId);
       refundId = replay.id;

@@ -84,21 +84,23 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 - [x] Close with counted drawer → expected vs actual → over/short per cashier
 - [x] Orders blocked unless the authenticated cashier owns the open shift
 - [x] Cashier transfer requests blocked without the cashier's open shift and linked to it
-- [ ] Refunds/expenses blocked unless a shift is open (complete with those later modules)
+- [x] Refunds blocked unless the authenticated cashier owns an open shift
+- [ ] Expenses blocked unless a shift is open (complete with the Expenses module)
 - [x] Admin: force-close / reopen / correct with audit note
 
-## 9. Refunds
+## 9. Refunds ✅
 
-- [ ] `refunds` + `refund_lines` (against original order, full or per line)
-- [ ] Cash refund reduces current shift expected drawer
-- [ ] As-is items: return to stock or mark as waste; recipes stay consumed
-- [ ] Reason logging + reports feed
+- [x] `refunds` + `refund_lines` (against original order, full or per line)
+- [x] Cash refund reduces current shift expected drawer
+- [x] As-is items: return to stock or mark as waste; recipes stay consumed
+- [x] Reason logging + immutable refund history ready for the reports feed
 
-## 10. Waste
+## 10. Waste ✅
 
-- [ ] `waste_entries` (warehouse, item or recipe product, qty, reason, FIFO cost)
-- [ ] Cashier: cafe waste only; admin: anywhere
-- [ ] Recipe-product waste deducts ingredients
+- [x] Refund-linked cafe `waste_entries` foundation (item, qty, reason, exact source-allocation FIFO cost)
+- [x] General `waste_entries` support (warehouse, item or recipe product, qty, reason, FIFO cost)
+- [x] Cashier: cafe waste only with an owned open shift; admin: anywhere
+- [x] Recipe-product waste deducts ingredients atomically
 
 ## 11. Expenses
 

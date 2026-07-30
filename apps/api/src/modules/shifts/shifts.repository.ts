@@ -8,6 +8,7 @@ import {
   shifts,
   transferRequests,
   users,
+  wasteEntries,
 } from "../../db/schema.js";
 
 const shiftColumns = {
@@ -151,29 +152,41 @@ export class ShiftsRepository {
   }
 
   async totals(id: number) {
-    const [[orderTotals], [requestTotals], [refundTotals]] = await Promise.all([
-      this.db
-        .select({
-          ordersCount: sql<number>`CAST(COUNT(${orders.id}) AS UNSIGNED)`,
-          sales: sql<string>`CAST(COALESCE(SUM(${orders.total}), 0) AS DECIMAL(12,2))`,
-          discounts: sql<string>`CAST(COALESCE(SUM(${orders.discountAmount}), 0) AS DECIMAL(12,2))`,
-        })
-        .from(orders)
-        .where(eq(orders.shiftId, id)),
-      this.db
-        .select({
-          transferRequests: sql<number>`CAST(COUNT(${transferRequests.id}) AS UNSIGNED)`,
-        })
-        .from(transferRequests)
-        .where(eq(transferRequests.shiftId, id)),
-      this.db
-        .select({
-          refunds: sql<string>`CAST(COALESCE(SUM(${refunds.amount}), 0) AS DECIMAL(12,2))`,
-        })
-        .from(refunds)
-        .where(eq(refunds.shiftId, id)),
-    ]);
-    return { ...orderTotals, ...requestTotals, ...refundTotals };
+    const [[orderTotals], [requestTotals], [refundTotals], [wasteTotals]] =
+      await Promise.all([
+        this.db
+          .select({
+            ordersCount: sql<number>`CAST(COUNT(${orders.id}) AS UNSIGNED)`,
+            sales: sql<string>`CAST(COALESCE(SUM(${orders.total}), 0) AS DECIMAL(12,2))`,
+            discounts: sql<string>`CAST(COALESCE(SUM(${orders.discountAmount}), 0) AS DECIMAL(12,2))`,
+          })
+          .from(orders)
+          .where(eq(orders.shiftId, id)),
+        this.db
+          .select({
+            transferRequests: sql<number>`CAST(COUNT(${transferRequests.id}) AS UNSIGNED)`,
+          })
+          .from(transferRequests)
+          .where(eq(transferRequests.shiftId, id)),
+        this.db
+          .select({
+            refunds: sql<string>`CAST(COALESCE(SUM(${refunds.amount}), 0) AS DECIMAL(12,2))`,
+          })
+          .from(refunds)
+          .where(eq(refunds.shiftId, id)),
+        this.db
+          .select({
+            wasteEntries: sql<number>`CAST(COUNT(${wasteEntries.id}) AS UNSIGNED)`,
+          })
+          .from(wasteEntries)
+          .where(eq(wasteEntries.shiftId, id)),
+      ]);
+    return {
+      ...orderTotals,
+      ...requestTotals,
+      ...refundTotals,
+      ...wasteTotals,
+    };
   }
 
   events(shiftId: number) {

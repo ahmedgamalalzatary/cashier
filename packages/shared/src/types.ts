@@ -476,3 +476,45 @@ export type RefundLine = {
 export type RefundDetail = RefundSummary & {
   lines: RefundLine[];
 };
+
+export type WasteReason =
+  "expired" | "damaged" | "preparation_mistake" | "spill" | "other";
+
+export type WasteSummary = {
+  id: number;
+  shiftId: number | null;
+  warehouse: "main" | "cafe";
+  targetType: "item" | "recipe";
+  targetName: string;
+  sizeName: string | null;
+  quantity: string;
+  reason: WasteReason;
+  note: string | null;
+  totalCost: string;
+  recordedBy: number;
+  recordedByName: string;
+  occurredAt: string;
+};
+
+export type WasteAllocation = {
+  id: number;
+  itemId: number;
+  itemName: string;
+  batchId: number | null;
+  quantity: string;
+  unitCost: string;
+};
+
+export type WasteDetail = WasteSummary & {
+  allocations: WasteAllocation[];
+};
+
+export type WasteCatalog = {
+  items: Array<{ id: number; name: string; stockUnit: string }>;
+  recipes: Array<{
+    recipeId: number;
+    recipeName: string;
+    recipeSizeId: number;
+    sizeName: string;
+  }>;
+};

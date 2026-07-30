@@ -7,6 +7,13 @@ const page = readFileSync(
 );
 
 describe("refund submission flow", () => {
+  it("reuses the guarded load helper on mount", () => {
+    expect(page).toMatch(/useEffect\(\(\) => \{[\s\S]*?load\(\(\) => cancelled\)/);
+    expect(page).not.toMatch(
+      /useEffect\(\(\) => \{[\s\S]*?Promise\.all\(\[listOrders\(\), listRefunds\(\)\]\)/,
+    );
+  });
+
   it("reports a post-creation refresh failure as a successful refund with stale data", () => {
     expect(page).toContain("تم تسجيل المرتجع، لكن تعذر تحديث البيانات");
     expect(page).toMatch(

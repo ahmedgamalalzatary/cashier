@@ -44,23 +44,20 @@ export default function RefundsPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const load = async () => {
+  const load = async (cancelled: () => boolean = () => false) => {
     const [nextOrders, nextRefunds] = await Promise.all([
       listOrders(),
       listRefunds(),
     ]);
+    if (cancelled()) return;
     setOrders(nextOrders);
     setRefunds(nextRefunds);
   };
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([listOrders(), listRefunds()])
-      .then(([nextOrders, nextRefunds]) => {
-        if (cancelled) return;
-        setOrders(nextOrders);
-        setRefunds(nextRefunds);
-      })
+    Promise.resolve()
+      .then(() => load(() => cancelled))
       .catch((cause: Error) => {
         if (!cancelled) setError(cause.message);
       });

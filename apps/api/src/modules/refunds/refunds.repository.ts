@@ -54,6 +54,14 @@ export class RefundsRepository {
     return row;
   }
 
+  async findOrder(id: number) {
+    const [row] = await this.db
+      .select({ id: orders.id })
+      .from(orders)
+      .where(eq(orders.id, id));
+    return row;
+  }
+
   lockOrderLines(orderId: number, lineIds: number[]) {
     if (lineIds.length === 0) return Promise.resolve([]);
     return this.db
@@ -243,6 +251,8 @@ export class RefundsRepository {
         itemCode: items.code,
       })
       .from(refundLines)
+      // order_lines.item_id references one items.id row. Keep that 1:1
+      // relationship if the schema changes so this join cannot multiply lines.
       .leftJoin(orderLines, eq(refundLines.orderLineId, orderLines.id))
       .leftJoin(items, eq(orderLines.itemId, items.id))
       .where(eq(refundLines.refundId, refundId))

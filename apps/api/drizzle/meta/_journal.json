@@ -169,6 +169,13 @@
       "when": 1785341426205,
       "tag": "0023_married_whizzer",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1785343162638,
+      "tag": "0024_lonely_onslaught",
+      "breakpoints": true
     }
   ]
 }

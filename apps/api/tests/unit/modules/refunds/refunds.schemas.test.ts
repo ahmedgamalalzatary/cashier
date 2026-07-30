@@ -24,16 +24,27 @@ describe("refundInput", () => {
     });
   });
 
-  it("rejects duplicate lines and imprecise quantities", () => {
+  it("rejects duplicate order line ids", () => {
     expect(() =>
       refundInput.parse({
         clientRequestId: "8f345091-c497-4b8b-b4f3-a8ebdc47dd31",
         orderId: 12,
         reason: "سبب",
         lines: [
-          { orderLineId: 7, quantity: 0.0001 },
+          { orderLineId: 7, quantity: 1 },
           { orderLineId: 7, quantity: 1 },
         ],
+      }),
+    ).toThrow();
+  });
+
+  it("rejects quantities with more than three decimal places", () => {
+    expect(() =>
+      refundInput.parse({
+        clientRequestId: "8f345091-c497-4b8b-b4f3-a8ebdc47dd31",
+        orderId: 12,
+        reason: "سبب",
+        lines: [{ orderLineId: 7, quantity: 0.0001 }],
       }),
     ).toThrow();
   });

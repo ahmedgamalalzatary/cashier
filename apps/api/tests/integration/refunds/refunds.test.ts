@@ -14,7 +14,7 @@ import {
   users,
 } from "../../../src/db/schema.js";
 import { appOptions, db, nextTestItemCode } from "../../support/setup.js";
-import { loginAs } from "../../support/helpers.js";
+import { createUser, loginAs } from "../../support/helpers.js";
 
 const app = () => createApp(db, appOptions);
 let authorization: { readonly Authorization: string };
@@ -220,9 +220,57 @@ describe("refunds", () => {
           .send(body);
         expect(replay.status).toBe(201);
         expect(replay.body.id).toBe(response.body.id);
+
+        const changedPayload = await request(app())
+          .post("/api/refunds")
+          .set(authorization)
+          .send({ ...body, reason: "سبب مختلف" });
+        expect(changedPayload.status).toBe(409);
+
+        const credentials = await createUser("cashier", "other-cashier");
+        const login = await request(app())
+          .post("/api/auth/login")
+          .send(credentials);
+        const otherCashier = {
+          Authorization: `Bearer ${login.body.token}`,
+        };
+        const changedCashier = await request(app())
+          .post("/api/refunds")
+          .set(otherCashier)
+          .send(body);
+        expect(changedCashier.status).toBe(409);
       }
     }
     expect(amounts.reduce((sum, amount) => sum + amount, 0)).toBe(1);
+  });
+
+  it("rejects refund creation without an open shift", async () => {
+    const fixture = await soldResaleOrder();
+    const current = (
+      await request(app()).get("/api/shifts/current").set(authorization)
+    ).body;
+    await request(app())
+      .post(`/api/shifts/${current.id}/close`)
+      .set(authorization)
+      .send({ actualCash: 100 });
+
+    const response = await request(app())
+      .post("/api/refunds")
+      .set(authorization)
+      .send({
+        clientRequestId: crypto.randomUUID(),
+        orderId: fixture.orderId,
+        reason: "طلب العميل",
+        lines: [
+          {
+            orderLineId: fixture.lineId,
+            quantity: 1,
+            stockAction: "return_to_stock",
+          },
+        ],
+      });
+
+    expect(response.status).toBe(409);
   });
 
   it("maps repeated partial stock returns exactly across original sale allocations", async () => {
