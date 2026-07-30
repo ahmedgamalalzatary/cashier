@@ -75,7 +75,7 @@ export class ShiftsService {
         discounts: totals.discounts,
         transferRequests: Number(totals.transferRequests),
         refunds: totals.refunds,
-        expenses: "0.00",
+        expenses: totals.expenses,
         wasteEntries: Number(totals.wasteEntries),
       },
       events,
@@ -110,7 +110,8 @@ export class ShiftsService {
       const expected =
         toCents(shift.openingFloat) +
         toCents(totals.sales) -
-        toCents(totals.refunds);
+        toCents(totals.refunds) -
+        toCents(totals.expenses);
       const actual = BigInt(Math.round(data.actualCash * 100));
       const closedAt = new Date();
       const actualCash = fromCents(actual);
@@ -153,7 +154,8 @@ export class ShiftsService {
       const expected =
         toCents(shift.openingFloat) +
         toCents(totals.sales) -
-        toCents(totals.refunds);
+        toCents(totals.refunds) -
+        toCents(totals.expenses);
       const actual = BigInt(Math.round(data.actualCash * 100));
       const occurredAt = new Date();
       const expectedCash = fromCents(expected);
@@ -239,7 +241,10 @@ export class ShiftsService {
           ? shift.actualCash
           : data.actualCash.toFixed(2);
       const expected =
-        toCents(openingFloat) + toCents(totals.sales) - toCents(totals.refunds);
+        toCents(openingFloat) +
+        toCents(totals.sales) -
+        toCents(totals.refunds) -
+        toCents(totals.expenses);
       const overShort = toCents(actualCash) - expected;
       const expectedCash = fromCents(expected);
       const overShortText = fromCents(overShort);

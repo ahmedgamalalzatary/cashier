@@ -43,6 +43,8 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await db.execute(sql`SET FOREIGN_KEY_CHECKS = 0`);
+  await db.execute(sql`TRUNCATE TABLE expenses`);
+  await db.execute(sql`TRUNCATE TABLE expense_categories`);
   await db.execute(sql`TRUNCATE TABLE waste_allocations`);
   await db.execute(sql`TRUNCATE TABLE waste_entries`);
   await db.execute(sql`TRUNCATE TABLE refund_line_allocations`);

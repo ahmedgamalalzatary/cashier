@@ -4,7 +4,7 @@ import { unfinishedModules } from "../../../src/components/layout/unfinished-mod
 describe("unfinished module routes", () => {
   it("defines an intentional placeholder for every advertised unfinished route", () => {
     expect(Object.keys(unfinishedModules).sort()).toEqual(
-      ["expenses", "reports", "salaries"].sort(),
+      ["reports", "salaries"].sort(),
     );
     for (const details of Object.values(unfinishedModules)) {
       expect(details.title.length).toBeGreaterThan(0);

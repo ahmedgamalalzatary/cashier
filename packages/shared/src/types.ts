@@ -518,3 +518,24 @@ export type WasteCatalog = {
     sizeName: string;
   }>;
 };
+
+export type ExpenseCategory = {
+  id: number;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+};
+
+export type ExpenseSummary = {
+  id: number;
+  type: "shift" | "general";
+  categoryId: number;
+  categoryName: string;
+  shiftId: number | null;
+  amount: string;
+  expenseDate: string;
+  note: string | null;
+  recordedBy: number;
+  recordedByName: string;
+  createdAt: string;
+};

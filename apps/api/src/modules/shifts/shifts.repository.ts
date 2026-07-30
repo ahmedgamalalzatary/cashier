@@ -2,6 +2,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import {
   employees,
+  expenses,
   orders,
   refunds,
   shiftEvents,
@@ -152,7 +153,7 @@ export class ShiftsRepository {
   }
 
   async totals(id: number) {
-    const [[orderTotals], [requestTotals], [refundTotals], [wasteTotals]] =
+    const [[orderTotals], [requestTotals], [refundTotals], [wasteTotals], [expenseTotals]] =
       await Promise.all([
         this.db
           .select({
@@ -180,12 +181,19 @@ export class ShiftsRepository {
           })
           .from(wasteEntries)
           .where(eq(wasteEntries.shiftId, id)),
+        this.db
+          .select({
+            expenses: sql<string>`CAST(COALESCE(SUM(${expenses.amount}), 0) AS DECIMAL(12,2))`,
+          })
+          .from(expenses)
+          .where(eq(expenses.shiftId, id)),
       ]);
     return {
       ...orderTotals,
       ...requestTotals,
       ...refundTotals,
       ...wasteTotals,
+      ...expenseTotals,
     };
   }
 

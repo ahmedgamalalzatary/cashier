@@ -4,11 +4,6 @@ export const unfinishedModules = {
     title: "المرتبات",
     description: "حساب المرتبات والسلف والتسويات سيُدار من هذه الصفحة.",
   },
-  expenses: {
-    code: "EX",
-    title: "المصروفات",
-    description: "تسجيل المصروفات اليومية وتصنيفها قيد التجهيز.",
-  },
   reports: {
     code: "RP",
     title: "التقارير",

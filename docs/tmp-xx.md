@@ -85,7 +85,7 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 - [x] Orders blocked unless the authenticated cashier owns the open shift
 - [x] Cashier transfer requests blocked without the cashier's open shift and linked to it
 - [x] Refunds blocked unless the authenticated cashier owns an open shift
-- [ ] Expenses blocked unless a shift is open (complete with the Expenses module)
+- [x] Expenses blocked unless a shift is open
 - [x] Admin: force-close / reopen / correct with audit note
 
 ## 9. Refunds ✅
@@ -102,11 +102,11 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 - [x] Cashier: cafe waste only with an owned open shift; admin: anywhere
 - [x] Recipe-product waste deducts ingredients atomically
 
-## 11. Expenses
+## 11. Expenses ✅
 
-- [ ] `expenses` + `expense_categories` (flat, admin-managed)
-- [ ] Shift expenses (cashier, from drawer → reduces expected cash)
-- [ ] General expenses (admin, anytime)
+- [x] `expenses` + `expense_categories` (flat, admin-managed)
+- [x] Shift expenses (cashier, from drawer → reduces expected cash)
+- [x] General expenses (admin, anytime)
 
 ## 12. Employees & Cashier Work Time
 
