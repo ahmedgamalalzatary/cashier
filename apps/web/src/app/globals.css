@@ -72,6 +72,92 @@ body {
   border-bottom: 3px dotted var(--border);
 }
 
+/* Mobile nav drawer. It is hidden rather than translated off-canvas when
+   closed: a fixed panel parked past the edge still widens the page's
+   scrollable area. Body scroll is locked while it is open, so the slide-in
+   cannot flash a scrollbar. */
+@media (width < 64rem) {
+  .app-drawer {
+    animation: drawer-in 180ms ease-out;
+  }
+
+  .app-scrim {
+    animation: scrim-in 180ms ease-out;
+  }
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Home shift tape: a receipt, so it is torn rather than bordered. */
+.tape {
+  filter: drop-shadow(0 16px 40px rgb(43 33 24 / 0.1));
+}
+
+.tape-top {
+  height: 6px;
+  background: radial-gradient(
+      circle at 5px 0,
+      transparent 4px,
+      var(--surface) 4.5px
+    )
+    0 0 / 10px 10px;
+}
+
+.tape-bottom {
+  height: 8px;
+  background:
+    linear-gradient(135deg, transparent 5px, var(--surface) 0) 0 0/10px 10px,
+    linear-gradient(225deg, transparent 5px, var(--surface) 0) 0 0/10px 10px;
+}
+
+/* leader dots carry the eye from label to figure, as on a printed receipt */
+.tape-leader {
+  flex: 1;
+  border-bottom: 1px dotted var(--border);
+}
+
+.tape-line {
+  animation: tape-feed 260ms ease-out backwards;
+}
+
+@keyframes tape-feed {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.tape-live {
+  animation: tape-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes tape-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tape-line,
+  .tape-live {
+    animation: none !important;
+  }
+}
+
 .pos-ticket::after {
   content: "";
   display: block;

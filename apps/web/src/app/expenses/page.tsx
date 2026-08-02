@@ -135,7 +135,7 @@ export default function ExpensesPage() {
           <div className="mb-4 flex gap-2">
             <input aria-label="اسم التصنيف الجديد" value={newCategory}
               onChange={(event) => setNewCategory(event.target.value)}
-              className="h-10 flex-1 rounded-xl border border-line bg-paper px-3" placeholder="مثال: صيانة" />
+              className="h-10 min-w-0 flex-1 rounded-xl border border-line bg-paper px-3" placeholder="مثال: صيانة" />
             <Button onClick={addCategory} disabled={!newCategory.trim()}><Plus className="size-4" />إضافة</Button>
           </div>
           <div className="space-y-2">
@@ -152,7 +152,7 @@ export default function ExpensesPage() {
                         .then(load)
                         .catch((cause: Error) => setError(cause.message));
                   }}
-                  className={`h-9 flex-1 rounded-lg border border-line bg-paper px-3 text-sm ${
+                  className={`h-9 min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 text-sm ${
                     category.isActive ? "" : "text-muted line-through"
                   }`}
                 />
