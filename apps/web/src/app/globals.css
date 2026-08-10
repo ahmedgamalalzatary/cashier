@@ -158,6 +158,69 @@ body {
   }
 }
 
+/* Catalog cards carry no photo, so the category tint is the only thing a
+   cashier can scan for. Each main category maps to one tone of the same warm
+   family: distinct enough to group by, quiet enough not to fight the receipt. */
+.tint-0 {
+  --tint: #a05c17;
+}
+.tint-1 {
+  --tint: #3f6f52;
+}
+.tint-2 {
+  --tint: #35637f;
+}
+.tint-3 {
+  --tint: #8a4a5f;
+}
+.tint-4 {
+  --tint: #b3402e;
+}
+.tint-5 {
+  --tint: #6d5a8c;
+}
+.tint-6 {
+  --tint: #7a6a2a;
+}
+.tint-7 {
+  --tint: #4c6b74;
+}
+
+.tint-dot {
+  background: var(--tint);
+}
+
+.catalog-card {
+  border-color: color-mix(in srgb, var(--tint) 30%, var(--border));
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--tint) 5%, var(--surface)),
+    var(--surface) 4.5rem
+  );
+}
+
+.catalog-card:hover {
+  border-color: color-mix(in srgb, var(--tint) 60%, var(--border));
+}
+
+.catalog-thumb {
+  background: color-mix(in srgb, var(--tint) 15%, #fff);
+  border: 1px solid color-mix(in srgb, var(--tint) 28%, #fff);
+  color: var(--tint);
+}
+
+.catalog-badge {
+  background: color-mix(in srgb, var(--tint) 12%, #fff);
+  color: var(--tint);
+}
+
+.catalog-option:hover,
+.catalog-option:focus-visible {
+  background: var(--tint);
+  border-color: var(--tint);
+  color: #fff;
+}
+
 .pos-ticket::after {
   content: "";
   display: block;

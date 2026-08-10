@@ -56,6 +56,7 @@ export default function PosPage() {
   );
   const [discountValue, setDiscountValue] = useState(0);
   const [cashReceived, setCashReceived] = useState(0);
+  const [ticketTab, setTicketTab] = useState<"ticket" | "orders">("ticket");
   const [receipt, setReceipt] = useState<OrderDetail | null>(null);
   const [autoPrintOrderId, setAutoPrintOrderId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -134,6 +135,9 @@ export default function PosPage() {
 
   function addProduct(product: PosCatalogProduct, recipeSizeId?: number) {
     setCart((current) => addCatalogSelection(current, product, recipeSizeId));
+    // The ticket now shares its panel with the order history, so a product
+    // added while browsing past orders would otherwise land out of sight.
+    setTicketTab("ticket");
     setError("");
   }
 
@@ -238,8 +242,19 @@ export default function PosPage() {
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_25rem]">
         <section className="min-w-0 space-y-4">
-          <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
-            <div className="flex flex-wrap gap-2">
+          <div className="rounded-2xl border border-line bg-surface p-3 shadow-sm">
+            <label className="relative block">
+              <Search className="pointer-events-none absolute inset-y-0 right-4 my-auto size-5 text-muted" />
+              <input
+                aria-label="ابحث باسم المنتج"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="ابحث باسم المنتج"
+                className="h-12 w-full rounded-xl border border-line bg-paper pe-12 ps-4 text-sm outline-none transition focus:border-primary focus:bg-surface focus:ring-4 focus:ring-primary/10"
+              />
+            </label>
+
+            <div className="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => chooseMainCategory(null)}
@@ -254,6 +269,10 @@ export default function PosPage() {
                   onClick={() => chooseMainCategory(category.id)}
                   className={categoryTab(mainCategoryId === category.id)}
                 >
+                  <span
+                    aria-hidden
+                    className={`tint-dot size-2 rounded-full ${tintClass(category.id)}`}
+                  />
                   {category.name}
                 </button>
               ))}
@@ -282,17 +301,6 @@ export default function PosPage() {
             )}
           </div>
 
-          <label className="relative block">
-            <Search className="pointer-events-none absolute inset-y-0 right-4 my-auto size-5 text-muted" />
-            <input
-              aria-label="ابحث باسم المنتج"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="ابحث باسم المنتج"
-              className="h-12 w-full rounded-xl border border-line bg-surface pe-12 ps-4 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-            />
-          </label>
-
           {loading ? (
             <div className="rounded-2xl border border-line bg-surface p-12 text-center text-muted">
               جارِ تحميل قائمة البيع…
@@ -320,183 +328,160 @@ export default function PosPage() {
               ))}
             </div>
           )}
-
-          <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <h2 className="font-bold">آخر الطلبات</h2>
-                <p className="text-xs text-muted">اختر أي طلب لإعادة طباعته</p>
-              </div>
-              <ReceiptText className="size-5 text-primary" />
-            </div>
-            {recentOrders.length === 0 ? (
-              <p className="rounded-lg bg-paper p-4 text-center text-sm text-muted">
-                لا توجد مبيعات مسجلة بعد.
-              </p>
-            ) : (
-              <div className="grid gap-2 md:grid-cols-2">
-                {recentOrders.slice(0, 10).map((order) => (
-                  <button
-                    type="button"
-                    key={order.id}
-                    onClick={() => openReceipt(order.id)}
-                    className="group flex items-center justify-between rounded-xl border border-line px-3 py-3 text-right transition hover:border-primary/40 hover:bg-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  >
-                    <span>
-                      <span className="block text-sm font-bold tnum" dir="ltr">
-                        {order.orderNumber}
-                      </span>
-                      <span className="text-xs text-muted">
-                        {new Date(order.createdAt).toLocaleTimeString("ar-EG", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-2 font-bold tnum">
-                      {formatMoney(order.total)}
-                      <Printer className="size-4 text-muted group-hover:text-primary" />
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </section>
         </section>
 
         <aside className="pos-ticket overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_20px_45px_-32px_rgba(43,33,24,0.55)] xl:sticky xl:top-6">
-          <div className="flex items-center justify-between border-b border-dashed border-line bg-sidebar px-5 py-4 text-white">
-            <div>
-              <p className="text-xs text-sidebar-ink">تذكرة الطلب</p>
-              <h2 className="text-lg font-bold">{cart.length} صنف</h2>
-            </div>
-            <ShoppingBasket className="size-6 text-accent" />
-          </div>
-
-          <div className="max-h-[38vh] min-h-40 space-y-2 overflow-y-auto p-4 xl:max-h-[42vh]">
-            {cart.length === 0 ? (
-              <div className="flex min-h-32 flex-col items-center justify-center text-center text-muted">
-                <ShoppingBasket className="mb-2 size-8 opacity-40" />
-                <p className="text-sm font-medium text-ink">الطلب فارغ</p>
-                <p className="mt-1 text-xs">اضغط على منتج لبدء البيع.</p>
-              </div>
-            ) : (
-              cart.map((line) => (
-                <CartRow
-                  key={line.key}
-                  line={line}
-                  onQuantity={(quantity) => changeQuantity(line, quantity)}
-                />
-              ))
-            )}
-          </div>
-
-          <div className="space-y-4 border-t border-dashed border-line bg-paper/55 p-4">
-            <div className="grid grid-cols-[8rem_1fr] gap-2">
-              <select
-                aria-label="نوع الخصم"
-                value={discountType ?? "none"}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setDiscountType(
-                    value === "none" ? null : (value as OrderDiscountType),
-                  );
-                  if (value === "none") setDiscountValue(0);
-                }}
-                className="rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
-              >
-                <option value="none">بدون خصم</option>
-                <option value="percent">نسبة %</option>
-                <option value="fixed">قيمة ثابتة</option>
-              </select>
-              <input
-                aria-label="قيمة الخصم"
-                type="number"
-                min="0"
-                max={discountType === "percent" ? 100 : 9_999_999_999.99}
-                step="0.01"
-                value={discountValue || ""}
-                onChange={(event) =>
-                  setDiscountValue(Number(event.target.value))
-                }
-                disabled={discountType === null}
-                placeholder="قيمة الخصم"
-                dir="ltr"
-                className="min-w-0 rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary disabled:opacity-50"
-              />
-            </div>
-            {!totals.discountValid && (
-              <p className="text-xs text-danger">
-                راجع قيمة الخصم قبل إتمام الطلب.
-              </p>
-            )}
-
-            <dl className="space-y-1.5 text-sm">
-              <TotalRow label="الإجمالي" value={totals.subtotal} />
-              {discountType && (
-                <TotalRow label="الخصم" value={-totals.discountAmount} muted />
+          <div className="flex gap-1 bg-sidebar px-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setTicketTab("ticket")}
+              aria-pressed={ticketTab === "ticket"}
+              className={ticketTabClass(ticketTab === "ticket")}
+            >
+              <ShoppingBasket className="size-4" />
+              تذكرة الطلب
+              {cart.length > 0 && (
+                <span className={ticketTabBadge(ticketTab === "ticket")}>
+                  {cart.length}
+                </span>
               )}
-              <TotalRow label="المطلوب" value={totals.total} strong />
-            </dl>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTicketTab("orders")}
+              aria-pressed={ticketTab === "orders"}
+              className={ticketTabClass(ticketTab === "orders")}
+            >
+              <ReceiptText className="size-4" />
+              آخر الطلبات
+              {recentOrders.length > 0 && (
+                <span className={ticketTabBadge(ticketTab === "orders")}>
+                  {recentOrders.length}
+                </span>
+              )}
+            </button>
+          </div>
 
-            <div>
-              <label className="mb-1.5 block text-sm font-medium">
-                النقد المستلم
-              </label>
-              <div className="relative">
-                <Banknote className="pointer-events-none absolute inset-y-0 right-3 my-auto size-5 text-primary" />
-                <input
-                  aria-label="النقد المستلم"
-                  type="number"
-                  min="0"
-                  max="9999999999.99"
-                  step="0.01"
-                  value={cashReceived || ""}
-                  onChange={(event) =>
-                    setCashReceived(Number(event.target.value))
-                  }
-                  placeholder="0.00"
-                  dir="ltr"
-                  className="h-12 w-full rounded-xl border border-line bg-surface pe-11 ps-3 text-left text-lg font-bold tnum outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
-                />
-              </div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {[totals.total, totals.total + 10, totals.total + 20].map(
-                  (amount, index) => (
-                    <button
-                      type="button"
-                      key={`${amount}-${index}`}
-                      onClick={() => setCashReceived(amount)}
-                      className="rounded-full border border-line bg-surface px-3 py-1 text-xs font-medium tnum hover:border-primary"
-                    >
-                      {index === 0 ? "المبلغ بالضبط" : formatMoney(amount)}
-                    </button>
-                  ),
+          {ticketTab === "orders" ? (
+            <RecentOrdersPanel orders={recentOrders} onOpen={openReceipt} />
+          ) : (
+            <>
+              <div className="max-h-[38vh] min-h-40 space-y-2 overflow-y-auto p-4 xl:max-h-[42vh]">
+                {cart.length === 0 ? (
+                  <div className="flex min-h-32 flex-col items-center justify-center text-center text-muted">
+                    <ShoppingBasket className="mb-2 size-8 opacity-40" />
+                    <p className="text-sm font-medium text-ink">الطلب فارغ</p>
+                    <p className="mt-1 text-xs">اضغط على منتج لبدء البيع.</p>
+                  </div>
+                ) : (
+                  cart.map((line) => (
+                    <CartRow
+                      key={line.key}
+                      line={line}
+                      onQuantity={(quantity) => changeQuantity(line, quantity)}
+                    />
+                  ))
                 )}
               </div>
-            </div>
 
-            <div className="flex items-center justify-between rounded-xl bg-sidebar px-4 py-3 text-white">
-              <span className="text-sm text-sidebar-ink">الباقي</span>
-              <strong className="text-xl text-accent tnum">
-                {formatMoney(totals.change)}
-              </strong>
-            </div>
+              <div className="space-y-4 border-t border-dashed border-line bg-paper/55 p-4">
+                <div className="grid grid-cols-[8rem_1fr] gap-2">
+                  <select
+                    aria-label="نوع الخصم"
+                    value={discountType ?? "none"}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setDiscountType(
+                        value === "none" ? null : (value as OrderDiscountType),
+                      );
+                      if (value === "none") setDiscountValue(0);
+                    }}
+                    className="rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+                  >
+                    <option value="none">بدون خصم</option>
+                    <option value="percent">نسبة %</option>
+                    <option value="fixed">قيمة ثابتة</option>
+                  </select>
+                  <input
+                    aria-label="قيمة الخصم"
+                    type="number"
+                    min="0"
+                    max={discountType === "percent" ? 100 : 9_999_999_999.99}
+                    step="0.01"
+                    value={discountValue || ""}
+                    onChange={(event) =>
+                      setDiscountValue(Number(event.target.value))
+                    }
+                    disabled={discountType === null}
+                    placeholder="قيمة الخصم"
+                    dir="ltr"
+                    className="min-w-0 rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary disabled:opacity-50"
+                  />
+                </div>
+                {!totals.discountValid && (
+                  <p className="text-xs text-danger">
+                    راجع قيمة الخصم قبل إتمام الطلب.
+                  </p>
+                )}
 
-            {!totals.hasEnoughCash && cart.length > 0 && (
-              <p className="text-xs text-danger">
-                المبلغ المستلم أقل من المطلوب.
-              </p>
-            )}
-            <Button
-              onClick={completeOrder}
-              disabled={!canComplete}
-              className="h-12 w-full justify-center text-base shadow-sm"
-            >
-              <ReceiptText className="size-5" />
-              {saving ? "جارِ حفظ الطلب…" : "إتمام البيع وطباعة الإيصال"}
-            </Button>
-          </div>
+                <dl className="space-y-1.5 text-sm">
+                  <TotalRow label="الإجمالي" value={totals.subtotal} />
+                  {discountType && (
+                    <TotalRow
+                      label="الخصم"
+                      value={-totals.discountAmount}
+                      muted
+                    />
+                  )}
+                  <TotalRow label="المطلوب" value={totals.total} strong />
+                </dl>
+
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">
+                    النقد المستلم
+                  </label>
+                  <div className="relative">
+                    <Banknote className="pointer-events-none absolute inset-y-0 right-3 my-auto size-5 text-primary" />
+                    <input
+                      aria-label="النقد المستلم"
+                      type="number"
+                      min="0"
+                      max="9999999999.99"
+                      step="0.01"
+                      value={cashReceived || ""}
+                      onChange={(event) =>
+                        setCashReceived(Number(event.target.value))
+                      }
+                      placeholder="0.00"
+                      dir="ltr"
+                      className="h-12 w-full rounded-xl border border-line bg-surface pe-11 ps-3 text-left text-lg font-bold tnum outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl bg-sidebar px-4 py-3 text-white">
+                  <span className="text-sm text-sidebar-ink">الباقي</span>
+                  <strong className="text-xl text-accent tnum">
+                    {formatMoney(totals.change)}
+                  </strong>
+                </div>
+
+                {!totals.hasEnoughCash && cart.length > 0 && (
+                  <p className="text-xs text-danger">
+                    المبلغ المستلم أقل من المطلوب.
+                  </p>
+                )}
+                <Button
+                  onClick={completeOrder}
+                  disabled={!canComplete}
+                  className="h-12 w-full justify-center text-base shadow-sm"
+                >
+                  <ReceiptText className="size-5" />
+                  {saving ? "جارِ حفظ الطلب…" : "إتمام البيع وطباعة الإيصال"}
+                </Button>
+              </div>
+            </>
+          )}
         </aside>
       </div>
 
@@ -538,47 +523,119 @@ function ProductCard({
   onAdd: (product: PosCatalogProduct, recipeSizeId?: number) => void;
 }) {
   return (
-    <article className="group overflow-hidden rounded-2xl border border-line bg-surface shadow-sm transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md">
-      <div className="flex items-start justify-between gap-3 p-4">
-        <div>
-          <p className="text-xs text-muted">
+    <article
+      className={`catalog-card flex flex-col rounded-2xl border-2 p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${tintClass(product.mainCategoryId)}`}
+    >
+      <div className="flex items-center gap-3">
+        <span
+          aria-hidden
+          className="catalog-thumb grid size-11 shrink-0 place-items-center rounded-xl text-xl font-bold"
+        >
+          {product.name.trim().charAt(0)}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-base font-bold leading-tight">
+            {product.name}
+          </h3>
+          <p className="mt-0.5 truncate text-xs text-muted">
             {product.subCategoryName ?? product.mainCategoryName}
           </p>
-          <h3 className="mt-1 text-lg font-bold">{product.name}</h3>
         </div>
-        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-bold text-primary">
-          {product.type === "recipe" ? "وصفة" : product.stockUnit}
-        </span>
+        {product.type === "item" && (
+          <span className="catalog-badge shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold">
+            {product.stockUnit}
+          </span>
+        )}
       </div>
-      <div className="border-t border-line bg-paper/60 p-2">
+      <div className="mt-3 flex flex-wrap gap-1.5">
         {product.type === "recipe" ? (
-          <div className="grid gap-1.5">
-            {product.sizes.map((size) => (
-              <button
-                type="button"
-                key={size.id}
-                onClick={() => onAdd(product, size.id)}
-                className="flex min-h-11 items-center justify-between rounded-xl bg-surface px-3 text-sm font-medium transition hover:bg-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                <span>{size.name}</span>
-                <span className="tnum">{formatMoney(size.sellingPrice)}</span>
-              </button>
-            ))}
-          </div>
+          product.sizes.map((size) => (
+            <button
+              type="button"
+              key={size.id}
+              onClick={() => onAdd(product, size.id)}
+              className="catalog-option min-h-11 flex-1 basis-20 rounded-xl border border-line bg-paper px-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              {size.name}
+            </button>
+          ))
         ) : (
           <button
             type="button"
             onClick={() => onAdd(product)}
-            className="flex min-h-11 w-full items-center justify-between rounded-xl bg-surface px-3 text-sm font-bold transition hover:bg-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="catalog-option flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-line bg-paper px-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            <span className="flex items-center gap-2">
-              <Plus className="size-4" /> إضافة
-            </span>
-            <span className="tnum">{formatMoney(product.sellingPrice)}</span>
+            <Plus className="size-4" />
+            إضافة
           </button>
         )}
       </div>
     </article>
+  );
+}
+
+function RecentOrdersPanel({
+  orders,
+  onOpen,
+}: {
+  orders: OrderSummary[];
+  onOpen: (id: number) => void;
+}) {
+  if (orders.length === 0) {
+    return (
+      <div className="flex min-h-56 flex-col items-center justify-center p-6 text-center text-muted">
+        <ReceiptText className="mb-2 size-8 opacity-40" />
+        <p className="text-sm font-medium text-ink">لا توجد مبيعات مسجلة بعد</p>
+        <p className="mt-1 text-xs">أول طلب تُتمّه سيظهر هنا لإعادة طباعته.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="max-h-[68vh] min-h-56 overflow-y-auto p-3">
+      <p className="mb-2 px-1 text-xs text-muted">اختر أي طلب لإعادة طباعته</p>
+      <ul className="space-y-1.5">
+        {orders.slice(0, 12).map((order, index) => (
+          <li key={order.id}>
+            <button
+              type="button"
+              onClick={() => onOpen(order.id)}
+              className="group flex w-full items-center justify-between gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-right transition hover:border-primary/45 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <span className="min-w-0">
+                <span
+                  className="block truncate text-[13px] font-bold tnum"
+                  dir="ltr"
+                >
+                  {order.orderNumber}
+                </span>
+                <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
+                  <Clock3 className="size-3" />
+                  {new Date(order.createdAt).toLocaleTimeString("ar-EG", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                  {index === 0 && (
+                    <span className="rounded-full bg-accent/20 px-1.5 font-bold text-primary">
+                      الأحدث
+                    </span>
+                  )}
+                  {order.isNegativeStock && (
+                    <AlertTriangle
+                      role="img"
+                      className="size-3 text-danger"
+                      aria-label="حُفظ برصيد مخزون سالب"
+                    />
+                  )}
+                </span>
+              </span>
+              <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-line text-muted transition group-hover:border-primary group-hover:bg-surface group-hover:text-primary">
+                <Printer className="size-4" />
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -658,11 +715,33 @@ function TotalRow({
   );
 }
 
+const TINT_COUNT = 8;
+
+/* Categories are the only grouping a cashier can see at a glance now that no
+   price is printed on a card, so the tone must stay put for a given category. */
+function tintClass(categoryId: number) {
+  return `tint-${((categoryId % TINT_COUNT) + TINT_COUNT) % TINT_COUNT}`;
+}
+
 function categoryTab(active: boolean) {
-  return `min-h-10 rounded-xl px-4 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+  return `inline-flex min-h-10 items-center gap-2 rounded-xl px-4 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
     active
       ? "bg-sidebar text-white shadow-sm"
       : "bg-paper text-muted hover:bg-line/60 hover:text-ink"
+  }`;
+}
+
+function ticketTabClass(active: boolean) {
+  return `flex flex-1 items-center justify-center gap-2 rounded-t-xl px-3 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+    active
+      ? "bg-surface text-ink"
+      : "text-sidebar-ink hover:bg-white/10 hover:text-white"
+  }`;
+}
+
+function ticketTabBadge(active: boolean) {
+  return `min-w-5 rounded-full px-1.5 text-xs tnum ${
+    active ? "bg-primary/10 text-primary" : "bg-white/15 text-white"
   }`;
 }
 
