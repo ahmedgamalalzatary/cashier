@@ -40,6 +40,25 @@ const runtimeEnvSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
+  EXTERNAL_ORDERS_BASE_URL: z
+    .string({ required_error: 'EXTERNAL_ORDERS_BASE_URL is required' })
+    .url('EXTERNAL_ORDERS_BASE_URL must be a valid URL')
+    .transform((value) => value.replace(/\/+$/, ''))
+    .refine((value) => new URL(value).origin === value, {
+      message: 'EXTERNAL_ORDERS_BASE_URL must contain only an origin',
+    })
+    .refine((value) => new URL(value).protocol === 'https:', {
+      message: 'EXTERNAL_ORDERS_BASE_URL must use HTTPS',
+    }),
+  EXTERNAL_ORDERS_PHONE_NUMBER: z
+    .string({ required_error: 'EXTERNAL_ORDERS_PHONE_NUMBER is required' })
+    .regex(
+      /^\+?\d{8,15}$/,
+      'EXTERNAL_ORDERS_PHONE_NUMBER must be a valid phone number',
+    ),
+  EXTERNAL_ORDERS_PASSWORD: z
+    .string({ required_error: 'EXTERNAL_ORDERS_PASSWORD is required' })
+    .min(1, 'EXTERNAL_ORDERS_PASSWORD is required'),
 });
 
 export type RuntimeEnv = z.infer<typeof runtimeEnvSchema>;

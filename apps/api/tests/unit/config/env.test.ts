@@ -7,6 +7,9 @@ const valid = {
   JWT_SECRET: 'a-production-secret-with-at-least-32-characters',
   PORT: '4000',
   CORS_ORIGIN: 'http://localhost:3000',
+  EXTERNAL_ORDERS_BASE_URL: 'https://orders.example.com',
+  EXTERNAL_ORDERS_PHONE_NUMBER: '01234567890',
+  EXTERNAL_ORDERS_PASSWORD: 'server-only-password',
 };
 
 describe('runtime environment', () => {
@@ -21,6 +24,8 @@ describe('runtime environment', () => {
       JWT_SECRET: valid.JWT_SECRET,
       PORT: 4321,
       CORS_ORIGIN: valid.CORS_ORIGIN,
+      EXTERNAL_ORDERS_BASE_URL: valid.EXTERNAL_ORDERS_BASE_URL,
+      EXTERNAL_ORDERS_PHONE_NUMBER: valid.EXTERNAL_ORDERS_PHONE_NUMBER,
     });
   });
 
@@ -30,6 +35,8 @@ describe('runtime environment', () => {
       JWT_SECRET: valid.JWT_SECRET,
       PORT: 4000,
       CORS_ORIGIN: valid.CORS_ORIGIN,
+      EXTERNAL_ORDERS_BASE_URL: valid.EXTERNAL_ORDERS_BASE_URL,
+      EXTERNAL_ORDERS_PHONE_NUMBER: valid.EXTERNAL_ORDERS_PHONE_NUMBER,
     });
   });
 
@@ -40,6 +47,30 @@ describe('runtime environment', () => {
     [{ ...valid, JWT_SECRET: 'change-me' }, 'JWT_SECRET'],
     [{ ...valid, PORT: '70000' }, 'PORT'],
     [{ ...valid, CORS_ORIGIN: 'not-an-origin' }, 'CORS_ORIGIN'],
+    [
+      { ...valid, EXTERNAL_ORDERS_BASE_URL: undefined },
+      'EXTERNAL_ORDERS_BASE_URL',
+    ],
+    [
+      { ...valid, EXTERNAL_ORDERS_BASE_URL: 'not-a-url' },
+      'EXTERNAL_ORDERS_BASE_URL',
+    ],
+    [
+      { ...valid, EXTERNAL_ORDERS_BASE_URL: 'https://orders.example.com/api/' },
+      'EXTERNAL_ORDERS_BASE_URL',
+    ],
+    [
+      { ...valid, EXTERNAL_ORDERS_BASE_URL: 'http://orders.example.com' },
+      'EXTERNAL_ORDERS_BASE_URL',
+    ],
+    [
+      { ...valid, EXTERNAL_ORDERS_PHONE_NUMBER: undefined },
+      'EXTERNAL_ORDERS_PHONE_NUMBER',
+    ],
+    [
+      { ...valid, EXTERNAL_ORDERS_PASSWORD: undefined },
+      'EXTERNAL_ORDERS_PASSWORD',
+    ],
   ])('rejects unsafe configuration %#', (environment, field) => {
     expect(() => parseRuntimeEnv(environment)).toThrow(field);
   });

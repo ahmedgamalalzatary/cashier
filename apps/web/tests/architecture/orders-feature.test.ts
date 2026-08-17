@@ -30,10 +30,30 @@ describe("orders feature boundaries", () => {
   });
 
   it("keeps cost and profit out of the cashier's view", () => {
-    for (const relative of ["src/app/orders/page.tsx", "src/app/orders/[id]/page.tsx"]) {
+    for (const relative of [
+      "src/app/orders/page.tsx",
+      "src/app/orders/[id]/page.tsx",
+    ]) {
       const page = read(relative);
       expect(page).toContain("orderMargin");
       expect(page).toContain('user?.role === "admin"');
     }
+  });
+
+  it("separates cashier and online orders into labelled tab panels", () => {
+    const page = read("src/app/orders/page.tsx");
+    expect(page).toContain("OrdersTabs");
+    expect(page).toContain('id="orders-cashier-panel"');
+    expect(page).toContain('id="orders-online-panel"');
+    expect(page).toContain("ExternalOrdersPanel");
+  });
+
+  it("loads and filters online orders through dedicated boundaries", () => {
+    const panel = read("src/components/orders/external-orders-panel.tsx");
+    expect(panel).toContain("listExternalOrders");
+    expect(panel).toContain("filterExternalOrders");
+    expect(panel).toContain("externalOrdersTotals");
+    expect(panel).toContain('aria-label="البحث عن طلب أونلاين"');
+    expect(panel).toContain('label="إجمالي قيمة الطلبات"');
   });
 });

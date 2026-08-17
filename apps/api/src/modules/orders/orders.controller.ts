@@ -1,10 +1,14 @@
 import type { Request, Response } from "express";
 import { idParam } from "../../middleware/validation.js";
 import type { OrdersService } from "./orders.service.js";
+import type { ExternalOrdersClient } from "./external-orders.client.js";
 import { orderInput } from "./orders.schemas.js";
 
 export class OrdersController {
-  constructor(private service: OrdersService) {}
+  constructor(
+    private service: OrdersService,
+    private externalOrders: ExternalOrdersClient,
+  ) {}
 
   catalog = async (_req: Request, res: Response) => {
     res.json(await this.service.catalog());
@@ -12,6 +16,10 @@ export class OrdersController {
 
   list = async (_req: Request, res: Response) => {
     res.json(await this.service.list());
+  };
+
+  externalList = async (_req: Request, res: Response) => {
+    res.json(await this.externalOrders.list());
   };
 
   get = async (req: Request, res: Response) => {

@@ -97,9 +97,10 @@ async function receiveCafeBatch(
 }
 
 describe("POS orders", () => {
-  it("requires authentication for catalog, creation, history, and detail", async () => {
+  it("requires authentication for catalog, creation, both histories, and detail", async () => {
     expect((await request(app()).get("/api/orders/catalog")).status).toBe(401);
     expect((await request(app()).get("/api/orders")).status).toBe(401);
+    expect((await request(app()).get("/api/orders/external")).status).toBe(401);
     expect((await request(app()).get("/api/orders/1")).status).toBe(401);
     expect(
       (

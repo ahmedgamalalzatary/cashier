@@ -4,6 +4,7 @@ import {
   createOrder,
   getOrder,
   listCatalog,
+  listExternalOrders,
   listOrders,
 } from "../../src/services/orders-service";
 
@@ -24,12 +25,14 @@ describe("orders service", () => {
 
     await listCatalog();
     await listOrders();
+    await listExternalOrders();
     await getOrder(7);
     await createOrder(body);
 
     expect(mockedApi.mock.calls).toEqual([
       ["/api/orders/catalog"],
       ["/api/orders"],
+      ["/api/orders/external"],
       ["/api/orders/7"],
       ["/api/orders", { method: "POST", body: JSON.stringify(body) }],
     ]);

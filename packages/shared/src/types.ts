@@ -444,6 +444,30 @@ export type OrderDetail = OrderSummary & {
   lines: OrderLine[];
 };
 
+export type ExternalOrderStatus =
+  "pending" | "completed" | "cancelled" | "unknown";
+export type ExternalPaymentStatus =
+  "pending" | "paid" | "failed" | "cancelled" | "unpaid" | "unknown";
+export type ExternalPaymentMethod =
+  "cash_on_delivery" | "online" | "onsite" | "unknown";
+export type ExternalOrderType = "pickup" | "delivery" | "unknown";
+
+export type ExternalOrderSummary = {
+  id: number;
+  customerName: string;
+  customerPhone: string | null;
+  subtotal: string;
+  discountAmount: string;
+  totalAmount: string;
+  deliveryFee: string;
+  createdAt: string;
+  orderStatus: ExternalOrderStatus;
+  paymentStatus: ExternalPaymentStatus;
+  paymentMethod: ExternalPaymentMethod;
+  orderType: ExternalOrderType;
+  itemCount: number;
+};
+
 export type RefundStockAction = "return_to_stock" | "not_returnable";
 
 export type RefundSummary = {

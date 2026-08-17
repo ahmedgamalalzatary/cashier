@@ -7,6 +7,11 @@ const db = {} as Db;
 const options = {
   jwtSecret: 'test-only-jwt-secret-at-least-32-characters',
   corsOrigin: 'https://cashier.example.com',
+  externalOrders: {
+    baseUrl: 'https://orders.example.com',
+    phoneNumber: '01234567890',
+    password: 'server-only-password',
+  },
 };
 
 describe('health check', () => {

@@ -27,6 +27,11 @@ export const db = createDb(testUrl!);
 export const appOptions = {
   jwtSecret: process.env.JWT_SECRET,
   corsOrigin: "http://localhost:3000",
+  externalOrders: {
+    baseUrl: "https://orders.example.com",
+    phoneNumber: "01234567890",
+    password: "server-only-password",
+  },
 };
 
 // items.code is system-assigned and unique; fixtures that insert straight into

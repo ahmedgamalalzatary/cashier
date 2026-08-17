@@ -37,4 +37,27 @@ describe('API runtime image', () => {
       'COPY --from=build /app/packages/shared ./packages/shared',
     );
   });
+
+  it('passes external-order credentials only to the API container', async () => {
+    const compose = await readFile(
+      new URL('../../../../../docker-compose.yml', import.meta.url),
+      'utf8',
+    );
+    const example = await readFile(
+      new URL('../../../../../.env.example', import.meta.url),
+      'utf8',
+    );
+
+    for (const name of [
+      'EXTERNAL_ORDERS_BASE_URL',
+      'EXTERNAL_ORDERS_PHONE_NUMBER',
+      'EXTERNAL_ORDERS_PASSWORD',
+    ]) {
+      expect(compose).toContain(`${name}: \${${name}:?${name} is required}`);
+      expect(example).toContain(`${name}=`);
+    }
+    expect(compose.indexOf('EXTERNAL_ORDERS_PASSWORD')).toBeLessThan(
+      compose.indexOf('\n  web:'),
+    );
+  });
 });

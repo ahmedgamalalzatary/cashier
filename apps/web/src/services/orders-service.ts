@@ -2,6 +2,7 @@ import type {
   OrderDetail,
   OrderDiscountType,
   OrderSummary,
+  ExternalOrderSummary,
   PosCatalogProduct,
 } from "@cashier/shared";
 import { api } from "../lib/api";
@@ -22,6 +23,10 @@ export function listCatalog() {
 
 export function listOrders() {
   return api<OrderSummary[]>("/api/orders");
+}
+
+export function listExternalOrders() {
+  return api<ExternalOrderSummary[]>("/api/orders/external");
 }
 
 export function getOrder(id: number) {
