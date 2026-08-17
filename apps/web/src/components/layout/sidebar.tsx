@@ -23,6 +23,7 @@ import {
   UserCog,
   ShoppingCart,
   ShoppingBag,
+  ReceiptText,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -35,6 +36,7 @@ type NavHref = (typeof NAV_ITEMS)[number]["href"];
 const navIcons: Record<NavHref, LucideIcon> = {
   "/": LayoutDashboard,
   "/pos": ShoppingBag,
+  "/orders": ReceiptText,
   "/categories": Tags,
   "/warehouse": Warehouse,
   "/cafe": CupSoda,
