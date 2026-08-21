@@ -3,22 +3,30 @@ import type {
   OrderDiscountType,
   OrderSummary,
   ExternalOrderSummary,
-  PosCatalogProduct,
+  ExternalProductCatalog,
 } from "@cashier/shared";
 import { api } from "../lib/api";
 
 export type CreateOrderBody = {
   clientRequestId: string;
   lines: Array<
-    | { type: "recipe"; recipeSizeId: number; quantity: number }
-    | { type: "item"; itemId: number; quantity: number }
+    {
+      type: "external_product";
+      externalProductId: number;
+      externalSizeId: number | null;
+      quantity: number;
+      modifiers: Array<{
+        externalModifierOptionId: number;
+        quantity: number;
+      }>;
+    }
   >;
   discount: { type: OrderDiscountType; value: number } | null;
   cashReceived: number;
 };
 
 export function listCatalog() {
-  return api<PosCatalogProduct[]>("/api/orders/catalog");
+  return api<ExternalProductCatalog>("/api/products");
 }
 
 export function listOrders() {
@@ -26,7 +34,7 @@ export function listOrders() {
 }
 
 export function listExternalOrders() {
-  return api<ExternalOrderSummary[]>("/api/orders/external");
+  return api<{ data: ExternalOrderSummary[]; pagination: { currentPage: number; pageSize: number; totalCount: number; totalPages: number; hasNextPage: boolean; hasPreviousPage: boolean } }>("/api/orders/external");
 }
 
 export function getOrder(id: number) {

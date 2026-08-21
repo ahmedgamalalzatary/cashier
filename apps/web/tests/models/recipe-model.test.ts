@@ -1,36 +1,14 @@
 import { describe, expect, it } from "vitest";
+import type { Recipe } from "@cashier/shared";
 import {
   emptyPreparedRecipeForm,
-  emptyProductRecipeForm,
   recipeRequestBody,
-  scalePreparationIngredients,
   recipeStats,
+  scalePreparationIngredients,
 } from "../../src/models/recipe-model";
-import type { Recipe } from "@cashier/shared";
 
 describe("recipe model", () => {
-  it("builds product and prepared request bodies from editable forms", () => {
-    const product = emptyProductRecipeForm();
-    product.name = "  لاتيه  ";
-    product.categoryId = "2";
-    product.sizes[0].name = " صغير ";
-    product.sizes[0].sellingPrice = "30";
-    product.sizes[0].ingredients[0].itemId = "4";
-    product.sizes[0].ingredients[0].quantity = "0.2";
-
-    expect(recipeRequestBody(product)).toEqual({
-      type: "product",
-      name: "لاتيه",
-      categoryId: 2,
-      sizes: [
-        {
-          name: "صغير",
-          sellingPrice: 30,
-          ingredients: [{ itemId: 4, quantity: 0.2 }],
-        },
-      ],
-    });
-
+  it("builds prepared-recipe request bodies from editable forms", () => {
     const prepared = emptyPreparedRecipeForm();
     prepared.name = " شربات ";
     prepared.categoryId = "3";
@@ -38,6 +16,7 @@ describe("recipe model", () => {
     prepared.baseYield = "2";
     prepared.ingredients[0].itemId = "5";
     prepared.ingredients[0].quantity = "1";
+
     expect(recipeRequestBody(prepared)).toEqual({
       type: "prepared",
       name: "شربات",
@@ -48,16 +27,17 @@ describe("recipe model", () => {
     });
   });
 
-  it("counts active, unavailable, and prepared recipes", () => {
+  it("counts active and unavailable prepared recipes", () => {
     const recipes = [
-      { type: "product", isActive: true, sizes: [{ hasSufficientStock: true }] },
-      { type: "product", isActive: true, sizes: [{ hasSufficientStock: false }] },
+      { type: "prepared", isActive: true, hasSufficientStock: true },
+      { type: "prepared", isActive: true, hasSufficientStock: false },
       { type: "prepared", isActive: false, hasSufficientStock: true },
     ] as Recipe[];
+
     expect(recipeStats(recipes)).toEqual({
       active: 2,
       unavailable: 1,
-      prepared: 1,
+      prepared: 3,
     });
   });
 

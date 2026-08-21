@@ -39,15 +39,17 @@ describe("recipe UI controls", () => {
     expect(html).toContain("رصيد غير كافٍ");
   });
 
-  it("labels the two recipe creation actions explicitly", () => {
+  it("keeps prepared-recipe creation and external catalog refresh actions", () => {
     const html = renderToStaticMarkup(
       createElement(RecipeHeaderActions, {
-        onProduct: vi.fn(),
         onPrepared: vi.fn(),
+        onRefresh: vi.fn(),
+        refreshing: false,
       }),
     );
-    expect(html).toContain("إضافة منتج وصفة");
     expect(html).toContain("إضافة وصفة تحضير");
+    expect(html).toContain("تحديث المنتجات");
+    expect(html).not.toContain("إضافة منتج وصفة");
   });
 
   it("allows the dense recipe editor to use a wide, scroll-safe dialog", () => {

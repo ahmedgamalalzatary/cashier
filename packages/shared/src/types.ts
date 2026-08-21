@@ -270,7 +270,7 @@ export type TransferDetail = TransferSummary & {
   lines: TransferLine[];
 };
 
-export type RecipeType = "product" | "prepared";
+export type RecipeType = "prepared";
 
 export type RecipeIngredientCost = {
   id: number;
@@ -296,26 +296,6 @@ type RecipeCommon = {
   updatedAt: string;
 };
 
-export type ProductRecipeSize = {
-  id: number;
-  name: string;
-  sellingPrice: string;
-  currentCost: string | null;
-  marginAmount: string | null;
-  marginPercentage: string | null;
-  costPercentage: string | null;
-  hasSufficientStock: boolean;
-  ingredients: RecipeIngredientCost[];
-};
-
-export type ProductRecipe = RecipeCommon & {
-  type: "product";
-  outputItemId: null;
-  outputItemName: null;
-  outputStockUnit: null;
-  sizes: ProductRecipeSize[];
-};
-
 export type PreparedRecipe = RecipeCommon & {
   type: "prepared";
   outputItemId: number;
@@ -328,7 +308,7 @@ export type PreparedRecipe = RecipeCommon & {
   ingredients: RecipeIngredientCost[];
 };
 
-export type Recipe = ProductRecipe | PreparedRecipe;
+export type Recipe = PreparedRecipe;
 
 export type PreparationSummary = {
   id: number;
@@ -364,33 +344,98 @@ export type PreparationDetail = PreparationSummary & {
   allocations: PreparationAllocation[];
 };
 
-type PosCatalogBase = {
-  name: string;
-  categoryId: number;
-  mainCategoryId: number;
-  mainCategoryName: string;
-  subCategoryId: number | null;
-  subCategoryName: string | null;
-};
-
-export type PosRecipeCatalogProduct = PosCatalogBase & {
-  type: "recipe";
-  recipeId: number;
-  sizes: Array<{
-    id: number;
-    name: string;
-    sellingPrice: string;
-  }>;
-};
-
-export type PosItemCatalogProduct = PosCatalogBase & {
-  type: "item";
+export type ExternalIngredientMapping = {
   itemId: number;
-  sellingPrice: string;
-  stockUnit: string;
+  quantity: string;
 };
 
-export type PosCatalogProduct = PosRecipeCatalogProduct | PosItemCatalogProduct;
+export type ExternalProductSize = {
+  externalId: number;
+  nameAr: string;
+  nameEn: string;
+  price: string;
+  isDefault: boolean;
+  ingredients: ExternalIngredientMapping[];
+};
+
+export type ExternalModifierOption = {
+  externalId: number;
+  // Null when the external catalog has lost the name. Such a product is
+  // cached and configurable but never sellable.
+  nameAr: string | null;
+  nameEn: string | null;
+  extraPrice: string;
+  stockEffect: "incomplete" | "mapped" | "none";
+  ingredients: ExternalIngredientMapping[];
+};
+
+export type ExternalModifierGroup = {
+  externalId: number;
+  nameAr: string | null;
+  nameEn: string | null;
+  isRequired: boolean;
+  maxSelections: number;
+  options: ExternalModifierOption[];
+};
+
+export type ExternalProduct = {
+  externalId: number;
+  externalCategoryId: number;
+  nameAr: string;
+  nameEn: string;
+  descriptionAr: string | null;
+  descriptionEn: string | null;
+  imageUrl: string | null;
+  price: string;
+  discountPercentage: string | null;
+  discountStart: string | null;
+  discountEnd: string | null;
+  calories: number;
+  pointsReward: number;
+  isAvailable: boolean;
+  isVisible: boolean;
+  ingredients: ExternalIngredientMapping[];
+  sizes: ExternalProductSize[];
+  modifierGroups: ExternalModifierGroup[];
+  stockConfigured: boolean;
+  modifierNamesMissing: boolean;
+  sellable: boolean;
+};
+
+export type ExternalCategory = {
+  externalId: number;
+  nameAr: string;
+  nameEn: string;
+  descriptionAr: string | null;
+  descriptionEn: string | null;
+  isActive: boolean;
+  isVisible: boolean;
+  displayOrder: number;
+};
+
+export type ExternalProductCatalog = {
+  categories: ExternalCategory[];
+  products: ExternalProduct[];
+  lastSuccessfulSyncAt: string;
+  stale: boolean;
+  syncError: string | null;
+};
+
+export type ProductStockSetupBody = {
+  baseIngredients: Array<{ itemId: number; quantity: number }>;
+  sizes: Array<{
+    externalSizeId: number;
+    ingredients: Array<{ itemId: number; quantity: number }>;
+  }>;
+  modifiers: Array<
+    | { externalModifierOptionId: number; stockEffect: "none" }
+    | {
+        externalModifierOptionId: number;
+        stockEffect: "mapped";
+        ingredients: Array<{ itemId: number; quantity: number }>;
+      }
+  >;
+};
 
 export type OrderDiscountType = "percent" | "fixed";
 
@@ -426,10 +471,12 @@ export type OrderLineAllocation = {
 
 export type OrderLine = {
   id: number;
-  type: "recipe" | "item";
+  type: "recipe" | "item" | "external_product";
   recipeId: number | null;
   recipeSizeId: number | null;
   itemId: number | null;
+  externalProductId: number | null;
+  externalSizeId: number | null;
   productName: string;
   sizeName: string | null;
   quantity: string;
@@ -437,6 +484,15 @@ export type OrderLine = {
   lineSubtotal: string;
   totalCost: string;
   hasStockDeficit: boolean;
+  modifiers: Array<{
+    id: number;
+    externalModifierGroupId: number;
+    externalModifierOptionId: number;
+    groupName: string;
+    optionName: string;
+    quantity: number;
+    unitExtraPrice: string;
+  }>;
   allocations: OrderLineAllocation[];
 };
 
@@ -486,7 +542,7 @@ export type RefundSummary = {
 export type RefundLine = {
   id: number;
   orderLineId: number;
-  type: "recipe" | "item";
+  type: "recipe" | "item" | "external_product";
   itemCode: number | null;
   productName: string;
   sizeName: string | null;
@@ -508,7 +564,7 @@ export type WasteSummary = {
   id: number;
   shiftId: number | null;
   warehouse: "main" | "cafe";
-  targetType: "item" | "recipe";
+  targetType: "item" | "recipe" | "external_product";
   targetName: string;
   sizeName: string | null;
   quantity: string;
@@ -535,11 +591,11 @@ export type WasteDetail = WasteSummary & {
 
 export type WasteCatalog = {
   items: Array<{ id: number; name: string; stockUnit: string }>;
-  recipes: Array<{
-    recipeId: number;
-    recipeName: string;
-    recipeSizeId: number;
-    sizeName: string;
+  products: Array<{
+    externalProductId: number;
+    externalSizeId: number | null;
+    productName: string;
+    sizeName: string | null;
   }>;
 };
 

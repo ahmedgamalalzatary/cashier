@@ -40,9 +40,9 @@ export function ExternalOrdersPanel() {
   useEffect(() => {
     let cancelled = false;
     listExternalOrders()
-      .then((rows) => {
+      .then((result) => {
         if (cancelled) return;
-        setOrders(rows);
+        setOrders(result.data);
         setError("");
       })
       .catch((caught) => {

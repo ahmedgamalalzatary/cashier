@@ -168,6 +168,14 @@ export default function OrderDetailPage({
                 <span className="block text-xs text-muted">
                   {line.sizeName ?? "صنف مباشر"}
                 </span>
+                {line.modifiers.map((modifier) => (
+                  <span
+                    key={modifier.id}
+                    className="block text-xs text-muted"
+                  >
+                    + {modifier.optionName} × {modifier.quantity}
+                  </span>
+                ))}
               </td>
               <td className="px-4 py-3 tnum">{quantity(line.quantity)}</td>
               <td className="px-4 py-3 tnum text-muted">

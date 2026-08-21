@@ -22,6 +22,9 @@ import {
   ExternalOrdersClient,
   type ExternalOrdersConfig,
 } from "./modules/orders/external-orders.client.js";
+import { ExternalBackendClient } from "./modules/external/external-backend.client.js";
+import { ExternalCatalogClient } from "./modules/external/external-catalog.client.js";
+import { createProductsModule } from "./modules/products/products.module.js";
 
 export type AppOptions = {
   jwtSecret: string;
@@ -35,7 +38,9 @@ export function createApp(
   { jwtSecret, corsOrigin, trustProxy = false, externalOrders }: AppOptions,
 ) {
   const app = express();
-  const externalOrdersClient = new ExternalOrdersClient(externalOrders);
+  const externalBackendClient = new ExternalBackendClient(externalOrders);
+  const externalOrdersClient = new ExternalOrdersClient(externalBackendClient);
+  const externalCatalogClient = new ExternalCatalogClient(externalBackendClient);
   app.set("trust proxy", trustProxy ? 1 : false);
   app.use(
     cors({
@@ -58,6 +63,11 @@ export function createApp(
   app.use("/api/shifts", authenticate(db, jwtSecret), createShiftsModule(db));
   app.use("/api/refunds", authenticate(db, jwtSecret), createRefundsModule(db));
   app.use("/api/waste", authenticate(db, jwtSecret), createWasteModule(db));
+  app.use(
+    "/api/products",
+    authenticate(db, jwtSecret),
+    createProductsModule(db, externalCatalogClient, requireRole("admin")),
+  );
   app.use(
     "/api/expenses",
     authenticate(db, jwtSecret),

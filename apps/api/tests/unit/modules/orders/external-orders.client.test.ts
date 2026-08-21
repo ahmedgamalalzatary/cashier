@@ -30,6 +30,14 @@ const rawOrder = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("ExternalOrdersClient", () => {
+  it("requests paginated external orders and unwraps pagination metadata", async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ accessToken: "a", refreshToken: "r" }))
+      .mockResolvedValueOnce(jsonResponse({ data: [rawOrder()], pagination: { currentPage: 2, pageSize: 1, totalCount: 3, totalPages: 3, hasNextPage: true, hasPreviousPage: true } }));
+    const client = new ExternalOrdersClient({ baseUrl: "https://orders.example.com", phoneNumber: "01234567890", password: "p" }, fetcher);
+    await expect(client.listPage({ search: "17", page: 2, pageSize: 1 })).resolves.toMatchObject({ data: [{ id: 17 }], pagination: { totalCount: 3 } });
+    expect(fetcher).toHaveBeenNthCalledWith(2, "https://orders.example.com/api/AdminOrders/search?search=17&page=2&pageSize=1", expect.anything());
+  });
   it("authenticates once and maps external orders to the safe cashier contract", async () => {
     const fetcher = vi
       .fn<typeof fetch>()

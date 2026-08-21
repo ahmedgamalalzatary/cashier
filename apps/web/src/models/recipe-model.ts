@@ -7,20 +7,6 @@ export type RecipeIngredientForm = {
   quantity: string;
 };
 
-export type ProductRecipeSizeForm = {
-  key: number;
-  name: string;
-  sellingPrice: string;
-  ingredients: RecipeIngredientForm[];
-};
-
-export type ProductRecipeForm = {
-  type: "product";
-  name: string;
-  categoryId: string;
-  sizes: ProductRecipeSizeForm[];
-};
-
 export type PreparedRecipeForm = {
   type: "prepared";
   name: string;
@@ -30,29 +16,13 @@ export type PreparedRecipeForm = {
   ingredients: RecipeIngredientForm[];
 };
 
-export type RecipeForm = ProductRecipeForm | PreparedRecipeForm;
+export type RecipeForm = PreparedRecipeForm;
 
 export const newRecipeIngredient = (key: number): RecipeIngredientForm => ({
   key,
   itemId: "",
   quantity: "",
 });
-
-export const newProductSize = (key: number): ProductRecipeSizeForm => ({
-  key,
-  name: "",
-  sellingPrice: "",
-  ingredients: [newRecipeIngredient(key * 100 + 1)],
-});
-
-export function emptyProductRecipeForm(): ProductRecipeForm {
-  return {
-    type: "product",
-    name: "",
-    categoryId: "",
-    sizes: [newProductSize(1)],
-  };
-}
 
 export function emptyPreparedRecipeForm(): PreparedRecipeForm {
   return {
@@ -66,21 +36,6 @@ export function emptyPreparedRecipeForm(): PreparedRecipeForm {
 }
 
 export function recipeRequestBody(form: RecipeForm): RecipeBody {
-  if (form.type === "product") {
-    return {
-      type: "product",
-      name: form.name.trim(),
-      categoryId: Number(form.categoryId),
-      sizes: form.sizes.map((size) => ({
-        name: size.name.trim(),
-        sellingPrice: Number(size.sellingPrice),
-        ingredients: size.ingredients.map((ingredient) => ({
-          itemId: Number(ingredient.itemId),
-          quantity: Number(ingredient.quantity),
-        })),
-      })),
-    };
-  }
   return {
     type: "prepared",
     name: form.name.trim(),
@@ -95,23 +50,6 @@ export function recipeRequestBody(form: RecipeForm): RecipeBody {
 }
 
 export function recipeFormFromRecipe(recipe: Recipe): RecipeForm {
-  if (recipe.type === "product") {
-    return {
-      type: "product",
-      name: recipe.name,
-      categoryId: String(recipe.categoryId),
-      sizes: recipe.sizes.map((size, sizeIndex) => ({
-        key: size.id,
-        name: size.name,
-        sellingPrice: size.sellingPrice,
-        ingredients: size.ingredients.map((ingredient, ingredientIndex) => ({
-          key: ingredient.id || sizeIndex * 100 + ingredientIndex,
-          itemId: String(ingredient.itemId),
-          quantity: ingredient.requiredQuantity,
-        })),
-      })),
-    };
-  }
   return {
     type: "prepared",
     name: recipe.name,
@@ -130,13 +68,9 @@ export function recipeStats(recipes: Recipe[]) {
   return {
     active: recipes.filter((recipe) => recipe.isActive).length,
     unavailable: recipes.filter(
-      (recipe) =>
-        recipe.isActive &&
-        (recipe.type === "product"
-          ? recipe.sizes.some((size) => !size.hasSufficientStock)
-          : !recipe.hasSufficientStock),
+      (recipe) => recipe.isActive && !recipe.hasSufficientStock,
     ).length,
-    prepared: recipes.filter((recipe) => recipe.type === "prepared").length,
+    prepared: recipes.length,
   };
 }
 

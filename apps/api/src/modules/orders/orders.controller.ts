@@ -10,16 +10,18 @@ export class OrdersController {
     private externalOrders: ExternalOrdersClient,
   ) {}
 
-  catalog = async (_req: Request, res: Response) => {
-    res.json(await this.service.catalog());
-  };
-
   list = async (_req: Request, res: Response) => {
     res.json(await this.service.list());
   };
 
-  externalList = async (_req: Request, res: Response) => {
-    res.json(await this.externalOrders.list());
+  externalList = async (req: Request, res: Response) => {
+    const page = Number(req.query.page);
+    const pageSize = Number(req.query.pageSize);
+    res.json(await this.externalOrders.listPage({
+      search: typeof req.query.search === "string" ? req.query.search : undefined,
+      page: Number.isInteger(page) && page > 0 ? page : undefined,
+      pageSize: Number.isInteger(pageSize) && pageSize > 0 ? pageSize : undefined,
+    }));
   };
 
   get = async (req: Request, res: Response) => {

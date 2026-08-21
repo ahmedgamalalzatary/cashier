@@ -17,19 +17,15 @@ const mockedApi = vi.mocked(api);
 describe("recipes service", () => {
   beforeEach(() => mockedApi.mockReset());
 
-  it("uses the recipe CRUD endpoints and request bodies", async () => {
+  it("uses the prepared-recipe CRUD endpoints and request bodies", async () => {
     mockedApi.mockResolvedValue(undefined as never);
     const body = {
-      type: "product" as const,
-      name: "لاتيه",
+      type: "prepared" as const,
+      name: "شربات",
       categoryId: 2,
-      sizes: [
-        {
-          name: "صغير",
-          sellingPrice: 30,
-          ingredients: [{ itemId: 4, quantity: 0.2 }],
-        },
-      ],
+      outputItemId: 8,
+      baseYield: 2,
+      ingredients: [{ itemId: 4, quantity: 0.2 }],
     };
 
     await listRecipes();

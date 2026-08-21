@@ -18,7 +18,15 @@ describe("orders service", () => {
     mockedApi.mockResolvedValue(undefined as never);
     const body = {
       clientRequestId: "90f2d7c2-2f4f-4de6-9abf-42eaba11e2cf",
-      lines: [{ type: "recipe" as const, recipeSizeId: 4, quantity: 2 }],
+      lines: [
+        {
+          type: "external_product" as const,
+          externalProductId: 4,
+          externalSizeId: 40,
+          quantity: 2,
+          modifiers: [{ externalModifierOptionId: 7, quantity: 1 }],
+        },
+      ],
       discount: { type: "percent" as const, value: 10 },
       cashReceived: 100,
     };
@@ -30,7 +38,7 @@ describe("orders service", () => {
     await createOrder(body);
 
     expect(mockedApi.mock.calls).toEqual([
-      ["/api/orders/catalog"],
+      ["/api/products"],
       ["/api/orders"],
       ["/api/orders/external"],
       ["/api/orders/7"],

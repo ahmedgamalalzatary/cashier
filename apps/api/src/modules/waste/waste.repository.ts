@@ -2,9 +2,6 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import {
   items,
-  recipeIngredients,
-  recipes,
-  recipeSizes,
   shifts,
   users,
   wasteAllocations,
@@ -12,6 +9,7 @@ import {
 } from "../../db/schema.js";
 import { InventoryRepository } from "../inventory/inventory.repository.js";
 import { InventoryTransaction } from "../inventory/inventory.service.js";
+import { OrdersRepository } from "../orders/orders.repository.js";
 
 export class WasteRepository {
   constructor(private db: Db) {}
@@ -51,36 +49,6 @@ export class WasteRepository {
     return row;
   }
 
-  async findRecipeSize(id: number) {
-    const [row] = await this.db
-      .select({
-        recipeSizeId: recipeSizes.id,
-        sizeName: recipeSizes.name,
-        recipeId: recipes.id,
-        recipeName: recipes.name,
-        recipeType: recipes.type,
-        isActive: recipes.isActive,
-      })
-      .from(recipeSizes)
-      .innerJoin(recipes, eq(recipeSizes.recipeId, recipes.id))
-      .where(eq(recipeSizes.id, id))
-      .for("update");
-    return row;
-  }
-
-  ingredients(recipeSizeId: number) {
-    return this.db
-      .select({
-        itemId: items.id,
-        itemName: items.name,
-        quantity: recipeIngredients.quantity,
-      })
-      .from(recipeIngredients)
-      .innerJoin(items, eq(recipeIngredients.itemId, items.id))
-      .where(eq(recipeIngredients.recipeSizeId, recipeSizeId))
-      .orderBy(asc(items.id));
-  }
-
   async findByClientRequestId(clientRequestId: string) {
     const [row] = await this.db
       .select({
@@ -117,22 +85,47 @@ export class WasteRepository {
       .orderBy(asc(items.name));
   }
 
-  listCatalogRecipes() {
-    return this.db
-      .select({
-        recipeId: recipes.id,
-        recipeName: recipes.name,
-        recipeSizeId: recipeSizes.id,
-        sizeName: recipeSizes.name,
-      })
-      .from(recipes)
-      .innerJoin(recipeSizes, eq(recipeSizes.recipeId, recipes.id))
-      .where(and(eq(recipes.isActive, true), eq(recipes.type, "product")))
-      .orderBy(
-        asc(recipes.name),
-        asc(recipeSizes.sortOrder),
-        asc(recipeSizes.id),
-      );
+  async loadExternalProduct(externalProductId: number) {
+    const [product] = await new OrdersRepository(this.db).loadExternalProducts([
+      externalProductId,
+    ]);
+    return product;
+  }
+
+  async listCatalogExternalProducts() {
+    const orders = new OrdersRepository(this.db);
+    const ids = await orders.listCurrentExternalProductIds();
+    const products = await orders.loadExternalProducts(
+      ids.map((row) => row.externalId),
+    );
+    const result: Array<{
+      externalProductId: number;
+      externalSizeId: number | null;
+      productName: string;
+      sizeName: string | null;
+    }> = [];
+    for (const product of products) {
+      if (product.sizes.length > 0) {
+        for (const size of product.sizes) {
+          if (size.ingredients.length > 0) {
+            result.push({
+              externalProductId: product.externalId,
+              externalSizeId: size.externalId,
+              productName: product.nameAr,
+              sizeName: size.nameAr,
+            });
+          }
+        }
+      } else if (product.ingredients.length > 0) {
+        result.push({
+          externalProductId: product.externalId,
+          externalSizeId: null,
+          productName: product.nameAr,
+          sizeName: null,
+        });
+      }
+    }
+    return result;
   }
 
   list(warehouse?: "cafe") {

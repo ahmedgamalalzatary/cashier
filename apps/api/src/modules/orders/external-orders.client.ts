@@ -1,17 +1,13 @@
 import { z } from "zod";
 import type { ExternalOrderSummary } from "@cashier/shared";
 import { HttpError } from "../../middleware/error.js";
+import {
+  ExternalBackendClient,
+  ExternalBackendError,
+  type ExternalBackendConfig,
+} from "../external/external-backend.client.js";
 
-export type ExternalOrdersConfig = {
-  baseUrl: string;
-  phoneNumber: string;
-  password: string;
-};
-
-const tokensSchema = z.object({
-  accessToken: z.string().min(1),
-  refreshToken: z.string().min(1),
-});
+export type ExternalOrdersConfig = ExternalBackendConfig;
 
 const decimalSchema = z.union([
   z.number().finite(),
@@ -53,15 +49,11 @@ const externalOrderSchema = z.object({
 });
 
 const externalOrdersSchema = z.array(externalOrderSchema);
-
+const paginationSchema = z.object({ currentPage: z.number().int(), pageSize: z.number().int(), totalCount: z.number().int(), totalPages: z.number().int(), hasNextPage: z.boolean(), hasPreviousPage: z.boolean() });
+const externalOrdersPageSchema = z.object({ data: externalOrdersSchema, pagination: paginationSchema });
 const decimal = (value: number | string) => Number(value).toFixed(2);
 
-const orderStatuses = {
-  0: "pending",
-  1: "completed",
-  2: "cancelled",
-} as const;
-
+const orderStatuses = { 0: "pending", 1: "completed", 2: "cancelled" } as const;
 const paymentStatuses = {
   1: "pending",
   2: "paid",
@@ -69,41 +61,56 @@ const paymentStatuses = {
   4: "cancelled",
   5: "unpaid",
 } as const;
-
 const paymentMethods = {
   1: "cash_on_delivery",
   2: "online",
   3: "onsite",
 } as const;
-
-const orderTypes = {
-  1: "pickup",
-  2: "delivery",
-} as const;
+const orderTypes = { 1: "pickup", 2: "delivery" } as const;
 
 export class ExternalOrdersClient {
-  private accessToken: string | null = null;
-  private refreshToken: string | null = null;
-  private loginPromise: Promise<void> | null = null;
-  private recoveryPromise: Promise<void> | null = null;
+  private readonly backend: ExternalBackendClient;
 
   constructor(
-    private readonly config: ExternalOrdersConfig,
-    private readonly fetcher: typeof fetch = fetch,
-  ) {}
+    backendOrConfig: ExternalBackendClient | ExternalOrdersConfig,
+    fetcher: typeof fetch = fetch,
+  ) {
+    this.backend =
+      backendOrConfig instanceof ExternalBackendClient
+        ? backendOrConfig
+        : new ExternalBackendClient(backendOrConfig, fetcher);
+  }
 
   async list(): Promise<ExternalOrderSummary[]> {
-    if (!this.accessToken) await this.ensureLogin();
-    const attemptedToken = this.accessToken!;
-    let response = await this.fetchOrders(attemptedToken);
-    if (response.status === 401) {
-      await this.recoverAuthentication(attemptedToken);
-      response = await this.fetchOrders(this.accessToken!);
-    }
-    if (!response.ok) throw new HttpError(502, "تعذر تحميل طلبات الأونلاين");
+    return (await this.listPage()).data;
+  }
 
-    const rows = await this.parseResponse(externalOrdersSchema, response);
-    return rows.map((row) => ({
+  async listPage(params: { search?: string; page?: number; pageSize?: number } = {}) {
+    let rows: z.infer<typeof externalOrdersSchema>;
+    try {
+      const query = new URLSearchParams();
+      if (params.search?.trim()) query.set("search", params.search.trim());
+      if (params.page !== undefined) query.set("page", String(params.page));
+      if (params.pageSize !== undefined) query.set("pageSize", String(params.pageSize));
+      const path = query.size ? `/api/AdminOrders/search?${query}` : "/api/AdminOrders";
+      const response = await this.backend.get(path, z.union([externalOrdersSchema, externalOrdersPageSchema]));
+      const page = Array.isArray(response) ? { data: response, pagination: { currentPage: 1, pageSize: response.length, totalCount: response.length, totalPages: response.length ? 1 : 0, hasNextPage: false, hasPreviousPage: false } } : response;
+      rows = page.data;
+      var pagination = page.pagination;
+    } catch (error) {
+      if (error instanceof ExternalBackendError) {
+        const messages = {
+          invalid: "استجابت خدمة طلبات الأونلاين ببيانات غير صالحة",
+          transport: "تعذر الاتصال بخدمة طلبات الأونلاين",
+          auth: "تعذر تسجيل الدخول إلى خدمة طلبات الأونلاين",
+          upstream: "تعذر تحميل طلبات الأونلاين",
+        } as const;
+        throw new HttpError(502, messages[error.kind]);
+      }
+      throw new HttpError(502, "تعذر تحميل طلبات الأونلاين");
+    }
+
+    return { data: rows.map((row) => ({
       id: row.id,
       customerName: row.user?.fullName ?? row.user?.userName ?? "—",
       customerPhone: row.phoneNumber ?? row.user?.phoneNumber ?? null,
@@ -121,99 +128,8 @@ export class ExternalOrdersClient {
       paymentMethod:
         paymentMethods[row.paymentMethod as keyof typeof paymentMethods] ??
         "unknown",
-      orderType:
-        orderTypes[row.orderType as keyof typeof orderTypes] ?? "unknown",
+      orderType: orderTypes[row.orderType as keyof typeof orderTypes] ?? "unknown",
       itemCount: row.orderItems.reduce((sum, item) => sum + item.quantity, 0),
-    }));
-  }
-
-  private fetchOrders(accessToken: string) {
-    return this.request(`${this.config.baseUrl}/api/AdminOrders`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-  }
-
-  private async ensureLogin() {
-    if (this.accessToken) return;
-    if (!this.loginPromise) {
-      this.loginPromise = this.login().finally(() => {
-        this.loginPromise = null;
-      });
-    }
-    await this.loginPromise;
-  }
-
-  private async login() {
-    const response = await this.request(
-      `${this.config.baseUrl}/api/Auth/login`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phoneNumber: this.config.phoneNumber,
-          password: this.config.password,
-        }),
-      },
-    );
-    if (!response.ok)
-      throw new HttpError(502, "تعذر تسجيل الدخول إلى خدمة طلبات الأونلاين");
-    const tokens = await this.parseResponse(tokensSchema, response);
-    this.accessToken = tokens.accessToken;
-    this.refreshToken = tokens.refreshToken;
-  }
-
-  private async recoverAuthentication(failedAccessToken: string) {
-    if (this.accessToken !== failedAccessToken) return;
-    if (!this.recoveryPromise) {
-      this.recoveryPromise = this.refreshOrLogin().finally(() => {
-        this.recoveryPromise = null;
-      });
-    }
-    await this.recoveryPromise;
-  }
-
-  private async refreshOrLogin() {
-    if (this.refreshToken) {
-      const response = await this.request(
-        `${this.config.baseUrl}/api/Auth/refresh-token`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refreshToken: this.refreshToken }),
-        },
-      );
-      if (response.ok) {
-        const tokens = await this.parseResponse(tokensSchema, response);
-        this.accessToken = tokens.accessToken;
-        this.refreshToken = tokens.refreshToken;
-        return;
-      }
-    }
-
-    this.accessToken = null;
-    this.refreshToken = null;
-    await this.ensureLogin();
-  }
-
-  private async request(input: string, init?: RequestInit) {
-    try {
-      return await this.fetcher(input, {
-        ...init,
-        signal: init?.signal ?? AbortSignal.timeout(10_000),
-      });
-    } catch {
-      throw new HttpError(502, "تعذر الاتصال بخدمة طلبات الأونلاين");
-    }
-  }
-
-  private async parseResponse<T>(schema: z.ZodType<T>, response: Response) {
-    try {
-      return schema.parse(await response.json());
-    } catch {
-      throw new HttpError(
-        502,
-        "استجابت خدمة طلبات الأونلاين ببيانات غير صالحة",
-      );
-    }
+    })), pagination };
   }
 }
