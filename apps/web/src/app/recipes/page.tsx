@@ -38,7 +38,10 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table } from "@/components/ui/table";
 import { formatMoney, itemLabel } from "@/lib/format";
-import { catalogRefreshOutcome } from "@/models/catalog-refresh";
+import {
+  catalogRefreshOutcome,
+  requestCatalogRefresh,
+} from "@/models/catalog-refresh";
 import { listCategories } from "@/services/categories-service";
 import { listItems } from "@/services/items-service";
 import {
@@ -172,17 +175,11 @@ export default function RecipesPage() {
   }
 
   async function manualRefresh() {
-    setRefreshing(true);
-    try {
-      await refreshProducts();
-      setError("");
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "تعذر تحديث المنتجات الخارجية",
-      );
-    }
+    await requestCatalogRefresh({
+      refresh: refreshProducts,
+      setRefreshing,
+      setError,
+    });
   }
 
   return (

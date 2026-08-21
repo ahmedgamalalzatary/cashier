@@ -1,9 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { catalogRefreshOutcome } from "../../src/models/catalog-refresh";
+import {
+  catalogRefreshOutcome,
+  requestCatalogRefresh,
+} from "../../src/models/catalog-refresh";
 
 const requestedAt = "2026-08-21T16:43:15.232Z";
 
 describe("catalog refresh status", () => {
+  it("stops refreshing and preserves the error when requesting refresh fails", async () => {
+    let refreshing = false;
+    let error = "";
+
+    await requestCatalogRefresh({
+      refresh: async () => {
+        throw new Error("الخدمة الخارجية غير متاحة");
+      },
+      setRefreshing: (value) => {
+        refreshing = value;
+      },
+      setError: (value) => {
+        error = value;
+      },
+    });
+
+    expect(refreshing).toBe(false);
+    expect(error).toBe("الخدمة الخارجية غير متاحة");
+  });
+
   it("reports an unclaimed refresh request as unavailable after 30 seconds", () => {
     expect(
       catalogRefreshOutcome(

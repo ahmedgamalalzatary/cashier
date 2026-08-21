@@ -2,6 +2,17 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 describe("API runtime image", () => {
+  it("builds the shared package before the Docker web build", async () => {
+    const dockerfile = await readFile(
+      new URL("../../../../../dockerfile.web", import.meta.url),
+      "utf8",
+    );
+
+    expect(dockerfile).toContain(
+      "RUN pnpm --filter @cashier/shared build && pnpm --filter @cashier/web build",
+    );
+  });
+
   it("runs the cache worker alongside the API during local development", async () => {
     const rootPackage = JSON.parse(
       await readFile(
