@@ -145,4 +145,42 @@ describe("ExternalProductCard", () => {
     expect(html).toContain("إضافة بدون اسم");
     expect(html).not.toContain("null");
   });
+  it("retains inactive items referenced by existing stock mappings", () => {
+    const html = renderToStaticMarkup(
+      <ProductStockSetupModal
+        product={{
+          ...product,
+          sizes: [
+            {
+              ...product.sizes[0]!,
+              ingredients: [{ itemId: 7, quantity: "0.020" }],
+            },
+          ],
+        }}
+        items={[
+          {
+            id: 7,
+            code: 7,
+            name: "قديم",
+            categoryId: 1,
+            categoryName: "خامات",
+            type: "raw",
+            sellingPrice: null,
+            stockUnit: "كجم",
+            purchaseUnit: "كجم",
+            purchaseToStockFactor: "1.000000",
+            mainMinimumLevel: "0.000",
+            cafeMinimumLevel: "0.000",
+            hasStockHistory: true,
+            isActive: false,
+            createdAt: "2026-08-01T00:00:00.000Z",
+          },
+        ]}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain("قديم");
+  });
 });

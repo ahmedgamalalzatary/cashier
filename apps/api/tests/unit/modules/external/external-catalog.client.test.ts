@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { ExternalBackendClient } from "../../../../src/modules/external/external-backend.client.js";
 import { ExternalCatalogClient } from "../../../../src/modules/external/external-catalog.client.js";
 import { ExternalOrdersClient } from "../../../../src/modules/orders/external-orders.client.js";
@@ -73,6 +74,66 @@ const createCatalog = (fetcher: typeof fetch) => {
 };
 
 describe("ExternalCatalogClient", () => {
+  it("waits for in-flight authentication recovery before retrying a stale request", async () => {
+    let loginCount = 0;
+    let dataCount = 0;
+    let releaseLogin!: () => void;
+    let announceLogin!: () => void;
+    const loginPending = new Promise<void>((resolve) => {
+      releaseLogin = resolve;
+    });
+    const loginStarted = new Promise<void>((resolve) => {
+      announceLogin = resolve;
+    });
+    const authorizations: string[] = [];
+    const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/api/Auth/login")) {
+        loginCount += 1;
+        if (loginCount === 2) {
+          announceLogin();
+          await loginPending;
+        }
+        return jsonResponse({
+          accessToken: loginCount === 1 ? "old-access" : "new-access",
+          refreshToken: loginCount === 1 ? "old-refresh" : "new-refresh",
+        });
+      }
+      if (url.endsWith("/api/Auth/refresh-token")) {
+        return jsonResponse({}, 401);
+      }
+      authorizations.push(
+        new Headers(init?.headers).get("Authorization") ?? "",
+      );
+      dataCount += 1;
+      if (dataCount === 2) await loginStarted;
+      return dataCount <= 2 ? jsonResponse({}, 401) : jsonResponse([]);
+    });
+    const backend = new ExternalBackendClient(
+      {
+        baseUrl: "https://catalog.example.com",
+        phoneNumber: "01234567890",
+        password: "server-only-password",
+      },
+      fetcher,
+    );
+
+    const requests = Promise.all([
+      backend.get("/data", z.array(z.unknown())),
+      backend.get("/data", z.array(z.unknown())),
+    ]);
+    await loginStarted;
+    releaseLogin();
+    await requests;
+
+    expect(authorizations).toEqual([
+      "Bearer old-access",
+      "Bearer old-access",
+      "Bearer new-access",
+      "Bearer new-access",
+    ]);
+  });
+
   it("shares one authenticated session with external orders", async () => {
     const fetcher = vi.fn<typeof fetch>(async (input) => {
       const url = String(input);
@@ -262,7 +323,7 @@ describe("ExternalCatalogClient", () => {
   });
 
   it("rejects external money that would be rounded or overflow storage", async () => {
-    for (const price of [80.001, "10000000000.00"]) {
+    for (const price of [80.001, 1e-7, "10000000000.00"]) {
       const fetcher = vi
         .fn<typeof fetch>()
         .mockResolvedValueOnce(
@@ -274,6 +335,20 @@ describe("ExternalCatalogClient", () => {
       await expect(createCatalog(fetcher).load()).rejects.toMatchObject({
         status: 502,
       });
+    }
+  });
+
+  it("accepts valid two-decimal numeric money despite floating-point representation", async () => {
+    for (const price of [0.29, 0.57, 10.12]) {
+      const fetcher = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(
+          jsonResponse({ accessToken: "access-1", refreshToken: "refresh-1" }),
+        )
+        .mockResolvedValueOnce(jsonResponse([category()]))
+        .mockResolvedValueOnce(jsonResponse([product({ price })]));
+
+      await expect(createCatalog(fetcher).load()).resolves.toBeDefined();
     }
   });
 

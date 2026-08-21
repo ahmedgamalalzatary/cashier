@@ -5,7 +5,7 @@
   "description": "Cashier + warehouse system (POS, main warehouse, cafe sub-warehouse) — see docs/system-specs.md",
   "packageManager": "pnpm@11.17.0",
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "turbo run dev dev:worker",
     "dev:web": "pnpm --filter @cashier/web dev",
     "dev:api": "pnpm --filter @cashier/api dev",
     "build": "turbo run build",

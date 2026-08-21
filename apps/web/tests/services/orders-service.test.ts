@@ -15,7 +15,10 @@ describe("orders service", () => {
   beforeEach(() => mockedApi.mockReset());
 
   it("uses catalog, recent-order, detail, and creation endpoints", async () => {
-    mockedApi.mockResolvedValue(undefined as never);
+    mockedApi.mockResolvedValue({
+      products: [],
+      pagination: { totalPages: 1 },
+    } as never);
     const body = {
       clientRequestId: "90f2d7c2-2f4f-4de6-9abf-42eaba11e2cf",
       lines: [
@@ -38,7 +41,7 @@ describe("orders service", () => {
     await createOrder(body);
 
     expect(mockedApi.mock.calls).toEqual([
-      ["/api/products"],
+      ["/api/products?page=1&pageSize=50"],
       ["/api/orders"],
       ["/api/orders/external"],
       ["/api/orders/7"],

@@ -84,6 +84,7 @@ beforeEach(async () => {
   await db.execute(sql`TRUNCATE TABLE external_products`);
   await db.execute(sql`TRUNCATE TABLE external_categories`);
   await db.execute(sql`TRUNCATE TABLE external_catalog_sync`);
+  await db.execute(sql`TRUNCATE TABLE external_orders_cache`);
   await db.execute(sql`TRUNCATE TABLE items`);
   await db.execute(sql`TRUNCATE TABLE supplier_payments`);
   await db.execute(sql`TRUNCATE TABLE suppliers`);

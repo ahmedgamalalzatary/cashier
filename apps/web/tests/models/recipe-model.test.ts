@@ -5,9 +5,27 @@ import {
   recipeRequestBody,
   recipeStats,
   scalePreparationIngredients,
+  selectRecipeOutputItem,
 } from "../../src/models/recipe-model";
 
 describe("recipe model", () => {
+  it("clears matching output ingredients and their quantities only", () => {
+    const form = {
+      ...emptyPreparedRecipeForm(),
+      ingredients: [
+        { key: 1, itemId: "7", quantity: "2.5" },
+        { key: 2, itemId: "8", quantity: "1.25" },
+      ],
+    };
+
+    expect(selectRecipeOutputItem(form, "7")).toMatchObject({
+      outputItemId: "7",
+      ingredients: [
+        { key: 1, itemId: "", quantity: "" },
+        { key: 2, itemId: "8", quantity: "1.25" },
+      ],
+    });
+  });
   it("builds prepared-recipe request bodies from editable forms", () => {
     const prepared = emptyPreparedRecipeForm();
     prepared.name = " شربات ";

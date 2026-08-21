@@ -11,8 +11,15 @@ const moneySchema = z
     z.string().regex(/^\d+(?:\.\d+)?$/),
   ])
   .refine((value) => {
-    const fraction = String(value).split(".")[1] ?? "";
-    return Number(value) <= MAX_MONEY && fraction.length <= 2;
+    const numeric = Number(value);
+    if (numeric > MAX_MONEY) return false;
+    if (typeof value === "string")
+      return (value.split(".")[1]?.length ?? 0) <= 2;
+    const scaled = numeric * 100;
+    return (
+      Math.abs(scaled - Math.round(scaled)) <=
+      Number.EPSILON * Math.max(1, Math.abs(scaled)) * 2
+    );
   });
 const positiveId = z.number().int().positive().max(SQL_INT_MAX);
 const localizedName = z.string().trim().min(1).max(191);
@@ -94,12 +101,8 @@ const productsSchema = z.array(
       .refine((value) => Number(value) <= 100)
       .nullish()
       .transform((value) => value ?? null),
-    discountStart: localDateTime
-      .nullish()
-      .transform((value) => value ?? null),
-    discountEnd: localDateTime
-      .nullish()
-      .transform((value) => value ?? null),
+    discountStart: localDateTime.nullish().transform((value) => value ?? null),
+    discountEnd: localDateTime.nullish().transform((value) => value ?? null),
     calories: z.number().int().nonnegative().max(SQL_INT_MAX),
     pointsReward: z.number().int().nonnegative().max(SQL_INT_MAX),
     isAvailable: z.boolean(),
@@ -119,7 +122,9 @@ const productsSchema = z.array(
 const money = (value: number | string) => Number(value).toFixed(2);
 const duplicated = (ids: number[]) => new Set(ids).size !== ids.length;
 
-export type ExternalCatalog = Awaited<ReturnType<ExternalCatalogClient["load"]>>;
+export type ExternalCatalog = Awaited<
+  ReturnType<ExternalCatalogClient["load"]>
+>;
 
 export class ExternalCatalogClient {
   constructor(private readonly backend: ExternalBackendClient) {}
@@ -165,10 +170,7 @@ export class ExternalCatalogClient {
             category.nameEn === product.categoryName,
         );
         if (categoryMatches.length !== 1) {
-          throw new HttpError(
-            502,
-            "تعذر تحديد تصنيف أحد المنتجات الخارجية",
-          );
+          throw new HttpError(502, "تعذر تحديد تصنيف أحد المنتجات الخارجية");
         }
         return {
           externalId: product.id,

@@ -3,7 +3,7 @@ import type { ProductsController } from "./products.controller.js";
 
 type ProductsRouteController = Pick<
   ProductsController,
-  "list" | "refresh" | "configureStock"
+  "list" | "refresh" | "refreshStatus" | "configureStock"
 >;
 
 export function productsRouter(
@@ -13,6 +13,7 @@ export function productsRouter(
   const router = Router();
   router.get("/", controller.list);
   router.post("/refresh", adminOnly, controller.refresh);
+  router.get("/refresh-status", controller.refreshStatus);
   router.put("/:id/stock-setup", adminOnly, controller.configureStock);
   return router;
 }

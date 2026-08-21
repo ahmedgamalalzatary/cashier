@@ -25,7 +25,7 @@ const dateTime = new Intl.DateTimeFormat("ar-EG", {
   timeStyle: "short",
 });
 
-const quantity = (value: string) =>
+const quantity = (value: string | number) =>
   Number(value).toLocaleString("ar-EG", { maximumFractionDigits: 3 });
 
 export default function OrderDetailPage({
@@ -169,11 +169,8 @@ export default function OrderDetailPage({
                   {line.sizeName ?? "صنف مباشر"}
                 </span>
                 {line.modifiers.map((modifier) => (
-                  <span
-                    key={modifier.id}
-                    className="block text-xs text-muted"
-                  >
-                    + {modifier.optionName} × {modifier.quantity}
+                  <span key={modifier.id} className="block text-xs text-muted">
+                    + {modifier.optionName} × {quantity(modifier.quantity)}
                   </span>
                 ))}
               </td>

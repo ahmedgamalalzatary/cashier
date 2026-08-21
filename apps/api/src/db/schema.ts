@@ -559,10 +559,67 @@ export const externalModifierIngredients = mysqlTable(
 
 export const externalCatalogSync = mysqlTable("external_catalog_sync", {
   id: int("id").primaryKey(),
-  lastSuccessfulSyncAt: timestamp("last_successful_sync_at"),
-  lastAttemptAt: timestamp("last_attempt_at"),
+  lastSuccessfulSyncAt: timestamp("last_successful_sync_at", { fsp: 3 }),
+  lastAttemptAt: timestamp("last_attempt_at", { fsp: 3 }),
+  lastFailedAt: timestamp("last_failed_at", { fsp: 3 }),
   lastError: varchar("last_error", { length: 500 }),
+  refreshRequestedAt: timestamp("refresh_requested_at", { fsp: 3 }),
+  refreshRequestVersion: int("refresh_request_version").notNull().default(0),
+  completedRequestVersion: int("completed_request_version")
+    .notNull()
+    .default(0),
+  lockOwner: varchar("lock_owner", { length: 191 }),
+  lockExpiresAt: timestamp("lock_expires_at", { fsp: 3 }),
 });
+
+export const externalOrdersCache = mysqlTable(
+  "external_orders_cache",
+  {
+    externalId: int("external_id").primaryKey(),
+    customerName: varchar("customer_name", { length: 191 }).notNull(),
+    customerPhone: varchar("customer_phone", { length: 32 }),
+    subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
+    discountAmount: decimal("discount_amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
+    deliveryFee: decimal("delivery_fee", { precision: 12, scale: 2 }).notNull(),
+    externalCreatedAt: varchar("external_created_at", { length: 40 }).notNull(),
+    orderStatus: mysqlEnum("order_status", [
+      "pending",
+      "completed",
+      "cancelled",
+      "unknown",
+    ]).notNull(),
+    paymentStatus: mysqlEnum("payment_status", [
+      "pending",
+      "paid",
+      "failed",
+      "cancelled",
+      "unpaid",
+      "unknown",
+    ]).notNull(),
+    paymentMethod: mysqlEnum("payment_method", [
+      "cash_on_delivery",
+      "online",
+      "onsite",
+      "unknown",
+    ]).notNull(),
+    orderType: mysqlEnum("order_type", [
+      "pickup",
+      "delivery",
+      "unknown",
+    ]).notNull(),
+    itemCount: int("item_count").notNull(),
+    cachedAt: timestamp("cached_at").notNull(),
+  },
+  (table) => [
+    index("external_orders_created_idx").on(table.externalCreatedAt),
+    index("external_orders_customer_idx").on(table.customerName),
+    index("external_orders_phone_idx").on(table.customerPhone),
+  ],
+);
 
 export const preparations = mysqlTable(
   "preparations",
@@ -1020,7 +1077,11 @@ export const wasteEntries = mysqlTable(
     requestFingerprint: varchar("request_fingerprint", { length: 64 }),
     shiftId: int("shift_id").references(() => shifts.id),
     warehouse: mysqlEnum("warehouse", ["main", "cafe"]).notNull(),
-    targetType: mysqlEnum("target_type", ["item", "recipe", "external_product"]),
+    targetType: mysqlEnum("target_type", [
+      "item",
+      "recipe",
+      "external_product",
+    ]),
     itemId: int("item_id").references(() => items.id),
     recipeId: int("recipe_id").references(() => recipes.id),
     recipeSizeId: int("recipe_size_id").references(() => recipeSizes.id),
@@ -1156,7 +1217,9 @@ export const expenses = mysqlTable(
     clientRequestId: varchar("client_request_id", { length: 36 })
       .notNull()
       .unique(),
-    requestFingerprint: varchar("request_fingerprint", { length: 64 }).notNull(),
+    requestFingerprint: varchar("request_fingerprint", {
+      length: 64,
+    }).notNull(),
     type: mysqlEnum("type", ["shift", "general"]).notNull(),
     categoryId: int("category_id")
       .notNull()

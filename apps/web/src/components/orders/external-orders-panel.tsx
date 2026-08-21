@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import type { ExternalOrderSummary } from "@cashier/shared";
+import type { ExternalOrderSummary, ExternalOrdersPage } from "@cashier/shared";
 import { Clock3, Coins, ReceiptText, Scissors, Search } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Table } from "../ui/table";
@@ -10,10 +10,8 @@ import { formatMoney } from "../../lib/format";
 import {
   externalOrderStatus,
   externalOrderTypeLabel,
-  externalOrdersTotals,
   externalPaymentMethodLabel,
   externalPaymentStatus,
-  filterExternalOrders,
 } from "../../models/external-orders-model";
 import { listExternalOrders } from "../../services/orders-service";
 
@@ -36,13 +34,22 @@ export function ExternalOrdersPanel() {
   const [query, setQuery] = useState("");
   const [day, setDay] = useState("");
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<
+    ExternalOrdersPage["pagination"] | null
+  >(null);
+  const [totals, setTotals] = useState<ExternalOrdersPage["totals"] | null>(
+    null,
+  );
 
   useEffect(() => {
     let cancelled = false;
-    listExternalOrders()
+    listExternalOrders({ search: query, day, page, pageSize: 25 })
       .then((result) => {
         if (cancelled) return;
         setOrders(result.data);
+        setPagination(result.pagination);
+        setTotals(result.totals);
         setError("");
       })
       .catch((caught) => {
@@ -59,7 +66,7 @@ export function ExternalOrdersPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [query, day, page]);
 
   return (
     <ExternalOrdersPanelView
@@ -68,8 +75,22 @@ export function ExternalOrdersPanel() {
       error={error}
       query={query}
       day={day}
-      onQueryChange={setQuery}
-      onDayChange={setDay}
+      onQueryChange={(value) => {
+        setLoading(true);
+        setQuery(value);
+        setPage(1);
+      }}
+      onDayChange={(value) => {
+        setLoading(true);
+        setDay(value);
+        setPage(1);
+      }}
+      totals={totals ?? undefined}
+      pagination={pagination ?? undefined}
+      onPageChange={(value) => {
+        setLoading(true);
+        setPage(value);
+      }}
     />
   );
 }
@@ -82,6 +103,9 @@ export function ExternalOrdersPanelView({
   day,
   onQueryChange,
   onDayChange,
+  totals,
+  pagination,
+  onPageChange,
 }: {
   orders: ExternalOrderSummary[];
   loading: boolean;
@@ -90,9 +114,21 @@ export function ExternalOrdersPanelView({
   day: string;
   onQueryChange: (query: string) => void;
   onDayChange: (day: string) => void;
+  totals?: ExternalOrdersPage["totals"];
+  pagination?: ExternalOrdersPage["pagination"];
+  onPageChange?: (page: number) => void;
 }) {
-  const visibleRows = filterExternalOrders(orders, { query, day });
-  const totals = externalOrdersTotals(visibleRows);
+  const visibleRows = orders;
+  const summary = totals ?? {
+    count: orders.length,
+    sales: orders
+      .reduce((sum, row) => sum + Number(row.totalAmount), 0)
+      .toFixed(2),
+    discounts: orders
+      .reduce((sum, row) => sum + Number(row.discountAmount), 0)
+      .toFixed(2),
+    pending: orders.filter((row) => row.orderStatus === "pending").length,
+  };
 
   return (
     <>
@@ -101,22 +137,22 @@ export function ExternalOrdersPanelView({
           <Summary
             icon={<ReceiptText className="size-5 text-accent" />}
             label="عدد الطلبات المعروضة"
-            value={totals.countLabel}
+            value={summary.count.toLocaleString("ar-EG")}
           />
           <Summary
             icon={<Coins className="size-5 text-accent" />}
             label="إجمالي قيمة الطلبات"
-            value={totals.sales}
+            value={formatMoney(summary.sales)}
           />
           <Summary
             icon={<Scissors className="size-5 text-accent" />}
             label="إجمالي الخصومات"
-            value={totals.discounts}
+            value={formatMoney(summary.discounts)}
           />
           <Summary
             icon={<Clock3 className="size-5 text-accent" />}
             label="طلبات قيد التنفيذ"
-            value={totals.pending.toLocaleString("ar-EG")}
+            value={summary.pending.toLocaleString("ar-EG")}
           />
         </div>
       </section>
@@ -161,7 +197,7 @@ export function ExternalOrdersPanelView({
 
       {error ? null : loading ? (
         <p className="text-muted">جارِ تحميل طلبات الأونلاين…</p>
-      ) : orders.length === 0 ? (
+      ) : orders.length === 0 && !query && !day ? (
         <div className="rounded-xl border border-dashed border-line bg-surface p-10 text-center">
           <ReceiptText className="mx-auto mb-3 size-8 text-muted" />
           <p className="font-medium">لا توجد طلبات أونلاين بعد</p>
@@ -312,6 +348,30 @@ export function ExternalOrdersPanelView({
               })}
             </Table>
           </div>
+          {pagination && pagination.totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                disabled={!pagination.hasPreviousPage}
+                onClick={() => onPageChange?.(pagination.currentPage - 1)}
+                className="rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-40"
+              >
+                السابق
+              </button>
+              <span className="text-sm text-muted">
+                {pagination.currentPage.toLocaleString("ar-EG")} /{" "}
+                {pagination.totalPages.toLocaleString("ar-EG")}
+              </span>
+              <button
+                type="button"
+                disabled={!pagination.hasNextPage}
+                onClick={() => onPageChange?.(pagination.currentPage + 1)}
+                className="rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-40"
+              >
+                التالي
+              </button>
+            </div>
+          )}
         </>
       )}
     </>

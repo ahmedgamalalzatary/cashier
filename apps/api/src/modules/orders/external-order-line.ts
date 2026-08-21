@@ -83,11 +83,14 @@ export function calculateExternalOrderLine(
             candidate.externalId === selection.externalSizeId &&
             candidate.externalProductId === product.externalId,
         );
-  if (
-    (product.sizes.length > 0 && !size) ||
-    (product.sizes.length === 0 && selection.externalSizeId !== null)
-  ) {
+  if (product.sizes.length > 0 && selection.externalSizeId === null) {
+    throw new HttpError(400, "يجب اختيار مقاس لهذا المنتج");
+  }
+  if (product.sizes.length > 0 && !size) {
     throw new HttpError(400, "المقاس لا ينتمي إلى المنتج المحدد");
+  }
+  if (product.sizes.length === 0 && selection.externalSizeId !== null) {
+    throw new HttpError(400, "هذا المنتج لا يدعم المقاسات");
   }
 
   const baseIngredients = size?.ingredients ?? product.ingredients;

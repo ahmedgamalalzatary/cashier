@@ -22,6 +22,7 @@ import type {
   PreparedRecipe,
 } from "@cashier/shared";
 import { ExternalProductCard } from "@/components/recipes/external-product-card";
+import { CatalogSyncStatus } from "@/components/recipes/catalog-sync-status";
 import { PrepareRecipeModal } from "@/components/recipes/prepare-recipe-modal";
 import { ProductStockSetupModal } from "@/components/recipes/product-stock-setup-modal";
 import { RecipeFormModal } from "@/components/recipes/recipe-form-modal";
@@ -37,6 +38,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table } from "@/components/ui/table";
 import { formatMoney, itemLabel } from "@/lib/format";
+import { catalogRefreshOutcome } from "@/models/catalog-refresh";
 import { listCategories } from "@/services/categories-service";
 import { listItems } from "@/services/items-service";
 import {
@@ -44,7 +46,11 @@ import {
   listRecipes,
   setRecipeActive,
 } from "@/services/recipes-service";
-import { listProducts, refreshProducts } from "@/services/products-service";
+import {
+  getProductRefreshStatus,
+  listProducts,
+  refreshProducts,
+} from "@/services/products-service";
 
 export default function RecipesPage() {
   const [catalog, setCatalog] = useState<ExternalProductCatalog | null>(null);
@@ -55,7 +61,9 @@ export default function RecipesPage() {
   const [tab, setTab] = useState<RecipeTab>("products");
   const [form, setForm] = useState<PreparedRecipe | null | undefined>();
   const [preparing, setPreparing] = useState<PreparedRecipe | null>(null);
-  const [stockProduct, setStockProduct] = useState<ExternalProduct | null>(null);
+  const [stockProduct, setStockProduct] = useState<ExternalProduct | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -66,14 +74,19 @@ export default function RecipesPage() {
     async function load() {
       setLoading(true);
       try {
-        const [productRows, recipeRows, preparationRows, categoryRows, itemRows] =
-          await Promise.all([
-            listProducts(),
-            listRecipes(),
-            listPreparations(),
-            listCategories(),
-            listItems(),
-          ]);
+        const [
+          productRows,
+          recipeRows,
+          preparationRows,
+          categoryRows,
+          itemRows,
+        ] = await Promise.all([
+          listProducts(),
+          listRecipes(),
+          listPreparations(),
+          listCategories(),
+          listItems(),
+        ]);
         if (cancelled) return;
         setCatalog(productRows);
         setRecipes(recipeRows);
@@ -99,6 +112,37 @@ export default function RecipesPage() {
     };
   }, [reloadKey]);
 
+  useEffect(() => {
+    if (!refreshing) return;
+    let cancelled = false;
+    const timer = window.setInterval(() => {
+      void getProductRefreshStatus()
+        .then((status) => {
+          if (cancelled) return;
+          const outcome = catalogRefreshOutcome(status);
+          if (outcome === "failed") {
+            setError(status.lastError ?? "تعذر تحديث المنتجات الخارجية");
+            setRefreshing(false);
+            return;
+          }
+          if (outcome === "worker-unavailable") {
+            setError("خدمة تحديث المنتجات غير متاحة الآن");
+            setRefreshing(false);
+            return;
+          }
+          if (outcome === "succeeded") {
+            setRefreshing(false);
+            setReloadKey((current) => current + 1);
+          }
+        })
+        .catch(() => undefined);
+    }, 2_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [refreshing]);
+
   const products = catalog?.products ?? [];
   const counts = {
     products: products.length,
@@ -114,15 +158,13 @@ export default function RecipesPage() {
   }
 
   async function toggle(recipe: PreparedRecipe) {
-    if (
-      recipe.isActive &&
-      !window.confirm(`إيقاف الوصفة «${recipe.name}»؟`)
-    )
+    if (recipe.isActive && !window.confirm(`إيقاف الوصفة «${recipe.name}»؟`))
       return;
     try {
       await setRecipeActive(recipe.id, !recipe.isActive);
       saved();
     } catch (caught) {
+      setRefreshing(false);
       setError(
         caught instanceof Error ? caught.message : "تعذر تغيير حالة الوصفة",
       );
@@ -132,7 +174,7 @@ export default function RecipesPage() {
   async function manualRefresh() {
     setRefreshing(true);
     try {
-      setCatalog(await refreshProducts());
+      await refreshProducts();
       setError("");
     } catch (caught) {
       setError(
@@ -140,8 +182,6 @@ export default function RecipesPage() {
           ? caught.message
           : "تعذر تحديث المنتجات الخارجية",
       );
-    } finally {
-      setRefreshing(false);
     }
   }
 
@@ -163,7 +203,9 @@ export default function RecipesPage() {
           <Summary
             icon={<RefreshCw className="size-5 text-accent" />}
             label="منتجات جاهزة للبيع"
-            value={String(products.filter((product) => product.sellable).length)}
+            value={String(
+              products.filter((product) => product.sellable).length,
+            )}
           />
           <Summary
             icon={<Scale className="size-5 text-accent" />}
@@ -196,23 +238,7 @@ export default function RecipesPage() {
           {error}
         </p>
       )}
-      {catalog && (
-        <p
-          className={`mb-4 rounded-lg p-3 text-sm ${
-            catalog.stale
-              ? "bg-warning/10 text-warning"
-              : "bg-paper text-muted"
-          }`}
-        >
-          {catalog.stale
-            ? `نعرض آخر نسخة محفوظة لأن التحديث الخارجي تعذر${
-                catalog.syncError ? ` (${catalog.syncError})` : ""
-              }. `
-            : ""}
-          آخر تحديث ناجح:{" "}
-          {new Date(catalog.lastSuccessfulSyncAt).toLocaleString("ar-EG")}
-        </p>
-      )}
+      {catalog && <CatalogSyncStatus catalog={catalog} />}
 
       <RecipeTabs active={tab} counts={counts} onChange={setTab} />
       <section
@@ -235,17 +261,15 @@ export default function RecipesPage() {
                 <ExternalProductCard
                   key={product.externalId}
                   product={product}
-                  categoryName={
-                    (() => {
-                      const category = catalog?.categories.find(
-                        (candidate) =>
-                          candidate.externalId === product.externalCategoryId,
-                      );
-                      return category
-                        ? `${category.nameAr} / ${category.nameEn}`
-                        : "—";
-                    })()
-                  }
+                  categoryName={(() => {
+                    const category = catalog?.categories.find(
+                      (candidate) =>
+                        candidate.externalId === product.externalCategoryId,
+                    );
+                    return category
+                      ? `${category.nameAr} / ${category.nameEn}`
+                      : "—";
+                  })()}
                   onStockSetup={() => setStockProduct(product)}
                 />
               ))}

@@ -416,9 +416,18 @@ export type ExternalCategory = {
 export type ExternalProductCatalog = {
   categories: ExternalCategory[];
   products: ExternalProduct[];
-  lastSuccessfulSyncAt: string;
+  lastSuccessfulSyncAt: string | null;
   stale: boolean;
   syncError: string | null;
+};
+
+export type ExternalCacheRefreshStatus = {
+  lastAttemptAt: string | null;
+  lastSuccessfulSyncAt: string | null;
+  lastFailedAt: string | null;
+  lastError: string | null;
+  refreshRequestedAt: string | null;
+  refreshing: boolean;
 };
 
 export type ProductStockSetupBody = {
@@ -522,6 +531,24 @@ export type ExternalOrderSummary = {
   paymentMethod: ExternalPaymentMethod;
   orderType: ExternalOrderType;
   itemCount: number;
+};
+
+export type ExternalOrdersPage = {
+  data: ExternalOrderSummary[];
+  pagination: {
+    currentPage: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+  totals: {
+    count: number;
+    sales: string;
+    discounts: string;
+    pending: number;
+  };
 };
 
 export type RefundStockAction = "return_to_stock" | "not_returnable";

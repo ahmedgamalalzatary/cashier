@@ -33,9 +33,7 @@ const product = {
           nameAr: "شوت إضافي",
           extraPrice: "15.00",
           stockEffect: "mapped" as const,
-          ingredients: [
-            { itemId: 1, itemName: "بن", quantity: "0.010" },
-          ],
+          ingredients: [{ itemId: 1, itemName: "بن", quantity: "0.010" }],
         },
       ],
     },
@@ -82,6 +80,40 @@ describe("calculateExternalOrderLine", () => {
         nowMs,
       ),
     ).toThrow(/المقاس/);
+  });
+
+  it("distinguishes missing, invalid, and unsupported sizes", () => {
+    const selection = {
+      externalProductId: 9,
+      quantity: 1,
+      modifiers: [{ externalModifierOptionId: 93, quantity: 1 }],
+    };
+
+    expect(() =>
+      calculateExternalOrderLine(
+        product,
+        { ...selection, externalSizeId: null },
+        nowMs,
+      ),
+    ).toThrow("يجب اختيار مقاس لهذا المنتج");
+    expect(() =>
+      calculateExternalOrderLine(
+        product,
+        { ...selection, externalSizeId: 999 },
+        nowMs,
+      ),
+    ).toThrow("المقاس لا ينتمي إلى المنتج المحدد");
+    expect(() =>
+      calculateExternalOrderLine(
+        {
+          ...product,
+          sizes: [],
+          ingredients: [{ itemId: 1, itemName: "بن", quantity: "0.020" }],
+        },
+        { ...selection, externalSizeId: 91 },
+        nowMs,
+      ),
+    ).toThrow("هذا المنتج لا يدعم المقاسات");
   });
 
   it("enforces required groups and maximum selection quantities", () => {

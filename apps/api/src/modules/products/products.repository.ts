@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import {
   externalCatalogSync,
@@ -17,8 +17,20 @@ import { HttpError } from "../../middleware/error.js";
 import type { ProductStockSetupInput } from "./products.schemas.js";
 import type { ProductsRepositoryContract } from "./products.service.js";
 
+const INSERT_CHUNK_SIZE = 250;
+const chunks = <T>(rows: T[]) => {
+  const result: T[][] = [];
+  for (let index = 0; index < rows.length; index += INSERT_CHUNK_SIZE) {
+    result.push(rows.slice(index, index + INSERT_CHUNK_SIZE));
+  }
+  return result;
+};
+
 export class ProductsRepository implements ProductsRepositoryContract {
-  constructor(private readonly db: Db) {}
+  constructor(
+    private readonly db: Db,
+    private readonly recordCatalogSuccess = true,
+  ) {}
 
   applyCatalog(catalog: ExternalCatalog): Promise<void> {
     return this.db.transaction(async (tx) => {
@@ -32,84 +44,151 @@ export class ProductsRepository implements ProductsRepositoryContract {
       await tx.update(externalModifierGroups).set({ isCurrent: false });
       await tx.update(externalModifierOptions).set({ isCurrent: false });
 
-      for (const category of catalog.categories) {
-        const values = { ...category, syncedAt: now, isCurrent: true };
+      const categoryRows = catalog.categories.map((category) => ({
+        ...category,
+        syncedAt: now,
+        isCurrent: true,
+      }));
+      for (const categoryChunk of chunks(categoryRows)) {
         await tx
           .insert(externalCategories)
-          .values(values)
-          .onDuplicateKeyUpdate({ set: values });
+          .values(categoryChunk)
+          .onDuplicateKeyUpdate({
+            set: {
+              nameAr: sql`values(name_ar)`,
+              nameEn: sql`values(name_en)`,
+              descriptionAr: sql`values(description_ar)`,
+              descriptionEn: sql`values(description_en)`,
+              isActive: sql`values(is_active)`,
+              isVisible: sql`values(is_visible)`,
+              displayOrder: sql`values(display_order)`,
+              syncedAt: sql`values(synced_at)`,
+              isCurrent: true,
+            },
+          });
       }
-      for (const product of catalog.products) {
-        const { sizes, modifierGroups, ...productValues } = product;
-        const values = { ...productValues, syncedAt: now, isCurrent: true };
+      const productRows = catalog.products.map(
+        ({ sizes: _sizes, modifierGroups: _groups, ...product }) => ({
+          ...product,
+          syncedAt: now,
+          isCurrent: true,
+        }),
+      );
+      for (const productChunk of chunks(productRows)) {
         await tx
           .insert(externalProducts)
-          .values(values)
-          .onDuplicateKeyUpdate({ set: values });
-
-        for (const size of sizes) {
-          const sizeValues = {
-            ...size,
-            externalProductId: product.externalId,
-            syncedAt: now,
-            isCurrent: true,
-          };
-          await tx
-            .insert(externalProductSizes)
-            .values(sizeValues)
-            .onDuplicateKeyUpdate({ set: sizeValues });
-        }
-        for (const group of modifierGroups) {
-          const { options, ...groupFields } = group;
-          const groupValues = {
-            ...groupFields,
-            externalProductId: product.externalId,
-            syncedAt: now,
-            isCurrent: true,
-          };
-          await tx
-            .insert(externalModifierGroups)
-            .values(groupValues)
-            .onDuplicateKeyUpdate({ set: groupValues });
-          for (const option of options) {
-            const optionValues = {
-              ...option,
-              externalModifierGroupId: group.externalId,
-              syncedAt: now,
+          .values(productChunk)
+          .onDuplicateKeyUpdate({
+            set: {
+              externalCategoryId: sql`values(external_category_id)`,
+              nameAr: sql`values(name_ar)`,
+              nameEn: sql`values(name_en)`,
+              descriptionAr: sql`values(description_ar)`,
+              descriptionEn: sql`values(description_en)`,
+              imageUrl: sql`values(image_url)`,
+              price: sql`values(price)`,
+              discountPercentage: sql`values(discount_percentage)`,
+              discountStart: sql`values(discount_start)`,
+              discountEnd: sql`values(discount_end)`,
+              calories: sql`values(calories)`,
+              pointsReward: sql`values(points_reward)`,
+              isAvailable: sql`values(is_available)`,
+              isVisible: sql`values(is_visible)`,
+              syncedAt: sql`values(synced_at)`,
               isCurrent: true,
-            };
-            await tx
-              .insert(externalModifierOptions)
-              .values(optionValues)
-              .onDuplicateKeyUpdate({
-                set: {
-                  nameAr: option.nameAr,
-                  nameEn: option.nameEn,
-                  extraPrice: option.extraPrice,
-                  externalModifierGroupId: group.externalId,
-                  syncedAt: now,
-                  isCurrent: true,
-                },
-              });
-          }
-        }
+            },
+          });
       }
-
-      await tx
-        .insert(externalCatalogSync)
-        .values({
-          id: 1,
-          lastSuccessfulSyncAt: now,
-          lastAttemptAt: now,
-          lastError: null,
-        })
-        .onDuplicateKeyUpdate({
-          set: {
+      const sizeRows = catalog.products.flatMap((product) =>
+        product.sizes.map((size) => ({
+          ...size,
+          externalProductId: product.externalId,
+          syncedAt: now,
+          isCurrent: true,
+        })),
+      );
+      for (const sizeChunk of chunks(sizeRows)) {
+        await tx
+          .insert(externalProductSizes)
+          .values(sizeChunk)
+          .onDuplicateKeyUpdate({
+            set: {
+              externalProductId: sql`values(external_product_id)`,
+              nameAr: sql`values(name_ar)`,
+              nameEn: sql`values(name_en)`,
+              price: sql`values(price)`,
+              isDefault: sql`values(is_default)`,
+              syncedAt: sql`values(synced_at)`,
+              isCurrent: true,
+            },
+          });
+      }
+      const groupRows = catalog.products.flatMap((product) =>
+        product.modifierGroups.map(({ options: _options, ...group }) => ({
+          ...group,
+          externalProductId: product.externalId,
+          syncedAt: now,
+          isCurrent: true,
+        })),
+      );
+      for (const groupChunk of chunks(groupRows)) {
+        await tx
+          .insert(externalModifierGroups)
+          .values(groupChunk)
+          .onDuplicateKeyUpdate({
+            set: {
+              externalProductId: sql`values(external_product_id)`,
+              nameAr: sql`values(name_ar)`,
+              nameEn: sql`values(name_en)`,
+              isRequired: sql`values(is_required)`,
+              maxSelections: sql`values(max_selections)`,
+              syncedAt: sql`values(synced_at)`,
+              isCurrent: true,
+            },
+          });
+      }
+      const optionRows = catalog.products.flatMap((product) =>
+        product.modifierGroups.flatMap((group) =>
+          group.options.map((option) => ({
+            ...option,
+            externalModifierGroupId: group.externalId,
+            syncedAt: now,
+            isCurrent: true,
+          })),
+        ),
+      );
+      for (const optionChunk of chunks(optionRows)) {
+        await tx
+          .insert(externalModifierOptions)
+          .values(optionChunk)
+          .onDuplicateKeyUpdate({
+            set: {
+              nameAr: sql`values(name_ar)`,
+              nameEn: sql`values(name_en)`,
+              extraPrice: sql`values(extra_price)`,
+              externalModifierGroupId: sql`values(external_modifier_group_id)`,
+              syncedAt: sql`values(synced_at)`,
+              isCurrent: true,
+            },
+          });
+      }
+      if (this.recordCatalogSuccess) {
+        await tx
+          .insert(externalCatalogSync)
+          .values({
+            id: 1,
             lastSuccessfulSyncAt: now,
             lastAttemptAt: now,
             lastError: null,
-          },
-        });
+          })
+          .onDuplicateKeyUpdate({
+            set: {
+              lastSuccessfulSyncAt: now,
+              lastAttemptAt: now,
+              lastError: null,
+            },
+          });
+      }
     });
   }
 
@@ -130,34 +209,85 @@ export class ProductsRepository implements ProductsRepositoryContract {
       .where(eq(externalCatalogSync.id, 1));
     if (!sync?.lastSuccessfulSyncAt) return null;
 
-    const [categories, products, sizes, groups, options, productIngredients, sizeIngredients, modifierIngredients] =
-      await Promise.all([
-        this.db
-          .select()
-          .from(externalCategories)
-          .where(eq(externalCategories.isCurrent, true))
-          .orderBy(asc(externalCategories.displayOrder)),
-        this.db
-          .select()
-          .from(externalProducts)
-          .where(eq(externalProducts.isCurrent, true))
-          .orderBy(asc(externalProducts.nameAr)),
-        this.db
-          .select()
-          .from(externalProductSizes)
-          .where(eq(externalProductSizes.isCurrent, true)),
-        this.db
-          .select()
-          .from(externalModifierGroups)
-          .where(eq(externalModifierGroups.isCurrent, true)),
-        this.db
-          .select()
-          .from(externalModifierOptions)
-          .where(eq(externalModifierOptions.isCurrent, true)),
-        this.db.select().from(externalProductIngredients),
-        this.db.select().from(externalSizeIngredients),
-        this.db.select().from(externalModifierIngredients),
-      ]);
+    const [
+      categories,
+      products,
+      sizes,
+      groups,
+      options,
+      productIngredients,
+      sizeIngredients,
+      modifierIngredients,
+    ] = await Promise.all([
+      this.db
+        .select()
+        .from(externalCategories)
+        .where(eq(externalCategories.isCurrent, true))
+        .orderBy(asc(externalCategories.displayOrder)),
+      this.db
+        .select()
+        .from(externalProducts)
+        .where(eq(externalProducts.isCurrent, true))
+        .orderBy(asc(externalProducts.nameAr)),
+      this.db
+        .select()
+        .from(externalProductSizes)
+        .where(eq(externalProductSizes.isCurrent, true)),
+      this.db
+        .select()
+        .from(externalModifierGroups)
+        .where(eq(externalModifierGroups.isCurrent, true)),
+      this.db
+        .select()
+        .from(externalModifierOptions)
+        .where(eq(externalModifierOptions.isCurrent, true)),
+      this.db
+        .select({
+          externalProductId: externalProductIngredients.externalProductId,
+          itemId: externalProductIngredients.itemId,
+          quantity: externalProductIngredients.quantity,
+        })
+        .from(externalProductIngredients)
+        .innerJoin(
+          externalProducts,
+          eq(
+            externalProductIngredients.externalProductId,
+            externalProducts.externalId,
+          ),
+        )
+        .where(eq(externalProducts.isCurrent, true)),
+      this.db
+        .select({
+          externalSizeId: externalSizeIngredients.externalSizeId,
+          itemId: externalSizeIngredients.itemId,
+          quantity: externalSizeIngredients.quantity,
+        })
+        .from(externalSizeIngredients)
+        .innerJoin(
+          externalProductSizes,
+          eq(
+            externalSizeIngredients.externalSizeId,
+            externalProductSizes.externalId,
+          ),
+        )
+        .where(eq(externalProductSizes.isCurrent, true)),
+      this.db
+        .select({
+          externalModifierOptionId:
+            externalModifierIngredients.externalModifierOptionId,
+          itemId: externalModifierIngredients.itemId,
+          quantity: externalModifierIngredients.quantity,
+        })
+        .from(externalModifierIngredients)
+        .innerJoin(
+          externalModifierOptions,
+          eq(
+            externalModifierIngredients.externalModifierOptionId,
+            externalModifierOptions.externalId,
+          ),
+        )
+        .where(eq(externalModifierOptions.isCurrent, true)),
+    ]);
 
     return {
       categories,
@@ -176,8 +306,7 @@ export class ProductsRepository implements ProductsRepositoryContract {
             ...group,
             options: options
               .filter(
-                (option) =>
-                  option.externalModifierGroupId === group.externalId,
+                (option) => option.externalModifierGroupId === group.externalId,
               )
               .map((option) => ({
                 ...option,
@@ -188,8 +317,7 @@ export class ProductsRepository implements ProductsRepositoryContract {
               })),
           }));
         const baseIngredients = productIngredients.filter(
-          (ingredient) =>
-            ingredient.externalProductId === product.externalId,
+          (ingredient) => ingredient.externalProductId === product.externalId,
         );
         const baseConfigured =
           productSizes.length === 0
@@ -363,6 +491,45 @@ export class ProductsRepository implements ProductsRepositoryContract {
         .sort((a, b) => a - b);
       const uniqueItemIds = [...new Set(itemIds)];
       if (uniqueItemIds.length > 0) {
+        const [existingBase, existingSizes, existingModifiers] =
+          await Promise.all([
+            tx
+              .select({ itemId: externalProductIngredients.itemId })
+              .from(externalProductIngredients)
+              .where(
+                eq(
+                  externalProductIngredients.externalProductId,
+                  externalProductId,
+                ),
+              ),
+            lockedSizes.length > 0
+              ? tx
+                  .select({ itemId: externalSizeIngredients.itemId })
+                  .from(externalSizeIngredients)
+                  .where(
+                    inArray(
+                      externalSizeIngredients.externalSizeId,
+                      lockedSizes.map((size) => size.externalId),
+                    ),
+                  )
+              : Promise.resolve([]),
+            lockedOptions.length > 0
+              ? tx
+                  .select({ itemId: externalModifierIngredients.itemId })
+                  .from(externalModifierIngredients)
+                  .where(
+                    inArray(
+                      externalModifierIngredients.externalModifierOptionId,
+                      lockedOptions.map((option) => option.externalId),
+                    ),
+                  )
+              : Promise.resolve([]),
+          ]);
+        const existingItemIds = new Set(
+          [...existingBase, ...existingSizes, ...existingModifiers].map(
+            (ingredient) => ingredient.itemId,
+          ),
+        );
         const validItems = await tx
           .select({ id: items.id, isActive: items.isActive })
           .from(items)
@@ -371,9 +538,14 @@ export class ProductsRepository implements ProductsRepositoryContract {
           .for("update");
         if (
           validItems.length !== uniqueItemIds.length ||
-          validItems.some((item) => !item.isActive)
+          validItems.some(
+            (item) => !item.isActive && !existingItemIds.has(item.id),
+          )
         ) {
-          throw new HttpError(409, "أحد مكونات إعداد المخزون غير موجود أو موقوف");
+          throw new HttpError(
+            409,
+            "أحد مكونات إعداد المخزون غير موجود أو موقوف",
+          );
         }
       }
 
@@ -382,29 +554,42 @@ export class ProductsRepository implements ProductsRepositoryContract {
         .where(
           eq(externalProductIngredients.externalProductId, externalProductId),
         );
-      for (const ingredient of data.baseIngredients) {
-        await tx.insert(externalProductIngredients).values({
-          externalProductId,
-          itemId: ingredient.itemId,
-          quantity: ingredient.quantity.toFixed(3),
-        });
+      const baseIngredientRows = data.baseIngredients.map((ingredient) => ({
+        externalProductId,
+        itemId: ingredient.itemId,
+        quantity: ingredient.quantity.toFixed(3),
+      }));
+      for (const ingredientChunk of chunks(baseIngredientRows)) {
+        await tx.insert(externalProductIngredients).values(ingredientChunk);
       }
 
+      const sizeIngredientRows = data.sizes.flatMap((size) =>
+        size.ingredients.map((ingredient) => ({
+          externalSizeId: size.externalSizeId,
+          itemId: ingredient.itemId,
+          quantity: ingredient.quantity.toFixed(3),
+        })),
+      );
       for (const size of data.sizes) {
         await tx
           .delete(externalSizeIngredients)
           .where(
             eq(externalSizeIngredients.externalSizeId, size.externalSizeId),
           );
-        for (const ingredient of size.ingredients) {
-          await tx.insert(externalSizeIngredients).values({
-            externalSizeId: size.externalSizeId,
-            itemId: ingredient.itemId,
-            quantity: ingredient.quantity.toFixed(3),
-          });
-        }
+      }
+      for (const ingredientChunk of chunks(sizeIngredientRows)) {
+        await tx.insert(externalSizeIngredients).values(ingredientChunk);
       }
 
+      const modifierIngredientRows = data.modifiers.flatMap((modifier) =>
+        modifier.stockEffect === "mapped"
+          ? modifier.ingredients.map((ingredient) => ({
+              externalModifierOptionId: modifier.externalModifierOptionId,
+              itemId: ingredient.itemId,
+              quantity: ingredient.quantity.toFixed(3),
+            }))
+          : [],
+      );
       for (const modifier of data.modifiers) {
         await tx
           .delete(externalModifierIngredients)
@@ -423,15 +608,9 @@ export class ProductsRepository implements ProductsRepositoryContract {
               modifier.externalModifierOptionId,
             ),
           );
-        if (modifier.stockEffect === "mapped") {
-          for (const ingredient of modifier.ingredients) {
-            await tx.insert(externalModifierIngredients).values({
-              externalModifierOptionId: modifier.externalModifierOptionId,
-              itemId: ingredient.itemId,
-              quantity: ingredient.quantity.toFixed(3),
-            });
-          }
-        }
+      }
+      for (const ingredientChunk of chunks(modifierIngredientRows)) {
+        await tx.insert(externalModifierIngredients).values(ingredientChunk);
       }
     });
   }

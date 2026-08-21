@@ -100,7 +100,11 @@ export class ExternalBackendClient {
   }
 
   private async recoverAuthentication(failedAccessToken: string) {
-    if (this.accessToken !== failedAccessToken) return;
+    if (this.accessToken !== failedAccessToken) {
+      if (this.recoveryPromise) await this.recoveryPromise;
+      if (!this.accessToken) await this.ensureLogin();
+      return;
+    }
     if (!this.recoveryPromise) {
       this.recoveryPromise = this.refreshOrLogin().finally(() => {
         this.recoveryPromise = null;

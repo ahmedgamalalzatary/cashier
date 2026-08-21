@@ -1,13 +1,13 @@
 import type { Request, Response } from "express";
 import { idParam } from "../../middleware/validation.js";
 import type { OrdersService } from "./orders.service.js";
-import type { ExternalOrdersClient } from "./external-orders.client.js";
+import type { ExternalOrdersRepository } from "./external-orders.repository.js";
 import { orderInput } from "./orders.schemas.js";
 
 export class OrdersController {
   constructor(
     private service: OrdersService,
-    private externalOrders: ExternalOrdersClient,
+    private externalOrders: ExternalOrdersRepository,
   ) {}
 
   list = async (_req: Request, res: Response) => {
@@ -17,11 +17,18 @@ export class OrdersController {
   externalList = async (req: Request, res: Response) => {
     const page = Number(req.query.page);
     const pageSize = Number(req.query.pageSize);
-    res.json(await this.externalOrders.listPage({
-      search: typeof req.query.search === "string" ? req.query.search : undefined,
-      page: Number.isInteger(page) && page > 0 ? page : undefined,
-      pageSize: Number.isInteger(pageSize) && pageSize > 0 ? pageSize : undefined,
-    }));
+    res.json(
+      await this.externalOrders.list({
+        search:
+          typeof req.query.search === "string" ? req.query.search : undefined,
+        day: typeof req.query.day === "string" ? req.query.day : undefined,
+        page: Number.isInteger(page) && page > 0 ? page : 1,
+        pageSize:
+          Number.isInteger(pageSize) && pageSize > 0
+            ? Math.min(pageSize, 100)
+            : 25,
+      }),
+    );
   };
 
   get = async (req: Request, res: Response) => {

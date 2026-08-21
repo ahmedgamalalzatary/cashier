@@ -27,6 +27,7 @@ describe("orders feature boundaries", () => {
     expect(page).toContain("getOrder");
     expect(page).toContain("OrderReceipt");
     expect(page).toContain("window.print()");
+    expect(page).toContain("quantity(modifier.quantity)");
   });
 
   it("keeps cost and profit out of the cashier's view", () => {
@@ -48,11 +49,12 @@ describe("orders feature boundaries", () => {
     expect(page).toContain("ExternalOrdersPanel");
   });
 
-  it("loads and filters online orders through dedicated boundaries", () => {
+  it("loads server-filtered and paginated online orders through dedicated boundaries", () => {
     const panel = read("src/components/orders/external-orders-panel.tsx");
     expect(panel).toContain("listExternalOrders");
-    expect(panel).toContain("filterExternalOrders");
-    expect(panel).toContain("externalOrdersTotals");
+    expect(panel).toContain("pageSize: 25");
+    expect(panel).toContain("pagination.hasNextPage");
+    expect(panel).toContain("result.totals");
     expect(panel).toContain('aria-label="البحث عن طلب أونلاين"');
     expect(panel).toContain('label="إجمالي قيمة الطلبات"');
   });

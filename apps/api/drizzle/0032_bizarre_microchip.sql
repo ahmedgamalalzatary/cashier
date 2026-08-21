@@ -1,0 +1,2 @@
+ALTER TABLE `external_catalog_sync` ADD `refresh_request_version` int DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE `external_catalog_sync` ADD `completed_request_version` int DEFAULT 0 NOT NULL;

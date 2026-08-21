@@ -72,9 +72,7 @@ describe("ProductsRepository catalog reconciliation", () => {
     await repository.saveStockSetup(9, {
       baseIngredients: [{ itemId: ingredient.insertId, quantity: 0.02 }],
       sizes: [],
-      modifiers: [
-        { externalModifierOptionId: 93, stockEffect: "none" },
-      ],
+      modifiers: [{ externalModifierOptionId: 93, stockEffect: "none" }],
     });
 
     await repository.applyCatalog(catalog("قهوة محدثة"));
@@ -118,6 +116,33 @@ describe("ProductsRepository catalog reconciliation", () => {
         sellable: false,
       }),
     ]);
+  });
+
+  it("preserves an unchanged mapping when its item was later deactivated", async () => {
+    const [category] = await db.insert(categories).values({ name: "مخزون" });
+    const [ingredient] = await db.insert(items).values({
+      code: nextTestItemCode(),
+      name: "بن قديم",
+      categoryId: category.insertId,
+      type: "raw",
+      stockUnit: "كجم",
+    });
+    const repository = new ProductsRepository(db);
+    await repository.applyCatalog(catalog());
+    const setup = {
+      baseIngredients: [{ itemId: ingredient.insertId, quantity: 0.02 }],
+      sizes: [],
+      modifiers: [
+        { externalModifierOptionId: 93, stockEffect: "none" as const },
+      ],
+    };
+    await repository.saveStockSetup(9, setup);
+    await db
+      .update(items)
+      .set({ isActive: false })
+      .where(eq(items.id, ingredient.insertId));
+
+    await expect(repository.saveStockSetup(9, setup)).resolves.toBeUndefined();
   });
 
   it("caches a product with unnamed modifiers but keeps it out of sale", async () => {

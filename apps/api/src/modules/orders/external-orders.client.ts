@@ -49,8 +49,18 @@ const externalOrderSchema = z.object({
 });
 
 const externalOrdersSchema = z.array(externalOrderSchema);
-const paginationSchema = z.object({ currentPage: z.number().int(), pageSize: z.number().int(), totalCount: z.number().int(), totalPages: z.number().int(), hasNextPage: z.boolean(), hasPreviousPage: z.boolean() });
-const externalOrdersPageSchema = z.object({ data: externalOrdersSchema, pagination: paginationSchema });
+const paginationSchema = z.object({
+  currentPage: z.number().int(),
+  pageSize: z.number().int(),
+  totalCount: z.number().int(),
+  totalPages: z.number().int(),
+  hasNextPage: z.boolean(),
+  hasPreviousPage: z.boolean(),
+});
+const externalOrdersPageSchema = z.object({
+  data: externalOrdersSchema,
+  pagination: paginationSchema,
+});
 const decimal = (value: number | string) => Number(value).toFixed(2);
 
 const orderStatuses = { 0: "pending", 1: "completed", 2: "cancelled" } as const;
@@ -85,18 +95,51 @@ export class ExternalOrdersClient {
     return (await this.listPage()).data;
   }
 
-  async listPage(params: { search?: string; page?: number; pageSize?: number } = {}) {
+  async listAll(): Promise<ExternalOrderSummary[]> {
+    const orders: ExternalOrderSummary[] = [];
+    for (let page = 1; ; page += 1) {
+      const response = await this.listPage({ page, pageSize: 100 });
+      orders.push(...response.data);
+      if (!response.pagination.hasNextPage) return orders;
+      if (response.pagination.currentPage !== page) {
+        throw new HttpError(502, "ترقيم صفحات طلبات الأونلاين غير صالح");
+      }
+    }
+  }
+
+  async listPage(
+    params: { search?: string; page?: number; pageSize?: number } = {},
+  ) {
     let rows: z.infer<typeof externalOrdersSchema>;
+    let pagination: z.infer<typeof paginationSchema>;
     try {
       const query = new URLSearchParams();
       if (params.search?.trim()) query.set("search", params.search.trim());
       if (params.page !== undefined) query.set("page", String(params.page));
-      if (params.pageSize !== undefined) query.set("pageSize", String(params.pageSize));
-      const path = query.size ? `/api/AdminOrders/search?${query}` : "/api/AdminOrders";
-      const response = await this.backend.get(path, z.union([externalOrdersSchema, externalOrdersPageSchema]));
-      const page = Array.isArray(response) ? { data: response, pagination: { currentPage: 1, pageSize: response.length, totalCount: response.length, totalPages: response.length ? 1 : 0, hasNextPage: false, hasPreviousPage: false } } : response;
+      if (params.pageSize !== undefined)
+        query.set("pageSize", String(params.pageSize));
+      const path = query.size
+        ? `/api/AdminOrders/search?${query}`
+        : "/api/AdminOrders";
+      const response = await this.backend.get(
+        path,
+        z.union([externalOrdersSchema, externalOrdersPageSchema]),
+      );
+      const page = Array.isArray(response)
+        ? {
+            data: response,
+            pagination: {
+              currentPage: 1,
+              pageSize: response.length,
+              totalCount: response.length,
+              totalPages: response.length ? 1 : 0,
+              hasNextPage: false,
+              hasPreviousPage: false,
+            },
+          }
+        : response;
       rows = page.data;
-      var pagination = page.pagination;
+      pagination = page.pagination;
     } catch (error) {
       if (error instanceof ExternalBackendError) {
         const messages = {
@@ -110,26 +153,30 @@ export class ExternalOrdersClient {
       throw new HttpError(502, "تعذر تحميل طلبات الأونلاين");
     }
 
-    return { data: rows.map((row) => ({
-      id: row.id,
-      customerName: row.user?.fullName ?? row.user?.userName ?? "—",
-      customerPhone: row.phoneNumber ?? row.user?.phoneNumber ?? null,
-      subtotal: decimal(row.subTotal),
-      discountAmount: decimal(row.discountAmount),
-      totalAmount: decimal(row.totalAmount),
-      deliveryFee: decimal(row.deliveryFee),
-      createdAt: row.createdAt,
-      orderStatus:
-        orderStatuses[row.orderStatus as keyof typeof orderStatuses] ??
-        "unknown",
-      paymentStatus:
-        paymentStatuses[row.paymentStatus as keyof typeof paymentStatuses] ??
-        "unknown",
-      paymentMethod:
-        paymentMethods[row.paymentMethod as keyof typeof paymentMethods] ??
-        "unknown",
-      orderType: orderTypes[row.orderType as keyof typeof orderTypes] ?? "unknown",
-      itemCount: row.orderItems.reduce((sum, item) => sum + item.quantity, 0),
-    })), pagination };
+    return {
+      data: rows.map((row) => ({
+        id: row.id,
+        customerName: row.user?.fullName ?? row.user?.userName ?? "—",
+        customerPhone: row.phoneNumber ?? row.user?.phoneNumber ?? null,
+        subtotal: decimal(row.subTotal),
+        discountAmount: decimal(row.discountAmount),
+        totalAmount: decimal(row.totalAmount),
+        deliveryFee: decimal(row.deliveryFee),
+        createdAt: row.createdAt,
+        orderStatus:
+          orderStatuses[row.orderStatus as keyof typeof orderStatuses] ??
+          "unknown",
+        paymentStatus:
+          paymentStatuses[row.paymentStatus as keyof typeof paymentStatuses] ??
+          "unknown",
+        paymentMethod:
+          paymentMethods[row.paymentMethod as keyof typeof paymentMethods] ??
+          "unknown",
+        orderType:
+          orderTypes[row.orderType as keyof typeof orderTypes] ?? "unknown",
+        itemCount: row.orderItems.reduce((sum, item) => sum + item.quantity, 0),
+      })),
+      pagination,
+    };
   }
 }

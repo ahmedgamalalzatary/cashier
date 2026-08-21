@@ -35,6 +35,19 @@ export function emptyPreparedRecipeForm(): PreparedRecipeForm {
   };
 }
 
+export function selectRecipeOutputItem(
+  form: RecipeForm,
+  outputItemId: string,
+): RecipeForm {
+  return {
+    ...form,
+    outputItemId,
+    ingredients: form.ingredients.map((row) =>
+      row.itemId === outputItemId ? { ...row, itemId: "", quantity: "" } : row,
+    ),
+  };
+}
+
 export function recipeRequestBody(form: RecipeForm): RecipeBody {
   return {
     type: "prepared",

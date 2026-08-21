@@ -84,7 +84,20 @@ export function ProductStockSetupModal({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const activeItems = items.filter((item) => item.isActive);
+  const referencedItemIds = new Set([
+    ...product.ingredients.map((ingredient) => ingredient.itemId),
+    ...product.sizes.flatMap((size) =>
+      size.ingredients.map((ingredient) => ingredient.itemId),
+    ),
+    ...product.modifierGroups.flatMap((group) =>
+      group.options.flatMap((option) =>
+        option.ingredients.map((ingredient) => ingredient.itemId),
+      ),
+    ),
+  ]);
+  const activeItems = items.filter(
+    (item) => item.isActive || referencedItemIds.has(item.id),
+  );
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -180,9 +193,7 @@ export function ProductStockSetupModal({
                     value={modifier.stockEffect}
                     onChange={(event) => {
                       const stockEffect = event.target.value as
-                        | ""
-                        | "mapped"
-                        | "none";
+                        "" | "mapped" | "none";
                       setModifiers((current) =>
                         current.map((row) =>
                           row.externalModifierOptionId ===
@@ -358,10 +369,7 @@ function IngredientRows({
       <Button
         variant="ghost"
         onClick={() =>
-          onChange([
-            ...rows,
-            { key: nextKey(), itemId: "", quantity: "" },
-          ])
+          onChange([...rows, { key: nextKey(), itemId: "", quantity: "" }])
         }
       >
         <Plus className="size-4" /> إضافة مكوّن

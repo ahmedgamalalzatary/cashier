@@ -62,10 +62,29 @@ export function addCatalogSelection(
   nowMs: number,
 ) {
   if (!product.sellable) return cart;
+  const normalizedById = new Map<number, number>();
+  for (const modifier of selectedModifiers) {
+    if (!Number.isInteger(modifier.quantity) || modifier.quantity <= 0) {
+      return cart;
+    }
+    normalizedById.set(
+      modifier.externalModifierOptionId,
+      (normalizedById.get(modifier.externalModifierOptionId) ?? 0) +
+        modifier.quantity,
+    );
+  }
+  const normalizedModifiers = [...normalizedById].map(
+    ([externalModifierOptionId, quantity]) => ({
+      externalModifierOptionId,
+      quantity,
+    }),
+  );
   const size =
     externalSizeId === null
       ? null
-      : product.sizes.find((candidate) => candidate.externalId === externalSizeId);
+      : product.sizes.find(
+          (candidate) => candidate.externalId === externalSizeId,
+        );
   if (
     (product.sizes.length > 0 && !size) ||
     (product.sizes.length === 0 && externalSizeId !== null)
@@ -73,14 +92,15 @@ export function addCatalogSelection(
     return cart;
 
   const selectedById = new Map(
-    selectedModifiers.map((modifier) => [
+    normalizedModifiers.map((modifier) => [
       modifier.externalModifierOptionId,
       modifier,
     ]),
   );
   for (const group of product.modifierGroups) {
     const count = group.options.reduce(
-      (sum, option) => sum + (selectedById.get(option.externalId)?.quantity ?? 0),
+      (sum, option) =>
+        sum + (selectedById.get(option.externalId)?.quantity ?? 0),
       0,
     );
     if ((group.isRequired && count === 0) || count > group.maxSelections) {
@@ -92,7 +112,11 @@ export function addCatalogSelection(
       group.options.map((option) => [option.externalId, option] as const),
     ),
   );
-  if (selectedModifiers.some((modifier) => !options.has(modifier.externalModifierOptionId))) {
+  if (
+    normalizedModifiers.some(
+      (modifier) => !options.has(modifier.externalModifierOptionId),
+    )
+  ) {
     return cart;
   }
 
@@ -110,7 +134,7 @@ export function addCatalogSelection(
       BigInt(10_000),
     );
   }
-  const modifiers = selectedModifiers
+  const modifiers = normalizedModifiers
     .map((selection) => {
       const option = options.get(selection.externalModifierOptionId)!;
       price +=
@@ -237,9 +261,7 @@ export function cartTotals(
     total: Number(totalCents) / 100,
     change:
       Number(
-        safeReceived > totalCents
-          ? safeReceived - totalCents
-          : BigInt(0),
+        safeReceived > totalCents ? safeReceived - totalCents : BigInt(0),
       ) / 100,
     hasEnoughCash: inputsValid && safeReceived >= totalCents,
     discountValid,
@@ -281,8 +303,9 @@ export function defaultExternalSize(product: ExternalProduct) {
  * tile matches what the cart and the server will charge.
  */
 export function catalogTilePrice(product: ExternalProduct, nowMs: number) {
+  const defaultSizeId = defaultExternalSize(product);
   const base =
-    product.sizes.find((size) => size.isDefault)?.price ??
+    product.sizes.find((size) => size.externalId === defaultSizeId)?.price ??
     product.sizes
       .map((size) => size.price)
       .sort((a, b) => Number(a) - Number(b))[0] ??

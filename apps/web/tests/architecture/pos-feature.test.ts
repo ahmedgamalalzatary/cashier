@@ -37,4 +37,13 @@ describe("POS feature boundaries", () => {
     expect(css).not.toContain("size: 80mm auto");
     expect(css).toContain(".pos-receipt-dialog > div");
   });
+
+  it("does not format a missing catalog synchronization timestamp", () => {
+    const page = fs.readFileSync(
+      path.resolve(process.cwd(), "src/app/pos/page.tsx"),
+      "utf8",
+    );
+    expect(page).toMatch(/catalog\.lastSuccessfulSyncAt\s*\?/);
+    expect(page).toContain("لم تتم المزامنة بعد");
+  });
 });

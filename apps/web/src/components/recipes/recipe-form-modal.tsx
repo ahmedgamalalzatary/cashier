@@ -15,6 +15,7 @@ import {
   newRecipeIngredient,
   recipeFormFromRecipe,
   recipeRequestBody,
+  selectRecipeOutputItem,
   type RecipeForm,
   type RecipeIngredientForm,
 } from "@/models/recipe-model";
@@ -116,7 +117,9 @@ export function RecipeFormModal({
             label="الصنف المُحضّر الناتج"
             value={form.outputItemId}
             onChange={(outputItemId) =>
-              setForm((current) => ({ ...current, outputItemId }))
+              setForm((current) =>
+                selectRecipeOutputItem(current, outputItemId),
+              )
             }
             required
           >
@@ -165,7 +168,11 @@ export function RecipeFormModal({
             إلغاء
           </Button>
           <Button type="submit" disabled={saving}>
-            {saving ? "جارِ الحفظ…" : editing ? "حفظ التعديلات" : "إنشاء الوصفة"}
+            {saving
+              ? "جارِ الحفظ…"
+              : editing
+                ? "حفظ التعديلات"
+                : "إنشاء الوصفة"}
           </Button>
         </div>
       </form>
@@ -204,7 +211,10 @@ function IngredientEditor({
       {lines.map((line, index) => {
         const selected = items.find((item) => String(item.id) === line.itemId);
         return (
-          <div key={line.key} className="grid items-end gap-3 sm:grid-cols-[1fr_12rem_auto]">
+          <div
+            key={line.key}
+            className="grid items-end gap-3 sm:grid-cols-[1fr_12rem_auto]"
+          >
             <SelectField
               label={`المكوّن ${index + 1}`}
               value={line.itemId}
@@ -248,7 +258,9 @@ function IngredientEditor({
               title="حذف المكوّن"
               className="mb-0.5 rounded-lg p-2 text-muted hover:bg-danger/10 hover:text-danger disabled:opacity-40"
               disabled={lines.length === 1}
-              onClick={() => onChange(lines.filter((row) => row.key !== line.key))}
+              onClick={() =>
+                onChange(lines.filter((row) => row.key !== line.key))
+              }
             >
               <Trash2 className="size-4" />
             </button>
@@ -296,6 +308,8 @@ function recipeUsesItem(recipe: Recipe | null, itemId: number) {
 }
 
 function outputUnit(outputItemId: string, items: Item[]) {
-  const unit = items.find((item) => String(item.id) === outputItemId)?.stockUnit;
+  const unit = items.find(
+    (item) => String(item.id) === outputItemId,
+  )?.stockUnit;
   return unit ? ` (${unit})` : "";
 }

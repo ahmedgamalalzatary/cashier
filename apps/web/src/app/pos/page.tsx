@@ -8,6 +8,7 @@ import {
   Plus,
   Printer,
   ReceiptText,
+  RefreshCw,
   Search,
   ShoppingBasket,
 } from "lucide-react";
@@ -33,6 +34,7 @@ import { OrderReceipt } from "@/components/pos/order-receipt";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { formatMoney } from "@/lib/format";
+import { catalogRefreshOutcome } from "@/models/catalog-refresh";
 import {
   addCatalogSelection,
   catalogTilePrice,
@@ -50,6 +52,10 @@ import {
   listOrders,
 } from "@/services/orders-service";
 import { getCurrentShift } from "@/services/shifts-service";
+import {
+  getProductRefreshStatus,
+  refreshProducts,
+} from "@/services/products-service";
 
 export default function PosPage() {
   const { user } = useAuth();
@@ -72,6 +78,7 @@ export default function PosPage() {
   const [autoPrintOrderId, setAutoPrintOrderId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [refreshingCatalog, setRefreshingCatalog] = useState(false);
   const [error, setError] = useState("");
   const checkoutAttempt = useRef<{
     fingerprint: string;
@@ -88,6 +95,49 @@ export default function PosPage() {
   }, []);
 
   useEffect(() => {
+    if (!refreshingCatalog) return;
+    let cancelled = false;
+    const timer = window.setInterval(() => {
+      void getProductRefreshStatus()
+        .then(async (status) => {
+          if (cancelled) return;
+          const outcome = catalogRefreshOutcome(status);
+          if (outcome === "failed") {
+            setError(status.lastError ?? "تعذر تحديث المنتجات الخارجية");
+            setRefreshingCatalog(false);
+            return;
+          }
+          if (outcome === "worker-unavailable") {
+            setError("خدمة تحديث المنتجات غير متاحة الآن");
+            setRefreshingCatalog(false);
+            return;
+          }
+          if (outcome === "pending") return;
+          setRefreshingCatalog(false);
+          setCatalog(await listCatalog());
+        })
+        .catch(() => undefined);
+    }, 2_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [refreshingCatalog]);
+
+  async function requestCatalogRefresh() {
+    setRefreshingCatalog(true);
+    setError("");
+    try {
+      await refreshProducts();
+    } catch (caught) {
+      setRefreshingCatalog(false);
+      setError(
+        caught instanceof Error ? caught.message : "تعذر طلب تحديث الكتالوج",
+      );
+    }
+  }
+
+  useEffect(() => {
     let cancelled = false;
     Promise.all([listCatalog(), listOrders(), getCurrentShift()])
       .then(([catalogRows, orderRows, shift]) => {
@@ -99,9 +149,7 @@ export default function PosPage() {
       .catch((caught) => {
         if (!cancelled) {
           setError(
-            caught instanceof Error
-              ? caught.message
-              : "تعذر تحميل نقطة البيع",
+            caught instanceof Error ? caught.message : "تعذر تحميل نقطة البيع",
           );
         }
       })
@@ -222,9 +270,23 @@ export default function PosPage() {
           </p>
           <h1 className="text-3xl font-bold tracking-tight">نقطة البيع</h1>
         </div>
-        <div className="flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-sm text-muted shadow-sm">
-          <Clock3 className="size-4 text-primary" />
-          <span>{recentOrders.length} طلب محفوظ حديثاً</span>
+        <div className="flex items-center gap-2">
+          {user?.role === "admin" && (
+            <Button
+              variant="ghost"
+              disabled={refreshingCatalog}
+              onClick={() => void requestCatalogRefresh()}
+            >
+              <RefreshCw
+                className={`size-4 ${refreshingCatalog ? "animate-spin" : ""}`}
+              />
+              تحديث الكتالوج
+            </Button>
+          )}
+          <div className="flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-sm text-muted shadow-sm">
+            <Clock3 className="size-4 text-primary" />
+            <span>{recentOrders.length} طلب محفوظ حديثاً</span>
+          </div>
         </div>
       </header>
 
@@ -239,7 +301,9 @@ export default function PosPage() {
       {catalog?.stale && (
         <div className="mx-2 mb-4 rounded-xl bg-accent/10 px-4 py-3 text-sm lg:mx-4">
           الكتالوج الخارجي قديم؛ آخر تحديث ناجح:{" "}
-          {new Date(catalog.lastSuccessfulSyncAt).toLocaleString("ar-EG")}
+          {catalog.lastSuccessfulSyncAt
+            ? new Date(catalog.lastSuccessfulSyncAt).toLocaleString("ar-EG")
+            : "لم تتم المزامنة بعد"}
         </div>
       )}
       {!loading && !hasOwnOpenShift && (
@@ -249,7 +313,10 @@ export default function PosPage() {
               ? "يجب فتح وردية تخص هذا الكاشير قبل تسجيل البيع."
               : "المدير لا يسجل مبيعات؛ استخدم حساب كاشير."}
           </span>
-          <Link className="rounded-lg bg-sidebar px-3 py-2 text-white" href="/shifts">
+          <Link
+            className="rounded-lg bg-sidebar px-3 py-2 text-white"
+            href="/shifts"
+          >
             الذهاب إلى الورديات
           </Link>
         </div>
@@ -269,7 +336,10 @@ export default function PosPage() {
               />
             </label>
             <div className="mt-3 flex flex-wrap gap-2">
-              <CategoryButton active={categoryId === null} onClick={() => setCategoryId(null)}>
+              <CategoryButton
+                active={categoryId === null}
+                onClick={() => setCategoryId(null)}
+              >
                 الكل
               </CategoryButton>
               {(catalog?.categories ?? [])
@@ -368,7 +438,9 @@ export default function PosPage() {
                 step="0.01"
                 disabled={discountType === null}
                 value={discountValue || ""}
-                onChange={(event) => setDiscountValue(Number(event.target.value))}
+                onChange={(event) =>
+                  setDiscountValue(Number(event.target.value))
+                }
                 className="rounded-lg border border-line px-3 py-2 text-sm"
               />
             </div>
@@ -423,7 +495,9 @@ export default function PosPage() {
         <ProductSelectionModal
           product={selecting}
           onClose={() => setSelecting(null)}
-          onAdd={(sizeId, modifiers) => addProduct(selecting, sizeId, modifiers)}
+          onAdd={(sizeId, modifiers) =>
+            addProduct(selecting, sizeId, modifiers)
+          }
         />
       )}
       <Modal
@@ -435,7 +509,10 @@ export default function PosPage() {
         {receipt && (
           <>
             <OrderReceipt order={receipt} />
-            <Button className="mt-4 w-full justify-center" onClick={() => window.print()}>
+            <Button
+              className="mt-4 w-full justify-center"
+              onClick={() => window.print()}
+            >
               <Printer className="size-4" /> طباعة
             </Button>
           </>
@@ -498,7 +575,10 @@ function ProductSelectionModal({
             0,
           );
           return (
-            <section key={group.externalId} className="space-y-2 rounded-xl border border-line p-4">
+            <section
+              key={group.externalId}
+              className="space-y-2 rounded-xl border border-line p-4"
+            >
               <div className="flex justify-between gap-2">
                 <h3 className="font-semibold">
                   {group.nameAr} {group.isRequired ? "(مطلوبة)" : ""}
@@ -508,7 +588,10 @@ function ProductSelectionModal({
                 </span>
               </div>
               {group.options.map((option) => (
-                <div key={option.externalId} className="flex items-center justify-between gap-3 rounded-lg bg-paper p-2">
+                <div
+                  key={option.externalId}
+                  className="flex items-center justify-between gap-3 rounded-lg bg-paper p-2"
+                >
                   <span className="text-sm">
                     {option.nameAr} · +{formatMoney(option.extraPrice)}
                   </span>
@@ -558,7 +641,9 @@ function ProductSelectionModal({
             إلغاء
           </Button>
           <Button
-            disabled={!groupsValid || (product.sizes.length > 0 && sizeId === null)}
+            disabled={
+              !groupsValid || (product.sizes.length > 0 && sizeId === null)
+            }
             onClick={() =>
               onAdd(
                 sizeId,
@@ -592,7 +677,12 @@ function CartRow({
         <div>
           <p className="font-medium">{line.productName}</p>
           <p className="text-xs text-muted">
-            {[line.sizeName, ...line.modifiers.map((modifier) => `${modifier.name} × ${modifier.quantity}`)]
+            {[
+              line.sizeName,
+              ...line.modifiers.map(
+                (modifier) => `${modifier.name} × ${modifier.quantity}`,
+              ),
+            ]
               .filter(Boolean)
               .join(" · ")}
           </p>
@@ -602,11 +692,19 @@ function CartRow({
         </span>
       </div>
       <div className="mt-2 flex items-center gap-2">
-        <button type="button" onClick={() => onQuantity(line.quantity - 1)} className="rounded-md border border-line p-1">
+        <button
+          type="button"
+          onClick={() => onQuantity(line.quantity - 1)}
+          className="rounded-md border border-line p-1"
+        >
           <Minus className="size-4" />
         </button>
         <span>{line.quantity}</span>
-        <button type="button" onClick={() => onQuantity(line.quantity + 1)} className="rounded-md border border-line p-1">
+        <button
+          type="button"
+          onClick={() => onQuantity(line.quantity + 1)}
+          className="rounded-md border border-line p-1"
+        >
           <Plus className="size-4" />
         </button>
       </div>
@@ -644,7 +742,9 @@ function Total({
   strong?: boolean;
 }) {
   return (
-    <div className={`flex justify-between ${strong ? "text-base font-bold" : ""}`}>
+    <div
+      className={`flex justify-between ${strong ? "text-base font-bold" : ""}`}
+    >
       <span>{label}</span>
       <span>{formatMoney(value)}</span>
     </div>

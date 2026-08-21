@@ -87,7 +87,7 @@ export class WasteService {
           if (input.warehouse !== "cafe")
             throw new HttpError(
               400,
-              "هالك منتج الوصفة يسجل في مخزن الكافيه فقط",
+              "هالك المنتج الخارجي يسجل في مخزن الكافيه فقط",
             );
           const product = await repo.loadExternalProduct(
             target.externalProductId,
@@ -98,18 +98,19 @@ export class WasteService {
             target.externalSizeId === null
               ? null
               : product.sizes.find(
-                  (candidate) =>
-                    candidate.externalId === target.externalSizeId,
+                  (candidate) => candidate.externalId === target.externalSizeId,
                 );
           if (
             (product.sizes.length > 0 && !size) ||
-            (product.sizes.length === 0 &&
-              target.externalSizeId !== null)
+            (product.sizes.length === 0 && target.externalSizeId !== null)
           )
             throw new HttpError(400, "المقاس لا ينتمي إلى المنتج المحدد");
           const ingredients = size?.ingredients ?? product.ingredients;
           if (!ingredients.length)
-            throw new HttpError(409, "منتج الوصفة لا يحتوي على مكونات");
+            throw new HttpError(
+              409,
+              "المنتج الخارجي أو المقاس المحدد لا يحتوي على مكونات",
+            );
           externalProductId = product.externalId;
           externalSizeId = size?.externalId ?? null;
           targetName = product.nameAr;

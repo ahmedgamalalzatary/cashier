@@ -91,6 +91,10 @@ The external backend exposes server-side search and pagination:
 
 Our API proxies paginated external orders through `GET /api/orders/external`, preserving `{ data, pagination }`. Full product synchronization continues to use `GET /api/admin/products` so the local cache can reconcile the complete catalog; product screens may paginate or filter the synchronized cache locally.
 
+### Cache and refresh architecture
+
+POS, `/recipes`, and other catalog reads use the local MySQL catalog cache and do not wait for the external backend. A separate worker container refreshes the catalog every 12 hours; the admin hard-refresh action uses the same refresh operation immediately. The refresh is validated and applied transactionally, preserving the previous valid cache on failure. External order caching follows the same pattern, inserting new orders without deleting local history; product reconciliation treats the external backend as authoritative for additions, updates, and removals.
+
 - `PUT /api/admin/products/{productId}/modifier-groups/{groupId}`
 - `PUT /api/admin/modifier-groups/{groupId}/options/{optionId}`
 

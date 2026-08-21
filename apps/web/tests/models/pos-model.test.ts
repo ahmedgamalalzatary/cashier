@@ -114,9 +114,9 @@ describe("POS model", () => {
   });
 
   it("filters bilingual products and builds only external-product lines", () => {
-    expect(
-      filterCatalog([product], { categoryId: 3, query: "lat" }),
-    ).toEqual([product]);
+    expect(filterCatalog([product], { categoryId: 3, query: "lat" })).toEqual([
+      product,
+    ]);
 
     const cart = addCatalogSelection(
       [],
@@ -166,17 +166,80 @@ describe("POS model", () => {
     };
     // 09:30Z is 12:30 UTC+3 — past the window — but only 11:30 in Cairo
     // winter time, so a DST-aware clock would still discount here.
-    const after = addCatalogSelection([], winter, 91, [], Date.parse("2026-12-01T09:30:00Z"));
+    const after = addCatalogSelection(
+      [],
+      winter,
+      91,
+      [],
+      Date.parse("2026-12-01T09:30:00Z"),
+    );
     expect(after[0].unitPrice).toBe("100.00");
 
-    const inside = addCatalogSelection([], winter, 91, [], Date.parse("2026-12-01T08:30:00Z"));
+    const inside = addCatalogSelection(
+      [],
+      winter,
+      91,
+      [],
+      Date.parse("2026-12-01T08:30:00Z"),
+    );
     expect(inside[0].unitPrice).toBe("90.00");
   });
 
   it("shows a discounted tile price for the default size", () => {
     expect(catalogTilePrice(product, nowMs)).toBe("90.00");
-    expect(catalogTilePrice({ ...product, discountPercentage: null }, nowMs)).toBe(
-      "100.00",
+    expect(
+      catalogTilePrice({ ...product, discountPercentage: null }, nowMs),
+    ).toBe("100.00");
+  });
+
+  it("uses explicit-choice fallback pricing when default sizes are ambiguous", () => {
+    const ambiguous = {
+      ...product,
+      sizes: [
+        { ...product.sizes[0]!, price: "120.00" },
+        {
+          ...product.sizes[0]!,
+          externalId: 94,
+          price: "110.00",
+          isDefault: true,
+        },
+        {
+          ...product.sizes[0]!,
+          externalId: 95,
+          price: "100.00",
+          isDefault: false,
+        },
+      ],
+    };
+
+    expect(catalogTilePrice(ambiguous, nowMs)).toBe("90.00");
+  });
+
+  it("normalizes duplicate modifiers and rejects invalid quantities", () => {
+    const normalized = addCatalogSelection(
+      [],
+      product,
+      91,
+      [
+        { externalModifierOptionId: 93, quantity: 1 },
+        { externalModifierOptionId: 93, quantity: 1 },
+      ],
+      nowMs,
     );
+    expect(normalized[0]).toMatchObject({
+      unitPrice: "120.00",
+      modifiers: [{ externalModifierOptionId: 93, quantity: 2 }],
+    });
+
+    const existing = addCatalogSelection([], product, 91, [], nowMs);
+    expect(
+      addCatalogSelection(
+        existing,
+        product,
+        91,
+        [{ externalModifierOptionId: 93, quantity: 1.5 }],
+        nowMs,
+      ),
+    ).toBe(existing);
   });
 });

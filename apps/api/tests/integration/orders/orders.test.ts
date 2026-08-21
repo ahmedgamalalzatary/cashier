@@ -210,6 +210,7 @@ describe("external-product POS orders", () => {
     await createExternalProductFixture();
     const body = saleBody();
     body.lines[0]!.modifiers = [
+      { externalModifierOptionId: 93, quantity: 1 },
       { externalModifierOptionId: 999_999, quantity: 1 },
     ];
 
@@ -219,6 +220,7 @@ describe("external-product POS orders", () => {
       .send(body);
 
     expect(response.status).toBe(400);
+    expect(response.body.error).toBe("إحدى الإضافات لا تنتمي إلى المنتج المحدد");
     expect(await db.select().from(orders)).toHaveLength(0);
   });
 
