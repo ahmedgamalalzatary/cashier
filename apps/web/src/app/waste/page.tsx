@@ -34,7 +34,7 @@ export default function WastePage() {
   const { user } = useAuth();
   const [catalog, setCatalog] = useState<WasteCatalog>({
     items: [],
-    products: [],
+    recipes: [],
   });
   const [entries, setEntries] = useState<WasteSummary[]>([]);
   const [targetKey, setTargetKey] = useState("");
@@ -80,24 +80,20 @@ export default function WastePage() {
         key: `item:${item.id}`,
         label: `${item.name} — ${item.stockUnit}`,
       })),
-      ...catalog.products.map((product) => ({
-        key: `product:${product.externalProductId}:${product.externalSizeId ?? 0}`,
-        label: `${product.productName}${product.sizeName ? ` — ${product.sizeName}` : ""}`,
+      ...catalog.recipes.map((recipe) => ({
+        key: `recipe:${recipe.recipeSizeId}`,
+        label: `${recipe.recipeName} — ${recipe.sizeName}`,
       })),
     ],
     [catalog],
   );
 
   async function submit() {
-    const [type, idText, sizeText] = targetKey.split(":");
+    const [type, idText] = targetKey.split(":");
     if (!idText) return;
     const target: CreateWasteBody["target"] =
-      type === "product"
-        ? {
-            type: "external_product",
-            externalProductId: Number(idText),
-            externalSizeId: Number(sizeText) || null,
-          }
+      type === "recipe"
+        ? { type: "recipe", recipeSizeId: Number(idText) }
         : { type: "item", itemId: Number(idText) };
     setSaving(true);
     setError("");
@@ -127,11 +123,12 @@ export default function WastePage() {
     }
   }
 
-  const selectedProduct = targetKey.startsWith("product:");
+  const selectedRecipe = targetKey.startsWith("recipe:");
   const valid =
     targetKey &&
     Number(quantity) > 0 &&
-    (!selectedProduct || Number.isInteger(Number(quantity))) &&
+    (!selectedRecipe || Number.isInteger(Number(quantity))) &&
+    (!selectedRecipe || warehouse === "cafe") &&
     (reason !== "other" || note.trim().length > 0);
 
   return (
@@ -161,7 +158,9 @@ export default function WastePage() {
               className="h-11 rounded-xl border border-line bg-paper px-3"
             >
               <option value="cafe">مخزن الكافيه</option>
-              <option value="main">المخزن الرئيسي</option>
+              <option value="main" disabled={selectedRecipe}>
+                المخزن الرئيسي
+              </option>
             </select>
           )}
           <select
@@ -171,7 +170,7 @@ export default function WastePage() {
             onChange={(event) => {
               setTargetKey(event.target.value);
               setClientRequestId(crypto.randomUUID());
-              if (event.target.value.startsWith("product:"))
+              if (event.target.value.startsWith("recipe:"))
                 setWarehouse("cafe");
             }}
             className="h-11 rounded-xl border border-line bg-paper px-3"
@@ -188,7 +187,7 @@ export default function WastePage() {
             disabled={saving}
             type="number"
             min="0"
-            step={selectedProduct ? 1 : 0.001}
+            step={selectedRecipe ? 1 : 0.001}
             value={quantity}
             onChange={(event) => {
               setQuantity(event.target.value);

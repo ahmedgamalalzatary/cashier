@@ -27,7 +27,6 @@ describe("orders feature boundaries", () => {
     expect(page).toContain("getOrder");
     expect(page).toContain("OrderReceipt");
     expect(page).toContain("window.print()");
-    expect(page).toContain("quantity(modifier.quantity)");
   });
 
   it("keeps cost and profit out of the cashier's view", () => {

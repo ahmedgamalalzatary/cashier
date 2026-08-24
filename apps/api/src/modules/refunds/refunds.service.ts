@@ -116,7 +116,7 @@ export class RefundsService {
                 `الكمية المرتجعة من ${line.productName} تتجاوز الكمية المباعة`,
               );
             }
-            if (line.type !== "item" && requestedQuantity % 1_000n !== 0n) {
+            if (line.type === "recipe" && requestedQuantity % 1_000n !== 0n) {
               throw new HttpError(
                 400,
                 "كمية منتج الوصفة المرتجعة يجب أن تكون عدداً صحيحاً",
@@ -125,7 +125,7 @@ export class RefundsService {
             if (line.type === "item" && requested.stockAction === null) {
               throw new HttpError(400, `اختر معالجة مخزون ${line.productName}`);
             }
-            if (line.type !== "item" && requested.stockAction !== null) {
+            if (line.type === "recipe" && requested.stockAction !== null) {
               throw new HttpError(
                 400,
                 "منتجات الوصفات لا تعاد مكوناتها إلى المخزون",
@@ -146,15 +146,7 @@ export class RefundsService {
                       ? proportional
                       : remainingGross;
                   })();
-            return {
-              requested,
-              line,
-              requestedQuantity,
-              priorQuantity,
-              soldQuantity,
-              gross,
-              cash: 0n,
-            };
+            return { requested, line, requestedQuantity, gross, cash: 0n };
           })
           .sort((left, right) => left.line.id - right.line.id);
 
@@ -198,8 +190,7 @@ export class RefundsService {
         let totalCostReturned = 0n;
         for (const entry of calculated) {
           const allocations =
-            entry.line.type === "item" ||
-            entry.line.type === "external_product"
+            entry.line.type === "item"
               ? await repo.allocations(entry.line.id)
               : [];
           const priorReturns = new Map(
@@ -219,33 +210,16 @@ export class RefundsService {
             quantity: bigint;
           }> = [];
           for (const allocation of allocations) {
-            if (entry.line.type === "item" && remainingToAllocate === 0n)
-              break;
-            const allocatedQuantity = scaled(allocation.quantity, 3);
-            const alreadyReturned = priorReturns.get(allocation.id) ?? 0n;
-            const available = allocatedQuantity - alreadyReturned;
+            if (remainingToAllocate === 0n) break;
+            const available =
+              scaled(allocation.quantity, 3) -
+              (priorReturns.get(allocation.id) ?? 0n);
             const quantity =
-              entry.line.type === "external_product"
-                ? (() => {
-                    const cumulativeQuantity =
-                      entry.priorQuantity + entry.requestedQuantity;
-                    const cumulativeAllocation =
-                      cumulativeQuantity === entry.soldQuantity
-                        ? allocatedQuantity
-                        : roundDivide(
-                            allocatedQuantity * cumulativeQuantity,
-                            entry.soldQuantity,
-                          );
-                    return cumulativeAllocation - alreadyReturned;
-                  })()
-                : available < remainingToAllocate
-                  ? available
-                  : remainingToAllocate;
+              available < remainingToAllocate ? available : remainingToAllocate;
             if (quantity > 0n) {
               plannedReturns.push({ allocation, quantity });
               lineCostScaleNine += quantity * scaled(allocation.unitCost, 6);
-              if (entry.line.type === "item")
-                remainingToAllocate -= quantity;
+              remainingToAllocate -= quantity;
             }
           }
           if (entry.line.type === "item" && remainingToAllocate !== 0n) {
@@ -322,17 +296,6 @@ export class RefundsService {
                 recordedBy: cashierId,
                 refundLineId,
                 occurredAt,
-              });
-            }
-          } else if (entry.line.type === "external_product") {
-            for (const planned of plannedReturns) {
-              await repo.createReturnAllocation({
-                refundLineId,
-                orderLineAllocationId: planned.allocation.id,
-                itemId: planned.allocation.itemId,
-                quantity: format(planned.quantity, 3),
-                unitCost: planned.allocation.unitCost,
-                returnedBatchId: null,
               });
             }
           }

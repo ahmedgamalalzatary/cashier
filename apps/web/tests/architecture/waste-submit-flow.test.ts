@@ -21,4 +21,13 @@ describe("waste submission flow", () => {
     );
     expect(page.match(/disabled=\{saving\}/g)).toHaveLength(5);
   });
+
+  it("keeps recipe waste in the cafe warehouse", () => {
+    expect(page).toContain(
+      '<option value="main" disabled={selectedRecipe}>',
+    );
+    expect(page).toContain(
+      '(!selectedRecipe || warehouse === "cafe")',
+    );
+  });
 });

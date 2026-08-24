@@ -56,7 +56,6 @@ beforeEach(async () => {
   await db.execute(sql`TRUNCATE TABLE refund_lines`);
   await db.execute(sql`TRUNCATE TABLE refunds`);
   await db.execute(sql`TRUNCATE TABLE order_line_allocations`);
-  await db.execute(sql`TRUNCATE TABLE order_line_modifiers`);
   await db.execute(sql`TRUNCATE TABLE order_lines`);
   await db.execute(sql`TRUNCATE TABLE orders`);
   await db.execute(sql`TRUNCATE TABLE shift_events`);
@@ -75,16 +74,6 @@ beforeEach(async () => {
   await db.execute(sql`TRUNCATE TABLE stock_deficit_allocations`);
   await db.execute(sql`TRUNCATE TABLE stock_movements`);
   await db.execute(sql`TRUNCATE TABLE stock_batches`);
-  await db.execute(sql`TRUNCATE TABLE external_modifier_ingredients`);
-  await db.execute(sql`TRUNCATE TABLE external_size_ingredients`);
-  await db.execute(sql`TRUNCATE TABLE external_product_ingredients`);
-  await db.execute(sql`TRUNCATE TABLE external_modifier_options`);
-  await db.execute(sql`TRUNCATE TABLE external_modifier_groups`);
-  await db.execute(sql`TRUNCATE TABLE external_product_sizes`);
-  await db.execute(sql`TRUNCATE TABLE external_products`);
-  await db.execute(sql`TRUNCATE TABLE external_categories`);
-  await db.execute(sql`TRUNCATE TABLE external_catalog_sync`);
-  await db.execute(sql`TRUNCATE TABLE external_orders_cache`);
   await db.execute(sql`TRUNCATE TABLE items`);
   await db.execute(sql`TRUNCATE TABLE supplier_payments`);
   await db.execute(sql`TRUNCATE TABLE suppliers`);

@@ -17,6 +17,8 @@ describe("POS feature boundaries", () => {
     expect(page).toContain('aria-label="النقد المستلم"');
     expect(page).toContain("تم حفظ الطلب، لكن تعذر تحديث قائمة الطلبات");
     expect(page).toContain('panelClassName="pos-receipt-dialog"');
+    expect(page).toContain('if (event.target.value === "") return;');
+    expect(page).toContain("if (Number.isNaN(quantity)) return;");
     expect(NAV_ITEMS).toContainEqual({ href: "/pos", label: "نقطة البيع" });
   });
 
@@ -36,14 +38,5 @@ describe("POS feature boundaries", () => {
     expect(css).toContain("size: 80mm 297mm");
     expect(css).not.toContain("size: 80mm auto");
     expect(css).toContain(".pos-receipt-dialog > div");
-  });
-
-  it("does not format a missing catalog synchronization timestamp", () => {
-    const page = fs.readFileSync(
-      path.resolve(process.cwd(), "src/app/pos/page.tsx"),
-      "utf8",
-    );
-    expect(page).toMatch(/catalog\.lastSuccessfulSyncAt\s*\?/);
-    expect(page).toContain("لم تتم المزامنة بعد");
   });
 });

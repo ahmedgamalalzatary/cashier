@@ -19,9 +19,8 @@ export const wasteInput = z
         itemId: z.number().int().positive(),
       }),
       z.object({
-        type: z.literal("external_product"),
-        externalProductId: z.number().int().positive(),
-        externalSizeId: z.number().int().positive().nullable(),
+        type: z.literal("recipe"),
+        recipeSizeId: z.number().int().positive(),
       }),
     ]),
     quantity,
@@ -35,14 +34,11 @@ export const wasteInput = z
     note: z.string().trim().max(500).nullable().default(null),
   })
   .superRefine((value, context) => {
-    if (
-      value.target.type === "external_product" &&
-      !Number.isInteger(value.quantity)
-    ) {
+    if (value.target.type === "recipe" && !Number.isInteger(value.quantity)) {
       context.addIssue({
         code: "custom",
         path: ["quantity"],
-        message: "كمية المنتج يجب أن تكون عدداً صحيحاً",
+        message: "كمية منتج الوصفة يجب أن تكون عدداً صحيحاً",
       });
     }
     if (value.reason === "other" && !value.note) {

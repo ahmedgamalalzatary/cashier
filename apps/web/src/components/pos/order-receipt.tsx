@@ -48,14 +48,6 @@ export function OrderReceipt({ order }: { order: OrderDetail }) {
                   {line.sizeName ? `${line.sizeName} · ` : ""}
                   {formatMoney(line.unitPrice)}
                 </span>
-                {line.modifiers.map((modifier) => (
-                  <span
-                    key={modifier.id}
-                    className="block text-[10px] text-muted"
-                  >
-                    + {modifier.optionName} × {modifier.quantity}
-                  </span>
-                ))}
               </td>
               <td className="py-2 text-center tnum" dir="ltr">
                 {Number(line.quantity).toLocaleString("ar-EG", {

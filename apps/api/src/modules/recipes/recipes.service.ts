@@ -70,9 +70,9 @@ export class RecipesService {
       await this.validateDefinition(repo, data);
       const recipeId = await repo.createRecipe({
         name: data.name,
-        type: 'prepared',
+        type: data.type,
         categoryId: data.categoryId,
-        outputItemId: data.outputItemId,
+        outputItemId: data.type === 'prepared' ? data.outputItemId : null,
       });
       await this.writeChildren(repo, recipeId, data);
       return recipeId;
@@ -82,16 +82,14 @@ export class RecipesService {
   update(id: number, data: RecipeInput) {
     return this.repo.transaction(async (repo) => {
       const existing = await repo.lockRecipe(id);
-      if (existing?.type === 'product')
-        throw new HttpError(404, 'الوصفة غير موجودة');
       if (!existing) throw new HttpError(404, 'الوصفة غير موجودة');
       await this.validateDefinition(repo, data, id);
       await repo.deleteRecipeChildren(id);
       await repo.updateRecipe(id, {
         name: data.name,
-        type: 'prepared',
+        type: data.type,
         categoryId: data.categoryId,
-        outputItemId: data.outputItemId,
+        outputItemId: data.type === 'prepared' ? data.outputItemId : null,
       });
       await this.writeChildren(repo, id, data);
     });
@@ -104,8 +102,6 @@ export class RecipesService {
 
   async get(id: number) {
     const header = await this.repo.findRecipeHeader(id);
-    if (header?.type === 'product')
-      throw new HttpError(404, 'الوصفة غير موجودة');
     if (!header) throw new HttpError(404, 'الوصفة غير موجودة');
     return this.decorate(header);
   }
@@ -113,8 +109,6 @@ export class RecipesService {
   deactivate(id: number) {
     return this.repo.transaction(async (repo) => {
       const recipe = await repo.lockRecipe(id);
-      if (recipe?.type === 'product')
-        throw new HttpError(404, 'الوصفة غير موجودة');
       if (!recipe) throw new HttpError(404, 'الوصفة غير موجودة');
       await repo.setActive(id, false);
     });
@@ -123,8 +117,6 @@ export class RecipesService {
   reactivate(id: number) {
     return this.repo.transaction(async (repo) => {
       const recipe = await repo.lockRecipe(id);
-      if (recipe?.type === 'product')
-        throw new HttpError(404, 'الوصفة غير موجودة');
       if (!recipe) throw new HttpError(404, 'الوصفة غير موجودة');
       const data = await this.storedDefinition(repo, id, recipe);
       await this.validateDefinition(repo, data, id);
@@ -135,8 +127,6 @@ export class RecipesService {
   prepare(id: number, data: PreparationInput, preparedBy: number) {
     return this.repo.transaction(async (repo, inventory) => {
       const recipe = await repo.lockRecipe(id);
-      if (recipe?.type === 'product')
-        throw new HttpError(404, 'الوصفة غير موجودة');
       if (!recipe) throw new HttpError(404, 'الوصفة غير موجودة');
       if (!recipe.isActive) throw new HttpError(409, 'الوصفة موقوفة');
       if (recipe.type !== 'prepared' || recipe.outputItemId === null) {
@@ -264,6 +254,57 @@ export class RecipesService {
   ) {
     const sizes = await this.repo.listSizes(header.id);
     const ingredients = await this.repo.listIngredients(header.id);
+    if (header.type === 'product') {
+      return {
+        ...header,
+        sizes: await Promise.all(
+          sizes.map(async (size) => {
+            const sizeIngredients = ingredients.filter(
+              (ingredient) => ingredient.recipeSizeId === size.id,
+            );
+            const preview = await this.costIngredients(sizeIngredients);
+            const sellingPrice = size.sellingPrice ?? '0.00';
+            const sellingPriceCents = decimalToScaled(sellingPrice, 2);
+            const currentCostCents = preview.costCents;
+            const marginCents =
+              currentCostCents === null
+                ? null
+                : sellingPriceCents - currentCostCents;
+            return {
+              id: size.id,
+              name: size.name,
+              sellingPrice,
+              currentCost:
+                currentCostCents === null
+                  ? null
+                  : formatScaled(currentCostCents, 2),
+              marginAmount:
+                marginCents === null ? null : formatScaled(marginCents, 2),
+              marginPercentage:
+                marginCents === null
+                  ? null
+                  : formatScaled(
+                      roundDivide(marginCents * 10_000n, sellingPriceCents),
+                      2,
+                    ),
+              costPercentage:
+                currentCostCents === null
+                  ? null
+                  : formatScaled(
+                      roundDivide(
+                        currentCostCents * 10_000n,
+                        sellingPriceCents,
+                      ),
+                      2,
+                    ),
+              hasSufficientStock: preview.hasSufficientStock,
+              ingredients: preview.ingredients,
+            };
+          }),
+        ),
+      };
+    }
+
     const base = sizes[0];
     const preview = await this.costIngredients(ingredients);
     const outputQuantity = base?.outputQuantity ?? '0.000';
@@ -352,8 +393,12 @@ export class RecipesService {
       throw new HttpError(409, 'يجب اختيار تصنيف فرعي لا يحتوي على تصنيفات أخرى');
     }
 
-    const involvedIds = data.ingredients.map((row) => row.itemId);
-    involvedIds.push(data.outputItemId);
+    const ingredientRows =
+      data.type === 'product'
+        ? data.sizes.flatMap((size) => size.ingredients)
+        : data.ingredients;
+    const involvedIds = ingredientRows.map((row) => row.itemId);
+    if (data.type === 'prepared') involvedIds.push(data.outputItemId);
     const lockedItems = await repo.lockItems(involvedIds);
     const itemsById = new Map(lockedItems.map((item) => [item.id, item]));
     for (const id of involvedIds) {
@@ -379,7 +424,7 @@ export class RecipesService {
 
   private async assertNoPreparedCycle(
     repo: RecipesRepository,
-    data: RecipeInput,
+    data: Extract<RecipeInput, { type: 'prepared' }>,
     recipeId?: number,
   ) {
     const edges = await repo.listPreparedEdges();
@@ -419,6 +464,26 @@ export class RecipesService {
     recipeId: number,
     data: RecipeInput,
   ) {
+    if (data.type === 'product') {
+      for (const [index, size] of data.sizes.entries()) {
+        const sizeId = await repo.createSize({
+          recipeId,
+          name: size.name,
+          sellingPrice: formatScaled(numberToScaled(size.sellingPrice, 2), 2),
+          outputQuantity: null,
+          sortOrder: index,
+        });
+        for (const ingredient of size.ingredients) {
+          await repo.createIngredient({
+            recipeSizeId: sizeId,
+            itemId: ingredient.itemId,
+            quantity: formatScaled(numberToScaled(ingredient.quantity, 3), 3),
+          });
+        }
+      }
+      return;
+    }
+
     const sizeId = await repo.createSize({
       recipeId,
       name: 'الوصفة الأساسية',
@@ -442,6 +507,23 @@ export class RecipesService {
   ): Promise<RecipeInput> {
     const sizes = await repo.listSizes(recipeId);
     const ingredients = await repo.listIngredients(recipeId);
+    if (recipe.type === 'product') {
+      return {
+        type: 'product',
+        name: recipe.name,
+        categoryId: recipe.categoryId,
+        sizes: sizes.map((size) => ({
+          name: size.name,
+          sellingPrice: Number(size.sellingPrice),
+          ingredients: ingredients
+            .filter((ingredient) => ingredient.recipeSizeId === size.id)
+            .map((ingredient) => ({
+              itemId: ingredient.itemId,
+              quantity: Number(ingredient.quantity),
+            })),
+        })),
+      };
+    }
     if (recipe.outputItemId === null || !sizes[0]?.outputQuantity) {
       throw new HttpError(409, 'بيانات الوصفة المُحضّرة غير مكتملة');
     }

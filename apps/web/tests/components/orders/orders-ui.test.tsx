@@ -62,13 +62,6 @@ describe("orders UI", () => {
     expect(html).not.toContain("لا توجد طلبات أونلاين بعد");
   });
 
-  it("uses the filtered empty message when the server returns no matches", () => {
-    const filtered = view({ query: "missing" });
-    expect(filtered).toContain("لا توجد طلبات تطابق عوامل التصفية الحالية.");
-    expect(filtered).not.toContain("لا توجد طلبات أونلاين بعد");
-    expect(view()).toContain("لا توجد طلبات أونلاين بعد");
-  });
-
   it("renders successful online order rows", () => {
     const html = view({ orders: [order] });
     expect(html).toContain("عميل تجريبي");

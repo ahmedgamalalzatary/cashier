@@ -8,14 +8,6 @@ config({ path: path.resolve(__dirname, "../../.env") });
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.resolve(__dirname, "../.."),
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "biscofa.runasp.net",
-      },
-    ],
-  },
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
   },

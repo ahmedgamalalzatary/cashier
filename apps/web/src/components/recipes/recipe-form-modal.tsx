@@ -9,29 +9,33 @@ import {
   type ReactNode,
 } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import type { Category, Item, Recipe } from "@cashier/shared";
+import type { Category, Item, Recipe, RecipeType } from "@cashier/shared";
 import {
   emptyPreparedRecipeForm,
+  emptyProductRecipeForm,
+  newProductSize,
   newRecipeIngredient,
   recipeFormFromRecipe,
   recipeRequestBody,
-  selectRecipeOutputItem,
+  type ProductRecipeForm,
   type RecipeForm,
   type RecipeIngredientForm,
 } from "@/models/recipe-model";
 import { createRecipe, updateRecipe } from "@/services/recipes-service";
-import { itemLabel } from "@/lib/format";
 import { Button } from "../ui/button";
 import { Field } from "../ui/field";
 import { Modal } from "../ui/modal";
+import { itemLabel } from "@/lib/format";
 
 export function RecipeFormModal({
+  type,
   editing,
   categories,
   items,
   onClose,
   onSaved,
 }: {
+  type: RecipeType;
   editing: Recipe | null;
   categories: Category[];
   items: Item[];
@@ -39,7 +43,11 @@ export function RecipeFormModal({
   onSaved: () => void;
 }) {
   const [form, setForm] = useState<RecipeForm>(() =>
-    editing ? recipeFormFromRecipe(editing) : emptyPreparedRecipeForm(),
+    editing
+      ? recipeFormFromRecipe(editing)
+      : type === "product"
+        ? emptyProductRecipeForm()
+        : emptyPreparedRecipeForm(),
   );
   const nextKeyRef = useRef(10_000);
   const [saving, setSaving] = useState(false);
@@ -80,13 +88,19 @@ export function RecipeFormModal({
     <Modal
       open
       size="xl"
-      title={editing ? `تعديل ${editing.name}` : "إضافة وصفة تحضير"}
+      title={
+        editing
+          ? `تعديل ${editing.name}`
+          : type === "product"
+            ? "إضافة منتج وصفة"
+            : "إضافة وصفة تحضير"
+      }
       onClose={onClose}
     >
       <form className="space-y-5" onSubmit={submit}>
         <div className="grid gap-4 md:grid-cols-2">
           <Field
-            label="اسم الوصفة"
+            label={form.type === "product" ? "اسم المنتج" : "اسم الوصفة"}
             value={form.name}
             onChange={(event) =>
               setForm((current) => ({ ...current, name: event.target.value }))
@@ -98,8 +112,8 @@ export function RecipeFormModal({
           <SelectField
             label="التصنيف"
             value={form.categoryId}
-            onChange={(categoryId) =>
-              setForm((current) => ({ ...current, categoryId }))
+            onChange={(value) =>
+              setForm((current) => ({ ...current, categoryId: value }))
             }
             required
           >
@@ -112,51 +126,69 @@ export function RecipeFormModal({
           </SelectField>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <SelectField
-            label="الصنف المُحضّر الناتج"
-            value={form.outputItemId}
-            onChange={(outputItemId) =>
-              setForm((current) =>
-                selectRecipeOutputItem(current, outputItemId),
-              )
-            }
-            required
-          >
-            <option value="">اختر الصنف الناتج</option>
-            {preparedItems.map((item) => (
-              <option key={item.id} value={item.id}>
-                {itemLabel(item.code, item.name)} ({item.stockUnit})
-              </option>
-            ))}
-          </SelectField>
-          <Field
-            label={`ناتج الوصفة الأساسي${outputUnit(form.outputItemId, items)}`}
-            type="number"
-            min="0.001"
-            step="0.001"
-            value={form.baseYield}
-            onChange={(event) =>
-              setForm((current) => ({
-                ...current,
-                baseYield: event.target.value,
-              }))
-            }
-            required
-            dir="ltr"
+        {form.type === "product" ? (
+          <ProductEditor
+            form={form}
+            items={ingredientItems}
+            nextKeyRef={nextKeyRef}
+            onChange={setForm}
           />
-        </div>
-        <IngredientEditor
-          title="مكونات الوصفة الأساسية"
-          lines={form.ingredients}
-          items={ingredientItems.filter(
-            (item) => String(item.id) !== form.outputItemId,
-          )}
-          nextKeyRef={nextKeyRef}
-          onChange={(ingredients) =>
-            setForm((current) => ({ ...current, ingredients }))
-          }
-        />
+        ) : (
+          <>
+            <div className="grid gap-4 md:grid-cols-2">
+              <SelectField
+                label="الصنف المُحضّر الناتج"
+                value={form.outputItemId}
+                onChange={(value) =>
+                  setForm((current) =>
+                    current.type === "prepared"
+                      ? { ...current, outputItemId: value }
+                      : current,
+                  )
+                }
+                required
+              >
+                <option value="">اختر الصنف الناتج</option>
+                {preparedItems.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {itemLabel(item.code, item.name)} ({item.stockUnit})
+                  </option>
+                ))}
+              </SelectField>
+              <Field
+                label={`ناتج الوصفة الأساسي${outputUnit(form.outputItemId, items)}`}
+                type="number"
+                min="0.001"
+                step="0.001"
+                value={form.baseYield}
+                onChange={(event) =>
+                  setForm((current) =>
+                    current.type === "prepared"
+                      ? { ...current, baseYield: event.target.value }
+                      : current,
+                  )
+                }
+                required
+                dir="ltr"
+              />
+            </div>
+            <IngredientEditor
+              title="مكونات الوصفة الأساسية"
+              lines={form.ingredients}
+              items={ingredientItems.filter(
+                (item) => String(item.id) !== form.outputItemId,
+              )}
+              nextKeyRef={nextKeyRef}
+              onChange={(ingredients) =>
+                setForm((current) =>
+                  current.type === "prepared"
+                    ? { ...current, ingredients }
+                    : current,
+                )
+              }
+            />
+          </>
+        )}
 
         {error && (
           <p className="rounded-lg bg-danger/10 p-3 text-sm text-danger">
@@ -168,15 +200,105 @@ export function RecipeFormModal({
             إلغاء
           </Button>
           <Button type="submit" disabled={saving}>
-            {saving
-              ? "جارِ الحفظ…"
-              : editing
-                ? "حفظ التعديلات"
-                : "إنشاء الوصفة"}
+            {saving ? "جارِ الحفظ…" : editing ? "حفظ التعديلات" : "إنشاء الوصفة"}
           </Button>
         </div>
       </form>
     </Modal>
+  );
+}
+
+function ProductEditor({
+  form,
+  items,
+  nextKeyRef,
+  onChange,
+}: {
+  form: ProductRecipeForm;
+  items: Item[];
+  nextKeyRef: MutableRefObject<number>;
+  onChange: (form: RecipeForm) => void;
+}) {
+  function updateSize(key: number, patch: Partial<ProductRecipeForm["sizes"][number]>) {
+    onChange({
+      ...form,
+      sizes: form.sizes.map((size) =>
+        size.key === key ? { ...size, ...patch } : size,
+      ),
+    });
+  }
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="font-semibold">المقاسات والأسعار</h3>
+          <p className="text-xs text-muted">لكل مقاس سعر وكميات مكونات مستقلة.</p>
+        </div>
+        <Button
+          variant="ghost"
+          onClick={() =>
+            onChange({
+              ...form,
+              sizes: [...form.sizes, newProductSize(nextKeyRef.current++)],
+            })
+          }
+          disabled={form.sizes.length >= 20}
+        >
+          <Plus className="size-4" /> إضافة مقاس
+        </Button>
+      </div>
+      {form.sizes.map((size, index) => (
+        <div key={size.key} className="rounded-2xl border border-line bg-paper/45 p-4">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <p className="text-sm font-semibold">المقاس {index + 1}</p>
+            <button
+              type="button"
+              aria-label={`حذف المقاس ${index + 1}`}
+              title="حذف المقاس"
+              className="rounded-lg p-1.5 text-muted hover:bg-danger/10 hover:text-danger disabled:opacity-40"
+              disabled={form.sizes.length === 1}
+              onClick={() =>
+                onChange({
+                  ...form,
+                  sizes: form.sizes.filter((row) => row.key !== size.key),
+                })
+              }
+            >
+              <Trash2 className="size-4" />
+            </button>
+          </div>
+          <div className="mb-4 grid gap-4 md:grid-cols-2">
+            <Field
+              label="اسم المقاس"
+              value={size.name}
+              onChange={(event) => updateSize(size.key, { name: event.target.value })}
+              maxLength={100}
+              required
+            />
+            <Field
+              label="سعر البيع (ج.م)"
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={size.sellingPrice}
+              onChange={(event) =>
+                updateSize(size.key, { sellingPrice: event.target.value })
+              }
+              required
+              dir="ltr"
+            />
+          </div>
+          <IngredientEditor
+            title="مكونات المقاس"
+            lines={size.ingredients}
+            items={items}
+            nextKeyRef={nextKeyRef}
+            onChange={(ingredients) => updateSize(size.key, { ingredients })}
+          />
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -211,10 +333,7 @@ function IngredientEditor({
       {lines.map((line, index) => {
         const selected = items.find((item) => String(item.id) === line.itemId);
         return (
-          <div
-            key={line.key}
-            className="grid items-end gap-3 sm:grid-cols-[1fr_12rem_auto]"
-          >
+          <div key={line.key} className="grid items-end gap-3 sm:grid-cols-[1fr_12rem_auto]">
             <SelectField
               label={`المكوّن ${index + 1}`}
               value={line.itemId}
@@ -258,9 +377,7 @@ function IngredientEditor({
               title="حذف المكوّن"
               className="mb-0.5 rounded-lg p-2 text-muted hover:bg-danger/10 hover:text-danger disabled:opacity-40"
               disabled={lines.length === 1}
-              onClick={() =>
-                onChange(lines.filter((row) => row.key !== line.key))
-              }
+              onClick={() => onChange(lines.filter((row) => row.key !== line.key))}
             >
               <Trash2 className="size-4" />
             </button>
@@ -301,15 +418,15 @@ function SelectField({
 
 function recipeUsesItem(recipe: Recipe | null, itemId: number) {
   if (!recipe) return false;
-  return (
-    recipe.outputItemId === itemId ||
-    recipe.ingredients.some((ingredient) => ingredient.itemId === itemId)
-  );
+  if (recipe.type === "prepared" && recipe.outputItemId === itemId) return true;
+  const ingredients =
+    recipe.type === "product"
+      ? recipe.sizes.flatMap((size) => size.ingredients)
+      : recipe.ingredients;
+  return ingredients.some((ingredient) => ingredient.itemId === itemId);
 }
 
 function outputUnit(outputItemId: string, items: Item[]) {
-  const unit = items.find(
-    (item) => String(item.id) === outputItemId,
-  )?.stockUnit;
+  const unit = items.find((item) => String(item.id) === outputItemId)?.stockUnit;
   return unit ? ` (${unit})` : "";
 }

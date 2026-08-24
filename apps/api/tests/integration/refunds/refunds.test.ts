@@ -356,35 +356,4 @@ describe("refunds", () => {
       });
     expect(response.status).toBe(400);
   });
-
-  it("uses the sale allocation snapshot when refunding an external product", async () => {
-    const fixture = await soldResaleOrder();
-    await db
-      .update(orderLines)
-      .set({ type: "external_product", itemId: null })
-      .where(eq(orderLines.id, fixture.lineId));
-    await db
-      .update(orderLineAllocations)
-      .set({ quantity: "0.080", unitCost: "10.000000" })
-      .where(eq(orderLineAllocations.orderLineId, fixture.lineId));
-
-    const response = await request(app())
-      .post("/api/refunds")
-      .set(authorization)
-      .send({
-        clientRequestId: crypto.randomUUID(),
-        orderId: fixture.orderId,
-        reason: "طلب العميل",
-        lines: [{ orderLineId: fixture.lineId, quantity: 1 }],
-      });
-
-    expect(response.status).toBe(201);
-    expect(await db.select().from(refundLineAllocations)).toEqual([
-      expect.objectContaining({
-        quantity: "0.040",
-        unitCost: "10.000000",
-        returnedBatchId: null,
-      }),
-    ]);
-  });
 });

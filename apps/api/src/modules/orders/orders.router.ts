@@ -4,6 +4,7 @@ import type { OrdersController } from "./orders.controller.js";
 
 export function ordersRouter(controller: OrdersController) {
   const router = Router();
+  router.get("/catalog", controller.catalog);
   router.get("/external", controller.externalList);
   router.get("/", controller.list);
   router.post("/", requireRole("cashier"), controller.create);

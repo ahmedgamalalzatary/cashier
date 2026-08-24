@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { HttpError } from "../../middleware/error.js";
 import type { FifoAllocation } from "../inventory/inventory.service.js";
-import { calculateExternalOrderLine } from "./external-order-line.js";
 import type { OrdersRepository } from "./orders.repository.js";
 import type { OrderInput, OrderLineInput } from "./orders.schemas.js";
 
@@ -36,21 +35,20 @@ const isDuplicateEntry = (error: unknown) =>
   "code" in error &&
   (error as { code?: unknown }).code === "ER_DUP_ENTRY";
 
-function normalizeLines(lines: OrderLineInput[]) {
-  const combined = new Map<string, OrderLineInput>();
+type NormalizedLine =
+  | { type: "recipe"; recipeSizeId: number; quantity: number }
+  | { type: "item"; itemId: number; quantity: number };
+
+function normalizeLines(lines: OrderLineInput[]): NormalizedLine[] {
+  const combined = new Map<string, NormalizedLine>();
   for (const line of lines) {
-    const modifiers = [...line.modifiers].sort(
-      (left, right) =>
-        left.externalModifierOptionId - right.externalModifierOptionId,
-    );
-    const key = JSON.stringify({
-      product: line.externalProductId,
-      size: line.externalSizeId,
-      modifiers,
-    });
+    const key =
+      line.type === "recipe"
+        ? `recipe:${line.recipeSizeId}`
+        : `item:${line.itemId}`;
     const existing = combined.get(key);
     if (existing) existing.quantity += line.quantity;
-    else combined.set(key, { ...line, modifiers });
+    else combined.set(key, { ...line });
   }
   return [...combined.values()];
 }
@@ -75,6 +73,65 @@ function requestFingerprint(data: OrderInput) {
 export class OrdersService {
   constructor(private repo: OrdersRepository) {}
 
+  async catalog() {
+    const [recipeRows, itemRows] = await Promise.all([
+      this.repo.listCatalogRecipes(),
+      this.repo.listCatalogItems(),
+    ]);
+    const recipesById = new Map<
+      number,
+      {
+        type: "recipe";
+        recipeId: number;
+        name: string;
+        categoryId: number;
+        mainCategoryId: number;
+        mainCategoryName: string;
+        subCategoryId: number | null;
+        subCategoryName: string | null;
+        sizes: Array<{ id: number; name: string; sellingPrice: string }>;
+      }
+    >();
+    for (const row of recipeRows) {
+      const parentId = row.parentCategoryId;
+      let recipe = recipesById.get(row.recipeId);
+      if (!recipe) {
+        recipe = {
+          type: "recipe",
+          recipeId: row.recipeId,
+          name: row.name,
+          categoryId: row.categoryId,
+          mainCategoryId: parentId ?? row.categoryId,
+          mainCategoryName: row.parentCategoryName ?? row.categoryName,
+          subCategoryId: parentId === null ? null : row.categoryId,
+          subCategoryName: parentId === null ? null : row.categoryName,
+          sizes: [],
+        };
+        recipesById.set(row.recipeId, recipe);
+      }
+      recipe.sizes.push({
+        id: row.sizeId,
+        name: row.sizeName,
+        sellingPrice: row.sellingPrice!,
+      });
+    }
+    const resale = itemRows.map((row) => ({
+      type: "item" as const,
+      itemId: row.itemId,
+      name: row.name,
+      categoryId: row.categoryId,
+      mainCategoryId: row.parentCategoryId ?? row.categoryId,
+      mainCategoryName: row.parentCategoryName ?? row.categoryName,
+      subCategoryId: row.parentCategoryId === null ? null : row.categoryId,
+      subCategoryName: row.parentCategoryId === null ? null : row.categoryName,
+      sellingPrice: row.sellingPrice!,
+      stockUnit: row.stockUnit,
+    }));
+    return [...recipesById.values(), ...resale].sort((a, b) =>
+      a.name.localeCompare(b.name, "ar"),
+    );
+  }
+
   async create(data: OrderInput, cashierId: number) {
     let orderId: number;
     const fingerprint = requestFingerprint(data);
@@ -82,46 +139,118 @@ export class OrdersService {
       orderId = await this.repo.transaction(async (repo, inventory) => {
         const existing = await repo.findByClientRequestId(data.clientRequestId);
         if (existing) {
-          this.assertReplay(existing, fingerprint, cashierId);
+          if (existing.requestFingerprint !== fingerprint) {
+            throw new HttpError(409, "معرّف الطلب مستخدم لبيانات بيع مختلفة");
+          }
+          if (existing.cashierId !== cashierId) {
+            throw new HttpError(409, "معرّف الطلب مستخدم من مستخدم آخر");
+          }
           return existing.id;
         }
 
         const shift = await repo.findOpenShiftForCashier(cashierId);
-        if (!shift) {
-          throw new HttpError(409, "يجب فتح وردية قبل تسجيل البيع");
-        }
-        const normalized = normalizeLines(data.lines);
-        if (normalized.some((line) => line.quantity > 999)) {
-          throw new HttpError(400, "كمية المنتج خارج النطاق المسموح");
-        }
-        const products = await repo.loadExternalProducts(
-          normalized.map((line) => line.externalProductId),
-        );
-        const productsById = new Map(
-          products.map((product) => [product.externalId, product]),
-        );
-        const now = new Date();
-        const calculated = normalized.map((line) => {
-          const product = productsById.get(line.externalProductId);
-          if (!product) {
-            throw new HttpError(404, "المنتج الخارجي غير موجود");
-          }
-          return calculateExternalOrderLine(product, line, now.getTime());
-        });
+        if (!shift) throw new HttpError(409, "يجب فتح وردية قبل تسجيل البيع");
 
-        const stockItemIds = calculated.flatMap((line) =>
-          line.consumptions.map((consumption) => consumption.itemId),
+        const normalized = normalizeLines(data.lines);
+        const recipeInputs = normalized.filter(
+          (line): line is Extract<NormalizedLine, { type: "recipe" }> =>
+            line.type === "recipe",
         );
+        const itemInputs = normalized.filter(
+          (line): line is Extract<NormalizedLine, { type: "item" }> =>
+            line.type === "item",
+        );
+        if (recipeInputs.some((line) => line.quantity > 999)) {
+          throw new HttpError(400, "كمية منتج الوصفة خارج النطاق المسموح");
+        }
+
+        const recipeRows = await repo.lockRecipeSizes(
+          recipeInputs.map((line) => line.recipeSizeId),
+        );
+        const recipeBySize = new Map(
+          recipeRows.map((row) => [row.sizeId, row]),
+        );
+        const itemRows = await repo.lockResaleItems(
+          itemInputs.map((line) => line.itemId),
+        );
+        const itemById = new Map(itemRows.map((row) => [row.id, row]));
+        const ingredientRows = await repo.listIngredientsForSizes(
+          recipeInputs.map((line) => line.recipeSizeId),
+        );
+        const ingredientsBySize = new Map<number, typeof ingredientRows>();
+        for (const ingredient of ingredientRows) {
+          const group = ingredientsBySize.get(ingredient.recipeSizeId) ?? [];
+          group.push(ingredient);
+          ingredientsBySize.set(ingredient.recipeSizeId, group);
+        }
+
+        const stockItemIds = [
+          ...itemInputs.map((line) => line.itemId),
+          ...ingredientRows.map((row) => row.itemId),
+        ];
         const stockRows = await repo.lockStockItems(stockItemIds);
-        if (stockRows.length !== new Set(stockItemIds).size) {
+        const stockById = new Map(stockRows.map((row) => [row.id, row]));
+        if (stockById.size !== new Set(stockItemIds).size) {
           throw new HttpError(409, "أحد أصناف المخزون غير موجود");
         }
         if (stockRows.some((row) => !row.isActive)) {
           throw new HttpError(409, "أحد أصناف المخزون موقوف");
         }
 
+        const calculated = normalized.map((line) => {
+          if (line.type === "recipe") {
+            const product = recipeBySize.get(line.recipeSizeId);
+            if (!product) throw new HttpError(404, "حجم منتج الوصفة غير موجود");
+            if (
+              product.recipeType !== "product" ||
+              !product.recipeIsActive ||
+              product.sellingPrice === null
+            ) {
+              throw new HttpError(409, "منتج الوصفة غير متاح للبيع");
+            }
+            const ingredientList =
+              ingredientsBySize.get(line.recipeSizeId) ?? [];
+            if (ingredientList.length === 0) {
+              throw new HttpError(409, "منتج الوصفة لا يحتوي على مكونات");
+            }
+            const quantity = numberToScaled(line.quantity, 3);
+            const unitPrice = stringToScaled(product.sellingPrice, 2);
+            return {
+              ...line,
+              recipeId: product.recipeId,
+              productName: product.recipeName,
+              sizeName: product.sizeName,
+              quantityText: formatScaled(quantity, 3),
+              unitPriceText: formatScaled(unitPrice, 2),
+              lineSubtotal: roundDivide(quantity * unitPrice, 1_000n),
+              ingredients: ingredientList,
+            };
+          }
+          const item = itemById.get(line.itemId);
+          if (!item) throw new HttpError(404, "صنف إعادة البيع غير موجود");
+          if (
+            item.type !== "resale" ||
+            !item.isActive ||
+            item.sellingPrice === null
+          ) {
+            throw new HttpError(409, "الصنف غير متاح للبيع المباشر");
+          }
+          const quantity = numberToScaled(line.quantity, 3);
+          const unitPrice = stringToScaled(item.sellingPrice, 2);
+          return {
+            ...line,
+            recipeId: null,
+            productName: item.name,
+            sizeName: null,
+            quantityText: formatScaled(quantity, 3),
+            unitPriceText: formatScaled(unitPrice, 2),
+            lineSubtotal: roundDivide(quantity * unitPrice, 1_000n),
+            ingredients: [],
+          };
+        });
+
         const subtotal = calculated.reduce(
-          (sum, line) => sum + stringToScaled(line.lineSubtotal, 2),
+          (sum, line) => sum + line.lineSubtotal,
           0n,
         );
         if (subtotal > 999_999_999_999n) {
@@ -144,9 +273,11 @@ export class OrdersService {
         if (cashReceived < total) {
           throw new HttpError(400, "المبلغ المستلم أقل من إجمالي الطلب");
         }
-
-        const id = await repo.createOrder({
-          orderNumber: orderNumber(now),
+        const changeAmount = cashReceived - total;
+        const occurredAt = new Date();
+        const generatedOrderNumber = orderNumber(occurredAt);
+        const orderId = await repo.createOrder({
+          orderNumber: generatedOrderNumber,
           clientRequestId: data.clientRequestId,
           requestFingerprint: fingerprint,
           cashierId,
@@ -158,42 +289,59 @@ export class OrdersService {
           discountAmount: formatScaled(discountAmount, 2),
           total: formatScaled(total, 2),
           cashReceived: formatScaled(cashReceived, 2),
-          changeAmount: formatScaled(cashReceived - total, 2),
+          changeAmount: formatScaled(changeAmount, 2),
           totalCost: "0.00",
           isNegativeStock: false,
-          createdAt: now,
+          createdAt: occurredAt,
         });
 
         let roundedOrderCost = 0n;
         let orderHasDeficit = false;
         for (const line of calculated) {
           const lineId = await repo.createLine({
-            orderId: id,
-            type: "external_product",
-            recipeId: null,
-            recipeSizeId: null,
-            itemId: null,
-            externalProductId: line.externalProductId,
-            externalSizeId: line.externalSizeId,
+            orderId,
+            type: line.type,
+            recipeId: line.recipeId,
+            recipeSizeId: line.type === "recipe" ? line.recipeSizeId : null,
+            itemId: line.type === "item" ? line.itemId : null,
             productName: line.productName,
             sizeName: line.sizeName,
             quantity: line.quantityText,
-            unitPrice: line.unitPrice,
-            lineSubtotal: line.lineSubtotal,
+            unitPrice: line.unitPriceText,
+            lineSubtotal: formatScaled(line.lineSubtotal, 2),
             totalCost: "0.00",
             hasStockDeficit: false,
           });
-          for (const modifier of line.modifiers) {
-            await repo.createLineModifier({ orderLineId: lineId, ...modifier });
-          }
+
+          const consumptions =
+            line.type === "recipe"
+              ? line.ingredients.map((ingredient) => ({
+                  itemId: ingredient.itemId,
+                  itemName: ingredient.itemName,
+                  quantity: formatScaled(
+                    roundDivide(
+                      stringToScaled(ingredient.quantity, 3) *
+                        stringToScaled(line.quantityText, 3),
+                      1_000n,
+                    ),
+                    3,
+                  ),
+                }))
+              : [
+                  {
+                    itemId: line.itemId,
+                    itemName: line.productName,
+                    quantity: line.quantityText,
+                  },
+                ];
 
           let lineCostAtScaleNine = 0n;
           let lineHasDeficit = false;
-          for (const consumption of line.consumptions) {
+          for (const consumption of consumptions) {
             if (consumption.quantity === "0.000") {
               throw new HttpError(
                 400,
-                "كمية أحد مكونات المنتج أصغر من دقة المخزون",
+                "كمية أحد مكونات الوصفة أصغر من دقة المخزون",
               );
             }
             const consumed = await inventory.consume({
@@ -202,9 +350,9 @@ export class OrdersService {
               quantity: Number(consumption.quantity),
               movementType: "sale",
               referenceType: "order",
-              referenceId: id,
+              referenceId: orderId,
               notes: null,
-              occurredAt: now,
+              occurredAt,
               allowNegative: true,
             });
             for (const allocation of consumed.allocations) {
@@ -215,9 +363,10 @@ export class OrdersService {
                 consumption.itemName,
                 allocation,
               );
-              lineCostAtScaleNine +=
+              const allocationCost =
                 stringToScaled(allocation.quantity, 3) *
                 stringToScaled(allocation.unitCost, 6);
+              lineCostAtScaleNine += allocationCost;
               if (allocation.batchId === null) lineHasDeficit = true;
             }
           }
@@ -229,11 +378,12 @@ export class OrdersService {
           roundedOrderCost += roundedLineCost;
           orderHasDeficit ||= lineHasDeficit;
         }
-        await repo.updateOrder(id, {
+
+        await repo.updateOrder(orderId, {
           totalCost: formatScaled(roundedOrderCost, 2),
           isNegativeStock: orderHasDeficit,
         });
-        return id;
+        return orderId;
       });
     } catch (error) {
       if (!isDuplicateEntry(error)) throw error;
@@ -241,23 +391,15 @@ export class OrdersService {
         data.clientRequestId,
       );
       if (!existing) throw error;
-      this.assertReplay(existing, fingerprint, cashierId);
+      if (existing.requestFingerprint !== fingerprint) {
+        throw new HttpError(409, "معرّف الطلب مستخدم لبيانات بيع مختلفة");
+      }
+      if (existing.cashierId !== cashierId) {
+        throw new HttpError(409, "معرّف الطلب مستخدم من مستخدم آخر");
+      }
       orderId = existing.id;
     }
     return this.get(orderId);
-  }
-
-  private assertReplay(
-    existing: { cashierId: number; requestFingerprint: string },
-    fingerprint: string,
-    cashierId: number,
-  ) {
-    if (existing.requestFingerprint !== fingerprint) {
-      throw new HttpError(409, "معرّف الطلب مستخدم لبيانات بيع مختلفة");
-    }
-    if (existing.cashierId !== cashierId) {
-      throw new HttpError(409, "معرّف الطلب مستخدم من مستخدم آخر");
-    }
   }
 
   private saveAllocation(
@@ -286,20 +428,22 @@ export class OrdersService {
     const order = await this.repo.findOrder(id);
     if (!order) throw new HttpError(404, "الطلب غير موجود");
     const lines = await this.repo.listLines(id);
-    const [allocations, modifiers] = await Promise.all([
-      this.repo.listAllocations(lines.map((line) => line.id)),
-      this.repo.listModifiers(lines.map((line) => line.id)),
-    ]);
+    const allocations = await this.repo.listAllocations(
+      lines.map((line) => line.id),
+    );
+    const allocationsByLine = new Map<number, typeof allocations>();
+    for (const allocation of allocations) {
+      const group = allocationsByLine.get(allocation.orderLineId) ?? [];
+      group.push(allocation);
+      allocationsByLine.set(allocation.orderLineId, group);
+    }
     return {
       ...order,
       lines: lines.map((line) => ({
         ...line,
-        allocations: allocations
-          .filter((allocation) => allocation.orderLineId === line.id)
-          .map(({ orderLineId: _orderLineId, ...allocation }) => allocation),
-        modifiers: modifiers
-          .filter((modifier) => modifier.orderLineId === line.id)
-          .map(({ orderLineId: _orderLineId, ...modifier }) => modifier),
+        allocations: (allocationsByLine.get(line.id) ?? []).map(
+          ({ orderLineId: _orderLineId, ...allocation }) => allocation,
+        ),
       })),
     };
   }

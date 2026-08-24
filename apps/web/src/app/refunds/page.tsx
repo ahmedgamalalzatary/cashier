@@ -239,7 +239,7 @@ export default function RefundsPage() {
                       type="number"
                       min="0"
                       max={available}
-                      step={line.type === "item" ? 0.001 : 1}
+                      step={line.type === "recipe" ? 1 : 0.001}
                       value={current.quantity || ""}
                       onChange={(event) => {
                         setClientRequestId(crypto.randomUUID());

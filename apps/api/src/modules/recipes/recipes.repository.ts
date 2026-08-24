@@ -54,7 +54,6 @@ export class RecipesRepository {
       .from(recipes)
       .innerJoin(categories, eq(recipes.categoryId, categories.id))
       .leftJoin(outputItem, eq(recipes.outputItemId, outputItem.id))
-      .where(eq(recipes.type, "prepared"))
       .orderBy(desc(recipes.createdAt), desc(recipes.id));
   }
 
@@ -151,7 +150,7 @@ export class RecipesRepository {
 
   async createRecipe(data: {
     name: string;
-    type: "prepared";
+    type: "product" | "prepared";
     categoryId: number;
     outputItemId: number | null;
   }) {
@@ -163,7 +162,7 @@ export class RecipesRepository {
     id: number,
     data: {
       name: string;
-      type: "prepared";
+      type: "product" | "prepared";
       categoryId: number;
       outputItemId: number | null;
     },

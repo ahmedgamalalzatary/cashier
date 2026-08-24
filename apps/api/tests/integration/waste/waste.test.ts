@@ -4,11 +4,10 @@ import { eq } from "drizzle-orm";
 import { createApp } from "../../../src/app.js";
 import {
   categories,
-  externalCategories,
-  externalProducts,
-  externalProductSizes,
-  externalSizeIngredients,
   items,
+  recipeIngredients,
+  recipes,
+  recipeSizes,
   stockBatches,
   stockMovements,
   wasteEntries,
@@ -178,52 +177,21 @@ describe("waste", () => {
     ).toHaveLength(0);
   });
 
-  it("records external-product waste by consuming its configured cafe ingredients", async () => {
+  it("records finished recipe waste by consuming its cafe ingredients", async () => {
     const itemId = await stockItem("cafe");
-    const syncedAt = new Date();
-    await db.insert(externalCategories).values({
-      externalId: 3,
-      nameAr: "مشروبات",
-      nameEn: "Drinks",
-      descriptionAr: null,
-      descriptionEn: null,
-      isActive: true,
-      isVisible: true,
-      displayOrder: 1,
-      isCurrent: true,
-      syncedAt,
+    const [category] = await db.insert(categories).values({ name: "مشروبات" });
+    const [recipe] = await db.insert(recipes).values({
+      name: "لاتيه",
+      categoryId: category.insertId,
+      type: "product",
     });
-    await db.insert(externalProducts).values({
-      externalId: 9,
-      externalCategoryId: 3,
-      nameAr: "لاتيه",
-      nameEn: "Latte",
-      descriptionAr: null,
-      descriptionEn: null,
-      imageUrl: null,
-      price: "30.00",
-      discountPercentage: null,
-      discountStart: null,
-      discountEnd: null,
-      calories: 100,
-      pointsReward: 3,
-      isAvailable: true,
-      isVisible: true,
-      isCurrent: true,
-      syncedAt,
+    const [size] = await db.insert(recipeSizes).values({
+      recipeId: recipe.insertId,
+      name: "كبير",
+      sellingPrice: "30.00",
     });
-    await db.insert(externalProductSizes).values({
-      externalId: 91,
-      externalProductId: 9,
-      nameAr: "كبير",
-      nameEn: "Large",
-      price: "30.00",
-      isDefault: true,
-      isCurrent: true,
-      syncedAt,
-    });
-    await db.insert(externalSizeIngredients).values({
-      externalSizeId: 91,
+    await db.insert(recipeIngredients).values({
+      recipeSizeId: size.insertId,
       itemId,
       quantity: "0.500",
     });
@@ -234,11 +202,7 @@ describe("waste", () => {
       .send({
         clientRequestId: crypto.randomUUID(),
         warehouse: "cafe",
-        target: {
-          type: "external_product",
-          externalProductId: 9,
-          externalSizeId: 91,
-        },
+        target: { type: "recipe", recipeSizeId: size.insertId },
         quantity: 2,
         reason: "spill",
         note: null,
@@ -246,7 +210,7 @@ describe("waste", () => {
 
     expect(response.status).toBe(201);
     expect(response.body).toMatchObject({
-      targetType: "external_product",
+      targetType: "recipe",
       targetName: "لاتيه",
       sizeName: "كبير",
       quantity: "2.000",

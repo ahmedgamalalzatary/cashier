@@ -6,7 +6,17 @@ import type {
 import { api } from "../lib/api";
 
 export type RecipeIngredientBody = { itemId: number; quantity: number };
-export type RecipeBody = {
+export type ProductRecipeBody = {
+  type: "product";
+  name: string;
+  categoryId: number;
+  sizes: Array<{
+    name: string;
+    sellingPrice: number;
+    ingredients: RecipeIngredientBody[];
+  }>;
+};
+export type PreparedRecipeBody = {
   type: "prepared";
   name: string;
   categoryId: number;
@@ -14,6 +24,7 @@ export type RecipeBody = {
   baseYield: number;
   ingredients: RecipeIngredientBody[];
 };
+export type RecipeBody = ProductRecipeBody | PreparedRecipeBody;
 export type PreparationBody = { quantity: number; notes: string | null };
 
 export function listRecipes() {
