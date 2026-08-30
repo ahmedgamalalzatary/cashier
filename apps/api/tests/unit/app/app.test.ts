@@ -6,7 +6,10 @@ import type { Db } from '../../../src/db/index.js';
 const db = {} as Db;
 const options = {
   jwtSecret: 'test-only-jwt-secret-at-least-32-characters',
-  corsOrigin: 'https://cashier.example.com',
+  corsOrigins: [
+    'https://cashier.example.com',
+    'http://localhost:3000',
+  ],
   externalOrders: {
     baseUrl: 'https://orders.example.com',
     phoneNumber: '01234567890',
@@ -24,8 +27,19 @@ describe('health check', () => {
   it('allows the configured frontend origin', async () => {
     const res = await request(createApp(db, options))
       .options('/health')
-      .set('Origin', options.corsOrigin);
-    expect(res.headers['access-control-allow-origin']).toBe(options.corsOrigin);
+      .set('Origin', options.corsOrigins[0]);
+    expect(res.headers['access-control-allow-origin']).toBe(
+      options.corsOrigins[0],
+    );
+  });
+
+  it('allows another configured frontend origin', async () => {
+    const res = await request(createApp(db, options))
+      .options('/health')
+      .set('Origin', options.corsOrigins[1]);
+    expect(res.headers['access-control-allow-origin']).toBe(
+      options.corsOrigins[1],
+    );
   });
 
   it('does not grant CORS access to any other origin', async () => {

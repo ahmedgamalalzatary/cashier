@@ -21,20 +21,20 @@ import { createExpensesModule } from "./modules/expenses/expenses.module.js";
 
 export type AppOptions = {
   jwtSecret: string;
-  corsOrigin: string;
+  corsOrigins: string[];
   trustProxy?: boolean;
 };
 
 export function createApp(
   db: Db,
-  { jwtSecret, corsOrigin, trustProxy = false }: AppOptions,
+  { jwtSecret, corsOrigins, trustProxy = false }: AppOptions,
 ) {
   const app = express();
   app.set("trust proxy", trustProxy ? 1 : false);
   app.use(
     cors({
       origin: (origin, callback) =>
-        callback(null, !origin || origin === corsOrigin),
+        callback(null, !origin || corsOrigins.includes(origin)),
     }),
   );
   app.use(express.json());

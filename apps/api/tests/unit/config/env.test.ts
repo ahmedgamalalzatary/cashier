@@ -23,7 +23,7 @@ describe('runtime environment', () => {
       DATABASE_URL: valid.DATABASE_URL,
       JWT_SECRET: valid.JWT_SECRET,
       PORT: 4321,
-      CORS_ORIGIN: valid.CORS_ORIGIN,
+      CORS_ORIGIN: [valid.CORS_ORIGIN],
       EXTERNAL_ORDERS_BASE_URL: valid.EXTERNAL_ORDERS_BASE_URL,
       EXTERNAL_ORDERS_PHONE_NUMBER: valid.EXTERNAL_ORDERS_PHONE_NUMBER,
     });
@@ -34,10 +34,23 @@ describe('runtime environment', () => {
       DATABASE_URL: valid.DATABASE_URL,
       JWT_SECRET: valid.JWT_SECRET,
       PORT: 4000,
-      CORS_ORIGIN: valid.CORS_ORIGIN,
+      CORS_ORIGIN: [valid.CORS_ORIGIN],
       EXTERNAL_ORDERS_BASE_URL: valid.EXTERNAL_ORDERS_BASE_URL,
       EXTERNAL_ORDERS_PHONE_NUMBER: valid.EXTERNAL_ORDERS_PHONE_NUMBER,
     });
+  });
+
+  it('parses multiple comma-separated CORS origins', () => {
+    expect(
+      parseRuntimeEnv({
+        ...valid,
+        CORS_ORIGIN:
+          'https://cashier.bittech.site, http://localhost:3000',
+      }).CORS_ORIGIN,
+    ).toEqual([
+      'https://cashier.bittech.site',
+      'http://localhost:3000',
+    ]);
   });
 
   it.each([
@@ -47,6 +60,7 @@ describe('runtime environment', () => {
     [{ ...valid, JWT_SECRET: 'change-me' }, 'JWT_SECRET'],
     [{ ...valid, PORT: '70000' }, 'PORT'],
     [{ ...valid, CORS_ORIGIN: 'not-an-origin' }, 'CORS_ORIGIN'],
+    [{ ...valid, CORS_ORIGIN: `${valid.CORS_ORIGIN},` }, 'CORS_ORIGIN'],
     [
       { ...valid, EXTERNAL_ORDERS_BASE_URL: undefined },
       'EXTERNAL_ORDERS_BASE_URL',

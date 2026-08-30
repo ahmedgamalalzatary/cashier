@@ -26,7 +26,7 @@ process.env.JWT_SECRET = "test-only-jwt-secret-at-least-32-characters";
 export const db = createDb(testUrl!);
 export const appOptions = {
   jwtSecret: process.env.JWT_SECRET,
-  corsOrigin: "http://localhost:3000",
+  corsOrigins: ["http://localhost:3000"],
   externalOrders: {
     baseUrl: "https://orders.example.com",
     phoneNumber: "01234567890",

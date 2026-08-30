@@ -5,6 +5,20 @@ import { z } from 'zod';
 // single .env at the repo root shared by all apps
 export const rootDir = path.resolve(import.meta.dirname, '../../..');
 
+const corsOriginSchema = z
+  .string()
+  .url('CORS_ORIGIN must contain valid URLs')
+  .refine(
+    (value) => {
+      try {
+        return new URL(value).origin === value;
+      } catch {
+        return false;
+      }
+    },
+    { message: 'CORS_ORIGIN entries must contain only an origin' },
+  );
+
 const runtimeEnvSchema = z.object({
   DATABASE_URL: z
     .string({ required_error: 'DATABASE_URL is required' })
@@ -24,18 +38,9 @@ const runtimeEnvSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65_535).default(4000),
   CORS_ORIGIN: z
     .string()
-    .url('CORS_ORIGIN must be a valid URL')
-    .refine(
-      (value) => {
-        try {
-          return new URL(value).origin === value;
-        } catch {
-          return false;
-        }
-      },
-      { message: 'CORS_ORIGIN must contain only an origin' },
-    )
-    .default('http://localhost:3000'),
+    .default('http://localhost:3000')
+    .transform((value) => value.split(',').map((origin) => origin.trim()))
+    .pipe(z.array(corsOriginSchema).min(1)),
   TRUST_PROXY: z
     .enum(['true', 'false'])
     .default('false')
