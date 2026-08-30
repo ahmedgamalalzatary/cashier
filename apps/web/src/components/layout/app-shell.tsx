@@ -3,10 +3,11 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { Coffee, Menu } from "lucide-react";
+import { normalizePath } from "@/lib/auth";
 import { Sidebar } from "./sidebar";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
+  const pathname = normalizePath(usePathname());
   const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {

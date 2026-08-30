@@ -5,6 +5,10 @@ export type { AuthUser, Role, Session } from "@cashier/shared";
 export const SESSION_KEY = "cashier.session";
 export const AUTH_CHANGED_EVENT = "cashier:auth-changed";
 
+export function normalizePath(pathname: string) {
+  return pathname.replace(/\/+$/, "") || "/";
+}
+
 export function readSession(): Session | null {
   if (typeof window === "undefined") return null;
   try {
@@ -76,9 +80,10 @@ export function canOpenPath(role: Role, pathname: string) {
 }
 
 export function loginPathFor(pathname: string) {
-  return pathname === "/login"
+  const normalizedPath = normalizePath(pathname);
+  return normalizedPath === "/login"
     ? "/login"
-    : `/login?next=${encodeURIComponent(pathname)}`;
+    : `/login?next=${encodeURIComponent(normalizedPath)}`;
 }
 
 export function postLoginPath(search: string, role: Role) {

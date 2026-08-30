@@ -99,6 +99,10 @@ describe("session validity", () => {
 });
 
 describe("login redirects", () => {
+  it("treats the trailing-slash login pathname as the login route", () => {
+    expect(loginPathFor("/login/")).toBe("/login");
+  });
+
   it("preserves an allowed protected deep link through login", () => {
     expect(loginPathFor("/warehouse")).toBe("/login?next=%2Fwarehouse");
     expect(postLoginPath("?next=%2Fwarehouse", "admin")).toBe("/warehouse");

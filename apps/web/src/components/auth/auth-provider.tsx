@@ -12,6 +12,7 @@ import { login as loginRequest } from "@/services/auth-service";
 import {
   canOpenPath,
   loginPathFor,
+  normalizePath,
   postLoginPath,
   readSession,
   subscribeToSessionChanges,
@@ -29,7 +30,9 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
+  // trailingSlash is on for the Tauri file-protocol build, so usePathname gives
+  // "/login/" — the route checks below all compare against slash-free paths.
+  const pathname = normalizePath(usePathname());
   const router = useRouter();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
 

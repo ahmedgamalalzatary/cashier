@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { NAV_ITEMS } from "@/lib/navigation";
+import { normalizePath } from "@/lib/auth";
 import { ChangePasswordModal } from "@/components/auth/change-password-modal";
 
 type NavHref = (typeof NAV_ITEMS)[number]["href"];
@@ -64,7 +65,7 @@ export function Sidebar({
   open: boolean;
   onClose: () => void;
 }) {
-  const pathname = usePathname();
+  const pathname = normalizePath(usePathname());
   const { user, logout } = useAuth();
   const [passwordOpen, setPasswordOpen] = useState(false);
   const visibleNav = NAV_ITEMS.filter(
