@@ -124,7 +124,7 @@ export default function SuppliersPage() {
               <td className="px-4 py-3">
                 <div className="flex items-center gap-1">
                   <Link
-                    href={`/suppliers/${s.id}`}
+                    href={`/suppliers/statement?id=${s.id}`}
                     title="كشف حساب"
                     className="rounded-md p-1.5 text-muted transition-colors hover:bg-line/50 hover:text-ink"
                   >

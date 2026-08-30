@@ -1,7 +1,8 @@
 "use client";
 
-import { use, useEffect, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { OrderDetail } from "@cashier/shared";
 import {
   ArrowRight,
@@ -28,12 +29,16 @@ const dateTime = new Intl.DateTimeFormat("ar-EG", {
 const quantity = (value: string) =>
   Number(value).toLocaleString("ar-EG", { maximumFractionDigits: 3 });
 
-export default function OrderDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = use(params);
+export default function OrderDetailPage() {
+  return (
+    <Suspense fallback={<p className="text-muted">جارِ تحميل الطلب…</p>}>
+      <OrderDetailView />
+    </Suspense>
+  );
+}
+
+function OrderDetailView() {
+  const id = useSearchParams().get("id");
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const [order, setOrder] = useState<OrderDetail | null>(null);

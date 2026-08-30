@@ -206,7 +206,7 @@ export default function OrdersPage() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <Link
-                        href={`/orders/${row.id}`}
+                        href={`/orders/detail?id=${row.id}`}
                         className="min-w-0 hover:text-primary"
                       >
                         <span className="tnum block font-bold">{code}</span>
@@ -290,7 +290,7 @@ export default function OrdersPage() {
                     <tr key={row.id} className="hover:bg-paper/50">
                       <td className="px-4 py-3">
                         <Link
-                          href={`/orders/${row.id}`}
+                          href={`/orders/detail?id=${row.id}`}
                           className="block hover:text-primary"
                         >
                           <span className="block font-bold tnum">{code}</span>

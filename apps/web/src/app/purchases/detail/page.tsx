@@ -1,7 +1,8 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import type { PurchaseInvoiceDetail } from "@cashier/shared";
 import { Badge } from "@/components/ui/badge";
@@ -10,12 +11,16 @@ import { Table } from "@/components/ui/table";
 import { formatMoney, itemLabel } from "@/lib/format";
 import { getPurchase } from "@/services/purchases-service";
 
-export default function PurchaseDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = use(params);
+export default function PurchaseDetailPage() {
+  return (
+    <Suspense fallback={<p className="text-muted">جارِ تحميل الفاتورة…</p>}>
+      <PurchaseDetailView />
+    </Suspense>
+  );
+}
+
+function PurchaseDetailView() {
+  const id = useSearchParams().get("id");
   const [invoice, setInvoice] = useState<PurchaseInvoiceDetail | null>(null);
   const [error, setError] = useState("");
 

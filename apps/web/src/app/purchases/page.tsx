@@ -98,7 +98,7 @@ export default function PurchasesPage() {
                 </td>
                 <td className="px-4 py-3">
                   <Link
-                    href={`/purchases/${invoice.id}`}
+                    href={`/purchases/detail?id=${invoice.id}`}
                     aria-label={`عرض فاتورة ${invoice.invoiceNumber || invoice.id}`}
                     title="عرض الفاتورة"
                     className="inline-flex rounded-lg p-2 text-muted hover:bg-line/50 hover:text-ink"

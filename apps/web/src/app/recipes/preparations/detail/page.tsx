@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { ArrowRight, Box, CalendarClock, ChefHat, User } from "lucide-react";
 import type { PreparationDetail } from "@cashier/shared";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,15 @@ import { formatMoney, itemLabel } from "@/lib/format";
 import { getPreparation } from "@/services/recipes-service";
 
 export default function PreparationDetailPage() {
-  const params = useParams<{ id: string }>();
+  return (
+    <Suspense fallback={<p className="text-muted">جارِ تحميل وثيقة التحضير…</p>}>
+      <PreparationDetailView />
+    </Suspense>
+  );
+}
+
+function PreparationDetailView() {
+  const id = useSearchParams().get("id");
   const [preparation, setPreparation] = useState<PreparationDetail | null>(
     null,
   );
@@ -20,7 +28,7 @@ export default function PreparationDetailPage() {
 
   useEffect(() => {
     let cancelled = false;
-    getPreparation(Number(params.id))
+    getPreparation(Number(id))
       .then((row) => {
         if (!cancelled) setPreparation(row);
       })
@@ -35,7 +43,7 @@ export default function PreparationDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [params.id]);
+  }, [id]);
 
   if (error)
     return <p className="rounded-lg bg-danger/10 p-4 text-danger">{error}</p>;

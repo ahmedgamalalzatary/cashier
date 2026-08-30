@@ -111,7 +111,7 @@ export function PurchaseInvoiceForm() {
           lines: [...lines].reverse(),
         }),
       );
-      router.push(`/purchases/${created.id}`);
+      router.push(`/purchases/detail?id=${created.id}`);
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "تعذر حفظ فاتورة الشراء",

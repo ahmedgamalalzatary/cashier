@@ -1,7 +1,8 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import type { TransferDetail } from "@cashier/shared";
 import { PageHeader } from "@/components/ui/page-header";
@@ -9,8 +10,16 @@ import { Table } from "@/components/ui/table";
 import { formatMoney, itemLabel } from "@/lib/format";
 import { getTransfer } from "@/services/transfers-service";
 
-export default function TransferDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function TransferDetailPage() {
+  return (
+    <Suspense fallback={<p className="text-muted">جارِ تحميل التحويل…</p>}>
+      <TransferDetailView />
+    </Suspense>
+  );
+}
+
+function TransferDetailView() {
+  const id = useSearchParams().get("id");
   const [transfer, setTransfer] = useState<TransferDetail | null>(null);
   const [error, setError] = useState("");
 

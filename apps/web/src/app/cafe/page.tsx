@@ -214,7 +214,7 @@ function TransfersTable({ rows }: { rows: TransferSummary[] }) {
           <td className="px-4 py-3 tnum">{formatMoney(transfer.totalCost)}</td>
           <td className="px-4 py-3 text-muted">{new Date(transfer.createdAt).toLocaleString("ar-EG")}</td>
           <td className="px-4 py-3">
-            <Link href={`/cafe/transfers/${transfer.id}`} aria-label={`عرض التحويل رقم ${transfer.id}`} title="عرض التحويل" className="inline-flex rounded-lg p-2 text-muted hover:bg-line/50 hover:text-ink"><Eye className="size-4" /></Link>
+            <Link href={`/cafe/transfers/detail?id=${transfer.id}`} aria-label={`عرض التحويل رقم ${transfer.id}`} title="عرض التحويل" className="inline-flex rounded-lg p-2 text-muted hover:bg-line/50 hover:text-ink"><Eye className="size-4" /></Link>
           </td>
         </tr>
       ))}

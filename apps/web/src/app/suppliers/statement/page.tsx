@@ -1,7 +1,8 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import type {
   Supplier,
@@ -13,12 +14,16 @@ import { Table } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
 import { getSupplierStatement } from "@/services/suppliers-service";
 
-export default function SupplierStatementPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = use(params);
+export default function SupplierStatementPage() {
+  return (
+    <Suspense fallback={<p className="text-muted">جارِ التحميل…</p>}>
+      <SupplierStatementView />
+    </Suspense>
+  );
+}
+
+function SupplierStatementView() {
+  const id = useSearchParams().get("id");
   const [data, setData] = useState<{
     supplier: Supplier;
     payments: SupplierPayment[];
@@ -90,7 +95,7 @@ export default function SupplierStatementPage({
                 {movement.type === "purchase" ? (
                   <Link
                     className="font-medium text-primary hover:underline"
-                    href={`/purchases/${movement.referenceId}`}
+                    href={`/purchases/detail?id=${movement.referenceId}`}
                   >
                     {movement.description}
                   </Link>
