@@ -5,11 +5,13 @@ import path from "node:path";
 // env lives in a single .env at the repo root
 config({ path: path.resolve(__dirname, "../../.env") });
 
+const isStandalone = process.env.NEXT_OUTPUT_MODE === "standalone";
+
 const nextConfig: NextConfig = {
-  output: "export",
+  output: isStandalone ? "standalone" : "export",
   // Tauri serves the bundle off the file protocol: directory-style paths resolve
   // to index.html, and there is no server to optimize images.
-  trailingSlash: true,
+  ...(!isStandalone && { trailingSlash: true }),
   images: { unoptimized: true },
   outputFileTracingRoot: path.resolve(__dirname, "../.."),
   env: {

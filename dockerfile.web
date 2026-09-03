@@ -15,6 +15,7 @@ RUN pnpm install --frozen-lockfile --filter @cashier/web...
 FROM dependencies AS build
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_OUTPUT_MODE=standalone
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY tsconfig.base.json ./
 COPY apps/web ./apps/web
