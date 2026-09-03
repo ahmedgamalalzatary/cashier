@@ -231,9 +231,14 @@ body {
 }
 
 @media print {
-  @page {
+  @page receipt {
     size: 80mm 297mm;
     margin: 0;
+  }
+
+  @page report {
+    size: A4 landscape;
+    margin: 10mm;
   }
 
   body {
@@ -256,12 +261,25 @@ body {
   }
 
   .receipt-print-root {
+    page: receipt;
     position: absolute;
     inset: 0 auto auto 0;
     width: 80mm !important;
     max-width: none !important;
     min-height: 0;
     box-shadow: none !important;
+  }
+
+  .report-print-root {
+    page: report;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+  }
+
+  .report-print-root,
+  .report-print-root * {
+    visibility: visible !important;
   }
 
   .print-controls {

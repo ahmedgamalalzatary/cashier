@@ -133,14 +133,14 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 
 ## 15. Reports & Dashboard
 
-- [ ] Admin dashboard: today sales/profit, open shift, low stock, negative stock, pending transfers
-- [ ] Sales & profit (day/product/category/shift/cashier, COGS, discounts, refunds)
-- [ ] Stock & movement ledger + stocktake history
-- [ ] Money & expenses (cash flow, category breakdown, over/short, supplier balances)
-- [ ] Employees, cashier worked-time, cashier actions + salary history
-- [ ] Waste & refunds report
-- [ ] Suppliers report (statements, purchases, balances)
-- [ ] PDF export (Arabic) for every report
+- [x] Admin dashboard: today sales/profit, open shift, low stock, negative stock, pending transfers
+- [x] Sales & profit (day/product/category/shift/cashier, COGS, discounts, refunds)
+- [x] Stock & movement ledger (stocktake history deferred with the stocktake module)
+- [x] Money & expenses (cash flow, category breakdown, over/short, supplier balances; payroll deferred)
+- [x] Employees, cashier worked-time, and cashier actions (salary history deferred with salaries)
+- [x] Waste & refunds report
+- [x] Suppliers report (purchases and balances; existing supplier statements remain linked from suppliers)
+- [x] Arabic print / PDF export for every currently available report
 
 ## Deferred technical decisions
 

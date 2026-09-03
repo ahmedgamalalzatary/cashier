@@ -18,6 +18,7 @@ import { createShiftsModule } from "./modules/shifts/shifts.module.js";
 import { createRefundsModule } from "./modules/refunds/refunds.module.js";
 import { createWasteModule } from "./modules/waste/waste.module.js";
 import { createExpensesModule } from "./modules/expenses/expenses.module.js";
+import { createReportsModule } from "./modules/reports/reports.module.js";
 
 export type AppOptions = {
   jwtSecret: string;
@@ -44,11 +45,7 @@ export function createApp(
   });
 
   app.use("/api/auth", createAuthModule(db, jwtSecret));
-  app.use(
-    "/api/orders",
-    authenticate(db, jwtSecret),
-    createOrdersModule(db),
-  );
+  app.use("/api/orders", authenticate(db, jwtSecret), createOrdersModule(db));
   app.use("/api/shifts", authenticate(db, jwtSecret), createShiftsModule(db));
   app.use("/api/refunds", authenticate(db, jwtSecret), createRefundsModule(db));
   app.use("/api/waste", authenticate(db, jwtSecret), createWasteModule(db));
@@ -74,6 +71,7 @@ export function createApp(
   );
   app.use("/api/users", ...adminOnly, createUsersModule(db));
   app.use("/api/employees", ...adminOnly, createEmployeesModule(db));
+  app.use("/api/reports", authenticate(db, jwtSecret), createReportsModule(db));
   app.use(
     "/api/inventory",
     authenticate(db, jwtSecret),

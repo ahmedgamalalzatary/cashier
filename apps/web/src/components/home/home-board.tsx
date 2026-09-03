@@ -10,6 +10,7 @@ import type {
 } from "@cashier/shared";
 import { useAuth } from "@/components/auth/auth-provider";
 import { AttentionQueue } from "@/components/home/attention-queue";
+import { AdminMetrics } from "@/components/home/admin-metrics";
 import { QuickActions } from "@/components/home/quick-actions";
 import { ShiftTape } from "@/components/home/shift-tape";
 import { cairoClock, cairoDayLabel, cairoHour } from "@/lib/cairo-date";
@@ -105,6 +106,8 @@ export function HomeBoard() {
           {error}
         </p>
       )}
+
+      {isAdmin && <AdminMetrics />}
 
       {loading ? (
         <p className="text-muted">جارِ تحميل حالة اليوم…</p>
