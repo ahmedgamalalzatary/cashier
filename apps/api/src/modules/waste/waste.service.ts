@@ -28,8 +28,8 @@ export class WasteService {
   catalog() {
     return Promise.all([
       this.repo.listCatalogItems(),
-      this.repo.listCatalogRecipes(),
-    ]).then(([items, recipes]) => ({ items, recipes }));
+      this.repo.listCatalogExternalProducts(),
+    ]).then(([items, products]) => ({ items, products }));
   }
 
   async create(input: WasteInput, actor: AuthUser) {
@@ -59,8 +59,8 @@ export class WasteService {
 
         const occurredAt = new Date();
         let itemId: number | null = null;
-        let recipeId: number | null = null;
-        let recipeSizeId: number | null = null;
+        let externalProductId: number | null = null;
+        let externalSizeId: number | null = null;
         let targetName: string;
         let sizeName: string | null = null;
         let consumptions: Array<{
@@ -83,22 +83,38 @@ export class WasteService {
             },
           ];
         } else {
+          const target = input.target;
           if (input.warehouse !== "cafe")
             throw new HttpError(
               400,
-              "هالك منتج الوصفة يسجل في مخزن الكافيه فقط",
+              "هالك المنتج الخارجي يسجل في مخزن الكافيه فقط",
             );
-          const recipe = await repo.findRecipeSize(input.target.recipeSizeId);
-          if (!recipe) throw new HttpError(404, "حجم منتج الوصفة غير موجود");
-          if (!recipe.isActive || recipe.recipeType !== "product")
-            throw new HttpError(409, "منتج الوصفة غير متاح");
-          const ingredients = await repo.ingredients(recipe.recipeSizeId);
+          const product = await repo.loadExternalProduct(
+            target.externalProductId,
+          );
+          if (!product || !product.isCurrent)
+            throw new HttpError(404, "المنتج الخارجي غير موجود");
+          const size =
+            target.externalSizeId === null
+              ? null
+              : product.sizes.find(
+                  (candidate) => candidate.externalId === target.externalSizeId,
+                );
+          if (
+            (product.sizes.length > 0 && !size) ||
+            (product.sizes.length === 0 && target.externalSizeId !== null)
+          )
+            throw new HttpError(400, "المقاس لا ينتمي إلى المنتج المحدد");
+          const ingredients = size?.ingredients ?? product.ingredients;
           if (!ingredients.length)
-            throw new HttpError(409, "منتج الوصفة لا يحتوي على مكونات");
-          recipeId = recipe.recipeId;
-          recipeSizeId = recipe.recipeSizeId;
-          targetName = recipe.recipeName;
-          sizeName = recipe.sizeName;
+            throw new HttpError(
+              409,
+              "المنتج الخارجي أو المقاس المحدد لا يحتوي على مكونات",
+            );
+          externalProductId = product.externalId;
+          externalSizeId = size?.externalId ?? null;
+          targetName = product.nameAr;
+          sizeName = size?.nameAr ?? null;
           consumptions = ingredients.map((ingredient) => ({
             itemId: ingredient.itemId,
             itemName: ingredient.itemName,
@@ -116,8 +132,10 @@ export class WasteService {
           warehouse: input.warehouse,
           targetType: input.target.type,
           itemId,
-          recipeId,
-          recipeSizeId,
+          recipeId: null,
+          recipeSizeId: null,
+          externalProductId,
+          externalSizeId,
           targetName,
           sizeName,
           quantity: input.quantity.toFixed(3),

@@ -1,4 +1,5 @@
 import type { ExternalOrderSummary } from "@cashier/shared";
+import type { ExternalCatalog } from "./external-catalog.client.js";
 
 const SUCCESS_INTERVAL_MS = 12 * 60 * 60 * 1_000;
 const FAILURE_COOLDOWN_MS = 30 * 1_000;
@@ -22,6 +23,8 @@ export type CacheRefreshStateStore = {
   request(now: Date): Promise<void>;
 };
 
+type CatalogSource = { load(): Promise<ExternalCatalog> };
+type CatalogStore = { applyCatalog(catalog: ExternalCatalog): Promise<void> };
 type OrdersSource = { listAll(): Promise<ExternalOrderSummary[]> };
 type OrdersStore = {
   insertUnseen(orders: ExternalOrderSummary[]): Promise<void>;
@@ -30,6 +33,8 @@ type OrdersStore = {
 export class CacheRefreshService {
   constructor(
     private readonly state: CacheRefreshStateStore,
+    private readonly catalogSource: CatalogSource,
+    private readonly catalogStore: CatalogStore,
     private readonly ordersSource: OrdersSource,
     private readonly ordersStore: OrdersStore,
     private readonly runtime: { now: () => Date; owner: string },
@@ -91,7 +96,14 @@ export class CacheRefreshService {
       heartbeat = setInterval(() => {
         void renewLease().catch(() => undefined);
       }, 60_000);
-      const orders = await this.ordersSource.listAll();
+      const [catalog, orders] = await Promise.all([
+        this.catalogSource.load(),
+        this.ordersSource.listAll(),
+      ]);
+      signal?.throwIfAborted();
+      await renewLease();
+      signal?.throwIfAborted();
+      await this.catalogStore.applyCatalog(catalog);
       signal?.throwIfAborted();
       await renewLease();
       signal?.throwIfAborted();

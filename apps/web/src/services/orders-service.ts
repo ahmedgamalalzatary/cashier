@@ -3,22 +3,41 @@ import type {
   OrderDiscountType,
   OrderSummary,
   ExternalOrdersPage,
-  PosCatalogProduct,
+  ExternalProductCatalog,
 } from "@cashier/shared";
 import { api } from "../lib/api";
 
 export type CreateOrderBody = {
   clientRequestId: string;
-  lines: Array<
-    | { type: "recipe"; recipeSizeId: number; quantity: number }
-    | { type: "item"; itemId: number; quantity: number }
-  >;
+  lines: Array<{
+    type: "external_product";
+    externalProductId: number;
+    externalSizeId: number | null;
+    quantity: number;
+    modifiers: Array<{
+      externalModifierOptionId: number;
+      quantity: number;
+    }>;
+  }>;
   discount: { type: OrderDiscountType; value: number } | null;
   cashReceived: number;
 };
 
-export function listCatalog() {
-  return api<PosCatalogProduct[]>("/api/orders/catalog");
+export async function listCatalog() {
+  const first = await api<
+    ExternalProductCatalog & {
+      pagination: { currentPage: number; totalPages: number };
+    }
+  >("/api/products?page=1&pageSize=50");
+  if (first.pagination.totalPages <= 1) return first;
+  const rest = await Promise.all(
+    Array.from({ length: first.pagination.totalPages - 1 }, (_, index) =>
+      api<ExternalProductCatalog>(
+        `/api/products?page=${index + 2}&pageSize=50`,
+      ),
+    ),
+  );
+  return { ...first, products: [first, ...rest].flatMap((page) => page.products) };
 }
 
 export function listOrders() {

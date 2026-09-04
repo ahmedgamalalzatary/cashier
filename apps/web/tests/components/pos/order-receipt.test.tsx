@@ -23,10 +23,12 @@ const order: OrderDetail = {
   lines: [
     {
       id: 3,
-      type: "recipe",
-      recipeId: 5,
-      recipeSizeId: 6,
+      type: "external_product",
+      recipeId: null,
+      recipeSizeId: null,
       itemId: null,
+      externalProductId: 5,
+      externalSizeId: 6,
       productName: "لاتيه",
       sizeName: "كبير",
       quantity: "2.000",
@@ -34,6 +36,17 @@ const order: OrderDetail = {
       lineSubtotal: "80.00",
       totalCost: "20.00",
       hasStockDeficit: false,
+      modifiers: [
+        {
+          id: 1,
+          externalModifierGroupId: 10,
+          externalModifierOptionId: 11,
+          groupName: "إضافات",
+          optionName: "شوت إضافي",
+          quantity: 1,
+          unitExtraPrice: "5.00",
+        },
+      ],
       allocations: [],
     },
     {
@@ -42,6 +55,8 @@ const order: OrderDetail = {
       recipeId: null,
       recipeSizeId: null,
       itemId: 8,
+      externalProductId: null,
+      externalSizeId: null,
       productName: "مياه",
       sizeName: null,
       quantity: "2.500",
@@ -49,6 +64,7 @@ const order: OrderDetail = {
       lineSubtotal: "25.00",
       totalCost: "12.00",
       hasStockDeficit: false,
+      modifiers: [],
       allocations: [],
     },
   ],
@@ -65,6 +81,7 @@ describe("order receipt", () => {
     expect(html).toContain("سارة");
     expect(html).toContain("لاتيه");
     expect(html).toContain("كبير");
+    expect(html).toContain("شوت إضافي");
     expect(html).toContain("الخصم");
     expect(html).toContain("المستلم");
     expect(html).toContain("الباقي");

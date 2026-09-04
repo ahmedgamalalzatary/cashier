@@ -10,10 +10,6 @@ export class OrdersController {
     private externalOrders: ExternalOrdersRepository,
   ) {}
 
-  catalog = async (_req: Request, res: Response) => {
-    res.json(await this.service.catalog());
-  };
-
   list = async (_req: Request, res: Response) => {
     res.json(await this.service.list());
   };

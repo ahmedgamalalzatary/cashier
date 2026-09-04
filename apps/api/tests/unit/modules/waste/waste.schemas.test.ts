@@ -11,15 +11,23 @@ describe("waste input", () => {
     note: null,
   };
 
-  it("accepts item and recipe-size waste targets", () => {
+  it("accepts item and external-product waste targets", () => {
     expect(wasteInput.parse(base).target).toEqual({ type: "item", itemId: 1 });
     expect(
       wasteInput.parse({
         ...base,
-        target: { type: "recipe", recipeSizeId: 2 },
+        target: {
+          type: "external_product",
+          externalProductId: 9,
+          externalSizeId: 91,
+        },
         reason: "spill",
       }).target,
-    ).toEqual({ type: "recipe", recipeSizeId: 2 });
+    ).toEqual({
+      type: "external_product",
+      externalProductId: 9,
+      externalSizeId: 91,
+    });
   });
 
   it("requires a note for the other reason", () => {
@@ -28,11 +36,15 @@ describe("waste input", () => {
     ).toThrow();
   });
 
-  it("rejects fractional recipe-product quantities", () => {
+  it("rejects fractional external-product quantities", () => {
     expect(() =>
       wasteInput.parse({
         ...base,
-        target: { type: "recipe", recipeSizeId: 2 },
+        target: {
+          type: "external_product",
+          externalProductId: 9,
+          externalSizeId: null,
+        },
         quantity: 0.5,
       }),
     ).toThrow();

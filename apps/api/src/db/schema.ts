@@ -370,6 +370,257 @@ export const recipeIngredients = mysqlTable(
   ],
 );
 
+export const externalCategories = mysqlTable("external_categories", {
+  externalId: int("external_id").primaryKey(),
+  nameAr: varchar("name_ar", { length: 191 }).notNull(),
+  nameEn: varchar("name_en", { length: 191 }).notNull(),
+  descriptionAr: text("description_ar"),
+  descriptionEn: text("description_en"),
+  isActive: boolean("is_active").notNull(),
+  isVisible: boolean("is_visible").notNull(),
+  displayOrder: int("display_order").notNull(),
+  isCurrent: boolean("is_current").notNull().default(true),
+  syncedAt: timestamp("synced_at").notNull(),
+});
+
+export const externalProducts = mysqlTable(
+  "external_products",
+  {
+    externalId: int("external_id").primaryKey(),
+    externalCategoryId: int("external_category_id").notNull(),
+    nameAr: varchar("name_ar", { length: 191 }).notNull(),
+    nameEn: varchar("name_en", { length: 191 }).notNull(),
+    descriptionAr: text("description_ar"),
+    descriptionEn: text("description_en"),
+    imageUrl: varchar("image_url", { length: 2048 }),
+    price: decimal("price", { precision: 12, scale: 2 }).notNull(),
+    discountPercentage: decimal("discount_percentage", {
+      precision: 5,
+      scale: 2,
+    }),
+    discountStart: varchar("discount_start", { length: 40 }),
+    discountEnd: varchar("discount_end", { length: 40 }),
+    calories: int("calories").notNull(),
+    pointsReward: int("points_reward").notNull(),
+    isAvailable: boolean("is_available").notNull(),
+    isVisible: boolean("is_visible").notNull(),
+    isCurrent: boolean("is_current").notNull().default(true),
+    syncedAt: timestamp("synced_at").notNull(),
+  },
+  (table) => [
+    index("external_products_category_idx").on(table.externalCategoryId),
+    index("external_products_current_idx").on(table.isCurrent),
+    foreignKey({
+      name: "ext_prod_cat_fk",
+      columns: [table.externalCategoryId],
+      foreignColumns: [externalCategories.externalId],
+    }),
+  ],
+);
+
+export const externalProductSizes = mysqlTable(
+  "external_product_sizes",
+  {
+    externalId: int("external_id").primaryKey(),
+    externalProductId: int("external_product_id").notNull(),
+    nameAr: varchar("name_ar", { length: 191 }).notNull(),
+    nameEn: varchar("name_en", { length: 191 }).notNull(),
+    price: decimal("price", { precision: 12, scale: 2 }).notNull(),
+    isDefault: boolean("is_default").notNull(),
+    isCurrent: boolean("is_current").notNull().default(true),
+    syncedAt: timestamp("synced_at").notNull(),
+  },
+  (table) => [
+    index("external_product_sizes_product_idx").on(table.externalProductId),
+    foreignKey({
+      name: "ext_size_prod_fk",
+      columns: [table.externalProductId],
+      foreignColumns: [externalProducts.externalId],
+    }),
+  ],
+);
+
+export const externalModifierGroups = mysqlTable(
+  "external_modifier_groups",
+  {
+    externalId: int("external_id").primaryKey(),
+    externalProductId: int("external_product_id").notNull(),
+    nameAr: varchar("name_ar", { length: 191 }),
+    nameEn: varchar("name_en", { length: 191 }),
+    isRequired: boolean("is_required").notNull(),
+    maxSelections: int("max_selections").notNull(),
+    isCurrent: boolean("is_current").notNull().default(true),
+    syncedAt: timestamp("synced_at").notNull(),
+  },
+  (table) => [
+    index("external_modifier_groups_product_idx").on(table.externalProductId),
+    foreignKey({
+      name: "ext_mod_grp_prod_fk",
+      columns: [table.externalProductId],
+      foreignColumns: [externalProducts.externalId],
+    }),
+  ],
+);
+
+export const externalModifierOptions = mysqlTable(
+  "external_modifier_options",
+  {
+    externalId: int("external_id").primaryKey(),
+    externalModifierGroupId: int("external_modifier_group_id").notNull(),
+    nameAr: varchar("name_ar", { length: 191 }),
+    nameEn: varchar("name_en", { length: 191 }),
+    extraPrice: decimal("extra_price", { precision: 12, scale: 2 }).notNull(),
+    stockEffect: mysqlEnum("stock_effect", ["incomplete", "mapped", "none"])
+      .notNull()
+      .default("incomplete"),
+    isCurrent: boolean("is_current").notNull().default(true),
+    syncedAt: timestamp("synced_at").notNull(),
+  },
+  (table) => [
+    index("external_modifier_options_group_idx").on(
+      table.externalModifierGroupId,
+    ),
+    foreignKey({
+      name: "ext_mod_opt_grp_fk",
+      columns: [table.externalModifierGroupId],
+      foreignColumns: [externalModifierGroups.externalId],
+    }),
+  ],
+);
+
+export const externalProductIngredients = mysqlTable(
+  "external_product_ingredients",
+  {
+    externalProductId: int("external_product_id").notNull(),
+    itemId: int("item_id")
+      .notNull()
+      .references(() => items.id),
+    quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("external_product_ingredients_uidx").on(
+      table.externalProductId,
+      table.itemId,
+    ),
+    index("external_product_ingredients_item_idx").on(table.itemId),
+    foreignKey({
+      name: "ext_prod_ing_prod_fk",
+      columns: [table.externalProductId],
+      foreignColumns: [externalProducts.externalId],
+    }),
+  ],
+);
+
+export const externalSizeIngredients = mysqlTable(
+  "external_size_ingredients",
+  {
+    externalSizeId: int("external_size_id").notNull(),
+    itemId: int("item_id")
+      .notNull()
+      .references(() => items.id),
+    quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("external_size_ingredients_uidx").on(
+      table.externalSizeId,
+      table.itemId,
+    ),
+    index("external_size_ingredients_item_idx").on(table.itemId),
+    foreignKey({
+      name: "ext_size_ing_size_fk",
+      columns: [table.externalSizeId],
+      foreignColumns: [externalProductSizes.externalId],
+    }),
+  ],
+);
+
+export const externalModifierIngredients = mysqlTable(
+  "external_modifier_ingredients",
+  {
+    externalModifierOptionId: int("external_modifier_option_id").notNull(),
+    itemId: int("item_id")
+      .notNull()
+      .references(() => items.id),
+    quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("external_modifier_ingredients_uidx").on(
+      table.externalModifierOptionId,
+      table.itemId,
+    ),
+    index("external_modifier_ingredients_item_idx").on(table.itemId),
+    foreignKey({
+      name: "ext_mod_ing_opt_fk",
+      columns: [table.externalModifierOptionId],
+      foreignColumns: [externalModifierOptions.externalId],
+    }),
+  ],
+);
+
+export const externalCatalogSync = mysqlTable("external_catalog_sync", {
+  id: int("id").primaryKey(),
+  lastSuccessfulSyncAt: timestamp("last_successful_sync_at", { fsp: 3 }),
+  lastAttemptAt: timestamp("last_attempt_at", { fsp: 3 }),
+  lastFailedAt: timestamp("last_failed_at", { fsp: 3 }),
+  lastError: varchar("last_error", { length: 500 }),
+  refreshRequestedAt: timestamp("refresh_requested_at", { fsp: 3 }),
+  refreshRequestVersion: int("refresh_request_version").notNull().default(0),
+  completedRequestVersion: int("completed_request_version")
+    .notNull()
+    .default(0),
+  lockOwner: varchar("lock_owner", { length: 191 }),
+  lockExpiresAt: timestamp("lock_expires_at", { fsp: 3 }),
+});
+
+export const externalOrdersCache = mysqlTable(
+  "external_orders_cache",
+  {
+    externalId: int("external_id").primaryKey(),
+    customerName: varchar("customer_name", { length: 191 }).notNull(),
+    customerPhone: varchar("customer_phone", { length: 32 }),
+    subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
+    discountAmount: decimal("discount_amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
+    deliveryFee: decimal("delivery_fee", { precision: 12, scale: 2 }).notNull(),
+    externalCreatedAt: varchar("external_created_at", { length: 40 }).notNull(),
+    orderStatus: mysqlEnum("order_status", [
+      "pending",
+      "completed",
+      "cancelled",
+      "unknown",
+    ]).notNull(),
+    paymentStatus: mysqlEnum("payment_status", [
+      "pending",
+      "paid",
+      "failed",
+      "cancelled",
+      "unpaid",
+      "unknown",
+    ]).notNull(),
+    paymentMethod: mysqlEnum("payment_method", [
+      "cash_on_delivery",
+      "online",
+      "onsite",
+      "unknown",
+    ]).notNull(),
+    orderType: mysqlEnum("order_type", [
+      "pickup",
+      "delivery",
+      "unknown",
+    ]).notNull(),
+    itemCount: int("item_count").notNull(),
+    cachedAt: timestamp("cached_at").notNull(),
+  },
+  (table) => [
+    index("external_orders_created_idx").on(table.externalCreatedAt),
+    index("external_orders_customer_idx").on(table.customerName),
+    index("external_orders_phone_idx").on(table.customerPhone),
+  ],
+);
+
 export const preparations = mysqlTable(
   "preparations",
   {
@@ -547,12 +798,16 @@ export const orderLines = mysqlTable(
     orderId: int("order_id")
       .notNull()
       .references(() => orders.id),
-    type: mysqlEnum("type", ["recipe", "item"]).notNull(),
+    type: mysqlEnum("type", ["recipe", "item", "external_product"]).notNull(),
     recipeId: int("recipe_id").references(() => recipes.id),
     recipeSizeId: int("recipe_size_id").references(() => recipeSizes.id, {
       onDelete: "set null",
     }),
     itemId: int("item_id").references(() => items.id),
+    externalProductId: int("external_product_id").references(
+      () => externalProducts.externalId,
+    ),
+    externalSizeId: int("external_size_id"),
     productName: varchar("product_name", { length: 191 }).notNull(),
     sizeName: varchar("size_name", { length: 100 }),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
@@ -570,6 +825,38 @@ export const orderLines = mysqlTable(
     index("order_lines_order_id_idx").on(table.orderId),
     index("order_lines_recipe_id_idx").on(table.recipeId),
     index("order_lines_item_id_idx").on(table.itemId),
+    index("order_lines_external_product_idx").on(table.externalProductId),
+    foreignKey({
+      name: "order_line_ext_size_fk",
+      columns: [table.externalSizeId],
+      foreignColumns: [externalProductSizes.externalId],
+    }),
+  ],
+);
+
+export const orderLineModifiers = mysqlTable(
+  "order_line_modifiers",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    orderLineId: int("order_line_id")
+      .notNull()
+      .references(() => orderLines.id),
+    externalModifierGroupId: int("external_modifier_group_id").notNull(),
+    externalModifierOptionId: int("external_modifier_option_id").notNull(),
+    groupName: varchar("group_name", { length: 191 }).notNull(),
+    optionName: varchar("option_name", { length: 191 }).notNull(),
+    quantity: int("quantity").notNull(),
+    unitExtraPrice: decimal("unit_extra_price", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+  },
+  (table) => [
+    index("order_line_modifiers_line_idx").on(table.orderLineId),
+    uniqueIndex("order_line_modifiers_line_option_uidx").on(
+      table.orderLineId,
+      table.externalModifierOptionId,
+    ),
   ],
 );
 
@@ -625,7 +912,7 @@ export const refundLines = mysqlTable(
     orderLineId: int("order_line_id")
       .notNull()
       .references(() => orderLines.id),
-    type: mysqlEnum("type", ["recipe", "item"]).notNull(),
+    type: mysqlEnum("type", ["recipe", "item", "external_product"]).notNull(),
     productName: varchar("product_name", { length: 191 }).notNull(),
     sizeName: varchar("size_name", { length: 100 }),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
@@ -658,7 +945,7 @@ export const refundLines = mysqlTable(
     check("refund_lines_cost_nonnegative_chk", sql`${table.returnedCost} >= 0`),
     check(
       "refund_lines_action_type_chk",
-      sql`((${table.type} = 'item' AND ${table.stockAction} IS NOT NULL) OR (${table.type} = 'recipe' AND ${table.stockAction} IS NULL))`,
+      sql`((${table.type} = 'item' AND ${table.stockAction} IS NOT NULL) OR (${table.type} <> 'item' AND ${table.stockAction} IS NULL))`,
     ),
   ],
 );
@@ -790,10 +1077,16 @@ export const wasteEntries = mysqlTable(
     requestFingerprint: varchar("request_fingerprint", { length: 64 }),
     shiftId: int("shift_id").references(() => shifts.id),
     warehouse: mysqlEnum("warehouse", ["main", "cafe"]).notNull(),
-    targetType: mysqlEnum("target_type", ["item", "recipe"]),
+    targetType: mysqlEnum("target_type", [
+      "item",
+      "recipe",
+      "external_product",
+    ]),
     itemId: int("item_id").references(() => items.id),
     recipeId: int("recipe_id").references(() => recipes.id),
     recipeSizeId: int("recipe_size_id").references(() => recipeSizes.id),
+    externalProductId: int("external_product_id"),
+    externalSizeId: int("external_size_id"),
     targetName: varchar("target_name", { length: 191 }),
     sizeName: varchar("size_name", { length: 100 }),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
@@ -820,6 +1113,16 @@ export const wasteEntries = mysqlTable(
     index("waste_entries_item_idx").on(table.itemId),
     index("waste_entries_shift_idx").on(table.shiftId),
     index("waste_entries_occurred_idx").on(table.occurredAt),
+    foreignKey({
+      name: "waste_ext_prod_fk",
+      columns: [table.externalProductId],
+      foreignColumns: [externalProducts.externalId],
+    }),
+    foreignKey({
+      name: "waste_ext_size_fk",
+      columns: [table.externalSizeId],
+      foreignColumns: [externalProductSizes.externalId],
+    }),
     check("waste_entries_quantity_positive_chk", sql`${table.quantity} > 0`),
     check("waste_entries_cost_nonnegative_chk", sql`${table.totalCost} >= 0`),
     check(
@@ -837,6 +1140,8 @@ export const wasteEntries = mysqlTable(
             AND ${table.itemId} IS NOT NULL
             AND ${table.recipeId} IS NULL
             AND ${table.recipeSizeId} IS NULL
+            AND ${table.externalProductId} IS NULL
+            AND ${table.externalSizeId} IS NULL
           )
           OR
           (
@@ -844,6 +1149,16 @@ export const wasteEntries = mysqlTable(
             AND ${table.itemId} IS NULL
             AND ${table.recipeId} IS NOT NULL
             AND ${table.recipeSizeId} IS NOT NULL
+            AND ${table.externalProductId} IS NULL
+            AND ${table.externalSizeId} IS NULL
+          )
+          OR
+          (
+            ${table.targetType} = 'external_product'
+            AND ${table.itemId} IS NULL
+            AND ${table.recipeId} IS NULL
+            AND ${table.recipeSizeId} IS NULL
+            AND ${table.externalProductId} IS NOT NULL
           )
         )
       )`,
@@ -902,7 +1217,9 @@ export const expenses = mysqlTable(
     clientRequestId: varchar("client_request_id", { length: 36 })
       .notNull()
       .unique(),
-    requestFingerprint: varchar("request_fingerprint", { length: 64 }).notNull(),
+    requestFingerprint: varchar("request_fingerprint", {
+      length: 64,
+    }).notNull(),
     type: mysqlEnum("type", ["shift", "general"]).notNull(),
     categoryId: int("category_id")
       .notNull()
@@ -925,69 +1242,5 @@ export const expenses = mysqlTable(
       "expenses_type_shift_chk",
       sql`((${table.type} = 'shift' AND ${table.shiftId} IS NOT NULL) OR (${table.type} = 'general' AND ${table.shiftId} IS NULL))`,
     ),
-  ],
-);
-
-export const externalOrdersSync = mysqlTable("external_orders_sync", {
-  id: int("id").primaryKey(),
-  lastSuccessfulSyncAt: timestamp("last_successful_sync_at", { fsp: 3 }),
-  lastAttemptAt: timestamp("last_attempt_at", { fsp: 3 }),
-  lastFailedAt: timestamp("last_failed_at", { fsp: 3 }),
-  lastError: varchar("last_error", { length: 500 }),
-  refreshRequestedAt: timestamp("refresh_requested_at", { fsp: 3 }),
-  refreshRequestVersion: int("refresh_request_version").notNull().default(0),
-  completedRequestVersion: int("completed_request_version")
-    .notNull()
-    .default(0),
-  lockOwner: varchar("lock_owner", { length: 191 }),
-  lockExpiresAt: timestamp("lock_expires_at", { fsp: 3 }),
-});
-
-export const externalOrdersCache = mysqlTable(
-  "external_orders_cache",
-  {
-    externalId: int("external_id").primaryKey(),
-    customerName: varchar("customer_name", { length: 191 }).notNull(),
-    customerPhone: varchar("customer_phone", { length: 32 }),
-    subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
-    discountAmount: decimal("discount_amount", {
-      precision: 12,
-      scale: 2,
-    }).notNull(),
-    totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
-    deliveryFee: decimal("delivery_fee", { precision: 12, scale: 2 }).notNull(),
-    externalCreatedAt: varchar("external_created_at", { length: 40 }).notNull(),
-    orderStatus: mysqlEnum("order_status", [
-      "pending",
-      "completed",
-      "cancelled",
-      "unknown",
-    ]).notNull(),
-    paymentStatus: mysqlEnum("payment_status", [
-      "pending",
-      "paid",
-      "failed",
-      "cancelled",
-      "unpaid",
-      "unknown",
-    ]).notNull(),
-    paymentMethod: mysqlEnum("payment_method", [
-      "cash_on_delivery",
-      "online",
-      "onsite",
-      "unknown",
-    ]).notNull(),
-    orderType: mysqlEnum("order_type", [
-      "pickup",
-      "delivery",
-      "unknown",
-    ]).notNull(),
-    itemCount: int("item_count").notNull(),
-    cachedAt: timestamp("cached_at").notNull(),
-  },
-  (table) => [
-    index("external_orders_created_idx").on(table.externalCreatedAt),
-    index("external_orders_customer_idx").on(table.customerName),
-    index("external_orders_phone_idx").on(table.customerPhone),
   ],
 );

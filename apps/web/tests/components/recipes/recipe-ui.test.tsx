@@ -7,9 +7,24 @@ import {
   RecipeMargin,
   RecipeTabs,
 } from "../../../src/components/recipes/recipe-controls";
+import { CatalogSyncStatus } from "../../../src/components/recipes/catalog-sync-status";
 import { Modal } from "../../../src/components/ui/modal";
 
 describe("recipe UI controls", () => {
+  it("renders the never-synchronized catalog message", () => {
+    const html = renderToStaticMarkup(
+      <CatalogSyncStatus
+        catalog={{
+          categories: [],
+          products: [],
+          lastSuccessfulSyncAt: null,
+          stale: false,
+          syncError: null,
+        }}
+      />,
+    );
+    expect(html).toContain("لم تتم مزامنة الكتالوج بنجاح بعد");
+  });
   it("renders keyboard-addressable tabs with their selected panel relationship", () => {
     const html = renderToStaticMarkup(
       createElement(RecipeTabs, {
@@ -39,15 +54,17 @@ describe("recipe UI controls", () => {
     expect(html).toContain("رصيد غير كافٍ");
   });
 
-  it("labels the two recipe creation actions explicitly", () => {
+  it("keeps prepared-recipe creation and external catalog refresh actions", () => {
     const html = renderToStaticMarkup(
       createElement(RecipeHeaderActions, {
-        onProduct: vi.fn(),
         onPrepared: vi.fn(),
+        onRefresh: vi.fn(),
+        refreshing: false,
       }),
     );
-    expect(html).toContain("إضافة منتج وصفة");
     expect(html).toContain("إضافة وصفة تحضير");
+    expect(html).toContain("تحديث المنتجات");
+    expect(html).not.toContain("إضافة منتج وصفة");
   });
 
   it("allows the dense recipe editor to use a wide, scroll-safe dialog", () => {

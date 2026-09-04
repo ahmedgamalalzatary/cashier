@@ -10,7 +10,12 @@ export type CreateWasteBody = {
   clientRequestId: string;
   warehouse: "main" | "cafe";
   target:
-    { type: "item"; itemId: number } | { type: "recipe"; recipeSizeId: number };
+    | { type: "item"; itemId: number }
+    | {
+        type: "external_product";
+        externalProductId: number;
+        externalSizeId: number | null;
+      };
   quantity: number;
   reason: WasteReason;
   note: string | null;

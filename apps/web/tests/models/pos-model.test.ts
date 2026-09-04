@@ -1,163 +1,245 @@
 import { describe, expect, it } from "vitest";
-import type { PosCatalogProduct } from "@cashier/shared";
+import type { ExternalProduct } from "@cashier/shared";
 import {
   addCatalogSelection,
+  catalogTilePrice,
   cartTotals,
+  defaultExternalSize,
   filterCatalog,
   orderPayload,
   setCartLineQuantity,
 } from "../../src/models/pos-model";
 
-const catalog: PosCatalogProduct[] = [
-  {
-    type: "recipe",
-    recipeId: 1,
-    name: "لاتيه",
-    categoryId: 11,
-    mainCategoryId: 10,
-    mainCategoryName: "مشروبات",
-    subCategoryId: 11,
-    subCategoryName: "قهوة",
-    sizes: [
-      { id: 101, name: "صغير", sellingPrice: "30.00" },
-      { id: 102, name: "كبير", sellingPrice: "40.00" },
-    ],
-  },
-  {
-    type: "item",
-    itemId: 2,
-    name: "مياه",
-    categoryId: 12,
-    mainCategoryId: 10,
-    mainCategoryName: "مشروبات",
-    subCategoryId: 12,
-    subCategoryName: "بارد",
-    sellingPrice: "10.00",
-    stockUnit: "زجاجة",
-  },
-];
+const product: ExternalProduct = {
+  externalId: 9,
+  externalCategoryId: 3,
+  nameAr: "لاتيه",
+  nameEn: "Latte",
+  descriptionAr: null,
+  descriptionEn: null,
+  imageUrl: null,
+  price: "80.00",
+  discountPercentage: "10.00",
+  discountStart: "2026-08-01T00:00:00",
+  discountEnd: "2026-08-31T23:59:59",
+  calories: 120,
+  pointsReward: 8,
+  isAvailable: true,
+  isVisible: true,
+  ingredients: [],
+  stockConfigured: true,
+  modifierNamesMissing: false,
+  sellable: true,
+  sizes: [
+    {
+      externalId: 91,
+      nameAr: "كبير",
+      nameEn: "Large",
+      price: "100.00",
+      isDefault: true,
+      ingredients: [{ itemId: 1, quantity: "0.020" }],
+    },
+  ],
+  modifierGroups: [
+    {
+      externalId: 92,
+      nameAr: "إضافات",
+      nameEn: "Extras",
+      isRequired: false,
+      maxSelections: 2,
+      options: [
+        {
+          externalId: 93,
+          nameAr: "شوت إضافي",
+          nameEn: "Extra shot",
+          extraPrice: "15.00",
+          stockEffect: "mapped",
+          ingredients: [{ itemId: 1, quantity: "0.010" }],
+        },
+      ],
+    },
+  ],
+};
+
+// The external catalog evaluates discount windows at a fixed UTC+3, so this is
+// 2026-08-18T12:00:00 in that catalog's own clock.
+const nowMs = Date.parse("2026-08-18T09:00:00Z");
 
 describe("POS model", () => {
-  it("adds size-aware selections and combines repeated cart keys", () => {
-    let cart = addCatalogSelection([], catalog[0], 102);
-    cart = addCatalogSelection(cart, catalog[0], 102);
-    cart = addCatalogSelection(cart, catalog[1]);
+  it("adds size/modifier selections and combines identical configurations", () => {
+    let cart = addCatalogSelection(
+      [],
+      product,
+      91,
+      [{ externalModifierOptionId: 93, quantity: 2 }],
+      nowMs,
+    );
+    cart = addCatalogSelection(
+      cart,
+      product,
+      91,
+      [{ externalModifierOptionId: 93, quantity: 2 }],
+      nowMs,
+    );
 
     expect(cart).toMatchObject([
       {
-        key: "recipe:102",
         productName: "لاتيه",
         sizeName: "كبير",
         quantity: 2,
-        unitPrice: "40.00",
-      },
-      {
-        key: "item:2",
-        productName: "مياه",
-        quantity: 1,
-        unitPrice: "10.00",
+        unitPrice: "120.00",
+        modifiers: [{ externalModifierOptionId: 93, quantity: 2 }],
       },
     ]);
   });
 
-  it("calculates percentage and fixed discounts in integer cents", () => {
-    const cart = [
-      {
-        key: "recipe:101",
-        type: "recipe" as const,
-        recipeSizeId: 101,
-        productName: "لاتيه",
-        sizeName: "صغير",
-        stockUnit: null,
-        quantity: 3,
-        unitPrice: "33.35",
-      },
-    ];
+  it("calculates discounts in integer cents", () => {
+    const cart = addCatalogSelection(
+      [],
+      { ...product, discountPercentage: null },
+      91,
+      [],
+      nowMs,
+    );
+    const three = setCartLineQuantity(cart, cart[0].key, 3);
 
-    expect(cartTotals(cart, { type: "percent", value: 10 }, 100)).toEqual({
-      subtotal: 100.05,
-      discountAmount: 10.01,
-      total: 90.04,
-      change: 9.96,
+    expect(cartTotals(three, { type: "percent", value: 10 }, 300)).toEqual({
+      subtotal: 300,
+      discountAmount: 30,
+      total: 270,
+      change: 30,
       hasEnoughCash: true,
       discountValid: true,
     });
-    expect(cartTotals(cart, { type: "fixed", value: 101 }, 101)).toMatchObject({
-      discountValid: false,
+  });
+
+  it("filters bilingual products and builds only external-product lines", () => {
+    expect(filterCatalog([product], { categoryId: 3, query: "lat" })).toEqual([
+      product,
+    ]);
+
+    const cart = addCatalogSelection(
+      [],
+      product,
+      91,
+      [{ externalModifierOptionId: 93, quantity: 1 }],
+      nowMs,
+    );
+    expect(orderPayload(cart, { type: null, value: 0 }, 200)).toEqual({
+      lines: [
+        {
+          type: "external_product",
+          externalProductId: 9,
+          externalSizeId: 91,
+          quantity: 1,
+          modifiers: [{ externalModifierOptionId: 93, quantity: 1 }],
+        },
+      ],
+      discount: null,
+      cashReceived: 200,
     });
   });
 
-  it("rounds fractional resale totals exactly like the server", () => {
+  it("does not guess when the external catalog marks multiple default sizes", () => {
+    expect(defaultExternalSize(product)).toBe(91);
     expect(
-      cartTotals(
-        [
+      defaultExternalSize({
+        ...product,
+        sizes: [
+          ...product.sizes,
           {
-            key: "item:9",
-            type: "item",
-            itemId: 9,
-            productName: "وزن",
-            sizeName: null,
-            stockUnit: "كجم",
-            quantity: 1.005,
-            unitPrice: "1.00",
+            ...product.sizes[0],
+            externalId: 94,
+            nameEn: "Medium",
+            isDefault: true,
           },
         ],
-        { type: null, value: 0 },
-        1.01,
-      ),
-    ).toMatchObject({
-      subtotal: 1.01,
-      total: 1.01,
-      hasEnoughCash: true,
-    });
-  });
-
-  it("rejects oversized exponential numeric inputs without throwing", () => {
-    const oversizedCart = [
-      {
-        key: "item:8",
-        type: "item" as const,
-        itemId: 8,
-        productName: "مياه",
-        sizeName: null,
-        stockUnit: "وحدة",
-        quantity: 1e21,
-        unitPrice: "10.00",
-      },
-    ];
-
-    expect(() =>
-      cartTotals(oversizedCart, { type: null, value: 0 }, 1e21),
-    ).not.toThrow();
-    expect(
-      cartTotals(oversizedCart, { type: null, value: 0 }, 1e21),
-    ).toMatchObject({ hasEnoughCash: false, discountValid: false });
-  });
-
-  it("filters by category and Arabic query, normalizes quantities, and builds the API body", () => {
-    expect(
-      filterCatalog(catalog, {
-        mainCategoryId: 10,
-        subCategoryId: 11,
-        query: "لات",
       }),
-    ).toEqual([catalog[0]]);
-
-    let cart = addCatalogSelection([], catalog[1]);
-    cart = setCartLineQuantity(cart, "item:2", 1.2344);
-    expect(cart[0].quantity).toBe(1.234);
-    expect(orderPayload(cart, { type: "fixed", value: 2 }, 20)).toEqual({
-      lines: [{ type: "item", itemId: 2, quantity: 1.234 }],
-      discount: { type: "fixed", value: 2 },
-      cashReceived: 20,
-    });
+    ).toBeNull();
   });
 
-  it("keeps positive stock quantities at the supported minimum precision", () => {
-    const cart = addCatalogSelection([], catalog[1]);
-
-    expect(setCartLineQuantity(cart, "item:2", 0.0004)[0].quantity).toBe(
-      0.001,
+  it("evaluates the discount window at the catalog's fixed UTC+3, not Cairo DST", () => {
+    const winter = {
+      ...product,
+      discountStart: "2026-12-01T10:00:00",
+      discountEnd: "2026-12-01T12:00:00",
+    };
+    // 09:30Z is 12:30 UTC+3 — past the window — but only 11:30 in Cairo
+    // winter time, so a DST-aware clock would still discount here.
+    const after = addCatalogSelection(
+      [],
+      winter,
+      91,
+      [],
+      Date.parse("2026-12-01T09:30:00Z"),
     );
+    expect(after[0].unitPrice).toBe("100.00");
+
+    const inside = addCatalogSelection(
+      [],
+      winter,
+      91,
+      [],
+      Date.parse("2026-12-01T08:30:00Z"),
+    );
+    expect(inside[0].unitPrice).toBe("90.00");
+  });
+
+  it("shows a discounted tile price for the default size", () => {
+    expect(catalogTilePrice(product, nowMs)).toBe("90.00");
+    expect(
+      catalogTilePrice({ ...product, discountPercentage: null }, nowMs),
+    ).toBe("100.00");
+  });
+
+  it("uses explicit-choice fallback pricing when default sizes are ambiguous", () => {
+    const ambiguous = {
+      ...product,
+      sizes: [
+        { ...product.sizes[0]!, price: "120.00" },
+        {
+          ...product.sizes[0]!,
+          externalId: 94,
+          price: "110.00",
+          isDefault: true,
+        },
+        {
+          ...product.sizes[0]!,
+          externalId: 95,
+          price: "100.00",
+          isDefault: false,
+        },
+      ],
+    };
+
+    expect(catalogTilePrice(ambiguous, nowMs)).toBe("90.00");
+  });
+
+  it("normalizes duplicate modifiers and rejects invalid quantities", () => {
+    const normalized = addCatalogSelection(
+      [],
+      product,
+      91,
+      [
+        { externalModifierOptionId: 93, quantity: 1 },
+        { externalModifierOptionId: 93, quantity: 1 },
+      ],
+      nowMs,
+    );
+    expect(normalized[0]).toMatchObject({
+      unitPrice: "120.00",
+      modifiers: [{ externalModifierOptionId: 93, quantity: 2 }],
+    });
+
+    const existing = addCatalogSelection([], product, 91, [], nowMs);
+    expect(
+      addCatalogSelection(
+        existing,
+        product,
+        91,
+        [{ externalModifierOptionId: 93, quantity: 1.5 }],
+        nowMs,
+      ),
+    ).toBe(existing);
   });
 });

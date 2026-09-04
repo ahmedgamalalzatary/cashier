@@ -4,7 +4,7 @@ import { CacheRefreshService } from "../../../../src/modules/external/cache-refr
 const now = new Date("2026-08-21T12:00:00.000Z");
 
 describe("CacheRefreshService", () => {
-  it("uses one durable lock and refreshes append-only orders", async () => {
+  it("uses one durable lock and refreshes catalog plus append-only orders", async () => {
     const state = {
       getState: vi.fn().mockResolvedValue({
         lastSuccessfulSyncAt: null,
@@ -20,12 +20,16 @@ describe("CacheRefreshService", () => {
       release: vi.fn(),
       request: vi.fn(),
     };
+    const catalog = { load: vi.fn().mockResolvedValue({ products: [] }) };
+    const products = { applyCatalog: vi.fn() };
     const externalOrders = {
       listAll: vi.fn().mockResolvedValue([{ id: 17 }]),
     };
     const orders = { insertUnseen: vi.fn() };
     const service = new CacheRefreshService(
       state,
+      catalog,
+      products,
       externalOrders,
       orders,
       { now: () => now, owner: "worker-1" },
@@ -33,6 +37,7 @@ describe("CacheRefreshService", () => {
 
     await expect(service.runDue()).resolves.toBe(true);
     expect(state.tryAcquire).toHaveBeenCalledOnce();
+    expect(products.applyCatalog).toHaveBeenCalledWith({ products: [] });
     expect(orders.insertUnseen).toHaveBeenCalledWith([{ id: 17 }]);
     expect(state.markSuccess).toHaveBeenCalledOnce();
     expect(state.release).toHaveBeenCalledOnce();
@@ -56,7 +61,9 @@ describe("CacheRefreshService", () => {
     };
     const service = new CacheRefreshService(
       state,
-      { listAll: vi.fn().mockRejectedValue(new Error("offline")) },
+      { load: vi.fn().mockRejectedValue(new Error("offline")) },
+      { applyCatalog: vi.fn() },
+      { listAll: vi.fn() },
       { insertUnseen: vi.fn() },
       { now: () => now, owner: "worker-1" },
     );
@@ -73,6 +80,8 @@ describe("CacheRefreshService", () => {
     const state = { request: vi.fn() };
     const service = new CacheRefreshService(
       state as never,
+      {} as never,
+      {} as never,
       {} as never,
       {} as never,
       { now: () => now, owner: "api" },
@@ -99,15 +108,19 @@ describe("CacheRefreshService", () => {
       release: vi.fn(),
       request: vi.fn(),
     };
+    const products = { applyCatalog: vi.fn() };
     const orders = { insertUnseen: vi.fn() };
     const service = new CacheRefreshService(
       state,
+      { load: vi.fn().mockResolvedValue({ categories: [], products: [] }) },
+      products,
       { listAll: vi.fn().mockResolvedValue([]) },
       orders,
       { now: () => now, owner: "worker-1" },
     );
 
     await expect(service.runForced()).rejects.toThrow("refresh lease");
+    expect(products.applyCatalog).not.toHaveBeenCalled();
     expect(orders.insertUnseen).not.toHaveBeenCalled();
     expect(state.markSuccess).not.toHaveBeenCalled();
   });
@@ -129,14 +142,17 @@ describe("CacheRefreshService", () => {
       release: vi.fn(),
       request: vi.fn(),
     };
+    const products = { applyCatalog: vi.fn() };
     const service = new CacheRefreshService(
       state,
       {
-        listAll: vi.fn().mockImplementation(async () => {
+        load: vi.fn().mockImplementation(async () => {
           shutdown.abort();
-          return [];
+          return { categories: [], products: [] };
         }),
       },
+      products,
+      { listAll: vi.fn().mockResolvedValue([]) },
       { insertUnseen: vi.fn() },
       { now: () => now, owner: "worker-1" },
     );
@@ -144,6 +160,7 @@ describe("CacheRefreshService", () => {
     await expect(service.runForced(shutdown.signal)).rejects.toMatchObject({
       name: "AbortError",
     });
+    expect(products.applyCatalog).not.toHaveBeenCalled();
     expect(state.markFailure).not.toHaveBeenCalled();
     expect(state.release).toHaveBeenCalledOnce();
   });

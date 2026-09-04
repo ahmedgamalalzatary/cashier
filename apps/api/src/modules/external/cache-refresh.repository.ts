@@ -1,7 +1,7 @@
 import { and, eq, lte, sql } from "drizzle-orm";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import type { Db } from "../../db/index.js";
-import { externalOrdersSync } from "../../db/schema.js";
+import { externalCatalogSync } from "../../db/schema.js";
 import type { CacheRefreshStateStore } from "./cache-refresh.service.js";
 
 export class CacheRefreshRepository implements CacheRefreshStateStore {
@@ -12,7 +12,7 @@ export class CacheRefreshRepository implements CacheRefreshStateStore {
 
   private async ensureRow() {
     await this.db
-      .insert(externalOrdersSync)
+      .insert(externalCatalogSync)
       .values({ id: 1 })
       .onDuplicateKeyUpdate({ set: { id: 1 } });
   }
@@ -21,8 +21,8 @@ export class CacheRefreshRepository implements CacheRefreshStateStore {
     await this.ensureRow();
     const [state] = await this.db
       .select()
-      .from(externalOrdersSync)
-      .where(eq(externalOrdersSync.id, 1));
+      .from(externalCatalogSync)
+      .where(eq(externalCatalogSync.id, 1));
     return {
       lastSuccessfulSyncAt: state?.lastSuccessfulSyncAt ?? null,
       lastFailedAt: state?.lastFailedAt ?? null,
@@ -35,8 +35,8 @@ export class CacheRefreshRepository implements CacheRefreshStateStore {
     await this.ensureRow();
     const [state] = await this.db
       .select()
-      .from(externalOrdersSync)
-      .where(eq(externalOrdersSync.id, 1));
+      .from(externalCatalogSync)
+      .where(eq(externalCatalogSync.id, 1));
     return {
       lastAttemptAt: state?.lastAttemptAt ?? null,
       lastSuccessfulSyncAt: state?.lastSuccessfulSyncAt ?? null,
@@ -60,17 +60,17 @@ export class CacheRefreshRepository implements CacheRefreshStateStore {
     }
     this.lockConnection = connection;
     await this.db
-      .update(externalOrdersSync)
+      .update(externalCatalogSync)
       .set({ lockOwner: owner, lockExpiresAt: expiresAt })
-      .where(eq(externalOrdersSync.id, 1));
+      .where(eq(externalCatalogSync.id, 1));
     return true;
   }
 
   async markAttempt(now: Date) {
     await this.db
-      .update(externalOrdersSync)
+      .update(externalCatalogSync)
       .set({ lastAttemptAt: now })
-      .where(eq(externalOrdersSync.id, 1));
+      .where(eq(externalCatalogSync.id, 1));
   }
 
   async renew(owner: string, _now: Date, expiresAt: Date) {
@@ -82,49 +82,49 @@ export class CacheRefreshRepository implements CacheRefreshStateStore {
     ]);
     if (lockRows[0]?.held !== 1) return false;
     await this.db
-      .update(externalOrdersSync)
+      .update(externalCatalogSync)
       .set({ lockExpiresAt: expiresAt })
       .where(
         and(
-          eq(externalOrdersSync.id, 1),
-          eq(externalOrdersSync.lockOwner, owner),
+          eq(externalCatalogSync.id, 1),
+          eq(externalCatalogSync.lockOwner, owner),
         ),
       );
     const [lease] = await this.db
-      .select({ lockOwner: externalOrdersSync.lockOwner })
-      .from(externalOrdersSync)
-      .where(eq(externalOrdersSync.id, 1));
+      .select({ lockOwner: externalCatalogSync.lockOwner })
+      .from(externalCatalogSync)
+      .where(eq(externalCatalogSync.id, 1));
     return lease?.lockOwner === owner;
   }
 
   async markSuccess(now: Date, requestVersion: number) {
     await this.db
-      .update(externalOrdersSync)
+      .update(externalCatalogSync)
       .set({
         lastSuccessfulSyncAt: now,
         lastError: null,
         completedRequestVersion: sql`GREATEST(
-          ${externalOrdersSync.completedRequestVersion},
+          ${externalCatalogSync.completedRequestVersion},
           ${requestVersion}
         )`,
       })
-      .where(eq(externalOrdersSync.id, 1));
+      .where(eq(externalCatalogSync.id, 1));
     await this.db
-      .update(externalOrdersSync)
+      .update(externalCatalogSync)
       .set({ refreshRequestedAt: null })
       .where(
         and(
-          eq(externalOrdersSync.id, 1),
-          lte(externalOrdersSync.refreshRequestVersion, requestVersion),
+          eq(externalCatalogSync.id, 1),
+          lte(externalCatalogSync.refreshRequestVersion, requestVersion),
         ),
       );
   }
 
   async markFailure(now: Date, message: string) {
     await this.db
-      .update(externalOrdersSync)
+      .update(externalCatalogSync)
       .set({ lastFailedAt: now, lastError: message.slice(0, 500) })
-      .where(eq(externalOrdersSync.id, 1));
+      .where(eq(externalCatalogSync.id, 1));
   }
 
   async release(owner: string) {
@@ -132,12 +132,12 @@ export class CacheRefreshRepository implements CacheRefreshStateStore {
     this.lockConnection = null;
     try {
       await this.db
-        .update(externalOrdersSync)
+        .update(externalCatalogSync)
         .set({ lockOwner: null, lockExpiresAt: null })
         .where(
           and(
-            eq(externalOrdersSync.id, 1),
-            eq(externalOrdersSync.lockOwner, owner),
+            eq(externalCatalogSync.id, 1),
+            eq(externalCatalogSync.lockOwner, owner),
           ),
         );
       if (connection) {
@@ -153,11 +153,11 @@ export class CacheRefreshRepository implements CacheRefreshStateStore {
   async request(now: Date) {
     await this.ensureRow();
     await this.db
-      .update(externalOrdersSync)
+      .update(externalCatalogSync)
       .set({
         refreshRequestedAt: now,
-        refreshRequestVersion: sql`${externalOrdersSync.refreshRequestVersion} + 1`,
+        refreshRequestVersion: sql`${externalCatalogSync.refreshRequestVersion} + 1`,
       })
-      .where(eq(externalOrdersSync.id, 1));
+      .where(eq(externalCatalogSync.id, 1));
   }
 }

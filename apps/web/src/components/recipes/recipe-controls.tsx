@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, type KeyboardEvent } from "react";
-import { ArrowLeft, Beaker, ChefHat, Plus } from "lucide-react";
+import { ArrowLeft, Beaker, ChefHat, RefreshCw } from "lucide-react";
 import { formatMoney } from "../../lib/format";
 import { Button } from "../ui/button";
 
@@ -74,19 +74,22 @@ export function RecipeTabs({
 }
 
 export function RecipeHeaderActions({
-  onProduct,
   onPrepared,
+  onRefresh,
+  refreshing,
 }: {
-  onProduct: () => void;
   onPrepared: () => void;
+  onRefresh: () => void;
+  refreshing: boolean;
 }) {
   return (
     <div className="flex flex-wrap gap-2">
       <Button variant="ghost" onClick={onPrepared}>
         <Beaker className="size-4" /> إضافة وصفة تحضير
       </Button>
-      <Button onClick={onProduct}>
-        <Plus className="size-4" /> إضافة منتج وصفة
+      <Button onClick={onRefresh} disabled={refreshing}>
+        <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
+        {refreshing ? "جارِ التحديث…" : "تحديث المنتجات"}
       </Button>
     </div>
   );

@@ -8,27 +8,38 @@ import {
   Plus,
   Printer,
   ReceiptText,
+  RefreshCw,
   Search,
   ShoppingBasket,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import type {
+  CurrentShift,
+  ExternalProduct,
+  ExternalProductCatalog,
   OrderDetail,
   OrderDiscountType,
   OrderSummary,
-  PosCatalogProduct,
-  CurrentShift,
 } from "@cashier/shared";
 import { useAuth } from "@/components/auth/auth-provider";
 import { OrderReceipt } from "@/components/pos/order-receipt";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { formatMoney } from "@/lib/format";
+import { catalogRefreshOutcome } from "@/models/catalog-refresh";
 import {
   addCatalogSelection,
+  catalogTilePrice,
   cartTotals,
-  catalogCategories,
+  defaultExternalSize,
   filterCatalog,
   orderPayload,
   setCartLineQuantity,
@@ -41,26 +52,33 @@ import {
   listOrders,
 } from "@/services/orders-service";
 import { getCurrentShift } from "@/services/shifts-service";
+import {
+  getProductRefreshStatus,
+  refreshProducts,
+} from "@/services/products-service";
 
 export default function PosPage() {
   const { user } = useAuth();
-  const [catalog, setCatalog] = useState<PosCatalogProduct[]>([]);
+  const [catalog, setCatalog] = useState<ExternalProductCatalog | null>(null);
   const [recentOrders, setRecentOrders] = useState<OrderSummary[]>([]);
   const [currentShift, setCurrentShift] = useState<CurrentShift | null>(null);
   const [cart, setCart] = useState<PosCartLine[]>([]);
-  const [mainCategoryId, setMainCategoryId] = useState<number | null>(null);
-  const [subCategoryId, setSubCategoryId] = useState<number | null>(null);
+  const [categoryId, setCategoryId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
+  const [selecting, setSelecting] = useState<ExternalProduct | null>(null);
   const [discountType, setDiscountType] = useState<OrderDiscountType | null>(
     null,
   );
   const [discountValue, setDiscountValue] = useState(0);
   const [cashReceived, setCashReceived] = useState(0);
-  const [ticketTab, setTicketTab] = useState<"ticket" | "orders">("ticket");
+  // Tile prices depend on the active discount window, so keep a clock in state
+  // (rendering must stay pure) and re-check it every minute.
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [receipt, setReceipt] = useState<OrderDetail | null>(null);
   const [autoPrintOrderId, setAutoPrintOrderId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [refreshingCatalog, setRefreshingCatalog] = useState(false);
   const [error, setError] = useState("");
   const checkoutAttempt = useRef<{
     fingerprint: string;
@@ -70,7 +88,54 @@ export default function PosPage() {
   const refreshOrders = useCallback(async () => {
     setRecentOrders(await listOrders());
   }, []);
-  const closeReceipt = useCallback(() => setReceipt(null), []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!refreshingCatalog) return;
+    let cancelled = false;
+    const timer = window.setInterval(() => {
+      void getProductRefreshStatus()
+        .then(async (status) => {
+          if (cancelled) return;
+          const outcome = catalogRefreshOutcome(status);
+          if (outcome === "failed") {
+            setError(status.lastError ?? "تعذر تحديث المنتجات الخارجية");
+            setRefreshingCatalog(false);
+            return;
+          }
+          if (outcome === "worker-unavailable") {
+            setError("خدمة تحديث المنتجات غير متاحة الآن");
+            setRefreshingCatalog(false);
+            return;
+          }
+          if (outcome === "pending") return;
+          setRefreshingCatalog(false);
+          setCatalog(await listCatalog());
+        })
+        .catch(() => undefined);
+    }, 2_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [refreshingCatalog]);
+
+  async function requestCatalogRefresh() {
+    setRefreshingCatalog(true);
+    setError("");
+    try {
+      await refreshProducts();
+    } catch (caught) {
+      setRefreshingCatalog(false);
+      setError(
+        caught instanceof Error ? caught.message : "تعذر طلب تحديث الكتالوج",
+      );
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -82,10 +147,11 @@ export default function PosPage() {
         setCurrentShift(shift);
       })
       .catch((caught) => {
-        if (!cancelled)
+        if (!cancelled) {
           setError(
             caught instanceof Error ? caught.message : "تعذر تحميل نقطة البيع",
           );
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -104,13 +170,13 @@ export default function PosPage() {
     return () => window.clearTimeout(timer);
   }, [autoPrintOrderId, receipt]);
 
-  const categories = useMemo(() => catalogCategories(catalog), [catalog]);
   const visibleProducts = useMemo(
-    () => filterCatalog(catalog, { mainCategoryId, subCategoryId, query }),
-    [catalog, mainCategoryId, query, subCategoryId],
-  );
-  const visibleSubcategories = categories.sub.filter(
-    (row) => mainCategoryId === null || row.mainId === mainCategoryId,
+    () =>
+      filterCatalog(catalog?.products ?? [], {
+        categoryId,
+        query,
+      }),
+    [catalog?.products, categoryId, query],
   );
   const totals = cartTotals(
     cart,
@@ -128,21 +194,25 @@ export default function PosPage() {
     totals.hasEnoughCash &&
     !saving;
 
-  function chooseMainCategory(id: number | null) {
-    setMainCategoryId(id);
-    setSubCategoryId(null);
-  }
-
-  function addProduct(product: PosCatalogProduct, recipeSizeId?: number) {
-    setCart((current) => addCatalogSelection(current, product, recipeSizeId));
-    // The ticket now shares its panel with the order history, so a product
-    // added while browsing past orders would otherwise land out of sight.
-    setTicketTab("ticket");
+  function addProduct(
+    product: ExternalProduct,
+    externalSizeId: number | null,
+    modifiers: Array<{
+      externalModifierOptionId: number;
+      quantity: number;
+    }>,
+  ) {
+    setCart((current) =>
+      addCatalogSelection(
+        current,
+        product,
+        externalSizeId,
+        modifiers,
+        Date.now(),
+      ),
+    );
+    setSelecting(null);
     setError("");
-  }
-
-  function changeQuantity(line: PosCartLine, quantity: number) {
-    setCart((current) => setCartLineQuantity(current, line.key, quantity));
   }
 
   async function completeOrder() {
@@ -184,7 +254,6 @@ export default function PosPage() {
   }
 
   async function openReceipt(id: number) {
-    setError("");
     try {
       setReceipt(await getOrder(id));
     } catch (caught) {
@@ -201,9 +270,23 @@ export default function PosPage() {
           </p>
           <h1 className="text-3xl font-bold tracking-tight">نقطة البيع</h1>
         </div>
-        <div className="flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-sm text-muted shadow-sm">
-          <Clock3 className="size-4 text-primary" />
-          <span>{recentOrders.length} طلب محفوظ حديثاً</span>
+        <div className="flex items-center gap-2">
+          {user?.role === "admin" && (
+            <Button
+              variant="ghost"
+              disabled={refreshingCatalog}
+              onClick={() => void requestCatalogRefresh()}
+            >
+              <RefreshCw
+                className={`size-4 ${refreshingCatalog ? "animate-spin" : ""}`}
+              />
+              تحديث الكتالوج
+            </Button>
+          )}
+          <div className="flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-sm text-muted shadow-sm">
+            <Clock3 className="size-4 text-primary" />
+            <span>{recentOrders.length} طلب محفوظ حديثاً</span>
+          </div>
         </div>
       </header>
 
@@ -212,28 +295,27 @@ export default function PosPage() {
           role="alert"
           className="mx-2 mb-4 flex items-start gap-2 rounded-xl border border-danger/25 bg-danger/5 px-4 py-3 text-sm text-danger lg:mx-4"
         >
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-          {error}
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" /> {error}
         </div>
       )}
-
+      {catalog?.stale && (
+        <div className="mx-2 mb-4 rounded-xl bg-accent/10 px-4 py-3 text-sm lg:mx-4">
+          الكتالوج الخارجي قديم؛ آخر تحديث ناجح:{" "}
+          {catalog.lastSuccessfulSyncAt
+            ? new Date(catalog.lastSuccessfulSyncAt).toLocaleString("ar-EG")
+            : "لم تتم المزامنة بعد"}
+        </div>
+      )}
       {!loading && !hasOwnOpenShift && (
         <div className="mx-2 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/35 bg-accent/10 px-4 py-3 text-sm lg:mx-4">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-primary" />
-            <span>
-              {detailedCurrentShift
-                ? `البيع متوقف لأن الوردية المفتوحة تخص ${detailedCurrentShift.cashierName}.`
-                : currentShift
-                  ? "البيع متوقف لأن درج النقدية مستخدم في وردية كاشير آخر."
-                  : user?.role === "cashier"
-                    ? "يجب فتح وردية قبل تسجيل أي عملية بيع."
-                    : "المدير لا يفتح ورديات أو يسجل مبيعات؛ استخدم حساب كاشير."}
-            </span>
-          </div>
+          <span>
+            {user?.role === "cashier"
+              ? "يجب فتح وردية تخص هذا الكاشير قبل تسجيل البيع."
+              : "المدير لا يسجل مبيعات؛ استخدم حساب كاشير."}
+          </span>
           <Link
+            className="rounded-lg bg-sidebar px-3 py-2 text-white"
             href="/shifts"
-            className="rounded-lg bg-sidebar px-3 py-2 font-medium text-white hover:bg-ink"
           >
             الذهاب إلى الورديات
           </Link>
@@ -250,55 +332,28 @@ export default function PosPage() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="ابحث باسم المنتج"
-                className="h-12 w-full rounded-xl border border-line bg-paper pe-12 ps-4 text-sm outline-none transition focus:border-primary focus:bg-surface focus:ring-4 focus:ring-primary/10"
+                className="h-12 w-full rounded-xl border border-line bg-paper pe-12 ps-4 text-sm outline-none focus:border-primary"
               />
             </label>
-
             <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => chooseMainCategory(null)}
-                className={categoryTab(mainCategoryId === null)}
+              <CategoryButton
+                active={categoryId === null}
+                onClick={() => setCategoryId(null)}
               >
                 الكل
-              </button>
-              {categories.main.map((category) => (
-                <button
-                  type="button"
-                  key={category.id}
-                  onClick={() => chooseMainCategory(category.id)}
-                  className={categoryTab(mainCategoryId === category.id)}
-                >
-                  <span
-                    aria-hidden
-                    className={`tint-dot size-2 rounded-full ${tintClass(category.id)}`}
-                  />
-                  {category.name}
-                </button>
-              ))}
-            </div>
-
-            {visibleSubcategories.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
-                <button
-                  type="button"
-                  onClick={() => setSubCategoryId(null)}
-                  className={subCategoryTab(subCategoryId === null)}
-                >
-                  كل الفروع
-                </button>
-                {visibleSubcategories.map((category) => (
-                  <button
-                    type="button"
-                    key={category.id}
-                    onClick={() => setSubCategoryId(category.id)}
-                    className={subCategoryTab(subCategoryId === category.id)}
+              </CategoryButton>
+              {(catalog?.categories ?? [])
+                .filter((category) => category.isActive && category.isVisible)
+                .map((category) => (
+                  <CategoryButton
+                    key={category.externalId}
+                    active={categoryId === category.externalId}
+                    onClick={() => setCategoryId(category.externalId)}
                   >
-                    {category.name}
-                  </button>
+                    {category.nameAr}
+                  </CategoryButton>
                 ))}
-              </div>
-            )}
+            </div>
           </div>
 
           {loading ? (
@@ -308,334 +363,304 @@ export default function PosPage() {
           ) : visibleProducts.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-line bg-surface/60 p-12 text-center">
               <ReceiptText className="mx-auto mb-3 size-8 text-muted" />
-              <p className="font-medium">لا توجد منتجات تطابق هذا الاختيار</p>
+              <p className="font-medium">لا توجد منتجات جاهزة للبيع</p>
               <p className="mt-1 text-sm text-muted">
-                غيّر التصنيف أو امسح عبارة البحث.
+                المنتجات غير المتاحة أو غير المكتملة لا تظهر هنا.
               </p>
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
               {visibleProducts.map((product) => (
-                <ProductCard
-                  key={
-                    product.type === "recipe"
-                      ? `recipe:${product.recipeId}`
-                      : `item:${product.itemId}`
-                  }
-                  product={product}
-                  onAdd={addProduct}
-                />
+                <button
+                  type="button"
+                  key={product.externalId}
+                  onClick={() => setSelecting(product)}
+                  className="rounded-2xl border border-line bg-surface p-4 text-start shadow-sm transition hover:-translate-y-0.5 hover:border-primary"
+                >
+                  <p className="font-bold">{product.nameAr}</p>
+                  <p className="text-xs text-muted" dir="ltr">
+                    {product.nameEn}
+                  </p>
+                  <p className="mt-4 font-bold text-primary">
+                    {formatMoney(catalogTilePrice(product, nowMs))}
+                  </p>
+                </button>
               ))}
             </div>
           )}
         </section>
 
-        <aside className="pos-ticket overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_20px_45px_-32px_rgba(43,33,24,0.55)] xl:sticky xl:top-6">
-          <div className="flex gap-1 bg-sidebar px-2 pt-2">
-            <button
-              type="button"
-              onClick={() => setTicketTab("ticket")}
-              aria-pressed={ticketTab === "ticket"}
-              className={ticketTabClass(ticketTab === "ticket")}
-            >
-              <ShoppingBasket className="size-4" />
-              تذكرة الطلب
-              {cart.length > 0 && (
-                <span className={ticketTabBadge(ticketTab === "ticket")}>
-                  {cart.length}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setTicketTab("orders")}
-              aria-pressed={ticketTab === "orders"}
-              className={ticketTabClass(ticketTab === "orders")}
-            >
-              <ReceiptText className="size-4" />
-              آخر الطلبات
-              {recentOrders.length > 0 && (
-                <span className={ticketTabBadge(ticketTab === "orders")}>
-                  {recentOrders.length}
-                </span>
-              )}
-            </button>
+        <aside className="pos-ticket overflow-hidden rounded-2xl border border-line bg-surface shadow-sm xl:sticky xl:top-6">
+          <div className="flex items-center gap-2 bg-sidebar px-4 py-3 text-white">
+            <ShoppingBasket className="size-4" /> تذكرة الطلب
+          </div>
+          <div className="max-h-[42vh] min-h-40 space-y-2 overflow-y-auto p-4">
+            {cart.length === 0 ? (
+              <div className="flex min-h-32 flex-col items-center justify-center text-center text-muted">
+                <ShoppingBasket className="mb-2 size-8 opacity-40" />
+                <p>الطلب فارغ</p>
+              </div>
+            ) : (
+              cart.map((line) => (
+                <CartRow
+                  key={line.key}
+                  line={line}
+                  onQuantity={(quantity) =>
+                    setCart((current) =>
+                      setCartLineQuantity(current, line.key, quantity),
+                    )
+                  }
+                />
+              ))
+            )}
           </div>
 
-          {ticketTab === "orders" ? (
-            <RecentOrdersPanel orders={recentOrders} onOpen={openReceipt} />
-          ) : (
-            <>
-              <div className="max-h-[38vh] min-h-40 space-y-2 overflow-y-auto p-4 xl:max-h-[42vh]">
-                {cart.length === 0 ? (
-                  <div className="flex min-h-32 flex-col items-center justify-center text-center text-muted">
-                    <ShoppingBasket className="mb-2 size-8 opacity-40" />
-                    <p className="text-sm font-medium text-ink">الطلب فارغ</p>
-                    <p className="mt-1 text-xs">اضغط على منتج لبدء البيع.</p>
-                  </div>
-                ) : (
-                  cart.map((line) => (
-                    <CartRow
-                      key={line.key}
-                      line={line}
-                      onQuantity={(quantity) => changeQuantity(line, quantity)}
-                    />
-                  ))
-                )}
-              </div>
-
-              <div className="space-y-4 border-t border-dashed border-line bg-paper/55 p-4">
-                <div className="grid grid-cols-[8rem_1fr] gap-2">
-                  <select
-                    aria-label="نوع الخصم"
-                    value={discountType ?? "none"}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      setDiscountType(
-                        value === "none" ? null : (value as OrderDiscountType),
-                      );
-                      if (value === "none") setDiscountValue(0);
-                    }}
-                    className="rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
-                  >
-                    <option value="none">بدون خصم</option>
-                    <option value="percent">نسبة %</option>
-                    <option value="fixed">قيمة ثابتة</option>
-                  </select>
-                  <input
-                    aria-label="قيمة الخصم"
-                    type="number"
-                    min="0"
-                    max={discountType === "percent" ? 100 : 9_999_999_999.99}
-                    step="0.01"
-                    value={discountValue || ""}
-                    onChange={(event) =>
-                      setDiscountValue(Number(event.target.value))
-                    }
-                    disabled={discountType === null}
-                    placeholder="قيمة الخصم"
-                    dir="ltr"
-                    className="min-w-0 rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary disabled:opacity-50"
-                  />
-                </div>
-                {!totals.discountValid && (
-                  <p className="text-xs text-danger">
-                    راجع قيمة الخصم قبل إتمام الطلب.
-                  </p>
-                )}
-
-                <dl className="space-y-1.5 text-sm">
-                  <TotalRow label="الإجمالي" value={totals.subtotal} />
-                  {discountType && (
-                    <TotalRow
-                      label="الخصم"
-                      value={-totals.discountAmount}
-                      muted
-                    />
-                  )}
-                  <TotalRow label="المطلوب" value={totals.total} strong />
-                </dl>
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">
-                    النقد المستلم
-                  </label>
-                  <div className="relative">
-                    <Banknote className="pointer-events-none absolute inset-y-0 right-3 my-auto size-5 text-primary" />
-                    <input
-                      aria-label="النقد المستلم"
-                      type="number"
-                      min="0"
-                      max="9999999999.99"
-                      step="0.01"
-                      value={cashReceived || ""}
-                      onChange={(event) =>
-                        setCashReceived(Number(event.target.value))
-                      }
-                      placeholder="0.00"
-                      dir="ltr"
-                      className="h-12 w-full rounded-xl border border-line bg-surface pe-11 ps-3 text-left text-lg font-bold tnum outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between rounded-xl bg-sidebar px-4 py-3 text-white">
-                  <span className="text-sm text-sidebar-ink">الباقي</span>
-                  <strong className="text-xl text-accent tnum">
-                    {formatMoney(totals.change)}
-                  </strong>
-                </div>
-
-                {!totals.hasEnoughCash && cart.length > 0 && (
-                  <p className="text-xs text-danger">
-                    المبلغ المستلم أقل من المطلوب.
-                  </p>
-                )}
-                <Button
-                  onClick={completeOrder}
-                  disabled={!canComplete}
-                  className="h-12 w-full justify-center text-base shadow-sm"
-                >
-                  <ReceiptText className="size-5" />
-                  {saving ? "جارِ حفظ الطلب…" : "إتمام البيع وطباعة الإيصال"}
-                </Button>
-              </div>
-            </>
-          )}
+          <div className="space-y-3 border-t border-line p-4">
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                aria-label="نوع الخصم"
+                value={discountType ?? ""}
+                onChange={(event) =>
+                  setDiscountType(
+                    (event.target.value || null) as OrderDiscountType | null,
+                  )
+                }
+                className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+              >
+                <option value="">بدون خصم</option>
+                <option value="percent">خصم نسبة</option>
+                <option value="fixed">خصم ثابت</option>
+              </select>
+              <input
+                aria-label="قيمة الخصم"
+                type="number"
+                min="0"
+                step="0.01"
+                disabled={discountType === null}
+                value={discountValue || ""}
+                onChange={(event) =>
+                  setDiscountValue(Number(event.target.value))
+                }
+                className="rounded-lg border border-line px-3 py-2 text-sm"
+              />
+            </div>
+            <input
+              aria-label="النقد المستلم"
+              type="number"
+              min="0"
+              step="0.01"
+              value={cashReceived || ""}
+              onChange={(event) => setCashReceived(Number(event.target.value))}
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm"
+            />
+            <div className="space-y-1 text-sm">
+              <Total label="الإجمالي الفرعي" value={totals.subtotal} />
+              <Total label="الخصم" value={totals.discountAmount} />
+              <Total label="المطلوب" value={totals.total} strong />
+              <Total label="الباقي" value={totals.change} />
+            </div>
+            <Button
+              className="w-full justify-center"
+              disabled={!canComplete}
+              onClick={() => void completeOrder()}
+            >
+              <Banknote className="size-4" />
+              {saving ? "جارِ الحفظ…" : "إتمام البيع"}
+            </Button>
+          </div>
         </aside>
       </div>
 
-      {receipt && (
-        <Modal
-          title={`إيصال ${receipt.orderNumber}`}
-          open
-          onClose={closeReceipt}
-          panelClassName="pos-receipt-dialog"
-        >
-          <div className="print-controls mb-3 flex justify-end">
+      <section className="mx-2 mt-5 rounded-2xl border border-line bg-surface p-4 lg:mx-4">
+        <h2 className="mb-3 font-bold">آخر الطلبات</h2>
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          {recentOrders.slice(0, 9).map((order) => (
             <button
               type="button"
-              onClick={() => window.print()}
-              className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium hover:bg-primary-strong"
+              key={order.id}
+              onClick={() => void openReceipt(order.id)}
+              className="flex items-center justify-between rounded-xl border border-line p-3 text-start hover:border-primary"
             >
-              <Printer className="size-4" />
-              طباعة مرة أخرى
+              <span>
+                <span className="block font-medium">{order.orderNumber}</span>
+                <span className="text-xs text-muted">{order.cashierName}</span>
+              </span>
+              <span className="font-bold">{formatMoney(order.total)}</span>
             </button>
-          </div>
-          <OrderReceipt order={receipt} />
-          {receipt.isNegativeStock && (
-            <div className="print-controls mx-auto mt-3 flex max-w-[80mm] gap-2 rounded-xl border border-accent/30 bg-white p-3 text-xs text-ink">
-              <AlertTriangle className="size-4 shrink-0 text-primary" />
-              تم حفظ البيع مع رصيد مخزون سالب للمراجعة الإدارية.
-            </div>
-          )}
-        </Modal>
+          ))}
+        </div>
+      </section>
+
+      {selecting && (
+        <ProductSelectionModal
+          product={selecting}
+          onClose={() => setSelecting(null)}
+          onAdd={(sizeId, modifiers) =>
+            addProduct(selecting, sizeId, modifiers)
+          }
+        />
       )}
+      <Modal
+        open={receipt !== null}
+        title={receipt ? `إيصال ${receipt.orderNumber}` : "الإيصال"}
+        onClose={() => setReceipt(null)}
+        panelClassName="pos-receipt-dialog"
+      >
+        {receipt && (
+          <>
+            <OrderReceipt order={receipt} />
+            <Button
+              className="mt-4 w-full justify-center"
+              onClick={() => window.print()}
+            >
+              <Printer className="size-4" /> طباعة
+            </Button>
+          </>
+        )}
+      </Modal>
     </div>
   );
 }
 
-function ProductCard({
+function ProductSelectionModal({
   product,
+  onClose,
   onAdd,
 }: {
-  product: PosCatalogProduct;
-  onAdd: (product: PosCatalogProduct, recipeSizeId?: number) => void;
+  product: ExternalProduct;
+  onClose: () => void;
+  onAdd: (
+    sizeId: number | null,
+    modifiers: Array<{
+      externalModifierOptionId: number;
+      quantity: number;
+    }>,
+  ) => void;
 }) {
-  return (
-    <article
-      className={`catalog-card flex flex-col rounded-2xl border-2 p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${tintClass(product.mainCategoryId)}`}
-    >
-      <div className="flex items-center gap-3">
-        <span
-          aria-hidden
-          className="catalog-thumb grid size-11 shrink-0 place-items-center rounded-xl text-xl font-bold"
-        >
-          {product.name.trim().charAt(0)}
-        </span>
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate text-base font-bold leading-tight">
-            {product.name}
-          </h3>
-          <p className="mt-0.5 truncate text-xs text-muted">
-            {product.subCategoryName ?? product.mainCategoryName}
-          </p>
-        </div>
-        {product.type === "item" && (
-          <span className="catalog-badge shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold">
-            {product.stockUnit}
-          </span>
-        )}
-      </div>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {product.type === "recipe" ? (
-          product.sizes.map((size) => (
-            <button
-              type="button"
-              key={size.id}
-              onClick={() => onAdd(product, size.id)}
-              className="catalog-option min-h-11 flex-1 basis-20 rounded-xl border border-line bg-paper px-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              {size.name}
-            </button>
-          ))
-        ) : (
-          <button
-            type="button"
-            onClick={() => onAdd(product)}
-            className="catalog-option flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-line bg-paper px-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          >
-            <Plus className="size-4" />
-            إضافة
-          </button>
-        )}
-      </div>
-    </article>
+  const [sizeId, setSizeId] = useState<number | null>(() =>
+    defaultExternalSize(product),
   );
-}
-
-function RecentOrdersPanel({
-  orders,
-  onOpen,
-}: {
-  orders: OrderSummary[];
-  onOpen: (id: number) => void;
-}) {
-  if (orders.length === 0) {
-    return (
-      <div className="flex min-h-56 flex-col items-center justify-center p-6 text-center text-muted">
-        <ReceiptText className="mb-2 size-8 opacity-40" />
-        <p className="text-sm font-medium text-ink">لا توجد مبيعات مسجلة بعد</p>
-        <p className="mt-1 text-xs">أول طلب تُتمّه سيظهر هنا لإعادة طباعته.</p>
-      </div>
+  const [quantities, setQuantities] = useState<Record<number, number>>({});
+  const groupsValid = product.modifierGroups.every((group) => {
+    const count = group.options.reduce(
+      (sum, option) => sum + (quantities[option.externalId] ?? 0),
+      0,
     );
-  }
+    return (!group.isRequired || count > 0) && count <= group.maxSelections;
+  });
+
   return (
-    <div className="max-h-[68vh] min-h-56 overflow-y-auto p-3">
-      <p className="mb-2 px-1 text-xs text-muted">اختر أي طلب لإعادة طباعته</p>
-      <ul className="space-y-1.5">
-        {orders.slice(0, 12).map((order, index) => (
-          <li key={order.id}>
-            <button
-              type="button"
-              onClick={() => onOpen(order.id)}
-              className="group flex w-full items-center justify-between gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-right transition hover:border-primary/45 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <span className="min-w-0">
-                <span
-                  className="block truncate text-[13px] font-bold tnum"
-                  dir="ltr"
+    <Modal open title={product.nameAr} onClose={onClose} size="xl">
+      <div className="space-y-5">
+        {product.sizes.length > 0 && (
+          <section className="space-y-2">
+            <h3 className="font-semibold">اختر المقاس</h3>
+            <div className="flex flex-wrap gap-2">
+              {product.sizes.map((size) => (
+                <button
+                  type="button"
+                  key={size.externalId}
+                  onClick={() => setSizeId(size.externalId)}
+                  className={`rounded-lg border px-3 py-2 text-sm ${sizeId === size.externalId ? "border-primary bg-primary text-white" : "border-line"}`}
                 >
-                  {order.orderNumber}
+                  {size.nameAr} · {formatMoney(size.price)}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+        {product.modifierGroups.map((group) => {
+          const selected = group.options.reduce(
+            (sum, option) => sum + (quantities[option.externalId] ?? 0),
+            0,
+          );
+          return (
+            <section
+              key={group.externalId}
+              className="space-y-2 rounded-xl border border-line p-4"
+            >
+              <div className="flex justify-between gap-2">
+                <h3 className="font-semibold">
+                  {group.nameAr} {group.isRequired ? "(مطلوبة)" : ""}
+                </h3>
+                <span className="text-xs text-muted">
+                  {selected}/{group.maxSelections}
                 </span>
-                <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
-                  <Clock3 className="size-3" />
-                  {new Date(order.createdAt).toLocaleTimeString("ar-EG", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                  {index === 0 && (
-                    <span className="rounded-full bg-accent/20 px-1.5 font-bold text-primary">
-                      الأحدث
+              </div>
+              {group.options.map((option) => (
+                <div
+                  key={option.externalId}
+                  className="flex items-center justify-between gap-3 rounded-lg bg-paper p-2"
+                >
+                  <span className="text-sm">
+                    {option.nameAr} · +{formatMoney(option.extraPrice)}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      aria-label={`تقليل ${option.nameAr}`}
+                      onClick={() =>
+                        setQuantities((current) => ({
+                          ...current,
+                          [option.externalId]: Math.max(
+                            0,
+                            (current[option.externalId] ?? 0) - 1,
+                          ),
+                        }))
+                      }
+                      className="rounded-md border border-line p-1"
+                    >
+                      <Minus className="size-4" />
+                    </button>
+                    <span className="min-w-5 text-center">
+                      {quantities[option.externalId] ?? 0}
                     </span>
-                  )}
-                  {order.isNegativeStock && (
-                    <AlertTriangle
-                      role="img"
-                      className="size-3 text-danger"
-                      aria-label="حُفظ برصيد مخزون سالب"
-                    />
-                  )}
-                </span>
-              </span>
-              <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-line text-muted transition group-hover:border-primary group-hover:bg-surface group-hover:text-primary">
-                <Printer className="size-4" />
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
+                    <button
+                      type="button"
+                      aria-label={`زيادة ${option.nameAr}`}
+                      disabled={selected >= group.maxSelections}
+                      onClick={() =>
+                        setQuantities((current) => ({
+                          ...current,
+                          [option.externalId]:
+                            (current[option.externalId] ?? 0) + 1,
+                        }))
+                      }
+                      className="rounded-md border border-line p-1 disabled:opacity-40"
+                    >
+                      <Plus className="size-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </section>
+          );
+        })}
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>
+            إلغاء
+          </Button>
+          <Button
+            disabled={
+              !groupsValid || (product.sizes.length > 0 && sizeId === null)
+            }
+            onClick={() =>
+              onAdd(
+                sizeId,
+                Object.entries(quantities)
+                  .filter(([, quantity]) => quantity > 0)
+                  .map(([optionId, quantity]) => ({
+                    externalModifierOptionId: Number(optionId),
+                    quantity,
+                  })),
+              )
+            }
+          >
+            إضافة إلى الطلب
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -647,48 +672,38 @@ function CartRow({
   onQuantity: (quantity: number) => void;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-surface p-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-bold">{line.productName}</p>
+    <div className="rounded-xl border border-line bg-paper/60 p-3">
+      <div className="flex justify-between gap-3">
+        <div>
+          <p className="font-medium">{line.productName}</p>
           <p className="text-xs text-muted">
-            {line.sizeName ?? line.stockUnit} · {formatMoney(line.unitPrice)}
+            {[
+              line.sizeName,
+              ...line.modifiers.map(
+                (modifier) => `${modifier.name} × ${modifier.quantity}`,
+              ),
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         </div>
-        <strong className="shrink-0 text-sm tnum">
+        <span className="font-bold">
           {formatMoney(Number(line.unitPrice) * line.quantity)}
-        </strong>
+        </span>
       </div>
-      <div className="mt-3 flex items-center justify-between gap-2">
+      <div className="mt-2 flex items-center gap-2">
         <button
           type="button"
-          aria-label={`تقليل ${line.productName}`}
           onClick={() => onQuantity(line.quantity - 1)}
-          className="grid size-9 place-items-center rounded-lg border border-line hover:border-primary hover:text-primary"
+          className="rounded-md border border-line p-1"
         >
           <Minus className="size-4" />
         </button>
-        <input
-          aria-label={`كمية ${line.productName}`}
-          type="number"
-          min={line.type === "recipe" ? 1 : 0.001}
-          max={line.type === "recipe" ? 999 : 99_999_999_999.999}
-          step={line.type === "recipe" ? 1 : 0.001}
-          value={line.quantity}
-          onChange={(event) => {
-            if (event.target.value === "") return;
-            const quantity = Number(event.target.value);
-            if (Number.isNaN(quantity)) return;
-            onQuantity(quantity);
-          }}
-          dir="ltr"
-          className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-paper text-center text-sm font-bold tnum outline-none focus:border-primary"
-        />
+        <span>{line.quantity}</span>
         <button
           type="button"
-          aria-label={`زيادة ${line.productName}`}
           onClick={() => onQuantity(line.quantity + 1)}
-          className="grid size-9 place-items-center rounded-lg border border-line hover:border-primary hover:text-primary"
+          className="rounded-md border border-line p-1"
         >
           <Plus className="size-4" />
         </button>
@@ -697,63 +712,41 @@ function CartRow({
   );
 }
 
-function TotalRow({
+function CategoryButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full px-4 py-2 text-sm ${active ? "bg-sidebar text-white" : "bg-paper text-muted hover:text-ink"}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Total({
   label,
   value,
   strong = false,
-  muted = false,
 }: {
   label: string;
   value: number;
   strong?: boolean;
-  muted?: boolean;
 }) {
   return (
     <div
-      className={`flex items-center justify-between ${
-        strong ? "border-t border-line pt-2 text-lg font-bold" : ""
-      } ${muted ? "text-muted" : ""}`}
+      className={`flex justify-between ${strong ? "text-base font-bold" : ""}`}
     >
-      <dt>{label}</dt>
-      <dd className="tnum">{formatMoney(value)}</dd>
+      <span>{label}</span>
+      <span>{formatMoney(value)}</span>
     </div>
   );
-}
-
-const TINT_COUNT = 8;
-
-/* Categories are the only grouping a cashier can see at a glance now that no
-   price is printed on a card, so the tone must stay put for a given category. */
-function tintClass(categoryId: number) {
-  return `tint-${((categoryId % TINT_COUNT) + TINT_COUNT) % TINT_COUNT}`;
-}
-
-function categoryTab(active: boolean) {
-  return `inline-flex min-h-10 items-center gap-2 rounded-xl px-4 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-    active
-      ? "bg-sidebar text-white shadow-sm"
-      : "bg-paper text-muted hover:bg-line/60 hover:text-ink"
-  }`;
-}
-
-function ticketTabClass(active: boolean) {
-  return `flex flex-1 items-center justify-center gap-2 rounded-t-xl px-3 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-    active
-      ? "bg-surface text-ink"
-      : "text-sidebar-ink hover:bg-white/10 hover:text-white"
-  }`;
-}
-
-function ticketTabBadge(active: boolean) {
-  return `min-w-5 rounded-full px-1.5 text-xs tnum ${
-    active ? "bg-primary/10 text-primary" : "bg-white/15 text-white"
-  }`;
-}
-
-function subCategoryTab(active: boolean) {
-  return `rounded-full border px-3 py-1.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-    active
-      ? "border-primary bg-primary/10 text-primary"
-      : "border-line text-muted hover:border-primary/40 hover:text-ink"
-  }`;
 }

@@ -1,19 +1,22 @@
-import type {
-  OrderDiscountType,
-  PosCatalogProduct,
-  PosRecipeCatalogProduct,
-} from "@cashier/shared";
+import { isExternalDiscountActive } from "@cashier/shared";
+import type { ExternalProduct, OrderDiscountType } from "@cashier/shared";
+
+export type PosModifierSelection = {
+  externalModifierOptionId: number;
+  quantity: number;
+  name: string;
+};
 
 export type PosCartLine = {
   key: string;
-  type: "recipe" | "item";
-  recipeSizeId?: number;
-  itemId?: number;
+  type: "external_product";
+  externalProductId: number;
+  externalSizeId: number | null;
   productName: string;
   sizeName: string | null;
-  stockUnit: string | null;
   quantity: number;
   unitPrice: string;
+  modifiers: PosModifierSelection[];
 };
 
 export type DiscountSelection = {
@@ -22,7 +25,6 @@ export type DiscountSelection = {
 };
 
 const MAX_MONEY = 9_999_999_999.99;
-const MAX_STOCK_QUANTITY = 99_999_999_999.999;
 
 const stringToScaled = (value: string, scale: number) => {
   const negative = value.startsWith("-");
@@ -41,45 +43,141 @@ const numberToScaled = (value: number, scale: number, maximum: number) => {
   return BigInt(fixed.replace(".", ""));
 };
 
+const formatScaled = (value: bigint, scale: number) => {
+  const divisor = BigInt(10) ** BigInt(scale);
+  return `${value / divisor}.${(value % divisor).toString().padStart(scale, "0")}`;
+};
+
 const roundDivide = (numerator: bigint, denominator: bigint) =>
   (numerator + denominator / BigInt(2)) / denominator;
 
 export function addCatalogSelection(
   cart: PosCartLine[],
-  product: PosCatalogProduct,
-  recipeSizeId?: number,
+  product: ExternalProduct,
+  externalSizeId: number | null,
+  selectedModifiers: Array<{
+    externalModifierOptionId: number;
+    quantity: number;
+  }>,
+  nowMs: number,
 ) {
-  let incoming: PosCartLine;
-  if (product.type === "recipe") {
-    const size = product.sizes.find((row) => row.id === recipeSizeId);
-    if (!size) return cart;
-    incoming = {
-      key: `recipe:${size.id}`,
-      type: "recipe",
-      recipeSizeId: size.id,
-      productName: product.name,
-      sizeName: size.name,
-      stockUnit: null,
-      quantity: 1,
-      unitPrice: size.sellingPrice,
-    };
-  } else {
-    incoming = {
-      key: `item:${product.itemId}`,
-      type: "item",
-      itemId: product.itemId,
-      productName: product.name,
-      sizeName: null,
-      stockUnit: product.stockUnit,
-      quantity: 1,
-      unitPrice: product.sellingPrice,
-    };
+  if (!product.sellable) return cart;
+  const normalizedById = new Map<number, number>();
+  for (const modifier of selectedModifiers) {
+    if (!Number.isInteger(modifier.quantity) || modifier.quantity <= 0) {
+      return cart;
+    }
+    normalizedById.set(
+      modifier.externalModifierOptionId,
+      (normalizedById.get(modifier.externalModifierOptionId) ?? 0) +
+        modifier.quantity,
+    );
   }
-  const existing = cart.find((line) => line.key === incoming.key);
-  if (!existing) return [...cart, incoming];
-  return cart.map((line) =>
-    line.key === incoming.key ? { ...line, quantity: line.quantity + 1 } : line,
+  const normalizedModifiers = [...normalizedById].map(
+    ([externalModifierOptionId, quantity]) => ({
+      externalModifierOptionId,
+      quantity,
+    }),
   );
+  const size =
+    externalSizeId === null
+      ? null
+      : product.sizes.find(
+          (candidate) => candidate.externalId === externalSizeId,
+        );
+  if (
+    (product.sizes.length > 0 && !size) ||
+    (product.sizes.length === 0 && externalSizeId !== null)
+  )
+    return cart;
+
+  const selectedById = new Map(
+    normalizedModifiers.map((modifier) => [
+      modifier.externalModifierOptionId,
+      modifier,
+    ]),
+  );
+  for (const group of product.modifierGroups) {
+    const count = group.options.reduce(
+      (sum, option) =>
+        sum + (selectedById.get(option.externalId)?.quantity ?? 0),
+      0,
+    );
+    if ((group.isRequired && count === 0) || count > group.maxSelections) {
+      return cart;
+    }
+  }
+  const options = new Map(
+    product.modifierGroups.flatMap((group) =>
+      group.options.map((option) => [option.externalId, option] as const),
+    ),
+  );
+  if (
+    normalizedModifiers.some(
+      (modifier) => !options.has(modifier.externalModifierOptionId),
+    )
+  ) {
+    return cart;
+  }
+
+  let price = stringToScaled(size?.price ?? product.price, 2);
+  if (
+    isExternalDiscountActive(
+      product.discountPercentage,
+      product.discountStart,
+      product.discountEnd,
+      nowMs,
+    )
+  ) {
+    price -= roundDivide(
+      price * stringToScaled(product.discountPercentage!, 2),
+      BigInt(10_000),
+    );
+  }
+  const modifiers = normalizedModifiers
+    .map((selection) => {
+      const option = options.get(selection.externalModifierOptionId)!;
+      price +=
+        stringToScaled(option.extraPrice, 2) * BigInt(selection.quantity);
+      return {
+        ...selection,
+        // Unreachable for a sellable product: one with unnamed modifiers is
+        // never sellable, and the guard above returns the cart unchanged.
+        name: option.nameAr ?? "إضافة بدون اسم",
+      };
+    })
+    .sort(
+      (left, right) =>
+        left.externalModifierOptionId - right.externalModifierOptionId,
+    );
+  const key = JSON.stringify({
+    product: product.externalId,
+    size: size?.externalId ?? null,
+    modifiers: modifiers.map((modifier) => ({
+      externalModifierOptionId: modifier.externalModifierOptionId,
+      quantity: modifier.quantity,
+    })),
+  });
+  const existing = cart.find((line) => line.key === key);
+  if (existing) {
+    return cart.map((line) =>
+      line.key === key ? { ...line, quantity: line.quantity + 1 } : line,
+    );
+  }
+  return [
+    ...cart,
+    {
+      key,
+      type: "external_product" as const,
+      externalProductId: product.externalId,
+      externalSizeId: size?.externalId ?? null,
+      productName: product.nameAr,
+      sizeName: size?.nameAr ?? null,
+      quantity: 1,
+      unitPrice: formatScaled(price, 2),
+      modifiers,
+    },
+  ];
 }
 
 export function setCartLineQuantity(
@@ -90,57 +188,27 @@ export function setCartLineQuantity(
   if (!Number.isFinite(quantity) || quantity <= 0) {
     return cart.filter((line) => line.key !== key);
   }
-  return cart.map((line) => {
-    if (line.key !== key) return line;
-    const normalized =
-      line.type === "recipe"
-        ? Math.min(999, Math.max(1, Math.round(quantity)))
-        : Math.max(0.001, Math.round(quantity * 1_000) / 1_000);
-    return { ...line, quantity: normalized };
-  });
+  return cart.map((line) =>
+    line.key === key
+      ? { ...line, quantity: Math.min(999, Math.max(1, Math.round(quantity))) }
+      : line,
+  );
 }
 
 export function filterCatalog(
-  products: PosCatalogProduct[],
-  filters: {
-    mainCategoryId: number | null;
-    subCategoryId: number | null;
-    query: string;
-  },
+  products: ExternalProduct[],
+  filters: { categoryId: number | null; query: string },
 ) {
-  const query = filters.query.trim().toLocaleLowerCase("ar");
-  return products.filter((product) => {
-    if (
-      filters.mainCategoryId !== null &&
-      product.mainCategoryId !== filters.mainCategoryId
-    )
-      return false;
-    if (
-      filters.subCategoryId !== null &&
-      product.subCategoryId !== filters.subCategoryId
-    )
-      return false;
-    return !query || product.name.toLocaleLowerCase("ar").includes(query);
-  });
-}
-
-export function catalogCategories(products: PosCatalogProduct[]) {
-  const main = new Map<number, string>();
-  const sub = new Map<number, { id: number; name: string; mainId: number }>();
-  for (const product of products) {
-    main.set(product.mainCategoryId, product.mainCategoryName);
-    if (product.subCategoryId !== null && product.subCategoryName) {
-      sub.set(product.subCategoryId, {
-        id: product.subCategoryId,
-        name: product.subCategoryName,
-        mainId: product.mainCategoryId,
-      });
-    }
-  }
-  return {
-    main: [...main].map(([id, name]) => ({ id, name })),
-    sub: [...sub.values()],
-  };
+  const query = filters.query.trim().toLocaleLowerCase();
+  return products.filter(
+    (product) =>
+      product.sellable &&
+      (filters.categoryId === null ||
+        product.externalCategoryId === filters.categoryId) &&
+      (!query ||
+        product.nameAr.toLocaleLowerCase("ar").includes(query) ||
+        product.nameEn.toLocaleLowerCase("en").includes(query)),
+  );
 }
 
 export function cartTotals(
@@ -151,11 +219,7 @@ export function cartTotals(
   let inputsValid = true;
   let subtotalCents = BigInt(0);
   for (const line of cart) {
-    const quantity = numberToScaled(
-      line.quantity,
-      3,
-      line.type === "recipe" ? 999 : MAX_STOCK_QUANTITY,
-    );
+    const quantity = numberToScaled(line.quantity, 3, 999);
     if (quantity === null) {
       inputsValid = false;
       continue;
@@ -210,19 +274,16 @@ export function orderPayload(
   cashReceived: number,
 ) {
   return {
-    lines: cart.map((line) =>
-      line.type === "recipe"
-        ? {
-            type: "recipe" as const,
-            recipeSizeId: line.recipeSizeId!,
-            quantity: line.quantity,
-          }
-        : {
-            type: "item" as const,
-            itemId: line.itemId!,
-            quantity: line.quantity,
-          },
-    ),
+    lines: cart.map((line) => ({
+      type: "external_product" as const,
+      externalProductId: line.externalProductId,
+      externalSizeId: line.externalSizeId,
+      quantity: line.quantity,
+      modifiers: line.modifiers.map((modifier) => ({
+        externalModifierOptionId: modifier.externalModifierOptionId,
+        quantity: modifier.quantity,
+      })),
+    })),
     discount:
       discount.type === null
         ? null
@@ -231,6 +292,37 @@ export function orderPayload(
   };
 }
 
-export function firstRecipeSize(product: PosRecipeCatalogProduct) {
-  return product.sizes[0]?.id;
+export function defaultExternalSize(product: ExternalProduct) {
+  const defaults = product.sizes.filter((size) => size.isDefault);
+  return defaults.length === 1 ? defaults[0]!.externalId : null;
+}
+
+/**
+ * Price shown on a POS catalog tile: the default size when the product defines
+ * one, otherwise the cheapest size, with any active discount applied so the
+ * tile matches what the cart and the server will charge.
+ */
+export function catalogTilePrice(product: ExternalProduct, nowMs: number) {
+  const defaultSizeId = defaultExternalSize(product);
+  const base =
+    product.sizes.find((size) => size.externalId === defaultSizeId)?.price ??
+    product.sizes
+      .map((size) => size.price)
+      .sort((a, b) => Number(a) - Number(b))[0] ??
+    product.price;
+  let price = stringToScaled(base, 2);
+  if (
+    isExternalDiscountActive(
+      product.discountPercentage,
+      product.discountStart,
+      product.discountEnd,
+      nowMs,
+    )
+  ) {
+    price -= roundDivide(
+      price * stringToScaled(product.discountPercentage!, 2),
+      BigInt(10_000),
+    );
+  }
+  return formatScaled(price, 2);
 }

@@ -3,29 +3,70 @@ import { orderInput } from "../../../../src/modules/orders/orders.schemas.js";
 
 const valid = {
   clientRequestId: "3f7797a2-16a4-4dd9-bd42-dd3f75af5d7a",
-  lines: [{ type: "recipe", recipeSizeId: 2, quantity: 1 }],
+  lines: [
+    {
+      type: "external_product",
+      externalProductId: 9,
+      externalSizeId: 91,
+      quantity: 1,
+      modifiers: [{ externalModifierOptionId: 93, quantity: 2 }],
+    },
+  ],
   cashReceived: 50,
 };
 
 describe("order schemas", () => {
-  it("accepts recipe and fractional resale lines with optional discounts", () => {
+  it("accepts external products, sizes, modifier quantities, and discounts", () => {
     expect(orderInput.safeParse(valid).success).toBe(true);
     expect(
       orderInput.safeParse({
         ...valid,
-        lines: [{ type: "item", itemId: 3, quantity: 0.125 }],
+        lines: [
+          {
+            type: "external_product",
+            externalProductId: 10,
+            externalSizeId: null,
+            quantity: 2,
+            modifiers: [],
+          },
+        ],
         discount: { type: "fixed", value: 2.5 },
         cashReceived: 20,
       }).success,
     ).toBe(true);
   });
 
-  it("rejects empty carts, fractional recipe counts, and over-100 percent discounts", () => {
+  it("rejects empty carts, fractional product counts, duplicate modifiers, and over-100 percent discounts", () => {
     expect(orderInput.safeParse({ ...valid, lines: [] }).success).toBe(false);
     expect(
       orderInput.safeParse({
         ...valid,
-        lines: [{ type: "recipe", recipeSizeId: 2, quantity: 1.5 }],
+        lines: [
+          {
+            type: "external_product",
+            externalProductId: 9,
+            externalSizeId: null,
+            quantity: 1.5,
+            modifiers: [],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      orderInput.safeParse({
+        ...valid,
+        lines: [
+          {
+            type: "external_product",
+            externalProductId: 9,
+            externalSizeId: null,
+            quantity: 1,
+            modifiers: [
+              { externalModifierOptionId: 93, quantity: 1 },
+              { externalModifierOptionId: 93, quantity: 1 },
+            ],
+          },
+        ],
       }).success,
     ).toBe(false);
     expect(

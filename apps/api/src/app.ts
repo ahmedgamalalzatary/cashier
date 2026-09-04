@@ -19,6 +19,7 @@ import { createRefundsModule } from "./modules/refunds/refunds.module.js";
 import { createWasteModule } from "./modules/waste/waste.module.js";
 import { createExpensesModule } from "./modules/expenses/expenses.module.js";
 import { createReportsModule } from "./modules/reports/reports.module.js";
+import { createProductsModule } from "./modules/products/products.module.js";
 
 export type AppOptions = {
   jwtSecret: string;
@@ -49,6 +50,11 @@ export function createApp(
   app.use("/api/shifts", authenticate(db, jwtSecret), createShiftsModule(db));
   app.use("/api/refunds", authenticate(db, jwtSecret), createRefundsModule(db));
   app.use("/api/waste", authenticate(db, jwtSecret), createWasteModule(db));
+  app.use(
+    "/api/products",
+    authenticate(db, jwtSecret),
+    createProductsModule(db, requireRole("admin")),
+  );
   app.use(
     "/api/expenses",
     authenticate(db, jwtSecret),
