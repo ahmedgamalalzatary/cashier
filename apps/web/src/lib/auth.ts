@@ -1,25 +1,46 @@
-import type { Role, Session } from "@cashier/shared";
+import type { AuthUser, Role, Session } from "@cashier/shared";
 import { ADMIN_PATHS } from "./navigation";
 export type { AuthUser, Role, Session } from "@cashier/shared";
 
 export const SESSION_KEY = "cashier.session";
 export const AUTH_CHANGED_EVENT = "cashier:auth-changed";
 
+// What the browser persists. The JWT itself is never stored here: browsers
+// authenticate with the HttpOnly `cashier.token` cookie set by the API, so a
+// stored token would only give XSS a second copy to steal. Only the profile
+// (for route guards) and the expiry (to avoid rendering on a dead session)
+// are kept. The `token` field exists solely for non-http(s) shells
+// (Tauri file-protocol builds) where cookies are not sent.
+export type PersistedSession = {
+  user: AuthUser;
+  exp: number;
+  token?: string;
+};
+
 export function normalizePath(pathname: string) {
   return pathname.replace(/\/+$/, "") || "/";
 }
 
-export function readSession(): Session | null {
+// Cookies are not sent from non-http(s) pages (Tauri file protocol), so
+// those shells fall back to a Bearer token like before.
+function usesTokenFallback() {
+  if (typeof window === "undefined") return false;
+  const protocol = window.location?.protocol;
+  return !!protocol && protocol !== "http:" && protocol !== "https:";
+}
+
+export function readSession(): PersistedSession | null {
   if (typeof window === "undefined") return null;
   try {
     const value = JSON.parse(
       window.localStorage.getItem(SESSION_KEY) ?? "null",
-    ) as Session | null;
+    ) as PersistedSession | null;
     if (
-      !value?.token ||
-      !value.user?.id ||
+      !value?.user?.id ||
       !["admin", "cashier"].includes(value.user.role) ||
-      !hasUnexpiredToken(value.token)
+      typeof value.exp !== "number" ||
+      !Number.isFinite(value.exp) ||
+      value.exp * 1000 <= Date.now()
     ) {
       window.localStorage.removeItem(SESSION_KEY);
       return null;
@@ -31,29 +52,37 @@ export function readSession(): Session | null {
   }
 }
 
-function hasUnexpiredToken(token: string) {
+function sessionExpiry(token: string): number | null {
   try {
     const payload = token.split(".")[1];
-    if (!payload) return false;
+    if (!payload) return null;
     const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
     const decoded = JSON.parse(
       globalThis.atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "=")),
     ) as { exp?: unknown };
-    return (
-      typeof decoded.exp === "number" &&
-      Number.isFinite(decoded.exp) &&
-      decoded.exp * 1000 > Date.now()
-    );
+    return typeof decoded.exp === "number" && Number.isFinite(decoded.exp)
+      ? decoded.exp
+      : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
 export function writeSession(session: Session | null) {
   if (typeof window === "undefined") return;
-  if (session)
-    window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  else window.localStorage.removeItem(SESSION_KEY);
+  if (session) {
+    const exp = sessionExpiry(session.token);
+    if (exp === null || exp * 1000 <= Date.now()) {
+      window.localStorage.removeItem(SESSION_KEY);
+    } else {
+      const persisted: PersistedSession = {
+        user: session.user,
+        exp,
+      };
+      if (usesTokenFallback()) persisted.token = session.token;
+      window.localStorage.setItem(SESSION_KEY, JSON.stringify(persisted));
+    }
+  } else window.localStorage.removeItem(SESSION_KEY);
   window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 }
 

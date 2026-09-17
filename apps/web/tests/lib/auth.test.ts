@@ -6,6 +6,7 @@ import {
   postLoginPath,
   readSession,
   subscribeToSessionChanges,
+  writeSession,
 } from "../../src/lib/auth";
 import { ADMIN_PATHS } from "../../src/lib/navigation";
 
@@ -53,8 +54,9 @@ function tokenWithExpiration(exp: number) {
   return `${encode({ alg: "HS256", typ: "JWT" })}.${encode({ exp })}.signature`;
 }
 
-function browserWithSession(token: string) {
+function browserWithLegacyTokenSession(token: string) {
   const browser = Object.assign(new EventTarget(), {
+    location: { protocol: "https:" },
     localStorage: {
       getItem: vi.fn(() =>
         JSON.stringify({
@@ -71,17 +73,20 @@ function browserWithSession(token: string) {
 }
 
 describe("session validity", () => {
-  it("rejects and removes an expired JWT before rendering protected UI", () => {
-    const browser = browserWithSession(tokenWithExpiration(1));
+  it("rejects a legacy stored JWT instead of trusting it", () => {
+    const browser = browserWithLegacyTokenSession(
+      tokenWithExpiration(Math.floor(Date.now() / 1000) + 60),
+    );
 
     expect(readSession()).toBeNull();
     expect(browser.localStorage.removeItem).toHaveBeenCalledWith(SESSION_KEY);
   });
 
-  it("accepts a structurally valid unexpired session", () => {
-    browserWithSession(tokenWithExpiration(Math.floor(Date.now() / 1000) + 60));
+  it("rejects and removes an expired persisted user", () => {
+    const browser = browserWithUser(1);
 
-    expect(readSession()?.user.role).toBe("admin");
+    expect(readSession()).toBeNull();
+    expect(browser.localStorage.removeItem).toHaveBeenCalledWith(SESSION_KEY);
   });
 
   it("removes malformed JSON from local storage", () => {
@@ -92,6 +97,63 @@ describe("session validity", () => {
       },
     });
     vi.stubGlobal("window", browser);
+
+    expect(readSession()).toBeNull();
+    expect(browser.localStorage.removeItem).toHaveBeenCalledWith(SESSION_KEY);
+  });
+});
+
+function browserWithUser(exp: number) {
+  const browser = Object.assign(new EventTarget(), {
+    location: { protocol: "https:" },
+    localStorage: {
+      getItem: vi.fn(() =>
+        JSON.stringify({
+          user: { id: 1, name: "Admin", role: "admin" },
+          exp,
+        }),
+      ),
+      removeItem: vi.fn(),
+      setItem: vi.fn(),
+    },
+  });
+  vi.stubGlobal("window", browser);
+  return browser;
+}
+
+describe("tokenless persisted session", () => {
+  it("persists the user without the JWT so scripts cannot steal it", () => {
+    const browser = Object.assign(new EventTarget(), {
+      location: { protocol: "https:" },
+      localStorage: { getItem: vi.fn(), removeItem: vi.fn(), setItem: vi.fn() },
+      dispatchEvent: vi.fn(),
+    });
+    vi.stubGlobal("window", browser);
+
+    writeSession({
+      token: tokenWithExpiration(Math.floor(Date.now() / 1000) + 60),
+      user: { id: 1, name: "Admin", role: "admin" },
+    });
+
+    const persisted = JSON.parse(
+      browser.localStorage.setItem.mock.calls[0][1] as string,
+    );
+    expect(browser.localStorage.setItem).toHaveBeenCalledWith(
+      SESSION_KEY,
+      expect.any(String),
+    );
+    expect(persisted.user).toMatchObject({ id: 1, role: "admin" });
+    expect(persisted).not.toHaveProperty("token");
+  });
+
+  it("accepts an unexpired persisted user without any token", () => {
+    browserWithUser(Math.floor(Date.now() / 1000) + 60);
+
+    expect(readSession()?.user.role).toBe("admin");
+  });
+
+  it("rejects and removes an expired persisted user", () => {
+    const browser = browserWithUser(1);
 
     expect(readSession()).toBeNull();
     expect(browser.localStorage.removeItem).toHaveBeenCalledWith(SESSION_KEY);

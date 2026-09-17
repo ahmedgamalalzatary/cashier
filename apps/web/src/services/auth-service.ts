@@ -19,6 +19,10 @@ export function login(username: string, password: string) {
   });
 }
 
+export function logout() {
+  return api<{ ok: boolean }>("/api/auth/logout", { method: "POST" });
+}
+
 export async function changePasswordAndRefreshSession(
   currentPassword: string,
   newPassword: string,

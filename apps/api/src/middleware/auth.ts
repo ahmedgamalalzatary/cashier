@@ -18,6 +18,9 @@ declare global {
 
 type AuthToken = AuthUser & { tokenVersion: number };
 
+export const AUTH_COOKIE_NAME = 'cashier.token';
+const AUTH_COOKIE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
 export function signToken(
   user: AuthUser,
   tokenVersion: number,
@@ -26,10 +29,50 @@ export function signToken(
   return jwt.sign({ ...user, tokenVersion }, jwtSecret, { expiresIn: '12h' });
 }
 
+function readCookie(header: string | undefined, name: string) {
+  if (!header) return undefined;
+  const entry = header
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`));
+  if (!entry) return undefined;
+  try {
+    return decodeURIComponent(entry.slice(name.length + 1));
+  } catch {
+    return undefined;
+  }
+}
+
+function authCookieOptions(req: Request) {
+  return {
+    httpOnly: true,
+    path: '/',
+    maxAge: AUTH_COOKIE_MAX_AGE_MS,
+    sameSite: 'lax' as const,
+    // localhost dev stays http; TLS-terminating deployments (trust proxy)
+    // automatically upgrade the cookie to Secure.
+    secure: req.secure,
+  };
+}
+
+export function setAuthCookie(req: Request, res: Response, token: string) {
+  res.cookie(AUTH_COOKIE_NAME, token, authCookieOptions(req));
+}
+
+export function clearAuthCookie(req: Request, res: Response) {
+  res.clearCookie(AUTH_COOKIE_NAME, { ...authCookieOptions(req), maxAge: 0 });
+}
+
+export function readRequestToken(req: Request) {
+  const fromCookie = readCookie(req.headers.cookie, AUTH_COOKIE_NAME);
+  if (fromCookie) return fromCookie;
+  const header = req.headers.authorization;
+  return header?.startsWith('Bearer ') ? header.slice(7) : undefined;
+}
+
 export function authenticate(db: Db, jwtSecret: string) {
   return async (req: Request, _res: Response, next: NextFunction) => {
-    const header = req.headers.authorization;
-    const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
+    const token = readRequestToken(req);
     if (!token) throw new HttpError(401, 'يجب تسجيل الدخول');
 
     let payload: AuthToken;

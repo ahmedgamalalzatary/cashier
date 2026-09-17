@@ -37,6 +37,7 @@ export function createApp(
     cors({
       origin: (origin, callback) =>
         callback(null, !origin || corsOrigins.includes(origin)),
+      credentials: true,
     }),
   );
   app.use(express.json());

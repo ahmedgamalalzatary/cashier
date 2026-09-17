@@ -40,4 +40,29 @@ describe("buildHeaders", () => {
 
     await expect(api("/api/health")).rejects.toThrow("تعذر الاتصال بالخادم");
   });
+
+  it("sends the HttpOnly cookie instead of a stored bearer token", async () => {
+    const stored = {
+      user: { id: 1, name: "Admin", role: "admin" },
+      exp: Math.floor(Date.now() / 1000) + 60,
+    };
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: vi.fn(() => JSON.stringify(stored)),
+        removeItem: vi.fn(),
+      },
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api("/api/health");
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.credentials).toBe("include");
+    expect(new Headers(init.headers).get("Authorization")).toBeNull();
+  });
 });

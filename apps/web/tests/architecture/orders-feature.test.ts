@@ -23,7 +23,7 @@ describe("orders feature boundaries", () => {
   });
 
   it("opens one order on its own route with a reprintable receipt", () => {
-    const page = read("src/app/orders/[id]/page.tsx");
+    const page = read("src/app/orders/detail/page.tsx");
     expect(page).toContain("getOrder");
     expect(page).toContain("OrderReceipt");
     expect(page).toContain("window.print()");
@@ -33,7 +33,7 @@ describe("orders feature boundaries", () => {
   it("keeps cost and profit out of the cashier's view", () => {
     for (const relative of [
       "src/app/orders/page.tsx",
-      "src/app/orders/[id]/page.tsx",
+      "src/app/orders/detail/page.tsx",
     ]) {
       const page = read(relative);
       expect(page).toContain("orderMargin");

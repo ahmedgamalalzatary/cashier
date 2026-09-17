@@ -42,6 +42,13 @@ describe('health check', () => {
     );
   });
 
+  it('permits browsers to send the HttpOnly auth cookie cross-origin', async () => {
+    const res = await request(createApp(db, options))
+      .options('/health')
+      .set('Origin', options.corsOrigins[0]);
+    expect(res.headers['access-control-allow-credentials']).toBe('true');
+  });
+
   it('does not grant CORS access to any other origin', async () => {
     const res = await request(createApp(db, options))
       .options('/health')

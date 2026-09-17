@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { login as loginRequest } from "@/services/auth-service";
+import { login as loginRequest, logout as logoutRequest } from "@/services/auth-service";
 import {
   canOpenPath,
   loginPathFor,
@@ -18,13 +18,13 @@ import {
   subscribeToSessionChanges,
   writeSession,
   type AuthUser,
-  type Session,
+  type PersistedSession,
 } from "@/lib/auth";
 
 type AuthContextValue = {
   user: AuthUser | null;
   login(username: string, password: string): Promise<void>;
-  logout(): void;
+  logout(): Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -34,7 +34,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // "/login/" — the route checks below all compare against slash-free paths.
   const pathname = normalizePath(usePathname());
   const router = useRouter();
-  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [session, setSession] = useState<PersistedSession | null | undefined>(
+    undefined,
+  );
 
   useEffect(() => {
     const sync = () => setSession(readSession());
@@ -55,11 +57,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function login(username: string, password: string) {
     const next = await loginRequest(username, password);
     writeSession(next);
-    setSession(next);
+    setSession(readSession());
     router.replace(postLoginPath(window.location.search, next.user.role));
   }
 
-  function logout() {
+  async function logout() {
+    // best-effort: the cookie may already be expired, the client state is
+    // what gates the UI, and the server clears the cookie when reachable.
+    // Still awaited so a logout fully completes before a later login.
+    await logoutRequest().catch(() => undefined);
     writeSession(null);
     setSession(null);
     router.replace("/login");

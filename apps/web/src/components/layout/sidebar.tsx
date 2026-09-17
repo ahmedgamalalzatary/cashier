@@ -84,7 +84,7 @@ export function Sidebar({
       )}
       <aside
         id="app-nav"
-        className={`app-drawer fixed inset-y-0 start-0 z-40 w-64 max-w-[85vw] flex-col overflow-y-auto bg-sidebar text-sidebar-ink lg:static lg:z-auto lg:flex lg:w-56 lg:max-w-none lg:shrink-0 ${
+        className={`app-drawer fixed inset-y-0 start-0 z-40 w-64 max-w-[85vw] flex-col overflow-y-auto bg-sidebar text-sidebar-ink lg:sticky lg:top-0 lg:z-auto lg:flex lg:h-screen lg:w-56 lg:max-w-none lg:shrink-0 ${
           open ? "flex" : "hidden"
         }`}
       >

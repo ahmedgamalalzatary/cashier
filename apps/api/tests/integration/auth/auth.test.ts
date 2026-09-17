@@ -149,6 +149,53 @@ describe("authentication", () => {
     }
     expect((await guess()).status).toBe(429);
   });
+
+  it("sets the auth token as an HttpOnly cookie on login", async () => {
+    const credentials = await createUser("admin");
+    const response = await request(app())
+      .post("/api/auth/login")
+      .send(credentials);
+
+    expect(response.status).toBe(200);
+    const cookies = response.headers["set-cookie"] ?? [];
+    expect(
+      cookies.some((cookie: string) =>
+        /cashier\.token=.+;.*HttpOnly/i.test(cookie),
+      ),
+    ).toBe(true);
+  });
+
+  it("authenticates requests carrying only the auth cookie", async () => {
+    const credentials = await createUser("cashier");
+    const login = await request(app())
+      .post("/api/auth/login")
+      .send(credentials);
+    const cookie = (login.headers["set-cookie"] ?? []).find(
+      (entry: string) => entry.startsWith("cashier.token="),
+    );
+    expect(cookie).toBeTypeOf("string");
+
+    const response = await request(app())
+      .get("/api/auth/me")
+      .set("Cookie", cookie!);
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ name: "كاشير", role: "cashier" });
+  });
+
+  it("clears the auth cookie on logout", async () => {
+    const authorization = await loginAs(app(), "cashier");
+    const response = await request(app())
+      .post("/api/auth/logout")
+      .set(authorization);
+
+    expect(response.status).toBe(200);
+    const cookies = response.headers["set-cookie"] ?? [];
+    expect(
+      cookies.some((cookie: string) =>
+        /cashier\.token=;.*Expires=Thu, 01 Jan 1970/i.test(cookie),
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("role protection", () => {

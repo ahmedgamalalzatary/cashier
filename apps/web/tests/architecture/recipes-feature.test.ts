@@ -20,7 +20,7 @@ describe("recipes feature boundaries", () => {
       fs.existsSync(
         path.resolve(
           process.cwd(),
-          "src/app/recipes/preparations/[id]/page.tsx",
+          "src/app/recipes/preparations/detail/page.tsx",
         ),
       ),
     ).toBe(true);

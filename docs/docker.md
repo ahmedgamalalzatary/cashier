@@ -43,6 +43,25 @@ sudo docker compose --env-file .env.production ps
 
 The persistent MySQL volume is retained across builds and container replacements. Compose waits for MySQL, runs pending migrations, starts the API, and then starts the web service.
 
+This update includes migration `0033_revoke_all_auth_tokens`, which invalidates every previously issued login token as part of the move to HttpOnly cookie auth. All users must log in again after this deploy; that is expected, not a failure.
+
+## Admin account
+
+The API synchronizes the admin account from `.env.production` on every start:
+
+- Empty database: creates the admin from `ADMIN_USERNAME` / `ADMIN_PASSWORD` (first deploy needs no manual seeding).
+- Changed name, username, or password: applied automatically; a password change logs all users out.
+- Unchanged values: silent no-op, nobody is logged out.
+- Deactivation is never managed from the environment file.
+
+Apply new admin credentials with:
+
+```bash
+sudo docker compose --env-file .env.production up -d --force-recreate api
+```
+
+For password recovery outside the normal flow, the manual seed script still resets and reactivates the admin. `ADMIN_USERNAME` and `ADMIN_PASSWORD` must always be set; the API refuses to start without them.
+
 ## Start, stop, and restart
 
 Start or reconcile the complete stack:
@@ -128,7 +147,7 @@ sudo docker compose --env-file .env.production exec api node -e \
   "fetch('http://127.0.0.1:4000/health').then(async r=>console.log(r.status,await r.text()))"
 ```
 
-Check that `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGIN`, and the database credentials exist in `.env.production`. After changing the file, recreate the API instead of merely restarting it:
+Check that `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGIN`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and the database credentials exist in `.env.production`. `CORS_ORIGIN` must list the exact web origin (browsers reject credentialed cookie requests to unlisted origins). After changing the file, recreate the API instead of merely restarting it:
 
 ```bash
 sudo docker compose --env-file .env.production up -d --force-recreate api web

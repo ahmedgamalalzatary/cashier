@@ -21,6 +21,9 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     res = await fetch(`${BASE}${path}`, {
       ...init,
+      // the HttpOnly auth cookie travels with every call; the Authorization
+      // header is only attached by non-browser shells holding a fallback token
+      credentials: "include",
       headers: buildHeaders(init?.headers, session?.token, init?.body != null),
     });
   } catch {

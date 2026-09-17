@@ -3,7 +3,10 @@ import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { db } from '../../support/setup.js';
 import { users } from '../../../src/db/schema.js';
-import { seedAdmin } from '../../../src/db/seed-admin.js';
+import {
+  seedAdmin,
+  syncConfiguredAdmin,
+} from '../../../src/db/seed-admin.js';
 
 const configuredAdmin = {
   name: 'مدير الفرع',
@@ -119,5 +122,92 @@ describe('seedAdmin', () => {
     await expect(seedAdmin(db, configuredAdmin)).rejects.toThrow(
       'Cannot seed admin: multiple admin accounts exist',
     );
+  });
+});
+
+describe('syncConfiguredAdmin', () => {
+  it('creates the configured admin when no users exist', async () => {
+    const result = await syncConfiguredAdmin(db, configuredAdmin);
+    const rows = await db.select().from(users);
+
+    expect(result).toBe('created');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      username: configuredAdmin.username,
+      role: 'admin',
+    });
+  });
+
+  it('does nothing when the stored admin already matches', async () => {
+    await db.insert(users).values({
+      name: configuredAdmin.name,
+      username: configuredAdmin.username,
+      passwordHash: await bcrypt.hash(configuredAdmin.password, 4),
+      tokenVersion: 7,
+      role: 'admin',
+    });
+
+    const result = await syncConfiguredAdmin(db, configuredAdmin);
+    const [row] = await db.select().from(users);
+
+    expect(result).toBe('unchanged');
+    expect(row.tokenVersion).toBe(7);
+    expect(
+      await bcrypt.compare(configuredAdmin.password, row.passwordHash),
+    ).toBe(true);
+  });
+
+  it('updates the name without revoking sessions', async () => {
+    await db.insert(users).values({
+      name: 'Old name',
+      username: configuredAdmin.username,
+      passwordHash: await bcrypt.hash(configuredAdmin.password, 4),
+      tokenVersion: 7,
+      role: 'admin',
+    });
+
+    const result = await syncConfiguredAdmin(db, {
+      ...configuredAdmin,
+      name: 'New name',
+    });
+    const [row] = await db.select().from(users);
+
+    expect(result).toBe('updated');
+    expect(row.name).toBe('New name');
+    expect(row.tokenVersion).toBe(7);
+  });
+
+  it('updates the password and revokes sessions only when it changed', async () => {
+    await db.insert(users).values({
+      name: configuredAdmin.name,
+      username: configuredAdmin.username,
+      passwordHash: await bcrypt.hash('old-password', 4),
+      tokenVersion: 7,
+      role: 'admin',
+    });
+
+    const result = await syncConfiguredAdmin(db, configuredAdmin);
+    const [row] = await db.select().from(users);
+
+    expect(result).toBe('updated');
+    expect(row.tokenVersion).toBe(8);
+    expect(await bcrypt.compare(configuredAdmin.password, row.passwordHash)).toBe(
+      true,
+    );
+  });
+
+  it('serializes concurrent syncs into a single admin without duplicates', async () => {
+    const results = await Promise.all([
+      syncConfiguredAdmin(db, configuredAdmin),
+      syncConfiguredAdmin(db, configuredAdmin),
+    ]);
+    const rows = await db.select().from(users);
+
+    expect(results).toContain('created');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      username: configuredAdmin.username,
+      role: 'admin',
+    });
   });
 });
