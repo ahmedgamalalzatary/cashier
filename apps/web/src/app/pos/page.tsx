@@ -37,10 +37,12 @@ import { formatMoney } from "@/lib/format";
 import { catalogRefreshOutcome } from "@/models/catalog-refresh";
 import {
   addCatalogSelection,
+  cartLineTotal,
   catalogTilePrice,
   cartTotals,
   defaultExternalSize,
   filterCatalog,
+  isOwnOpenShift,
   orderPayload,
   setCartLineQuantity,
   type PosCartLine,
@@ -162,6 +164,20 @@ export default function PosPage() {
   }, []);
 
   useEffect(() => {
+    const refreshShift = () => {
+      getCurrentShift()
+        .then(setCurrentShift)
+        .catch(() => undefined);
+    };
+    const interval = window.setInterval(refreshShift, 30_000);
+    window.addEventListener("focus", refreshShift);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshShift);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!receipt || receipt.id !== autoPrintOrderId) return;
     const timer = window.setTimeout(() => {
       window.print();
@@ -183,10 +199,7 @@ export default function PosPage() {
     { type: discountType, value: discountValue },
     cashReceived,
   );
-  const detailedCurrentShift =
-    currentShift && !("occupied" in currentShift) ? currentShift : null;
-  const hasOwnOpenShift =
-    user?.role === "cashier" && detailedCurrentShift?.cashierUserId === user.id;
+  const hasOwnOpenShift = isOwnOpenShift(currentShift, user);
   const canComplete =
     hasOwnOpenShift &&
     cart.length > 0 &&
@@ -220,6 +233,12 @@ export default function PosPage() {
     setSaving(true);
     setError("");
     try {
+      const freshShift = await getCurrentShift().catch(() => null);
+      setCurrentShift(freshShift);
+      if (!isOwnOpenShift(freshShift, user)) {
+        setError("تغيرت حالة الوردية — تحقق منها قبل إتمام البيع");
+        return;
+      }
       const payload = orderPayload(
         cart,
         { type: discountType, value: discountValue },
@@ -332,7 +351,7 @@ export default function PosPage() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="ابحث باسم المنتج"
-                className="h-12 w-full rounded-xl border border-line bg-paper pe-12 ps-4 text-sm outline-none focus:border-primary"
+                className="h-12 w-full rounded-xl border border-line bg-paper pe-4 ps-12 text-sm outline-none focus:border-primary"
               />
             </label>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -688,7 +707,7 @@ function CartRow({
           </p>
         </div>
         <span className="font-bold">
-          {formatMoney(Number(line.unitPrice) * line.quantity)}
+          {formatMoney(cartLineTotal(line))}
         </span>
       </div>
       <div className="mt-2 flex items-center gap-2">

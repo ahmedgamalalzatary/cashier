@@ -1,5 +1,9 @@
 import { isExternalDiscountActive } from "@cashier/shared";
-import type { ExternalProduct, OrderDiscountType } from "@cashier/shared";
+import type {
+  CurrentShift,
+  ExternalProduct,
+  OrderDiscountType,
+} from "@cashier/shared";
 
 export type PosModifierSelection = {
   externalModifierOptionId: number;
@@ -208,6 +212,22 @@ export function filterCatalog(
       (!query ||
         product.nameAr.toLocaleLowerCase("ar").includes(query) ||
         product.nameEn.toLocaleLowerCase("en").includes(query)),
+  );
+}
+
+export function isOwnOpenShift(
+  shift: CurrentShift | null,
+  user: { id: number; role: string } | null | undefined,
+): boolean {
+  if (!user || user.role !== "cashier") return false;
+  if (shift === null || "occupied" in shift) return false;
+  return shift.cashierUserId === user.id;
+}
+
+export function cartLineTotal(line: PosCartLine): string {
+  return formatScaled(
+    stringToScaled(line.unitPrice, 2) * BigInt(line.quantity),
+    2,
   );
 }
 

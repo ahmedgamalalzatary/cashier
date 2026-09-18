@@ -12,3 +12,6 @@ export type ReportTable = {
 export function reportTotal(rows: ReportRow[], key: string) {
   return rows.reduce((sum, row) => sum + Number(row[key] ?? 0), 0);
 }
+export function isReportRangeReady(from: string, to: string) {
+  return from !== "" && to !== "" && from <= to;
+}

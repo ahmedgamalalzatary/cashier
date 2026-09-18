@@ -1,13 +1,14 @@
 import type { ReactNode } from "react";
 
-export function Table({ headers, children }: { headers: string[]; children: ReactNode }) {
+export function Table({ headers, children, caption }: { headers: string[]; children: ReactNode; caption?: string }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-line bg-surface">
       <table className="w-full text-sm">
+        {caption && <caption className="sr-only">{caption}</caption>}
         <thead>
           <tr className="border-b border-line bg-paper/60 text-start">
             {headers.map((h) => (
-              <th key={h} className="px-4 py-3 text-start font-medium text-muted">
+              <th key={h} scope="col" className="px-4 py-3 text-start font-medium text-muted">
                 {h}
               </th>
             ))}

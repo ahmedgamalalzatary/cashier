@@ -245,6 +245,7 @@ export class RefundsRepository {
         sizeName: refundLines.sizeName,
         quantity: refundLines.quantity,
         unitPrice: refundLines.unitPrice,
+        grossAmount: refundLines.grossAmount,
         refundAmount: refundLines.refundAmount,
         stockAction: refundLines.stockAction,
         returnedCost: refundLines.returnedCost,

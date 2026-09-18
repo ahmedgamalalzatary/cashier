@@ -1,9 +1,18 @@
 import { z } from "zod";
 
+// z.coerce.number() converts booleans (true -> 1), so only coerce genuine
+// form-data inputs: strings and numbers. Anything else passes through for
+// z.number() to reject.
+const coerceStrictNumber = (value: unknown) =>
+  typeof value === "string" || typeof value === "number"
+    ? Number(value)
+    : value;
+
 const quantity = z
-  .number()
-  .positive()
-  .max(99_999_999_999.999)
+  .preprocess(
+    coerceStrictNumber,
+    z.number().positive().max(99_999_999_999.999),
+  )
   .refine(
     (value) => Math.abs(value - Number(value.toFixed(3))) < 1e-9,
     "الكمية لا تقبل أكثر من ثلاث خانات عشرية",
@@ -16,12 +25,18 @@ export const wasteInput = z
     target: z.discriminatedUnion("type", [
       z.object({
         type: z.literal("item"),
-        itemId: z.number().int().positive(),
+        itemId: z.preprocess(coerceStrictNumber, z.number().int().positive()),
       }),
       z.object({
         type: z.literal("external_product"),
-        externalProductId: z.number().int().positive(),
-        externalSizeId: z.number().int().positive().nullable(),
+        externalProductId: z.preprocess(
+          coerceStrictNumber,
+          z.number().int().positive(),
+        ),
+        externalSizeId: z.preprocess(
+          coerceStrictNumber,
+          z.number().int().positive().nullable(),
+        ),
       }),
     ]),
     quantity,

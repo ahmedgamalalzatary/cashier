@@ -21,4 +21,8 @@ describe("waste submission flow", () => {
     );
     expect(page.match(/disabled=\{saving\}/g)).toHaveLength(5);
   });
+
+  it("tells the user a product is always recorded in the cafe warehouse", () => {
+    expect(page).toContain("يُسجل في مخزن الكافيه فقط");
+  });
 });

@@ -19,4 +19,13 @@ describe("expenses feature", () => {
     expect(service).toContain('method: "POST"');
     expect(service).toContain('method: "PATCH"');
   });
+
+  it("clears the form after a successful reload, not before", () => {
+    const page = read("app/expenses/page.tsx");
+    const reload = page.indexOf("await load()");
+    const clear = page.indexOf('setAmount("")');
+
+    expect(reload).toBeGreaterThan(-1);
+    expect(clear).toBeGreaterThan(reload);
+  });
 });

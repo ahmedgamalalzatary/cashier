@@ -20,4 +20,21 @@ describe("refund submission flow", () => {
       /created = await createRefund[\s\S]*?catch \(cause\)[\s\S]*?تعذر تسجيل المرتجع[\s\S]*?setDetail\(created\)[\s\S]*?await load\(\)[\s\S]*?تم تسجيل المرتجع، لكن تعذر تحديث البيانات/,
     );
   });
+
+  it("tells non-cashiers that recording refunds is cashier-only", () => {
+    expect(page).toContain("لحساب الكاشير فقط");
+  });
+
+  it("clears the refunds search icon on the inline-start side", () => {
+    expect(page).toContain("ps-11");
+    expect(page).not.toContain("pe-11");
+  });
+
+  it("initializes a missing draft entry from the normalizer before updating", () => {
+    expect(
+      page.match(
+        /\[\s*line\.id\s*\]: \{\s*\.\.\.refundDraftEntry\(state, line\.id\)/g,
+      ),
+    ).toHaveLength(2);
+  });
 });

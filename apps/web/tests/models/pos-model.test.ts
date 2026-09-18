@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { ExternalProduct } from "@cashier/shared";
+import type { CurrentShift, ExternalProduct } from "@cashier/shared";
 import {
   addCatalogSelection,
+  cartLineTotal,
   catalogTilePrice,
   cartTotals,
   defaultExternalSize,
   filterCatalog,
+  isOwnOpenShift,
   orderPayload,
   setCartLineQuantity,
 } from "../../src/models/pos-model";
@@ -241,5 +243,34 @@ describe("POS model", () => {
         nowMs,
       ),
     ).toBe(existing);
+  });
+
+  it("totals cart lines with exact decimal math", () => {
+    const line = {
+      key: "k",
+      type: "external_product" as const,
+      externalProductId: 9,
+      externalSizeId: 91,
+      productName: "لاتيه",
+      sizeName: "كبير",
+      quantity: 3,
+      unitPrice: "10.10",
+      modifiers: [],
+    };
+    // Number("10.10") * 3 === 30.299999999999997 in floating point.
+    expect(cartLineTotal(line)).toBe("30.30");
+    expect(cartLineTotal({ ...line, unitPrice: "19.99" })).toBe("59.97");
+  });
+
+  it("recognizes only the cashier's own open shift", () => {
+    const shift = { cashierUserId: 5 } as unknown as CurrentShift;
+    const cashier = { id: 5, role: "cashier" };
+
+    expect(isOwnOpenShift(shift, cashier)).toBe(true);
+    expect(isOwnOpenShift(shift, { id: 6, role: "cashier" })).toBe(false);
+    expect(isOwnOpenShift(shift, { id: 5, role: "admin" })).toBe(false);
+    expect(isOwnOpenShift({ occupied: true }, cashier)).toBe(false);
+    expect(isOwnOpenShift(null, cashier)).toBe(false);
+    expect(isOwnOpenShift(shift, null)).toBe(false);
   });
 });

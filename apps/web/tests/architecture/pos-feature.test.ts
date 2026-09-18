@@ -46,4 +46,44 @@ describe("POS feature boundaries", () => {
     expect(page).toMatch(/catalog\.lastSuccessfulSyncAt\s*\?/);
     expect(page).toContain("لم تتم المزامنة بعد");
   });
+
+  it("polls the current shift and refreshes on window focus", () => {
+    const page = fs.readFileSync(
+      path.resolve(process.cwd(), "src/app/pos/page.tsx"),
+      "utf8",
+    );
+    expect(page).toContain("refreshShift");
+    expect(page).toContain("30_000");
+    expect(page).toContain('addEventListener("focus"');
+  });
+
+  it("re-checks the shift inside checkout before creating the order", () => {
+    const page = fs.readFileSync(
+      path.resolve(process.cwd(), "src/app/pos/page.tsx"),
+      "utf8",
+    );
+    expect(page).toMatch(
+      /async function completeOrder[\s\S]{0,600}getCurrentShift/,
+    );
+  });
+
+  it("clears the POS search icon on the inline-start side", () => {
+    const page = fs.readFileSync(
+      path.resolve(process.cwd(), "src/app/pos/page.tsx"),
+      "utf8",
+    );
+    expect(page).toContain("ps-12");
+    expect(page).not.toContain("pe-12");
+  });
+
+  it("anchors the printed receipt with logical insets", () => {
+    const css = fs.readFileSync(
+      path.resolve(process.cwd(), "src/app/globals.css"),
+      "utf8",
+    );
+    const block = css.slice(css.indexOf(".receipt-print-root {"));
+
+    expect(block).toContain("inset-inline-start");
+    expect(block).not.toContain("inset: 0 auto auto 0");
+  });
 });

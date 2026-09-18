@@ -444,6 +444,11 @@ export function TransferFormModal({
         />
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+          {tab === "invoice" && (
+            <p className="basis-full text-xs text-muted">
+              حدد البنود ثم اضغط «اعتماد البنود المحددة» لنقلها إلى الطلب قبل الإرسال.
+            </p>
+          )}
           <span className="text-xs text-muted">
             إجمالي الكميات:{" "}
             {transferTotalQuantity(lines).toLocaleString("ar-EG", {

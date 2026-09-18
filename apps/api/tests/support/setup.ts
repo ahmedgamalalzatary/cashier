@@ -21,7 +21,7 @@ if (!/(^test_|_test$)/i.test(dbName)) {
     `DATABASE_URL in .env.test must point to a database named test_* or *_test (got "${dbName}")`,
   );
 }
-process.env.JWT_SECRET = "test-only-jwt-secret-at-least-32-characters";
+// JWT_SECRET comes from .env.test (validated by tests/unit/config/env.test.ts).
 
 export const db = createDb(testUrl!);
 export const appOptions = {

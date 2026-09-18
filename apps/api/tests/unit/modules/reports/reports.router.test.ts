@@ -5,7 +5,7 @@ import type { ReportsController } from "../../../../src/modules/reports/reports.
 import { reportsRouter } from "../../../../src/modules/reports/reports.router.js";
 
 describe("reports route authorization", () => {
-  it("blocks cashiers from every reports endpoint", async () => {
+  it("leaves role enforcement to the mount (adminOnly in app.ts)", async () => {
     const controller = {
       dashboard: vi.fn((_req, res) => res.status(200).end()),
       report: vi.fn((_req, res) => res.status(200).end()),
@@ -22,8 +22,8 @@ describe("reports route authorization", () => {
       request(app).get("/?from=2026-09-01&to=2026-09-30"),
     ]);
 
-    expect(responses.map(({ status }) => status)).toEqual([403, 403]);
-    expect(controller.dashboard).not.toHaveBeenCalled();
-    expect(controller.report).not.toHaveBeenCalled();
+    expect(responses.map(({ status }) => status)).toEqual([200, 200]);
+    expect(controller.dashboard).toHaveBeenCalled();
+    expect(controller.report).toHaveBeenCalled();
   });
 });

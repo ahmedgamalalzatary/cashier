@@ -71,10 +71,10 @@ export default function ExpensesPage() {
         expenseDate: user?.role === "admin" ? expenseDate : undefined,
         note: note.trim() || null,
       });
+      await load();
       setAmount("");
       setNote("");
       setRequestId(crypto.randomUUID());
-      await load();
     } catch (cause) {
       setError((cause as Error).message);
     } finally {

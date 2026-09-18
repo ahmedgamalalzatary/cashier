@@ -183,6 +183,11 @@ export default function WastePage() {
               </option>
             ))}
           </select>
+          {selectedProduct && (
+            <p className="text-xs text-muted md:col-span-2">
+              منتج الوصفة يُسجل في مخزن الكافيه فقط.
+            </p>
+          )}
           <input
             aria-label="الكمية"
             disabled={saving}

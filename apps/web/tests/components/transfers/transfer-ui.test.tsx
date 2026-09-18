@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Modal } from "../../../src/components/ui/modal";
 import {
@@ -48,5 +49,20 @@ describe("transfer UI accessibility", () => {
 
     expect(html).toContain("max-h-[calc(100dvh-2rem)]");
     expect(html).toContain("overflow-y-auto");
+  });
+});
+
+describe("transfer invoice tab", () => {
+  it("hints users to approve invoice lines before submitting", () => {
+    const source = readFileSync(
+      new URL(
+        "../../../src/components/transfers/transfer-form-modal.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    expect(source).toContain("اعتماد البنود المحددة");
+    expect(source).toMatch(/tab === "invoice"[\s\S]{0,400}اعتماد البنود المحددة/);
   });
 });

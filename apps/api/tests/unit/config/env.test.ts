@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { parse as parseDotenv } from 'dotenv';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadRuntimeEnv, parseRuntimeEnv, rootDir } from '../../../src/env.js';
 
@@ -51,6 +53,12 @@ describe('runtime environment', () => {
       'https://cashier.bittech.site',
       'http://localhost:3000',
     ]);
+  });
+
+  it('accepts the checked-in .env.test as a complete configuration', () => {
+    const raw = readFileSync(path.join(rootDir, '.env.test'), 'utf8');
+
+    expect(() => parseRuntimeEnv(parseDotenv(raw))).not.toThrow();
   });
 
   it.each([

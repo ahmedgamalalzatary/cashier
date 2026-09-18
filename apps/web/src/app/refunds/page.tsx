@@ -15,6 +15,10 @@ import { Modal } from "@/components/ui/modal";
 import { Table } from "@/components/ui/table";
 import { useAuth } from "@/components/auth/auth-provider";
 import { formatMoney } from "@/lib/format";
+import {
+  refundDraftEntry,
+  type RefundDraftLine,
+} from "@/models/refunds-model";
 import { getOrder, listOrders } from "@/services/orders-service";
 import {
   createRefund,
@@ -23,19 +27,13 @@ import {
   listRefunds,
 } from "@/services/refunds-service";
 
-type DraftLine = {
-  quantity: number;
-  stockAction: RefundStockAction | null;
-  refundedQuantity: number;
-};
-
 export default function RefundsPage() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [refunds, setRefunds] = useState<RefundSummary[]>([]);
   const [query, setQuery] = useState("");
   const [order, setOrder] = useState<OrderDetail | null>(null);
-  const [draft, setDraft] = useState<Record<number, DraftLine>>({});
+  const [draft, setDraft] = useState<Record<number, RefundDraftLine>>({});
   const [reason, setReason] = useState("");
   const [clientRequestId, setClientRequestId] = useState(() =>
     crypto.randomUUID(),
@@ -109,13 +107,18 @@ export default function RefundsPage() {
 
   const submit = async () => {
     if (!order) return;
-    const lines = order.lines
-      .filter((line) => (draft[line.id]?.quantity ?? 0) > 0)
-      .map((line) => ({
-        orderLineId: line.id,
-        quantity: draft[line.id].quantity,
-        stockAction: draft[line.id].stockAction,
-      }));
+    const lines = order.lines.flatMap((line) => {
+      const entry = refundDraftEntry(draft, line.id);
+      return entry.quantity > 0
+        ? [
+            {
+              orderLineId: line.id,
+              quantity: entry.quantity,
+              stockAction: entry.stockAction,
+            },
+          ]
+        : [];
+    });
     setSaving(true);
     setError("");
     try {
@@ -163,6 +166,11 @@ export default function RefundsPage() {
         </p>
       )}
 
+      {user?.role !== "cashier" && (
+        <p className="rounded-xl border border-line bg-surface p-3 text-sm text-muted">
+          تسجيل المرتجعات متاح لحساب الكاشير فقط — يعرض هذا الحساب سجل المرتجعات أدناه.
+        </p>
+      )}
       {user?.role === "cashier" && <section className="rounded-2xl border border-line bg-surface p-4">
         <label className="relative block">
           <Search className="pointer-events-none absolute inset-y-0 right-3 my-auto size-5 text-muted" />
@@ -171,7 +179,7 @@ export default function RefundsPage() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="رقم الطلب أو اسم الكاشير"
-            className="h-11 w-full rounded-xl border border-line bg-paper pe-11 ps-3 outline-none focus:border-primary"
+            className="h-11 w-full rounded-xl border border-line bg-paper pe-3 ps-11 outline-none focus:border-primary"
           />
         </label>
         <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -225,7 +233,7 @@ export default function RefundsPage() {
         <Modal title={`مرتجع الطلب ${order.orderNumber}`} open onClose={() => setOrder(null)}>
           <div className="space-y-4">
             {order.lines.map((line) => {
-              const current = draft[line.id];
+              const current = refundDraftEntry(draft, line.id);
               const available = Math.max(0, Number(line.quantity) - current.refundedQuantity);
               return (
                 <div key={line.id} className="rounded-xl border border-line p-3">
@@ -245,7 +253,7 @@ export default function RefundsPage() {
                         setClientRequestId(crypto.randomUUID());
                         setDraft((state) => ({
                           ...state,
-                          [line.id]: { ...state[line.id], quantity: Number(event.target.value) },
+                          [line.id]: { ...refundDraftEntry(state, line.id), quantity: Number(event.target.value) },
                         }));
                       }}
                       className="h-10 rounded-lg border border-line px-3 tnum"
@@ -258,7 +266,7 @@ export default function RefundsPage() {
                           setClientRequestId(crypto.randomUUID());
                           setDraft((state) => ({
                             ...state,
-                            [line.id]: { ...state[line.id], stockAction: event.target.value as RefundStockAction },
+                            [line.id]: { ...refundDraftEntry(state, line.id), stockAction: event.target.value as RefundStockAction },
                           }));
                         }}
                         className="h-10 rounded-lg border border-line px-3"

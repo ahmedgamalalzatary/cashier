@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../../src/app.js';
 import type { Db } from '../../../src/db/index.js';
+import { signToken } from '../../../src/middleware/auth.js';
 
 const db = {} as Db;
 const options = {
@@ -64,5 +65,35 @@ describe('health check', () => {
 
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty('error');
+  });
+
+  it('blocks cashiers from reports at the mount', async () => {
+    const cashierDb = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => [
+              {
+                id: 1,
+                name: 'Cashier',
+                role: 'cashier',
+                isActive: true,
+                tokenVersion: 0,
+              },
+            ],
+          }),
+        }),
+      }),
+    } as unknown as Db;
+    const token = signToken(
+      { id: 1, name: 'Cashier', role: 'cashier' },
+      0,
+      options.jwtSecret,
+    );
+    const res = await request(createApp(cashierDb, options))
+      .get('/api/reports/dashboard')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(403);
   });
 });

@@ -5,6 +5,10 @@ import { externalOrdersCache } from "../../db/schema.js";
 
 const CHUNK_SIZE = 250;
 
+// LIKE treats \, %, _ as syntax; escape user input so search terms match literally.
+const escapeLike = (value: string) =>
+  value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+
 export class ExternalOrdersRepository {
   constructor(private readonly db: Db) {}
 
@@ -45,7 +49,7 @@ export class ExternalOrdersRepository {
     const filters: SQL[] = [];
     const search = params.search?.trim();
     if (search) {
-      const pattern = `%${search}%`;
+      const pattern = `%${escapeLike(search)}%`;
       filters.push(
         or(
           like(externalOrdersCache.customerName, pattern),

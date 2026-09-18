@@ -575,6 +575,7 @@ export type RefundLine = {
   sizeName: string | null;
   quantity: string;
   unitPrice: string;
+  grossAmount: string;
   refundAmount: string;
   stockAction: RefundStockAction | null;
   returnedCost: string;

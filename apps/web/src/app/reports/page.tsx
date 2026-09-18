@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { cairoCalendarDate } from "@/lib/cairo-date";
 import type { ReportTable as TableData } from "@/models/reports-model";
+import { isReportRangeReady } from "@/models/reports-model";
 import { getReports, type ReportsData } from "@/services/reports-service";
 
 const today = cairoCalendarDate(),
@@ -288,6 +289,7 @@ export default function ReportsPage() {
     [loading, setLoading] = useState(true),
     [error, setError] = useState("");
   const load = (start = from, end = to) => {
+    if (!isReportRangeReady(start, end)) return;
     setLoading(true);
     setError("");
     getReports(start, end)
@@ -321,7 +323,7 @@ export default function ReportsPage() {
             <Button
               variant="ghost"
               onClick={() => load()}
-              disabled={loading || from > to}
+              disabled={loading || !isReportRangeReady(from, to)}
             >
               <RefreshCw className="size-4" />
               تحديث

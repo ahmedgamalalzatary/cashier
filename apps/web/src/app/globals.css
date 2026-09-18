@@ -263,7 +263,8 @@ body {
   .receipt-print-root {
     page: receipt;
     position: absolute;
-    inset: 0 auto auto 0;
+    top: 0;
+    inset-inline-start: 0;
     width: 80mm !important;
     max-width: none !important;
     min-height: 0;
