@@ -5,7 +5,12 @@ import { productsRouter } from "../../src/modules/products/products.router.js";
 
 describe("productsRouter", () => {
   it("returns accepted immediately for manual refresh", async () => {
-    const refresh = vi.fn(() => new Promise(() => undefined));
+    const refreshWork = new Promise(() => undefined);
+    const refresh = vi.fn(async (_req, res) => {
+      res.status(202).json({ accepted: true });
+      await refreshWork;
+    });
+    const adminOnly = vi.fn((_req, _res, next) => next());
     const router = productsRouter(
       {
         list: vi.fn(),
@@ -13,12 +18,18 @@ describe("productsRouter", () => {
         refreshStatus: vi.fn(),
         configureStock: vi.fn(),
       },
-      vi.fn(),
+      adminOnly,
     );
     const layer = router.stack.find(
       (entry) => entry.route?.path === "/refresh",
     );
     expect(layer).toBeDefined();
+
+    const app = express();
+    app.use(router);
+    const response = await request(app).post("/refresh");
+    expect(response.status).toBe(202);
+    expect(refresh).toHaveBeenCalledOnce();
   });
   it("exposes catalog, manual refresh, and stock setup routes", async () => {
     const controller = {

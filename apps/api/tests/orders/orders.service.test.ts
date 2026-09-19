@@ -14,15 +14,44 @@ const product = (externalId: number) => ({
   isCurrent: true,
   ingredients: [{ itemId: 1, itemName: "حليب", quantity: "0.010" }],
   sizes: [],
-  modifierGroups: [],
+  modifierGroups: [
+    {
+      externalId: 1,
+      nameAr: "إضافات",
+      nameEn: "Extras",
+      isRequired: false,
+      maxSelections: 5,
+      options: [
+        {
+          externalId: 1,
+          nameAr: "بدون",
+          nameEn: "None",
+          extraPrice: "0.00",
+          stockEffect: "none" as const,
+          ingredients: [],
+        },
+        {
+          externalId: 2,
+          nameAr: "إضافي",
+          nameEn: "Extra",
+          extraPrice: "0.00",
+          stockEffect: "none" as const,
+          ingredients: [],
+        },
+      ],
+    },
+  ],
 });
 
-const line = (externalProductId: number) => ({
+const line = (
+  externalProductId: number,
+  modifiers: Array<{ externalModifierOptionId: number; quantity: number }> = [],
+) => ({
   type: "external_product" as const,
   externalProductId,
   externalSizeId: null,
   quantity: 1,
-  modifiers: [],
+  modifiers,
 });
 
 describe("OrdersService idempotency fingerprint", () => {
@@ -87,6 +116,80 @@ describe("OrdersService idempotency fingerprint", () => {
       {
         clientRequestId,
         lines: [line(1), line(2)],
+        discount: null,
+        cashReceived: 20,
+      },
+      7,
+    );
+
+    expect(replay.id).toBe(5);
+    expect(tx.createOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it("replays when same product lines differ only by modifier order", async () => {
+    let stored:
+      | { id: number; cashierId: number; requestFingerprint: string }
+      | undefined;
+    const tx = {
+      findByClientRequestId: vi.fn(async () => stored),
+      findOpenShiftForCashier: vi.fn().mockResolvedValue({ id: 1 }),
+      loadExternalProducts: vi.fn().mockResolvedValue([product(1)]),
+      lockStockItems: vi.fn().mockResolvedValue([{ id: 1, isActive: true }]),
+      createOrder: vi.fn(
+        async (row: { requestFingerprint: string; cashierId: number }) => {
+          stored = {
+            id: 5,
+            cashierId: row.cashierId,
+            requestFingerprint: row.requestFingerprint,
+          };
+          return 5;
+        },
+      ),
+      createLine: vi.fn().mockResolvedValue(10),
+      createAllocation: vi.fn(),
+      createLineModifier: vi.fn(),
+      updateLine: vi.fn(),
+      updateOrder: vi.fn(),
+    };
+    const repo = {
+      transaction: vi.fn(
+        async (run: (r: typeof tx, inv: object) => Promise<number>) =>
+          run(tx, {
+            consume: vi.fn().mockResolvedValue({
+              allocations: [
+                {
+                  quantity: "0.010",
+                  unitCost: "1.000000",
+                  batchId: 1,
+                },
+              ],
+            }),
+          }),
+      ),
+      findByClientRequestId: vi.fn(async () => stored),
+      findOrder: vi.fn().mockResolvedValue({ id: 5 }),
+      listLines: vi.fn().mockResolvedValue([]),
+      listAllocations: vi.fn().mockResolvedValue([]),
+      listModifiers: vi.fn().mockResolvedValue([]),
+    } as unknown as OrdersRepository;
+    const service = new OrdersService(repo);
+    const clientRequestId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    const extra = [{ externalModifierOptionId: 2, quantity: 1 }];
+    const plain = [{ externalModifierOptionId: 1, quantity: 1 }];
+
+    await service.create(
+      {
+        clientRequestId,
+        lines: [line(1, extra), line(1, plain)],
+        discount: null,
+        cashReceived: 20,
+      },
+      7,
+    );
+    const replay = await service.create(
+      {
+        clientRequestId,
+        lines: [line(1, plain), line(1, extra)],
         discount: null,
         cashReceived: 20,
       },

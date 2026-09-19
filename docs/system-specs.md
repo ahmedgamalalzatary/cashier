@@ -65,6 +65,7 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 - **Main category** (e.g. مشروبات ساخنة) contains **sub-categories** (e.g. قهوة، شاي).
 - An item/product attaches to a sub-category, or directly to a main category that has no subs.
 - POS: main categories as tabs, sub-categories as a filter row.
+- Decision (intended, by design): POS sells from the flat external catalog, so it renders a single flat external category row instead of the two-level main/sub tabs. The local main/sub tree remains the source of truth for warehouse items and reports grouping.
 - Reports can group by main or sub level.
 - Admin manages the tree (add/rename/deactivate).
 
@@ -131,7 +132,7 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 ## 7. POS (Sales)
 
 - **Order type:** takeaway only.
-- Flow: product grid (main-category tabs → sub-category filter) → cart with quantities/sizes → cash received → change computed → order saved → receipt auto-prints.
+- Flow: product grid (flat external catalog row) → cart with quantities/sizes → cash received → change computed → order saved → receipt auto-prints.
 - **Products:** recipe products (with size variants) and as-is resale items. Selling deducts from **cafe stock** only:
   - Recipe product → deducts each ingredient quantity (FIFO) for the chosen size.
   - As-is item → deducts the item itself (FIFO).

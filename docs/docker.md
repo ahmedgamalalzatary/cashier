@@ -81,13 +81,13 @@ sudo docker compose --env-file .env.production restart web
 Stop application traffic while leaving MySQL running:
 
 ```bash
-sudo docker compose --env-file .env.production stop web api
+sudo docker compose --env-file .env.production stop web api cache-worker
 ```
 
 Start application traffic again:
 
 ```bash
-sudo docker compose --env-file .env.production start api web
+sudo docker compose --env-file .env.production start api cache-worker web
 ```
 
 Stop and remove containers and the project network while preserving the database volume:
@@ -135,7 +135,7 @@ sudo docker compose --env-file .env.production logs --tail=300 mysql migrate
 After correcting the database connection or migration problem, recreate the migration job and application services:
 
 ```bash
-sudo docker compose --env-file .env.production up -d --force-recreate migrate api web
+sudo docker compose --env-file .env.production up -d --force-recreate migrate api cache-worker web
 ```
 
 Do not edit an already-applied SQL migration. Add a new migration and redeploy.
@@ -151,8 +151,13 @@ sudo docker compose --env-file .env.production exec api node -e \
 Check that `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGIN`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and the database credentials exist in `.env.production`. `CORS_ORIGIN` must list the exact web origin (browsers reject credentialed cookie requests to unlisted origins). After changing the file, recreate the API instead of merely restarting it:
 
 ```bash
-sudo docker compose --env-file .env.production up -d --force-recreate api web
+sudo docker compose --env-file .env.production up -d --force-recreate api cache-worker web
 ```
+
+### CORS and TRUST_PROXY security notes
+
+- CORS is not auth and not access control. Browsers enforce `CORS_ORIGIN`, but curl / non-browser clients with no-Origin bypass CORS entirely. Every `/api/*` route still requires JWT/cookie auth.
+- `TRUST_PROXY`: default `false` locally, `"true"` in compose behind host Nginx. Set `TRUST_PROXY=true` only behind a trusted proxy that terminates TLS, because Express trusts `X-Forwarded-Proto` for secure cookies when enabled. Setting it true without a proxy lets a client spoof `X-Forwarded-Proto`.
 
 ### Web is unhealthy or shows an old API URL
 
@@ -229,10 +234,10 @@ Restoring replaces live database state. Take a new backup first and perform the 
 set -a
 . ./.env.production
 set +a
-sudo docker compose --env-file .env.production stop api web
+sudo docker compose --env-file .env.production stop api web cache-worker
 sudo docker compose --env-file .env.production exec -T mysql \
   mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE" < backups/selected-dump.sql
-sudo docker compose --env-file .env.production up -d --force-recreate migrate api web
+sudo docker compose --env-file .env.production up -d --force-recreate migrate api cache-worker web
 unset MYSQL_ROOT_PASSWORD
 ```
 

@@ -37,18 +37,26 @@ const isDuplicateEntry = (error: unknown) =>
   "code" in error &&
   (error as { code?: unknown }).code === "ER_DUP_ENTRY";
 
+function canonicalModifiers(modifiers: OrderLineInput["modifiers"]) {
+  return [...modifiers].sort(
+    (left, right) =>
+      left.externalModifierOptionId - right.externalModifierOptionId,
+  );
+}
+
+function lineKey(line: OrderLineInput) {
+  return JSON.stringify({
+    product: line.externalProductId,
+    size: line.externalSizeId,
+    modifiers: canonicalModifiers(line.modifiers),
+  });
+}
+
 function normalizeLines(lines: OrderLineInput[]) {
   const combined = new Map<string, OrderLineInput>();
   for (const line of lines) {
-    const modifiers = [...line.modifiers].sort(
-      (left, right) =>
-        left.externalModifierOptionId - right.externalModifierOptionId,
-    );
-    const key = JSON.stringify({
-      product: line.externalProductId,
-      size: line.externalSizeId,
-      modifiers,
-    });
+    const modifiers = canonicalModifiers(line.modifiers);
+    const key = lineKey({ ...line, modifiers });
     const existing = combined.get(key);
     if (existing) existing.quantity += line.quantity;
     else combined.set(key, { ...line, modifiers });
@@ -65,7 +73,8 @@ function requestFingerprint(data: OrderInput) {
   const lines = [...normalizeLines(data.lines)].sort(
     (left, right) =>
       left.externalProductId - right.externalProductId ||
-      (left.externalSizeId ?? 0) - (right.externalSizeId ?? 0),
+      (left.externalSizeId ?? 0) - (right.externalSizeId ?? 0) ||
+      lineKey(left).localeCompare(lineKey(right)),
   );
   return hashRequest({
     lines,

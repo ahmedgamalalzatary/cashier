@@ -39,6 +39,16 @@ describe("durable cache refresh state", () => {
 
   it("preserves a hard-refresh request created after the active run started", async () => {
     const repository = new CacheRefreshRepository(db);
+    const runStartedAt = new Date("2026-08-21T12:00:00Z");
+    expect(
+      await repository.tryAcquire(
+        "worker-1",
+        runStartedAt,
+        new Date("2026-08-21T12:15:00Z"),
+      ),
+    ).toBe(true);
+    await repository.markAttempt(runStartedAt);
+
     const requestedAt = new Date("2026-08-21T12:01:00Z");
     await repository.request(requestedAt);
     await expect(repository.getStatus()).resolves.toMatchObject({

@@ -43,7 +43,7 @@ Every problem/bug in this report with its current state. States: ✅ Fixed (veri
 | §2.10 | Dead `recipe` waste path | ❌ Open | Remove or implement |
 | §2.12 | Report groups 2–4 knock-ons; PDF via print only | ❌ Open | — |
 | §2.13 | 5 tables missing (`salary_*`, `stocktake*`) | ❌ Open | — |
-| §2.14-1 | POS hierarchy decision unrecorded | ❌ Open | — |
+| §2.14-1 | POS hierarchy decision unrecorded | ✅ Fixed | `system-specs.md` §3+§7: flat external catalog by design, local main/sub for warehouse/reports; pinned by `pos-hierarchy.test.ts` |
 | §2.14-3 | `docker.md` omits `cache-worker` | ✅ Fixed | Fifth service listed in `docs/docker.md` |
 | §2.14-4 | Cashier main-stock blindness | ➖ No action | Accepted per spec |
 | W1 | Single open shift blocks multi-register | ❌ Open | Document constraint or implement slots |
@@ -64,12 +64,12 @@ Every problem/bug in this report with its current state. States: ✅ Fixed (veri
 | §4 admin notice | Bare log instead of cashier-only message | ✅ Fixed | Notice + test |
 | §4 shift polling | Shift state fetched once, goes stale | ✅ Fixed | 30s poll + focus + checkout re-check + test |
 | §4 waste feedback | Cafe warehouse forced silently | ✅ Fixed | Status notice when product waste forces cafe; `waste-target.test.ts` |
-| §4 table captions | No `scope`/no `caption` | ❌ Open | Component ready (`scope` + optional `caption` ✅); call sites pass no `caption` yet |
+| §4 table captions | No `scope`/no `caption` | ➖ No action | Skipped per owner — not needed |
 | §4 receipt RTL | Receipt pinned physically left | ✅ Fixed | `inset-inline-start` + test |
 | §4 expense order | Form cleared before reload | ✅ Fixed | Clear after `await load()` + test |
 | §4 transfer hint | Dead submit on invoice tab, no hint | ✅ Fixed | Hint text + disabled submit + test |
 | §4 report dates | Empty/inverted dates hit API | ✅ Fixed | `isReportRangeReady` + test |
-| S3 | CORS ≠ auth undocumented; `TRUST_PROXY` footgun | ❌ Open | Document |
+| S3 | CORS ≠ auth undocumented; `TRUST_PROXY` footgun | ✅ Fixed | `docker.md` CORS ≠ auth + curl/no-Origin + `TRUST_PROXY`/`X-Forwarded-Proto`; pinned by `security-docs.test.ts` |
 | S4 | LIKE wildcards unescaped | ✅ Fixed | `escapeLike` + test; reports repo has no LIKE search |
 | S6 | `.env.test` contract gaps | ✅ Fixed | Root `.env.test` includes `EXTERNAL_ORDERS_*`; `env.test.ts` parses it as complete |
 | D4 | Deadlock retry only on categories | ❌ Open | Shared wrapper + concurrency tests |
@@ -135,7 +135,7 @@ Source: `docs/system-specs.md`, `docs/external-products-integration-design.md`, 
 | §15 | Data model | ⚠️ Partial (5 tables missing) |
 | §16 | Out-of-scope exclusions respected | ✅ Implemented |
 | — | External-products integration design | ✅ Implemented |
-| — | Docker runbook accuracy | ⚠️ Partial (worker undocumented) |
+| — | Docker runbook accuracy | ✅ Implemented |
 
 ### 2.1 Roles (§2) — ✅
 
@@ -299,11 +299,10 @@ Auth correct: cookie-first + Tauri Bearer fallback (`lib/api.ts:22-28`, `lib/aut
 
 - External-orders search escapes LIKE wildcards (`external-orders.repository.ts:8-9,52`, pinned by test). Drizzle params throughout; `reports.repository.ts` has no LIKE/text search today (date-range SQL only), so no wildcard handling applies there.
 
-### 🟡 S6 — Env contract gaps [Medium]
+### 🟢 S6 — Env contract gaps [Fixed]
 
-- `.env.test:1-3` only `DATABASE_URL/JWT_SECRET/PORT` but `env.ts:22-67` requires `EXTERNAL_ORDERS_*` — integration must inject elsewhere or fail validation.
+- Root `.env.test` includes `EXTERNAL_ORDERS_*`; `env.test.ts` parses it as a complete config (`env.ts` required keys).
 - `.env.example` is the single template for local + production vars (no separate `.env.production.example` by intent); compose requires `.env.production` + `MYSQL_PASSWORD/ROOT/DATABASE_URL/CORS_ORIGIN/NEXT_PUBLIC_API_URL`.
-- Fix: fix `.env.test` contract, document vars.
 
 ---
 
@@ -364,10 +363,10 @@ Additional frontend edges (§4.3): waste warehouse override, missing table capti
 
 1. ~~Resolve external-product refund stock handling (C2/D2/E1a)~~ ✅ Fixed — restock or auto-waste; CHECK + 0034 backfill (E1b).
 2. ~~Add idempotency keys to purchases + transfers (D5) with race tests; fix purchase duplicate catch (C1); canonicalize idempotency fingerprints (M2)~~ ✅ Fixed.
-3. Share deadlock-retry beyond categories + add sales/refund/approve concurrency tests (D4, §7.1-3); sort purchase locks (W4).
+3. Share deadlock-retry beyond categories + add sales/refund/approve concurrency tests (D4, §7.1-3).
 4. Build salaries module + stocktake module (§2.8, §2.3); wire salaries into cash-flow + employees report; replace `/salaries` stub.
-5. Decide dead `recipe` waste path — remove or implement (§2.10); align shared `RecipeType` drift (M3); cap external-refund proportional cost (W3); document single-register constraint or implement per-terminal slots (W1); record POS-hierarchy decision (§2.14-1).
-6. Security/config (kept): document CORS ≠ auth (S3); LIKE escaping verified (S4); fix `.env.test` contract + document vars (S6).
+5. Decide dead `recipe` waste path — remove or implement (§2.10); align shared `RecipeType` drift (M3); document single-register constraint or implement per-terminal slots (W1); record POS-hierarchy decision (§2.14-1).
+6. Security/config (kept): document CORS ≠ auth (S3); LIKE escaping verified (S4); `.env.test` contract verified (S6).
 7. DevOps (kept): add `migrate`/`cache-worker` healthchecks; fix `NEXT_PUBLIC_API_URL` rebuild coupling or document it.
 8. Frontend (kept): keep `/salaries` nav advertised while §2.8 is built; missing table captions at call sites. Waste warehouse feedback ✅ Fixed.
 9. Edge cases (kept): pin stacked-discount combined math with test (E2); decide low-stock alerting scope (E7).

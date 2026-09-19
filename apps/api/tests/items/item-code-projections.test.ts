@@ -53,6 +53,13 @@ describe("item code projections", () => {
 
     await run(db);
 
-    expect(statements.join(" ").toLowerCase()).toContain("`items`.`code`");
+    const selectList = statements
+      .map((sql) => {
+        const match = sql.match(/select\s+([\s\S]*?)\s+from\s/i);
+        return match?.[1] ?? "";
+      })
+      .join(" ")
+      .toLowerCase();
+    expect(selectList).toContain("`items`.`code`");
   });
 });

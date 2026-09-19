@@ -44,6 +44,15 @@ describe("productStockSetupInput", () => {
         ],
         sizes: [
           { externalSizeId: 4, ingredients: [{ itemId: 2, quantity: 1 }] },
+        ],
+        modifiers: [],
+      }),
+    ).toThrow();
+    expect(() =>
+      productStockSetupInput.parse({
+        baseIngredients: [{ itemId: 1, quantity: 1 }],
+        sizes: [
+          { externalSizeId: 4, ingredients: [{ itemId: 2, quantity: 1 }] },
           { externalSizeId: 4, ingredients: [{ itemId: 3, quantity: 1 }] },
         ],
         modifiers: [],

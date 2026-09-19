@@ -34,16 +34,38 @@ describe('AuthService credential work', () => {
         isActive: false,
       }),
     } as unknown as AuthRepository;
-    const compare = vi.fn().mockResolvedValue(true);
+    let resolveCompare: (matched: boolean) => void = () => undefined;
+    const compare = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveCompare = resolve;
+        }),
+    );
     const service = new AuthService(
       repo,
       'test-only-jwt-secret-at-least-32-characters',
       compare,
     );
 
-    await expect(
-      service.login({ username: 'inactive', password: 'secret123' }),
-    ).rejects.toMatchObject({ status: 401 });
+    const pending = service.login({
+      username: 'inactive',
+      password: 'secret123',
+    });
+    let settled = false;
+    void pending.then(
+      () => {
+        settled = true;
+      },
+      () => {
+        settled = true;
+      },
+    );
+    await Promise.resolve();
     expect(compare).toHaveBeenCalledWith('secret123', storedHash);
+    expect(settled).toBe(false);
+
+    resolveCompare(true);
+    await expect(pending).rejects.toMatchObject({ status: 401 });
+    expect(settled).toBe(true);
   });
 });
