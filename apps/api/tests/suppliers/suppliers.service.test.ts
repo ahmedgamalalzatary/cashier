@@ -127,4 +127,108 @@ describe('SuppliersService financial consistency', () => {
     expect(repo.transaction).toHaveBeenCalledOnce();
     expect(repo.deactivate).not.toHaveBeenCalled();
   });
+
+  it('404s missing suppliers on update, deactivate, payment, and statement', async () => {
+    const missingTx = repository({
+      findByIdForUpdate: vi.fn().mockResolvedValue(undefined),
+    });
+    const missingService = new SuppliersService(
+      missingTx as unknown as SuppliersRepository,
+    );
+    await expect(missingService.update(999, { name: 'x' })).rejects.toMatchObject({
+      status: 404,
+    });
+    await expect(missingService.deactivate(999)).rejects.toMatchObject({
+      status: 404,
+    });
+    await expect(
+      missingService.addPayment(999, { amount: 25, paidAt: '2026-07-19' }),
+    ).rejects.toMatchObject({ status: 404 });
+
+    const missingGet = { findById: vi.fn().mockResolvedValue(undefined) };
+    await expect(
+      new SuppliersService(
+        missingGet as unknown as SuppliersRepository,
+      ).statement(999),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('blocks an opening-balance rewrite after purchases even without payments', async () => {
+    const repo = repository({
+      hasPayments: vi.fn().mockResolvedValue(false),
+      hasPurchases: vi.fn().mockResolvedValue(true),
+    });
+    const service = new SuppliersService(
+      repo as unknown as SuppliersRepository,
+    );
+
+    await expect(
+      service.update(1, { openingBalance: 201 }),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+});
+
+describe('SuppliersService statement math', () => {
+  const supplier = {
+    id: 1,
+    name: 'المورد',
+    openingBalance: '100.00',
+  };
+
+  function statementRepo(purchases: unknown[], payments: unknown[]) {
+    return {
+      findById: vi.fn(async () => supplier),
+      listPayments: vi.fn(async () => payments),
+      listPurchases: vi.fn(async () => purchases),
+    } as unknown as SuppliersRepository;
+  }
+
+  it('orders same-day purchases before payments and keeps a running balance', async () => {
+    const repo = statementRepo(
+      [
+        { id: 2, purchasedAt: '2026-07-20', invoiceNumber: null, totalAmount: '50.00' },
+        { id: 1, purchasedAt: '2026-07-19', invoiceNumber: 'INV-1', totalAmount: '30.00' },
+      ],
+      [{ id: 5, paidAt: '2026-07-20', amount: '20.00', notes: null }],
+    );
+
+    const { movements } = await new SuppliersService(repo).statement(1);
+
+    expect(movements.map((movement) => movement.id)).toEqual([
+      'purchase-1',
+      'purchase-2',
+      'payment-5',
+    ]);
+    expect(movements.map((movement) => movement.balanceAfter)).toEqual([
+      '130.00',
+      '180.00',
+      '160.00',
+    ]);
+    expect(movements[1]).toMatchObject({
+      description: 'فاتورة شراء #2',
+      amount: '50.00',
+    });
+    expect(movements[2]).toMatchObject({
+      description: 'دفعة للمورد',
+      amount: '-20.00',
+    });
+  });
+
+  it('formats negative running balances and custom descriptions', async () => {
+    const repo = statementRepo(
+      [],
+      [{ id: 5, paidAt: '2026-07-20', amount: '150.00', notes: 'عربون' }],
+    );
+
+    const { movements } = await new SuppliersService(repo).statement(1);
+
+    expect(movements).toEqual([
+      expect.objectContaining({
+        id: 'payment-5',
+        description: 'عربون',
+        amount: '-150.00',
+        balanceAfter: '-50.00',
+      }),
+    ]);
+  });
 });

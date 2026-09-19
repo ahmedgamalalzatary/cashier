@@ -155,3 +155,136 @@ describe('CategoriesService deadlock retries', () => {
     expect(repo.transaction).toHaveBeenCalledOnce();
   });
 });
+
+function repoWithRows(
+  rows: Array<{
+    id: number;
+    name: string;
+    parentId: number | null;
+    isActive: boolean;
+  }>,
+  overrides: Record<string, unknown> = {},
+) {
+  const repo = {
+    transaction: vi.fn(
+      async (run: (value: CategoriesRepository) => Promise<unknown>) =>
+        run(repo as unknown as CategoriesRepository),
+    ),
+    findByIdForUpdate: vi.fn(async (id: number) =>
+      rows.find((row) => row.id === id),
+    ),
+    lockForUpdate: vi.fn(async () => rows),
+    hasActiveItems: vi.fn(async () => false),
+    hasActiveRecipes: vi.fn(async () => false),
+    create: vi.fn(async () => 9),
+    update: vi.fn(async () => true),
+    deactivateMany: vi.fn(async () => undefined),
+    ...overrides,
+  };
+  return repo;
+}
+
+const mainRow = (overrides: Record<string, unknown> = {}) => ({
+  id: 1,
+  name: 'Main',
+  parentId: null,
+  isActive: true,
+  ...overrides,
+});
+
+describe('CategoriesService parent validation', () => {
+  it('400s a missing, inactive, or sub-level parent on create', async () => {
+    const missing = repoWithRows([]);
+    await expect(
+      new CategoriesService(missing as unknown as CategoriesRepository).create({
+        name: 'Sub',
+        parentId: 99,
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+
+    const inactive = repoWithRows([mainRow({ isActive: false })]);
+    await expect(
+      new CategoriesService(inactive as unknown as CategoriesRepository).create({
+        name: 'Sub',
+        parentId: 1,
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+
+    const subParent = repoWithRows([
+      mainRow(),
+      { id: 2, name: 'Sub', parentId: 1, isActive: true },
+    ]);
+    await expect(
+      new CategoriesService(
+        subParent as unknown as CategoriesRepository,
+      ).create({ name: 'SubSub', parentId: 2 }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('409s creating a branch under an item- or recipe-linked parent', async () => {
+    for (const flag of ['hasActiveItems', 'hasActiveRecipes'] as const) {
+      const repo = repoWithRows([mainRow()], { [flag]: vi.fn(async () => true) });
+      await expect(
+        new CategoriesService(repo as unknown as CategoriesRepository).create({
+          name: 'Sub',
+          parentId: 1,
+        }),
+      ).rejects.toMatchObject({ status: 409 });
+    }
+  });
+
+  it('creates a main category without touching the parent checks', async () => {
+    const repo = repoWithRows([]);
+    const service = new CategoriesService(
+      repo as unknown as CategoriesRepository,
+    );
+
+    await expect(service.create({ name: 'Main' })).resolves.toBe(9);
+    expect(repo.findByIdForUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('CategoriesService update guards', () => {
+  it('404s a missing category', async () => {
+    const repo = repoWithRows([]);
+    await expect(
+      new CategoriesService(repo as unknown as CategoriesRepository).update(999, {
+        name: 'x',
+      }),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('400s self-parenting and moving a parent that has children', async () => {
+    const selfParent = repoWithRows([mainRow()]);
+    await expect(
+      new CategoriesService(
+        selfParent as unknown as CategoriesRepository,
+      ).update(1, { parentId: 1 }),
+    ).rejects.toMatchObject({ status: 400 });
+
+    const withChild = repoWithRows([
+      mainRow({ id: 1 }),
+      mainRow({ id: 2 }),
+      { id: 3, name: 'Child', parentId: 2, isActive: true },
+    ]);
+    await expect(
+      new CategoriesService(
+        withChild as unknown as CategoriesRepository,
+      ).update(2, { parentId: 1 }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('409s deactivation under active items or active recipes', async () => {
+    for (const flag of ['hasActiveItems', 'hasActiveRecipes'] as const) {
+      const repo = repoWithRows([mainRow()], {
+        [flag]: vi.fn(async () => true),
+      });
+      await expect(
+        new CategoriesService(repo as unknown as CategoriesRepository).deactivate(
+          1,
+        ),
+      ).rejects.toMatchObject({ status: 409 });
+      expect(repo.deactivateMany).not.toHaveBeenCalled();
+    }
+  });
+});

@@ -38,6 +38,14 @@ export const wasteInput = z
           z.number().int().positive().nullable(),
         ),
       }),
+      z.object({
+        type: z.literal("recipe"),
+        recipeId: z.preprocess(coerceStrictNumber, z.number().int().positive()),
+        recipeSizeId: z.preprocess(
+          coerceStrictNumber,
+          z.number().int().positive(),
+        ),
+      }),
     ]),
     quantity,
     reason: z.enum([
@@ -51,13 +59,17 @@ export const wasteInput = z
   })
   .superRefine((value, context) => {
     if (
-      value.target.type === "external_product" &&
+      (value.target.type === "external_product" ||
+        value.target.type === "recipe") &&
       !Number.isInteger(value.quantity)
     ) {
       context.addIssue({
         code: "custom",
         path: ["quantity"],
-        message: "كمية المنتج يجب أن تكون عدداً صحيحاً",
+        message:
+          value.target.type === "recipe"
+            ? "كمية الوصفة يجب أن تكون عدداً صحيحاً"
+            : "كمية المنتج يجب أن تكون عدداً صحيحاً",
       });
     }
     if (value.reason === "other" && !value.note) {

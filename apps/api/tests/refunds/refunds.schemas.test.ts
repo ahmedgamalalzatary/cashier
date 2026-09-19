@@ -48,4 +48,30 @@ describe("refundInput", () => {
       }),
     ).toThrow();
   });
+
+  it("rejects short or over-long reasons, empty lines, and bad ids", () => {
+    const base = {
+      clientRequestId: "8f345091-c497-4b8b-b4f3-a8ebdc47dd31",
+      orderId: 12,
+      reason: "سبب كاف",
+      lines: [{ orderLineId: 7, quantity: 1 }],
+    };
+
+    expect(
+      refundInput.safeParse({ ...base, reason: "x" }).success,
+    ).toBe(false);
+    expect(
+      refundInput.safeParse({ ...base, reason: "x".repeat(501) }).success,
+    ).toBe(false);
+    expect(refundInput.safeParse({ ...base, lines: [] }).success).toBe(false);
+    expect(
+      refundInput.safeParse({ ...base, orderId: 0 }).success,
+    ).toBe(false);
+    expect(
+      refundInput.safeParse({
+        ...base,
+        lines: [{ orderLineId: 7, quantity: 1, stockAction: "resell" }],
+      }).success,
+    ).toBe(false);
+  });
 });

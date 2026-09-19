@@ -376,3 +376,151 @@ describe("FIFO inventory service", () => {
     expect(repo.movements).toHaveLength(0);
   });
 });
+
+describe("inventory input validation", () => {
+  const baseReceive = {
+    itemId: 1,
+    warehouse: "main" as const,
+    quantity: 1,
+    unitCost: "5",
+    movementType: "purchase",
+  };
+
+  it("rejects zero, negative, non-finite, and over-precise quantities", async () => {
+    const repo = new FakeInventoryRepository();
+    const service = new InventoryService(repo);
+
+    for (const quantity of [0, -1, NaN, Infinity, 100_000_000_000, 1.0005]) {
+      await expect(
+        service.receive({ ...baseReceive, quantity }),
+      ).rejects.toMatchObject({ status: 400 });
+    }
+    await expect(
+      service.consume({
+        itemId: 1,
+        warehouse: "main",
+        quantity: 1.0005,
+        movementType: "sale",
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("rejects malformed and out-of-range unit costs", async () => {
+    const repo = new FakeInventoryRepository();
+    const service = new InventoryService(repo);
+
+    for (const unitCost of ["-1", "abc", "", "1.1234567", "12.34.56"]) {
+      await expect(
+        service.receive({ ...baseReceive, unitCost }),
+      ).rejects.toMatchObject({ status: 400 });
+    }
+  });
+});
+
+describe("inventory item guards", () => {
+  it("404s a missing item and 409s an inactive one", async () => {
+    const missing = new FakeInventoryRepository();
+    missing.items.delete(1);
+    await expect(
+      new InventoryService(missing).receive({
+        itemId: 1,
+        warehouse: "main",
+        quantity: 1,
+        unitCost: "5",
+        movementType: "purchase",
+      }),
+    ).rejects.toMatchObject({ status: 404 });
+
+    const inactive = new FakeInventoryRepository();
+    inactive.items.set(1, { id: 1, isActive: false });
+    await expect(
+      new InventoryService(inactive).consume({
+        itemId: 1,
+        warehouse: "main",
+        quantity: 1,
+        movementType: "sale",
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+});
+
+describe("inventory deficit and stock flags", () => {
+  const deficitMovement = (quantity: string) => ({
+    itemId: 1,
+    warehouse: "cafe" as const,
+    batchId: null,
+    movementType: "sale",
+    quantity,
+    unitCost: "0.000000",
+    referenceType: null,
+    referenceId: null,
+    notes: null,
+    occurredAt: new Date("2026-07-01T00:00:00Z"),
+  });
+
+  it("splits incoming stock across several outstanding deficits", async () => {
+    const repo = new FakeInventoryRepository();
+    repo.movements.push(deficitMovement("-1.000"), deficitMovement("-2.000"));
+    const service = new InventoryService(repo);
+
+    const result = await service.receive({
+      itemId: 1,
+      warehouse: "cafe",
+      quantity: 2,
+      unitCost: "8",
+      movementType: "transfer_in",
+    });
+
+    expect(repo.batches[0]).toMatchObject({
+      initialQuantity: "2.000",
+      remainingQuantity: "0.000",
+    });
+    expect(result.deficitAllocations).toEqual([
+      { deficitMovementId: 1, batchId: 1, quantity: "1.000", unitCost: "8.000000" },
+      { deficitMovementId: 2, batchId: 1, quantity: "1.000", unitCost: "8.000000" },
+    ]);
+  });
+
+  it("flags low and negative stock levels", async () => {
+    const repo = new FakeInventoryRepository();
+    const row = (overrides: Record<string, unknown>) => ({
+      itemId: 1,
+      code: 1001,
+      name: "بن",
+      categoryId: 1,
+      categoryName: "خامات",
+      type: "raw",
+      stockUnit: "كجم",
+      isActive: true,
+      quantity: "10.000",
+      stockValue: "20.00",
+      minimumLevel: "5.000",
+      ...overrides,
+    });
+    repo.listStock = (async () => [
+      row({ quantity: "2.000" }),
+      row({ quantity: "10.000" }),
+      row({ quantity: "1.000", isActive: false }),
+      row({ quantity: "0.000", minimumLevel: "0.000" }),
+      row({ quantity: "-1.000" }),
+    ]) as typeof repo.listStock;
+    const service = new InventoryService(repo);
+
+    const rows = await service.listStock("cafe");
+
+    expect(rows.map((candidate) => candidate.isLowStock)).toEqual([
+      true,
+      false,
+      false,
+      false,
+      true,
+    ]);
+    expect(rows.map((candidate) => candidate.isNegativeStock)).toEqual([
+      false,
+      false,
+      false,
+      false,
+      true,
+    ]);
+  });
+});

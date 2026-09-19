@@ -270,7 +270,7 @@ export type TransferDetail = TransferSummary & {
   lines: TransferLine[];
 };
 
-export type RecipeType = "prepared";
+export type RecipeType = "product" | "prepared";
 
 export type RecipeIngredientCost = {
   id: number;
@@ -623,6 +623,12 @@ export type WasteCatalog = {
     externalProductId: number;
     externalSizeId: number | null;
     productName: string;
+    sizeName: string | null;
+  }>;
+  recipes: Array<{
+    recipeId: number;
+    recipeSizeId: number;
+    recipeName: string;
     sizeName: string | null;
   }>;
 };

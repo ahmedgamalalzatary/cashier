@@ -1,4 +1,5 @@
 import { requestFingerprint as hashRequest } from "../../lib/request-fingerprint.js";
+import { transactionWithDeadlockRetry } from "../../lib/deadlock-retry.js";
 import { HttpError } from "../../middleware/error.js";
 import type { RefundsRepository } from "./refunds.repository.js";
 import type { RefundInput } from "./refunds.schemas.js";
@@ -76,7 +77,7 @@ export function planExternalRefundQuantities(input: {
   return input.allocations.map((allocation) => {
     const available =
       allocation.quantityMilli - allocation.alreadyReturnedMilli;
-    let remaining = remainingByItem.get(allocation.itemId) ?? 0n;
+    const remaining = remainingByItem.get(allocation.itemId) ?? 0n;
     const quantityMilli =
       remaining === 0n || available <= 0n
         ? 0n
@@ -117,7 +118,8 @@ export class RefundsService {
     const requestFingerprint = fingerprint(input);
     let refundId: number;
     try {
-      refundId = await this.repo.transaction(async (repo, inventory) => {
+      refundId = await transactionWithDeadlockRetry(() =>
+        this.repo.transaction(async (repo, inventory) => {
         const replay = await repo.findByClientRequestId(input.clientRequestId);
         if (replay) {
           this.assertReplay(replay, requestFingerprint, cashierId);
@@ -444,7 +446,8 @@ export class RefundsService {
           format(totalCostReturned, 2),
         );
         return id;
-      });
+        }),
+      );
     } catch (error) {
       if (!isDuplicateEntry(error)) throw error;
       const replay = await this.repo.findByClientRequestId(

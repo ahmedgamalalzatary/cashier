@@ -22,4 +22,11 @@ describe("warehouseForWasteTarget", () => {
       cafeForced: false,
     });
   });
+
+  it("forces cafe when a recipe is chosen from main", () => {
+    expect(warehouseForWasteTarget("recipe:3:7", "main")).toEqual({
+      warehouse: "cafe",
+      cafeForced: true,
+    });
+  });
 });

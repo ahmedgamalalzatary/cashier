@@ -69,3 +69,141 @@ describe('AuthService credential work', () => {
     expect(settled).toBe(true);
   });
 });
+
+const JWT_SECRET = 'test-only-jwt-secret-at-least-32-characters';
+
+const activeUser = (overrides: Record<string, unknown> = {}) => ({
+  id: 1,
+  name: 'Cashier',
+  username: 'cashier',
+  passwordHash: 'stored-hash',
+  role: 'cashier',
+  isActive: true,
+  tokenVersion: 0,
+  ...overrides,
+});
+
+describe('AuthService login outcomes', () => {
+  it('returns a token and safe profile for valid credentials', async () => {
+    const repo = {
+      findByUsername: vi.fn().mockResolvedValue(activeUser()),
+    } as unknown as AuthRepository;
+    const service = new AuthService(
+      repo,
+      JWT_SECRET,
+      vi.fn().mockResolvedValue(true),
+    );
+
+    const session = await service.login({
+      username: 'cashier',
+      password: 'secret123',
+    });
+
+    expect(session.user).toEqual({ id: 1, name: 'Cashier', role: 'cashier' });
+    expect(typeof session.token).toBe('string');
+    expect(session).not.toHaveProperty('passwordHash');
+  });
+
+  it('uses one identical 401 for unknown users and wrong passwords', async () => {
+    const unknownRepo = {
+      findByUsername: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AuthRepository;
+    const wrongPasswordRepo = {
+      findByUsername: vi.fn().mockResolvedValue(activeUser()),
+    } as unknown as AuthRepository;
+
+    const unknownFailure = await new AuthService(
+      unknownRepo,
+      JWT_SECRET,
+      vi.fn().mockResolvedValue(false),
+    )
+      .login({ username: 'missing', password: 'guess' })
+      .catch((error: unknown) => error);
+    const wrongFailure = await new AuthService(
+      wrongPasswordRepo,
+      JWT_SECRET,
+      vi.fn().mockResolvedValue(false),
+    )
+      .login({ username: 'cashier', password: 'guess' })
+      .catch((error: unknown) => error);
+
+    expect(unknownFailure).toMatchObject({ status: 401 });
+    expect(wrongFailure).toMatchObject({
+      status: 401,
+      message: (unknownFailure as Error).message,
+    });
+  });
+});
+
+describe('AuthService changePassword guards', () => {
+  it('401s a missing or inactive user before checking the password', async () => {
+    for (const user of [undefined, activeUser({ isActive: false })]) {
+      const repo = {
+        findById: vi.fn().mockResolvedValue(user),
+      } as unknown as AuthRepository;
+      const compare = vi.fn();
+
+      await expect(
+        new AuthService(repo, JWT_SECRET, compare).changePassword(1, {
+          currentPassword: 'old',
+          newPassword: 'new-secret-123',
+        }),
+      ).rejects.toMatchObject({ status: 401 });
+      expect(compare).not.toHaveBeenCalled();
+    }
+  });
+
+  it('400s a wrong current password without updating anything', async () => {
+    const repo = {
+      findById: vi.fn().mockResolvedValue(activeUser()),
+      updatePassword: vi.fn(),
+    } as unknown as AuthRepository;
+
+    await expect(
+      new AuthService(repo, JWT_SECRET, vi.fn().mockResolvedValue(false))
+        .changePassword(1, {
+          currentPassword: 'wrong',
+          newPassword: 'new-secret-123',
+        }),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(repo.updatePassword).not.toHaveBeenCalled();
+  });
+
+  it('401s when the account is deactivated mid-change', async () => {
+    const repo = {
+      findById: vi
+        .fn()
+        .mockResolvedValueOnce(activeUser())
+        .mockResolvedValueOnce(activeUser({ isActive: false })),
+      updatePassword: vi.fn(async () => undefined),
+    } as unknown as AuthRepository;
+
+    await expect(
+      new AuthService(repo, JWT_SECRET, vi.fn().mockResolvedValue(true))
+        .changePassword(1, {
+          currentPassword: 'secret123',
+          newPassword: 'new-secret-123',
+        }),
+    ).rejects.toMatchObject({ status: 401 });
+  });
+
+  it('returns a fresh session after a successful change', async () => {
+    const repo = {
+      findById: vi.fn().mockResolvedValue(activeUser({ tokenVersion: 2 })),
+      updatePassword: vi.fn(async () => undefined),
+    } as unknown as AuthRepository;
+
+    const session = await new AuthService(
+      repo,
+      JWT_SECRET,
+      vi.fn().mockResolvedValue(true),
+    ).changePassword(1, {
+      currentPassword: 'secret123',
+      newPassword: 'new-secret-123',
+    });
+
+    expect(repo.updatePassword).toHaveBeenCalledTimes(1);
+    expect(session.user).toEqual({ id: 1, name: 'Cashier', role: 'cashier' });
+    expect(typeof session.token).toBe('string');
+  });
+});

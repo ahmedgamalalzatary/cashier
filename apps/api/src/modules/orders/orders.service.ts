@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { requestFingerprint as hashRequest } from "../../lib/request-fingerprint.js";
+import { transactionWithDeadlockRetry } from "../../lib/deadlock-retry.js";
 import { HttpError } from "../../middleware/error.js";
 import type { FifoAllocation } from "../inventory/inventory.service.js";
 import { calculateExternalOrderLine } from "./external-order-line.js";
@@ -90,7 +91,8 @@ export class OrdersService {
     let orderId: number;
     const fingerprint = requestFingerprint(data);
     try {
-      orderId = await this.repo.transaction(async (repo, inventory) => {
+      orderId = await transactionWithDeadlockRetry(() =>
+        this.repo.transaction(async (repo, inventory) => {
         const existing = await repo.findByClientRequestId(data.clientRequestId);
         if (existing) {
           this.assertReplay(existing, fingerprint, cashierId);
@@ -245,7 +247,8 @@ export class OrdersService {
           isNegativeStock: orderHasDeficit,
         });
         return id;
-      });
+        }),
+      );
     } catch (error) {
       if (!isDuplicateEntry(error)) throw error;
       const existing = await this.repo.findByClientRequestId(

@@ -36,6 +36,7 @@ export default function WastePage() {
   const [catalog, setCatalog] = useState<WasteCatalog>({
     items: [],
     products: [],
+    recipes: [],
   });
   const [entries, setEntries] = useState<WasteSummary[]>([]);
   const [targetKey, setTargetKey] = useState("");
@@ -82,6 +83,10 @@ export default function WastePage() {
         key: `item:${item.id}`,
         label: `${item.name} — ${item.stockUnit}`,
       })),
+      ...(catalog.recipes ?? []).map((recipe) => ({
+        key: `recipe:${recipe.recipeId}:${recipe.recipeSizeId}`,
+        label: `${recipe.recipeName}${recipe.sizeName ? ` — ${recipe.sizeName}` : ""}`,
+      })),
       ...catalog.products.map((product) => ({
         key: `product:${product.externalProductId}:${product.externalSizeId ?? 0}`,
         label: `${product.productName}${product.sizeName ? ` — ${product.sizeName}` : ""}`,
@@ -94,8 +99,14 @@ export default function WastePage() {
     const [type, idText, sizeText] = targetKey.split(":");
     if (!idText) return;
     const target: CreateWasteBody["target"] =
-      type === "product"
+      type === "recipe"
         ? {
+            type: "recipe",
+            recipeId: Number(idText),
+            recipeSizeId: Number(sizeText),
+          }
+        : type === "product"
+          ? {
             type: "external_product",
             externalProductId: Number(idText),
             externalSizeId: Number(sizeText) || null,
@@ -130,10 +141,12 @@ export default function WastePage() {
   }
 
   const selectedProduct = targetKey.startsWith("product:");
+  const selectedRecipe = targetKey.startsWith("recipe:");
+  const selectedUnit = selectedProduct || selectedRecipe;
   const valid =
     targetKey &&
     Number(quantity) > 0 &&
-    (!selectedProduct || Number.isInteger(Number(quantity))) &&
+    (!selectedUnit || Number.isInteger(Number(quantity))) &&
     (reason !== "other" || note.trim().length > 0);
 
   return (
@@ -194,14 +207,14 @@ export default function WastePage() {
               </option>
             ))}
           </select>
-          {selectedProduct && (
+          {(selectedProduct || selectedRecipe) && (
             <p
               className="text-xs text-muted md:col-span-2"
               role={cafeForcedNotice ? "status" : undefined}
             >
               {cafeForcedNotice
-                ? "تم تغيير المخزن إلى الكافيه لأن هالك المنتج يُسجل هناك فقط."
-                : "منتج الوصفة يُسجل في مخزن الكافيه فقط."}
+                ? "تم تغيير المخزن إلى الكافيه لأن هالك المنتج/الوصفة يُسجل هناك فقط."
+                : "الوصفة أو منتج الوصفة يُسجل في مخزن الكافيه فقط."}
             </p>
           )}
           <input
@@ -209,7 +222,7 @@ export default function WastePage() {
             disabled={saving}
             type="number"
             min="0"
-            step={selectedProduct ? 1 : 0.001}
+            step={selectedUnit ? 1 : 0.001}
             value={quantity}
             onChange={(event) => {
               setQuantity(event.target.value);

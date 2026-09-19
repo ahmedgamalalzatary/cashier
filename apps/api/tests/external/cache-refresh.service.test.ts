@@ -164,4 +164,130 @@ describe("CacheRefreshService", () => {
     expect(state.markFailure).not.toHaveBeenCalled();
     expect(state.release).toHaveBeenCalledOnce();
   });
+
+  it("skips a due run inside the success interval", async () => {
+    const state = {
+      getState: vi.fn().mockResolvedValue({
+        lastSuccessfulSyncAt: new Date("2026-08-21T11:00:00Z"),
+        lastFailedAt: null,
+        refreshRequestedAt: null,
+        refreshRequestVersion: 0,
+      }),
+      tryAcquire: vi.fn(),
+      renew: vi.fn(),
+      markAttempt: vi.fn(),
+      markSuccess: vi.fn(),
+      markFailure: vi.fn(),
+      release: vi.fn(),
+      request: vi.fn(),
+    };
+    const service = new CacheRefreshService(
+      state,
+      { load: vi.fn() },
+      { applyCatalog: vi.fn() },
+      { listAll: vi.fn() },
+      { insertUnseen: vi.fn() },
+      { now: () => now, owner: "worker-1" },
+    );
+
+    await expect(service.runDue()).resolves.toBe(false);
+    expect(state.tryAcquire).not.toHaveBeenCalled();
+  });
+
+  it("returns false without work when another owner holds the lock", async () => {
+    const state = {
+      getState: vi.fn().mockResolvedValue({
+        lastSuccessfulSyncAt: null,
+        lastFailedAt: null,
+        refreshRequestedAt: null,
+        refreshRequestVersion: 0,
+      }),
+      tryAcquire: vi.fn().mockResolvedValue(false),
+      renew: vi.fn(),
+      markAttempt: vi.fn(),
+      markSuccess: vi.fn(),
+      markFailure: vi.fn(),
+      release: vi.fn(),
+      request: vi.fn(),
+    };
+    const catalog = { load: vi.fn() };
+    const service = new CacheRefreshService(
+      state,
+      catalog,
+      { applyCatalog: vi.fn() },
+      { listAll: vi.fn() },
+      { insertUnseen: vi.fn() },
+      { now: () => now, owner: "worker-1" },
+    );
+
+    await expect(service.runForced()).resolves.toBe(false);
+    expect(catalog.load).not.toHaveBeenCalled();
+    expect(state.markAttempt).not.toHaveBeenCalled();
+    expect(state.release).not.toHaveBeenCalled();
+  });
+
+  it("lets an explicit request bypass the failure cooldown", async () => {
+    const state = {
+      getState: vi.fn().mockResolvedValue({
+        lastSuccessfulSyncAt: new Date("2026-08-20T00:00:00Z"),
+        lastFailedAt: new Date("2026-08-21T11:59:50Z"),
+        refreshRequestedAt: new Date("2026-08-21T11:59:55Z"),
+        refreshRequestVersion: 2,
+      }),
+      tryAcquire: vi.fn().mockResolvedValue(true),
+      renew: vi.fn().mockResolvedValue(true),
+      markAttempt: vi.fn(),
+      markSuccess: vi.fn(),
+      markFailure: vi.fn(),
+      release: vi.fn(),
+      request: vi.fn(),
+    };
+    const service = new CacheRefreshService(
+      state,
+      { load: vi.fn().mockResolvedValue({ products: [] }) },
+      { applyCatalog: vi.fn() },
+      { listAll: vi.fn().mockResolvedValue([]) },
+      { insertUnseen: vi.fn() },
+      { now: () => now, owner: "worker-1" },
+    );
+
+    await expect(service.runDue()).resolves.toBe(true);
+    expect(state.tryAcquire).toHaveBeenCalledOnce();
+    expect(state.markSuccess).toHaveBeenCalledWith(now, 2);
+  });
+
+  it("falls back to a generic message for non-error failures", async () => {
+    const state = {
+      getState: vi.fn().mockResolvedValue({
+        lastSuccessfulSyncAt: null,
+        lastFailedAt: null,
+        refreshRequestedAt: null,
+        refreshRequestVersion: 0,
+      }),
+      tryAcquire: vi.fn().mockResolvedValue(true),
+      renew: vi.fn().mockResolvedValue(true),
+      markAttempt: vi.fn(),
+      markSuccess: vi.fn(),
+      markFailure: vi.fn(),
+      release: vi.fn(),
+      request: vi.fn(),
+    };
+    const service = new CacheRefreshService(
+      state,
+      {
+        load: vi.fn().mockRejectedValue("string-failure"),
+      },
+      { applyCatalog: vi.fn() },
+      { listAll: vi.fn().mockResolvedValue([]) },
+      { insertUnseen: vi.fn() },
+      { now: () => now, owner: "worker-1" },
+    );
+
+    await expect(service.runForced()).rejects.toBe("string-failure");
+    expect(state.markFailure).toHaveBeenCalledWith(
+      now,
+      "تعذر تحديث الذاكرة المحلية",
+    );
+    expect(state.release).toHaveBeenCalledOnce();
+  });
 });

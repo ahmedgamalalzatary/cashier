@@ -1,6 +1,16 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 
+/**
+ * Status-code convention (intentional, see audit M4):
+ * - 404 = unknown ID, whether from URL params (GET /orders/:id)
+ *   or from POST-body references (externalProductId, itemId,
+ *   supplierId, categoryId, ...). The Arabic message names the
+ *   missing entity, so cashiers see one consistent "غير موجود".
+ * - 400 = malformed shape/values (Zod, JSON parse, range checks).
+ * - 409 = conflict (duplicate, double-submit, occupied shift).
+ * Kept 404 for body FKs instead of 400/422 for consistency.
+ */
 export class HttpError extends Error {
   constructor(
     public status: number,

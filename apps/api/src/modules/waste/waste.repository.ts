@@ -2,6 +2,9 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import {
   items,
+  recipeIngredients,
+  recipes,
+  recipeSizes,
   shifts,
   users,
   wasteAllocations,
@@ -92,6 +95,39 @@ export class WasteRepository {
     return product;
   }
 
+  async loadRecipeProduct(recipeId: number, recipeSizeId: number) {
+    const [recipe] = await this.db
+      .select({
+        recipeId: recipes.id,
+        recipeName: recipes.name,
+        isActive: recipes.isActive,
+      })
+      .from(recipes)
+      .where(eq(recipes.id, recipeId))
+      .for("update");
+    if (!recipe) return undefined;
+    const [size] = await this.db
+      .select({ sizeId: recipeSizes.id, sizeName: recipeSizes.name })
+      .from(recipeSizes)
+      .where(
+        and(eq(recipeSizes.id, recipeSizeId), eq(recipeSizes.recipeId, recipeId)),
+      )
+      .for("update");
+    if (!size) throw new Error("RECIPE_SIZE_MISMATCH");
+    const ingredients = await this.db
+      .select({
+        itemId: recipeIngredients.itemId,
+        itemName: items.name,
+        quantity: recipeIngredients.quantity,
+      })
+      .from(recipeIngredients)
+      .innerJoin(items, eq(items.id, recipeIngredients.itemId))
+      .where(eq(recipeIngredients.recipeSizeId, recipeSizeId))
+      .orderBy(asc(recipeIngredients.id))
+      .for("update");
+    return { ...recipe, ...size, ingredients };
+  }
+
   async listCatalogExternalProducts() {
     const orders = new OrdersRepository(this.db);
     const ids = await orders.listCurrentExternalProductIds();
@@ -124,6 +160,38 @@ export class WasteRepository {
           sizeName: null,
         });
       }
+    }
+    return result;
+  }
+
+  async listCatalogRecipes() {
+    const rows = await this.db
+      .select({
+        recipeId: recipes.id,
+        recipeName: recipes.name,
+        recipeSizeId: recipeSizes.id,
+        sizeName: recipeSizes.name,
+      })
+      .from(recipes)
+      .innerJoin(recipeSizes, eq(recipeSizes.recipeId, recipes.id))
+      .innerJoin(
+        recipeIngredients,
+        eq(recipeIngredients.recipeSizeId, recipeSizes.id),
+      )
+      .where(eq(recipes.isActive, true))
+      .orderBy(asc(recipes.name), asc(recipeSizes.sortOrder));
+    const seen = new Set<string>();
+    const result: Array<{
+      recipeId: number;
+      recipeSizeId: number;
+      recipeName: string;
+      sizeName: string | null;
+    }> = [];
+    for (const row of rows) {
+      const key = `${row.recipeId}:${row.recipeSizeId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(row);
     }
     return result;
   }

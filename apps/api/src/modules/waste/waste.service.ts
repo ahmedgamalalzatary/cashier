@@ -35,7 +35,8 @@ export class WasteService {
     return Promise.all([
       this.repo.listCatalogItems(),
       this.repo.listCatalogExternalProducts(),
-    ]).then(([items, products]) => ({ items, products }));
+      this.repo.listCatalogRecipes(),
+    ]).then(([items, products, recipes]) => ({ items, products, recipes }));
   }
 
   async create(input: WasteInput, actor: AuthUser) {
@@ -65,6 +66,8 @@ export class WasteService {
 
         const occurredAt = new Date();
         let itemId: number | null = null;
+        let recipeId: number | null = null;
+        let recipeSizeId: number | null = null;
         let externalProductId: number | null = null;
         let externalSizeId: number | null = null;
         let targetName: string;
@@ -88,6 +91,42 @@ export class WasteService {
               quantity: input.quantity.toFixed(3),
             },
           ];
+        } else if (input.target.type === "recipe") {
+          if (input.warehouse !== "cafe")
+            throw new HttpError(
+              400,
+              "هالك الوصفة يسجل في مخزن الكافيه فقط",
+            );
+          let recipe: Awaited<ReturnType<typeof repo.loadRecipeProduct>>;
+          try {
+            recipe = await repo.loadRecipeProduct(
+              input.target.recipeId,
+              input.target.recipeSizeId,
+            );
+          } catch (error) {
+            if (
+              error instanceof Error &&
+              error.message === "RECIPE_SIZE_MISMATCH"
+            )
+              throw new HttpError(400, "المقاس لا ينتمي إلى الوصفة المحددة");
+            throw error;
+          }
+          if (!recipe) throw new HttpError(404, "الوصفة غير موجودة");
+          if (!recipe.isActive) throw new HttpError(409, "الوصفة موقوفة");
+          if (!recipe.ingredients.length)
+            throw new HttpError(409, "الوصفة أو المقاس المحدد لا يحتوي على مكونات");
+          recipeId = recipe.recipeId;
+          recipeSizeId = recipe.sizeId;
+          targetName = recipe.recipeName;
+          sizeName = recipe.sizeName;
+          consumptions = recipe.ingredients.map((ingredient) => ({
+            itemId: ingredient.itemId,
+            itemName: ingredient.itemName,
+            quantity: format(
+              scaled(ingredient.quantity, 3) * BigInt(input.quantity),
+              3,
+            ),
+          }));
         } else {
           const target = input.target;
           if (input.warehouse !== "cafe")
@@ -138,8 +177,8 @@ export class WasteService {
           warehouse: input.warehouse,
           targetType: input.target.type,
           itemId,
-          recipeId: null,
-          recipeSizeId: null,
+          recipeId,
+          recipeSizeId,
           externalProductId,
           externalSizeId,
           targetName,

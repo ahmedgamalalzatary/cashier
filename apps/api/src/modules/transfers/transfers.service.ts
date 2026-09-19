@@ -1,6 +1,8 @@
 import { requestFingerprint as hashRequest } from "../../lib/request-fingerprint.js";
+import { transactionWithDeadlockRetry } from "../../lib/deadlock-retry.js";
 import { HttpError } from "../../middleware/error.js";
 import type { AuthUser } from "@cashier/shared";
+import type { InventoryTransaction } from "../inventory/inventory.service.js";
 import type { TransfersRepository } from "./transfers.repository.js";
 import type {
   TransferApprovalInput,
@@ -15,12 +17,6 @@ const isDuplicateEntry = (error: unknown) =>
   error !== null &&
   "code" in error &&
   (error as { code?: unknown }).code === "ER_DUP_ENTRY";
-
-const isDeadlock = (error: unknown) =>
-  typeof error === "object" &&
-  error !== null &&
-  "code" in error &&
-  (error as { code?: unknown }).code === "ER_LOCK_DEADLOCK";
 
 const requestFingerprint = (data: TransferRequestInput) =>
   hashRequest({
@@ -78,17 +74,15 @@ export class TransfersService {
     }
   }
 
-  private async transactionWithDeadlockRetry<T>(
-    fn: (repo: TransfersRepository) => Promise<T>,
+  // a concurrent shift close can deadlock the shift row —
+  // MySQL asks the loser to restart, so retry once after it commits
+  private transactionWithDeadlockRetry<T>(
+    fn: (
+      repo: TransfersRepository,
+      inventory: InventoryTransaction,
+    ) => Promise<T>,
   ) {
-    try {
-      return await this.repo.transaction(fn);
-    } catch (error) {
-      // a concurrent shift close can deadlock the shift row —
-      // MySQL asks the loser to restart, so retry once after it commits
-      if (!isDeadlock(error)) throw error;
-      return await this.repo.transaction(fn);
-    }
+    return transactionWithDeadlockRetry(() => this.repo.transaction(fn));
   }
 
   private assertReplay(
@@ -115,7 +109,7 @@ export class TransfersService {
   }
 
   approveRequest(id: number, data: TransferApprovalInput, approvedBy: number) {
-    return this.repo.transaction(async (repo, inventory) => {
+    return this.transactionWithDeadlockRetry(async (repo, inventory) => {
       const request = await repo.lockRequest(id);
       if (!request) throw new HttpError(404, "طلب التحويل غير موجود");
       if (request.status !== "pending")
@@ -152,7 +146,7 @@ export class TransfersService {
   }
 
   rejectRequest(id: number, reason: string, reviewedBy: number) {
-    return this.repo.transaction(async (repo) => {
+    return this.transactionWithDeadlockRetry(async (repo) => {
       const request = await repo.lockRequest(id);
       if (!request) throw new HttpError(404, "طلب التحويل غير موجود");
       if (request.status !== "pending")
@@ -162,7 +156,7 @@ export class TransfersService {
   }
 
   createDirect(data: TransferDirectInput, adminId: number) {
-    return this.repo.transaction(async (repo, inventory) => {
+    return this.transactionWithDeadlockRetry(async (repo, inventory) => {
       await this.validateItems(repo, data.lines);
       return this.moveStock(
         repo,

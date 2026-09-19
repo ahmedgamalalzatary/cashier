@@ -1,4 +1,5 @@
 import { requestFingerprint as hashRequest } from '../../lib/request-fingerprint.js';
+import { transactionWithDeadlockRetry } from '../../lib/deadlock-retry.js';
 import { HttpError } from '../../middleware/error.js';
 import type { PurchasesRepository } from './purchases.repository.js';
 import type { PurchaseInput } from './purchases.schemas.js';
@@ -42,7 +43,8 @@ export class PurchasesService {
   async create(data: PurchaseInput, createdBy: number) {
     const fingerprint = requestFingerprint(data);
     try {
-      return await this.repo.transaction(async (repo, inventory) => {
+      return await transactionWithDeadlockRetry(() =>
+        this.repo.transaction(async (repo, inventory) => {
         const replay = await repo.findByClientRequestId(data.clientRequestId);
         if (replay) {
           this.assertReplay(replay, fingerprint, createdBy);
@@ -165,7 +167,8 @@ export class PurchasesService {
         });
       }
       return invoiceId;
-      });
+        }),
+      );
     } catch (error) {
       if (!isDuplicateEntry(error)) throw error;
       // a concurrent retry with the same key lost the insert race — replay it

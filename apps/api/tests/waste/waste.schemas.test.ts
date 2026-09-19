@@ -30,6 +30,16 @@ describe("waste input", () => {
     });
   });
 
+  it("accepts recipe waste targets with integer quantity", () => {
+    expect(
+      wasteInput.parse({
+        ...base,
+        target: { type: "recipe", recipeId: 3, recipeSizeId: 7 },
+        quantity: 2,
+      }).target,
+    ).toEqual({ type: "recipe", recipeId: 3, recipeSizeId: 7 });
+  });
+
   it("requires a note for the other reason", () => {
     expect(() =>
       wasteInput.parse({ ...base, reason: "other", note: " " }),
@@ -56,6 +66,16 @@ describe("waste input", () => {
           externalSizeId: null,
         },
         quantity: 0.5,
+      }),
+    ).toThrow();
+  });
+
+  it("rejects fractional recipe quantities", () => {
+    expect(() =>
+      wasteInput.parse({
+        ...base,
+        target: { type: "recipe", recipeId: 3, recipeSizeId: 7 },
+        quantity: 1.5,
       }),
     ).toThrow();
   });
@@ -88,6 +108,12 @@ describe("waste input", () => {
           externalProductId: 9,
           externalSizeId: false,
         },
+      }),
+    ).toThrow();
+    expect(() =>
+      wasteInput.parse({
+        ...base,
+        target: { type: "recipe", recipeId: true, recipeSizeId: 7 },
       }),
     ).toThrow();
   });

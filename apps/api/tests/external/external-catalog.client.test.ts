@@ -238,6 +238,40 @@ describe("ExternalCatalogClient", () => {
     });
   });
 
+  it("rejects the refresh when a product matches no category", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({ accessToken: "access-1", refreshToken: "refresh-1" }),
+      )
+      .mockResolvedValueOnce(jsonResponse([category()]))
+      .mockResolvedValueOnce(
+        jsonResponse([product({ categoryName: "No Such Category" })]),
+      );
+
+    const failure = await createCatalog(fetcher)
+      .load()
+      .catch((error: unknown) => error);
+    expect(failure).toMatchObject({ status: 502 });
+    expect(String((failure as Error).message)).toContain("تعذر تحديد");
+  });
+
+  it("rejects duplicate category ids with the duplication message", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({ accessToken: "access-1", refreshToken: "refresh-1" }),
+      )
+      .mockResolvedValueOnce(jsonResponse([category(), category()]))
+      .mockResolvedValueOnce(jsonResponse([product()]));
+
+    const failure = await createCatalog(fetcher)
+      .load()
+      .catch((error: unknown) => error);
+    expect(failure).toMatchObject({ status: 502 });
+    expect(String((failure as Error).message)).toContain("مكررة");
+  });
+
   it("rejects malformed nested money instead of partially accepting products", async () => {
     const fetcher = vi
       .fn<typeof fetch>()

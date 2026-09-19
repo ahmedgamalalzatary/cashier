@@ -100,4 +100,106 @@ describe("ProductsService", () => {
       }),
     ).rejects.toMatchObject({ status: 400 });
   });
+
+  it("404s a product with no stock targets", async () => {
+    const repository = {
+      getStockTargets: vi.fn().mockResolvedValue({
+        exists: false,
+        sizeIds: [],
+        modifierOptionIds: [],
+      }),
+      saveStockSetup: vi.fn(),
+    };
+    const service = new ProductsService(repository);
+
+    await expect(
+      service.configureStock(999, {
+        baseIngredients: [],
+        sizes: [],
+        modifiers: [],
+      }),
+    ).rejects.toMatchObject({ status: 404 });
+    expect(repository.saveStockSetup).not.toHaveBeenCalled();
+  });
+
+  it("rejects a modifier subset and enforces the base-ingredients polarity", async () => {
+    const sized = {
+      getStockTargets: vi.fn().mockResolvedValue({
+        exists: true,
+        sizeIds: [91],
+        modifierOptionIds: [101, 102],
+      }),
+      saveStockSetup: vi.fn(),
+    };
+    await expect(
+      new ProductsService(sized).configureStock(9, {
+        baseIngredients: [],
+        sizes: [
+          {
+            externalSizeId: 91,
+            ingredients: [{ itemId: 1, quantity: 1 }],
+          },
+        ],
+        modifiers: [{ externalModifierOptionId: 101, stockEffect: "none" }],
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+
+    // sized products must not carry base ingredients
+    await expect(
+      new ProductsService(sized).configureStock(9, {
+        baseIngredients: [{ itemId: 1, quantity: 1 }],
+        sizes: [
+          {
+            externalSizeId: 91,
+            ingredients: [{ itemId: 1, quantity: 1 }],
+          },
+        ],
+        modifiers: [
+          { externalModifierOptionId: 101, stockEffect: "none" },
+          { externalModifierOptionId: 102, stockEffect: "none" },
+        ],
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+
+    // sizeless products require base ingredients
+    const sizeless = {
+      getStockTargets: vi.fn().mockResolvedValue({
+        exists: true,
+        sizeIds: [],
+        modifierOptionIds: [],
+      }),
+      saveStockSetup: vi.fn(),
+    };
+    await expect(
+      new ProductsService(sizeless).configureStock(9, {
+        baseIngredients: [],
+        sizes: [],
+        modifiers: [],
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("saves a complete setup regardless of input order", async () => {
+    const repository = {
+      getStockTargets: vi.fn().mockResolvedValue({
+        exists: true,
+        sizeIds: [91, 92],
+        modifierOptionIds: [101],
+      }),
+      saveStockSetup: vi.fn(),
+    };
+    const service = new ProductsService(repository);
+    const data = {
+      baseIngredients: [],
+      sizes: [
+        { externalSizeId: 92, ingredients: [{ itemId: 2, quantity: 1 }] },
+        { externalSizeId: 91, ingredients: [{ itemId: 1, quantity: 1 }] },
+      ],
+      modifiers: [{ externalModifierOptionId: 101, stockEffect: "none" as const }],
+    };
+
+    await service.configureStock(9, data);
+
+    expect(repository.saveStockSetup).toHaveBeenCalledWith(9, data);
+  });
 });

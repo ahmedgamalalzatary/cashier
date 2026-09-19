@@ -15,7 +15,8 @@ export type CreateWasteBody = {
         type: "external_product";
         externalProductId: number;
         externalSizeId: number | null;
-      };
+      }
+    | { type: "recipe"; recipeId: number; recipeSizeId: number };
   quantity: number;
   reason: WasteReason;
   note: string | null;

@@ -9,6 +9,9 @@ import {
   externalProductSizes,
   externalSizeIngredients,
   items,
+  recipeIngredients,
+  recipes,
+  recipeSizes,
   stockBatches,
   stockMovements,
   wasteEntries,
@@ -259,5 +262,66 @@ describe("waste", () => {
         }),
       ],
     });
+  });
+
+  it("records recipe waste by consuming its size ingredients", async () => {
+    const itemId = await stockItem("cafe");
+    const [category] = await db.insert(categories).values({ name: "مشروبات" });
+    const [recipe] = await db.insert(recipes).values({
+      name: "كابتشينو",
+      type: "product",
+      categoryId: category.insertId,
+      outputItemId: null,
+    });
+    const [size] = await db.insert(recipeSizes).values({
+      recipeId: recipe.insertId,
+      name: "وسط",
+      sellingPrice: "25.00",
+      outputQuantity: null,
+      sortOrder: 0,
+    });
+    await db.insert(recipeIngredients).values({
+      recipeSizeId: size.insertId,
+      itemId,
+      quantity: "0.500",
+    });
+
+    const response = await request(app())
+      .post("/api/waste")
+      .set(cashierAuth)
+      .send({
+        clientRequestId: crypto.randomUUID(),
+        warehouse: "cafe",
+        target: {
+          type: "recipe",
+          recipeId: recipe.insertId,
+          recipeSizeId: size.insertId,
+        },
+        quantity: 2,
+        reason: "spill",
+        note: null,
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({
+      targetType: "recipe",
+      targetName: "كابتشينو",
+      sizeName: "وسط",
+      quantity: "2.000",
+      totalCost: "2.00",
+      allocations: [
+        expect.objectContaining({
+          itemName: "لبن",
+          quantity: "1.000",
+          unitCost: "2.000000",
+        }),
+      ],
+    });
+    const [stored] = await db
+      .select()
+      .from(wasteEntries)
+      .where(eq(wasteEntries.targetType, "recipe"));
+    expect(stored.recipeId).toBe(recipe.insertId);
+    expect(stored.recipeSizeId).toBe(size.insertId);
   });
 });
