@@ -15,6 +15,7 @@ import {
   mergeTransferLines,
   newTransferLine,
   selectedTransferLines,
+  transferDirectBody,
   transferRequestBody,
   transferTotalQuantity,
   type InvoiceTransferRow,
@@ -46,6 +47,9 @@ export function TransferFormModal({
   const [lines, setLines] = useState<TransferLineForm[]>([newTransferLine(1)]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [clientRequestId, setClientRequestId] = useState(() =>
+    crypto.randomUUID(),
+  );
   // invoices are an admin-only API, so the shortcut only exists for direct transfers
   const invoiceSourceAllowed = mode === "direct";
   const [tab, setTab] = useState<SourceTab>(
@@ -130,9 +134,14 @@ export function TransferFormModal({
     setSaving(true);
     setError("");
     try {
-      const body = transferRequestBody({ notes, lines });
-      if (mode === "direct") await createDirectTransfer(body);
-      else await createTransferRequest(body);
+      if (mode === "direct") {
+        await createDirectTransfer(transferDirectBody({ notes, lines }));
+      } else {
+        await createTransferRequest(
+          transferRequestBody({ clientRequestId, notes, lines }),
+        );
+        setClientRequestId(crypto.randomUUID());
+      }
       onSaved();
     } catch (caught) {
       setError(

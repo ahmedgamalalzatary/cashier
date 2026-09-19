@@ -65,9 +65,23 @@ export class TransfersRepository {
     requestedBy: number;
     shiftId: number | null;
     notes: string | null;
+    clientRequestId: string;
+    requestFingerprint: string;
   }) {
     const [result] = await this.db.insert(transferRequests).values(data);
     return result.insertId;
+  }
+
+  async findRequestByClientRequestId(clientRequestId: string) {
+    const [row] = await this.db
+      .select({
+        id: transferRequests.id,
+        requestedBy: transferRequests.requestedBy,
+        requestFingerprint: transferRequests.requestFingerprint,
+      })
+      .from(transferRequests)
+      .where(eq(transferRequests.clientRequestId, clientRequestId));
+    return row;
   }
 
   async createRequestLine(data: {

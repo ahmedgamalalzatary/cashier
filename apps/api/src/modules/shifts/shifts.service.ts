@@ -18,6 +18,15 @@ function isDuplicateEntry(error: unknown) {
   );
 }
 
+function isDeadlock(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "ER_LOCK_DEADLOCK"
+  );
+}
+
 export class ShiftsService {
   constructor(private repo: ShiftsRepository) {}
 
@@ -99,7 +108,19 @@ export class ShiftsService {
   }
 
   async close(id: number, data: CloseShiftInput, cashierUserId: number) {
-    await this.repo.transaction(async (repo) => {
+    try {
+      await this.closeOnce(id, data, cashierUserId);
+    } catch (error) {
+      // a concurrent transfer request can deadlock the shift row —
+      // MySQL asks the loser to restart, so retry once after it commits
+      if (!isDeadlock(error)) throw error;
+      await this.closeOnce(id, data, cashierUserId);
+    }
+    return this.get(id);
+  }
+
+  private closeOnce(id: number, data: CloseShiftInput, cashierUserId: number) {
+    return this.repo.transaction(async (repo) => {
       const shift = await repo.findByIdForUpdate(id);
       if (!shift) throw new HttpError(404, "الوردية غير موجودة");
       if (shift.status !== "open")
@@ -137,7 +158,6 @@ export class ShiftsService {
         occurredAt: closedAt,
       });
     });
-    return this.get(id);
   }
 
   async adminClose(

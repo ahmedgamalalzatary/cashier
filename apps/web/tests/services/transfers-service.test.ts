@@ -11,7 +11,7 @@ describe("transfers service", () => {
 
     service.listTransferRequests();
     service.getTransferRequest(4);
-    service.createTransferRequest({ notes: null, lines: [{ itemId: 2, quantity: 3 }] });
+    service.createTransferRequest({ clientRequestId: "11111111-1111-4111-8111-111111111111", notes: null, lines: [{ itemId: 2, quantity: 3 }] });
     service.approveTransferRequest(4, [{ itemId: 2, quantity: 2.5 }]);
     service.rejectTransferRequest(4, "غير مطلوب");
     service.listTransfers();

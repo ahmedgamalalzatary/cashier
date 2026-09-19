@@ -125,7 +125,13 @@ export class RefundsService {
             if (line.type === "item" && requested.stockAction === null) {
               throw new HttpError(400, `اختر معالجة مخزون ${line.productName}`);
             }
-            if (line.type !== "item" && requested.stockAction !== null) {
+            if (
+              line.type === "external_product" &&
+              requested.stockAction === null
+            ) {
+              throw new HttpError(400, `اختر معالجة مخزون ${line.productName}`);
+            }
+            if (line.type === "recipe" && requested.stockAction !== null) {
               throw new HttpError(
                 400,
                 "منتجات الوصفات لا تعاد مكوناتها إلى المخزون",
@@ -325,14 +331,56 @@ export class RefundsService {
               });
             }
           } else if (entry.line.type === "external_product") {
-            for (const planned of plannedReturns) {
-              await repo.createReturnAllocation({
+            if (entry.requested.stockAction === "return_to_stock") {
+              for (const planned of plannedReturns) {
+                const received = await inventory.receive({
+                  itemId: planned.allocation.itemId,
+                  warehouse: "cafe",
+                  quantity: Number(format(planned.quantity, 3)),
+                  unitCost: planned.allocation.unitCost,
+                  movementType: "refund_return",
+                  referenceType: "refund",
+                  referenceId: id,
+                  notes: input.reason,
+                  occurredAt,
+                });
+                await repo.createReturnAllocation({
+                  refundLineId,
+                  orderLineAllocationId: planned.allocation.id,
+                  itemId: planned.allocation.itemId,
+                  quantity: format(planned.quantity, 3),
+                  unitCost: planned.allocation.unitCost,
+                  returnedBatchId: received.batchId,
+                });
+              }
+              totalCostReturned += storedReturnedCost;
+            } else {
+              for (const planned of plannedReturns) {
+                await repo.createReturnAllocation({
+                  refundLineId,
+                  orderLineAllocationId: planned.allocation.id,
+                  itemId: planned.allocation.itemId,
+                  quantity: format(planned.quantity, 3),
+                  unitCost: planned.allocation.unitCost,
+                  returnedBatchId: null,
+                });
+              }
+              await repo.createWaste({
+                shiftId: shift.id,
+                warehouse: "cafe",
+                targetType: "external_product",
+                externalProductId: entry.line.externalProductId!,
+                externalSizeId: entry.line.externalSizeId ?? null,
+                targetName: entry.line.productName,
+                sizeName: entry.line.sizeName ?? null,
+                quantity: format(entry.requestedQuantity, 3),
+                reason: input.reason,
+                reasonCode: "other",
+                note: input.reason,
+                totalCost: format(returnedCost, 2),
+                recordedBy: cashierId,
                 refundLineId,
-                orderLineAllocationId: planned.allocation.id,
-                itemId: planned.allocation.itemId,
-                quantity: format(planned.quantity, 3),
-                unitCost: planned.allocation.unitCost,
-                returnedBatchId: null,
+                occurredAt,
               });
             }
           }

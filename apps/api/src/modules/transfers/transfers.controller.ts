@@ -3,6 +3,7 @@ import { idParam } from "../../middleware/validation.js";
 import type { TransfersService } from "./transfers.service.js";
 import {
   transferApprovalInput,
+  transferDirectInput,
   transferRejectionInput,
   transferRequestInput,
 } from "./transfers.schemas.js";
@@ -55,7 +56,7 @@ export class TransfersController {
 
   createDirect = async (req: Request, res: Response) => {
     const transferId = await this.service.createDirect(
-      transferRequestInput.parse(req.body),
+      transferDirectInput.parse(req.body),
       req.user!.id,
     );
     res.status(201).json({ transferId });

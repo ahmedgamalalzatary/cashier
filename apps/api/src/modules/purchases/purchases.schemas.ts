@@ -48,6 +48,7 @@ const purchaseLineInput = z.object({
 
 export const purchaseInput = z
   .object({
+    clientRequestId: z.string().uuid(),
     supplierId: z.coerce.number().int().positive(),
     invoiceNumber: optionalText(100),
     purchasedAt: calendarDate,

@@ -70,6 +70,8 @@ export class RefundsRepository {
         orderId: orderLines.orderId,
         type: orderLines.type,
         itemId: orderLines.itemId,
+        externalProductId: orderLines.externalProductId,
+        externalSizeId: orderLines.externalSizeId,
         productName: orderLines.productName,
         sizeName: orderLines.sizeName,
         quantity: orderLines.quantity,

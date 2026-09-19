@@ -26,6 +26,17 @@ const hasUniqueLines = (data: { lines: Array<{ itemId: number }> }) =>
 
 export const transferRequestInput = z
   .object({
+    clientRequestId: z.string().uuid(),
+    notes: optionalText(2000),
+    lines: z.array(transferLineInput).min(1).max(100),
+  })
+  .refine(hasUniqueLines, {
+    message: 'لا يمكن تكرار الصنف في التحويل',
+    path: ['lines'],
+  });
+
+export const transferDirectInput = z
+  .object({
     notes: optionalText(2000),
     lines: z.array(transferLineInput).min(1).max(100),
   })
@@ -48,4 +59,5 @@ export const transferRejectionInput = z.object({
 });
 
 export type TransferRequestInput = z.infer<typeof transferRequestInput>;
+export type TransferDirectInput = z.infer<typeof transferDirectInput>;
 export type TransferApprovalInput = z.infer<typeof transferApprovalInput>;

@@ -87,6 +87,10 @@ export const purchaseInvoices = mysqlTable(
     createdBy: int("created_by")
       .notNull()
       .references(() => users.id),
+    clientRequestId: varchar("client_request_id", { length: 36 }).notNull(),
+    requestFingerprint: varchar("request_fingerprint", {
+      length: 64,
+    }).notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [
@@ -95,6 +99,9 @@ export const purchaseInvoices = mysqlTable(
     uniqueIndex("purchase_invoices_supplier_number_uidx").on(
       table.supplierId,
       table.invoiceNumber,
+    ),
+    uniqueIndex("purchase_invoices_client_request_uidx").on(
+      table.clientRequestId,
     ),
   ],
 );
@@ -232,6 +239,10 @@ export const transferRequests = mysqlTable(
     reviewedBy: int("reviewed_by").references(() => users.id),
     rejectionReason: varchar("rejection_reason", { length: 500 }),
     reviewedAt: timestamp("reviewed_at"),
+    clientRequestId: varchar("client_request_id", { length: 36 }).notNull(),
+    requestFingerprint: varchar("request_fingerprint", {
+      length: 64,
+    }).notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [
@@ -240,6 +251,9 @@ export const transferRequests = mysqlTable(
       table.createdAt,
     ),
     index("transfer_requests_requested_by_idx").on(table.requestedBy),
+    uniqueIndex("transfer_requests_client_request_uidx").on(
+      table.clientRequestId,
+    ),
   ],
 );
 
@@ -945,7 +959,7 @@ export const refundLines = mysqlTable(
     check("refund_lines_cost_nonnegative_chk", sql`${table.returnedCost} >= 0`),
     check(
       "refund_lines_action_type_chk",
-      sql`((${table.type} = 'item' AND ${table.stockAction} IS NOT NULL) OR (${table.type} <> 'item' AND ${table.stockAction} IS NULL))`,
+      sql`((${table.type} IN ('item', 'external_product') AND ${table.stockAction} IS NOT NULL) OR (${table.type} = 'recipe' AND ${table.stockAction} IS NULL))`,
     ),
   ],
 );

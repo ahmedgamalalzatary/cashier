@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import { createApp } from "../../../src/app.js";
 import {
   categories,
+  externalCategories,
+  externalProducts,
   items,
   orderLineAllocations,
   orderLines,
@@ -12,6 +14,7 @@ import {
   stockBatches,
   stockMovements,
   users,
+  wasteEntries,
 } from "../../../src/db/schema.js";
 import { appOptions, db, nextTestItemCode } from "../../support/setup.js";
 import { createUser, loginAs } from "../../support/helpers.js";
@@ -99,6 +102,111 @@ async function soldResaleOrder() {
     unitCost: "3.000000",
   });
   return { orderId: order.insertId, lineId: line.insertId };
+}
+
+async function soldExternalOrder() {
+  const [cashier] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.username, "cashier"));
+  await db
+    .insert(externalCategories)
+    .values({
+      externalId: 9001,
+      nameAr: "مشروبات",
+      nameEn: "Drinks",
+      isActive: true,
+      isVisible: true,
+      displayOrder: 0,
+      syncedAt: new Date(),
+    })
+    .onDuplicateKeyUpdate({ set: { nameAr: "مشروبات" } });
+  await db
+    .insert(externalProducts)
+    .values({
+      externalId: 9101,
+      externalCategoryId: 9001,
+      nameAr: "لاتيه",
+      nameEn: "Latte",
+      price: "20.00",
+      calories: 0,
+      pointsReward: 0,
+      isAvailable: true,
+      isVisible: true,
+      syncedAt: new Date(),
+    })
+    .onDuplicateKeyUpdate({ set: { nameAr: "لاتيه" } });
+  const [ingredientCategory] = await db
+    .insert(categories)
+    .values({ name: "خامات" });
+  const [ingredient] = await db.insert(items).values({
+    code: nextTestItemCode(),
+    name: "حليب",
+    categoryId: ingredientCategory.insertId,
+    type: "raw",
+    stockUnit: "لتر",
+  });
+  const shift = (
+    await request(app()).get("/api/shifts/current").set(authorization)
+  ).body;
+  const [order] = await db.insert(orders).values({
+    orderNumber: `TEST-${Date.now()}`,
+    clientRequestId: crypto.randomUUID(),
+    requestFingerprint: "b".repeat(64),
+    cashierId: cashier.id,
+    shiftId: shift.id,
+    subtotal: "20.00",
+    discountAmount: "0.00",
+    total: "20.00",
+    cashReceived: "20.00",
+    changeAmount: "0.00",
+    totalCost: "1.00",
+  });
+  const [line] = await db.insert(orderLines).values({
+    orderId: order.insertId,
+    type: "external_product",
+    externalProductId: 9101,
+    productName: "لاتيه",
+    quantity: "1.000",
+    unitPrice: "20.00",
+    lineSubtotal: "20.00",
+    totalCost: "1.00",
+  });
+  const [sourceBatch] = await db.insert(stockBatches).values({
+    itemId: ingredient.insertId,
+    warehouse: "cafe",
+    initialQuantity: "5.000",
+    remainingQuantity: "4.900",
+    unitCost: "10.000000",
+    receivedAt: new Date(),
+    sourceType: "transfer_in",
+  });
+  const [saleMovement] = await db.insert(stockMovements).values({
+    itemId: ingredient.insertId,
+    warehouse: "cafe",
+    batchId: sourceBatch.insertId,
+    movementType: "sale",
+    quantity: "-0.100",
+    unitCost: "10.000000",
+    referenceType: "order",
+    referenceId: order.insertId,
+    occurredAt: new Date(),
+  });
+  await db.insert(orderLineAllocations).values({
+    orderLineId: line.insertId,
+    itemId: ingredient.insertId,
+    itemName: "حليب",
+    batchId: sourceBatch.insertId,
+    stockMovementId: saleMovement.insertId,
+    quantity: "0.100",
+    unitCost: "10.000000",
+  });
+  return {
+    orderId: order.insertId,
+    lineId: line.insertId,
+    ingredientId: ingredient.insertId,
+    batchId: sourceBatch.insertId,
+  };
 }
 
 describe("refunds", () => {
@@ -375,7 +483,13 @@ describe("refunds", () => {
         clientRequestId: crypto.randomUUID(),
         orderId: fixture.orderId,
         reason: "طلب العميل",
-        lines: [{ orderLineId: fixture.lineId, quantity: 1 }],
+        lines: [
+          {
+            orderLineId: fixture.lineId,
+            quantity: 1,
+            stockAction: "not_returnable",
+          },
+        ],
       });
 
     expect(response.status).toBe(201);
@@ -386,5 +500,81 @@ describe("refunds", () => {
         returnedBatchId: null,
       }),
     ]);
+  });
+
+  it("records a waste entry when an external product refund is not returnable", async () => {
+    const fixture = await soldExternalOrder();
+
+    const response = await request(app())
+      .post("/api/refunds")
+      .set(authorization)
+      .send({
+        clientRequestId: crypto.randomUUID(),
+        orderId: fixture.orderId,
+        reason: "مشروب مُعد ولا يصلح",
+        lines: [
+          {
+            orderLineId: fixture.lineId,
+            quantity: 1,
+            stockAction: "not_returnable",
+          },
+        ],
+      });
+
+    expect(response.status).toBe(201);
+    const waste = await db.select().from(wasteEntries);
+    expect(waste).toHaveLength(1);
+    expect(waste[0]).toMatchObject({
+      targetType: "external_product",
+      externalProductId: 9101,
+      warehouse: "cafe",
+      quantity: "1.000",
+      totalCost: "1.00",
+    });
+    expect(waste[0].refundLineId).not.toBeNull();
+  });
+
+  it("restocks the ingredient when an external product refund returns to stock", async () => {
+    const fixture = await soldExternalOrder();
+
+    const response = await request(app())
+      .post("/api/refunds")
+      .set(authorization)
+      .send({
+        clientRequestId: crypto.randomUUID(),
+        orderId: fixture.orderId,
+        reason: "لم يُحضّر بعد",
+        lines: [
+          {
+            orderLineId: fixture.lineId,
+            quantity: 1,
+            stockAction: "return_to_stock",
+          },
+        ],
+      });
+
+    expect(response.status).toBe(201);
+    // restocking creates a new FIFO batch for the returned ingredient quantity
+    const restockMovements = await db
+      .select()
+      .from(stockMovements)
+      .where(eq(stockMovements.movementType, "refund_return"));
+    expect(restockMovements).toHaveLength(1);
+    expect(restockMovements[0]).toMatchObject({
+      itemId: fixture.ingredientId,
+      warehouse: "cafe",
+      quantity: "0.100",
+    });
+    const restockBatch = await db
+      .select()
+      .from(stockBatches)
+      .where(eq(stockBatches.id, restockMovements[0].batchId!));
+    expect(restockBatch[0]).toMatchObject({
+      itemId: fixture.ingredientId,
+      warehouse: "cafe",
+      remainingQuantity: "0.100",
+    });
+    // no waste is recorded for a restocked refund
+    expect(await db.select().from(wasteEntries)).toHaveLength(0);
   });
 });

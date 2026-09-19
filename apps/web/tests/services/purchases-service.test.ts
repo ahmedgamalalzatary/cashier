@@ -27,6 +27,7 @@ describe("purchases service", () => {
 
   it("creates a confirmed purchase invoice", async () => {
     const body: PurchaseCreateBody = {
+      clientRequestId: "11111111-1111-4111-8111-111111111111",
       supplierId: 2,
       invoiceNumber: "A-1",
       purchasedAt: "2026-07-19",

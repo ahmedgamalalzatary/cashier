@@ -5,6 +5,7 @@ import {
   mergeTransferLines,
   newTransferLine,
   selectedTransferLines,
+  transferDirectBody,
   transferRequestBody,
   transferTotalQuantity,
 } from "../../src/models/transfer-model";
@@ -50,6 +51,7 @@ describe("transfer model", () => {
   it("builds normalized transfer request bodies", () => {
     expect(
       transferRequestBody({
+        clientRequestId: "11111111-1111-4111-8111-111111111111",
         notes: "  للوردية  ",
         lines: [
           { key: 1, itemId: "3", quantity: "2.500" },
@@ -57,11 +59,24 @@ describe("transfer model", () => {
         ],
       }),
     ).toEqual({
+      clientRequestId: "11111111-1111-4111-8111-111111111111",
       notes: "للوردية",
       lines: [
         { itemId: 3, quantity: 2.5 },
         { itemId: 7, quantity: 1 },
       ],
+    });
+  });
+
+  it("builds keyless direct transfer bodies", () => {
+    expect(
+      transferDirectBody({
+        notes: "  مباشر  ",
+        lines: [{ key: 1, itemId: "3", quantity: "2.500" }],
+      }),
+    ).toEqual({
+      notes: "مباشر",
+      lines: [{ itemId: 3, quantity: 2.5 }],
     });
   });
 

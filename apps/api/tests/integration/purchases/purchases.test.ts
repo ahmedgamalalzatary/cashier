@@ -52,6 +52,7 @@ describe("purchase invoices", () => {
       .post("/api/purchases")
       .set(authorization)
       .send({
+        clientRequestId: crypto.randomUUID(),
         supplierId: fixture.supplierId,
         invoiceNumber: "INV-100",
         purchasedAt: "2026-07-19",
@@ -102,6 +103,7 @@ describe("purchase invoices", () => {
       .post("/api/purchases")
       .set(authorization)
       .send({
+        clientRequestId: crypto.randomUUID(),
         supplierId: fixture.supplierId,
         invoiceNumber: "INV-101",
         purchasedAt: "2026-07-20",
@@ -179,6 +181,7 @@ describe("purchase invoices", () => {
       .post("/api/purchases")
       .set(authorization)
       .send({
+        clientRequestId: crypto.randomUUID(),
         supplierId: fixture.supplierId,
         purchasedAt: "2026-07-20",
         paidAmount: 0,
@@ -207,6 +210,7 @@ describe("purchase invoices", () => {
       .post("/api/purchases")
       .set(authorization)
       .send({
+        clientRequestId: crypto.randomUUID(),
         supplierId: fixture.supplierId,
         purchasedAt: "2026-07-20",
         paidAmount: 0,
@@ -238,6 +242,7 @@ describe("purchase invoices", () => {
       .post("/api/purchases")
       .set(authorization)
       .send({
+        clientRequestId: crypto.randomUUID(),
         supplierId: fixture.supplierId,
         purchasedAt: "2026-07-20",
         paidAmount: 0,
@@ -263,6 +268,7 @@ describe("purchase invoices", () => {
       .post("/api/purchases")
       .set(authorization)
       .send({
+        clientRequestId: crypto.randomUUID(),
         supplierId: fixture.supplierId,
         purchasedAt: "2026-07-20",
         paidAmount: 0,
@@ -292,6 +298,7 @@ describe("purchase invoices", () => {
       .post("/api/purchases")
       .set(authorization)
       .send({
+        clientRequestId: crypto.randomUUID(),
         supplierId: fixture.supplierId,
         purchasedAt: "2026-07-20",
         paidAmount: 4.02,
@@ -323,6 +330,7 @@ describe("purchase invoices", () => {
   it("serializes concurrent duplicate invoice numbers for one supplier", async () => {
     const fixture = await createPurchaseFixture();
     const body = {
+      clientRequestId: crypto.randomUUID(),
       supplierId: fixture.supplierId,
       invoiceNumber: "DUP-1",
       purchasedAt: "2026-07-20",
@@ -339,7 +347,10 @@ describe("purchase invoices", () => {
 
     const responses = await Promise.all([
       request(app()).post("/api/purchases").set(authorization).send(body),
-      request(app()).post("/api/purchases").set(authorization).send(body),
+      request(app())
+        .post("/api/purchases")
+        .set(authorization)
+        .send({ ...body, clientRequestId: crypto.randomUUID() }),
     ]);
 
     expect(responses.map((response) => response.status).sort()).toEqual([
@@ -356,6 +367,7 @@ describe("purchase invoices", () => {
       .post("/api/purchases")
       .set(authorization)
       .send({
+        clientRequestId: crypto.randomUUID(),
         supplierId: fixture.supplierId,
         purchasedAt: "2026-07-20",
         paidAmount: 10.01,
@@ -392,6 +404,7 @@ describe("purchase invoices", () => {
       .post("/api/purchases")
       .set(authorization)
       .send({
+        clientRequestId: crypto.randomUUID(),
         supplierId: fixture.supplierId,
         purchasedAt: "2026-07-20",
         paidAmount: 0,
@@ -415,5 +428,47 @@ describe("purchase invoices", () => {
       quantity: "2.000",
       unitCost: "10.000000",
     });
+  });
+
+  it("replays the same clientRequestId without duplicating stock, and 409s on a changed payload", async () => {
+    const fixture = await createPurchaseFixture();
+    const body = {
+      clientRequestId: crypto.randomUUID(),
+      supplierId: fixture.supplierId,
+      purchasedAt: "2026-07-20",
+      paidAmount: 0,
+      lines: [
+        {
+          itemId: fixture.itemId,
+          quantity: 1,
+          unitMode: "stock",
+          unitPrice: 10,
+        },
+      ],
+    };
+
+    const first = await request(app())
+      .post("/api/purchases")
+      .set(authorization)
+      .send(body);
+    expect(first.status).toBe(201);
+
+    // a retry with the same key returns the original instead of double-creating
+    const replay = await request(app())
+      .post("/api/purchases")
+      .set(authorization)
+      .send(body);
+    expect(replay.status).toBe(201);
+    expect(replay.body.id).toBe(first.body.id);
+    expect(await db.select().from(purchaseInvoices)).toHaveLength(1);
+    expect(await db.select().from(stockBatches)).toHaveLength(1);
+
+    // the same key with a different payload is a conflict, not a new invoice
+    const changed = await request(app())
+      .post("/api/purchases")
+      .set(authorization)
+      .send({ ...body, paidAmount: 5 });
+    expect(changed.status).toBe(409);
+    expect(await db.select().from(purchaseInvoices)).toHaveLength(1);
   });
 });

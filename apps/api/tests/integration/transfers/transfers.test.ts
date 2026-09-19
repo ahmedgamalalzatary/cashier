@@ -82,7 +82,11 @@ async function createRequest(
   return request(app())
     .post("/api/transfers/requests")
     .set(authorization)
-    .send({ notes: "احتياج الوردية", lines: [{ itemId, quantity }] });
+    .send({
+      clientRequestId: crypto.randomUUID(),
+      notes: "احتياج الوردية",
+      lines: [{ itemId, quantity }],
+    });
 }
 
 describe("cafe transfer requests and transfers", () => {
@@ -312,6 +316,7 @@ describe("cafe transfer requests and transfers", () => {
       .post("/api/transfers/requests")
       .set(cashierAuthorization)
       .send({
+        clientRequestId: crypto.randomUUID(),
         lines: [
           { itemId: firstItemId, quantity: 1 },
           { itemId: secondItemId, quantity: 1 },
@@ -476,5 +481,37 @@ describe("cafe transfer requests and transfers", () => {
       detail.body.lines.map((line: { lineCost: string }) => line.lineCost),
     ).toEqual(["0.01", "0.01"]);
     expect(detail.body.totalCost).toBe("0.02");
+  });
+
+  it("replays the same clientRequestId without duplicating the request, and 409s on a changed payload", async () => {
+    const itemId = await createItem();
+    const body = {
+      clientRequestId: crypto.randomUUID(),
+      notes: "احتياج الوردية",
+      lines: [{ itemId, quantity: 2 }],
+    };
+
+    const first = await request(app())
+      .post("/api/transfers/requests")
+      .set(cashierAuthorization)
+      .send(body);
+    expect(first.status).toBe(201);
+
+    // a retry with the same key returns the original request, not a duplicate
+    const replay = await request(app())
+      .post("/api/transfers/requests")
+      .set(cashierAuthorization)
+      .send(body);
+    expect(replay.status).toBe(201);
+    expect(replay.body.id).toBe(first.body.id);
+    expect(await db.select().from(transferRequests)).toHaveLength(1);
+
+    // the same key with a different payload is a conflict, not a new request
+    const changed = await request(app())
+      .post("/api/transfers/requests")
+      .set(cashierAuthorization)
+      .send({ ...body, notes: "ملاحظة مختلفة" });
+    expect(changed.status).toBe(409);
+    expect(await db.select().from(transferRequests)).toHaveLength(1);
   });
 });

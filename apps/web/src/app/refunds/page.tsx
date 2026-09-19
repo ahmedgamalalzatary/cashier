@@ -92,7 +92,10 @@ export default function RefundsPage() {
             line.id,
             {
               quantity: 0,
-              stockAction: line.type === "item" ? "return_to_stock" : null,
+              stockAction:
+                line.type === "item" || line.type === "external_product"
+                  ? "return_to_stock"
+                  : null,
               refundedQuantity: refunded.get(line.id) ?? 0,
             },
           ]),
@@ -258,7 +261,7 @@ export default function RefundsPage() {
                       }}
                       className="h-10 rounded-lg border border-line px-3 tnum"
                     />
-                    {line.type === "item" && (
+                    {(line.type === "item" || line.type === "external_product") && (
                       <select
                         aria-label={`معالجة مخزون ${line.productName}`}
                         value={current.stockAction ?? "return_to_stock"}

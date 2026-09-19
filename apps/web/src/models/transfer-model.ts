@@ -1,5 +1,8 @@
 import type { InventoryStockRow, PurchaseInvoiceLine } from "@cashier/shared";
-import type { TransferRequestBody } from "@/services/transfers-service";
+import type {
+  TransferDirectBody,
+  TransferRequestBody,
+} from "@/services/transfers-service";
 
 export type TransferLineForm = {
   key: number;
@@ -105,9 +108,24 @@ export function newTransferLine(key: number): TransferLineForm {
 }
 
 export function transferRequestBody(input: {
+  clientRequestId: string;
   notes: string;
   lines: TransferLineForm[];
 }): TransferRequestBody {
+  return {
+    clientRequestId: input.clientRequestId,
+    notes: input.notes.trim() || null,
+    lines: input.lines.map((line) => ({
+      itemId: Number(line.itemId),
+      quantity: Number(line.quantity),
+    })),
+  };
+}
+
+export function transferDirectBody(input: {
+  notes: string;
+  lines: TransferLineForm[];
+}): TransferDirectBody {
   return {
     notes: input.notes.trim() || null,
     lines: input.lines.map((line) => ({

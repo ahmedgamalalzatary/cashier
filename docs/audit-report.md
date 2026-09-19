@@ -4,12 +4,13 @@
 **Scope:** `apps/api` (Express + Drizzle + MySQL), `apps/web` (Next.js Arabic RTL), `packages/shared`, `docker-compose.yml` / Dockerfiles, `docs/system-specs.md`
 **Method:** 4 parallel sub-agent audits — (1) Spec vs Implementation, (2) Backend correctness, (3) Frontend correctness, (4) Security / Data / Tests / DevOps. All findings verified by file reads. Evidence format `path:line`.
 
-> How to use this doc: fix in priority order in §10. Each item has severity, evidence, impact, and suggested fix. Check off as you go.
+> How to use this doc: fix in priority order in §10. Each item has severity, evidence, impact, and suggested fix. Check off as you go. Fixed/unfixed state for every item: see Fix tracker.
 
 ---
 
 ## Table of contents
 
+- [Fix tracker](#fix-tracker)
 - [0. Executive summary](#0-executive-summary)
 - [1. Critical bugs — fix first](#1-critical-bugs--fix-first)
 - [2. Spec vs implementation gaps](#2-spec-vs-implementation-gaps)
@@ -26,37 +27,84 @@
 
 ---
 
+## Fix tracker
+
+Every problem/bug in this report with its current state. States: ✅ Fixed (verified in code + pinned by test) · ❌ Open · ➖ No action (intended, accepted, or false positive).
+
+| ID | Problem | State | Evidence / note |
+|---|---|---|---|
+| C1 | Duplicate purchase invoice-number race returns 500 not 409 | ✅ Fixed | `purchases.service.ts` maps `ER_DUP_ENTRY` to 409 Arabic message; pinned by `purchases.service.test.ts` |
+| C2 | External-product refunds never restock ingredients (stock leak) | ✅ Fixed | `refunds.service.ts` restocks `return_to_stock` ingredients and wastes `not_returnable`; pinned by `refunds.test.ts` |
+| §2.1 | Reports guard placement | ✅ Fixed | Guard at mount `app.ts:81`, covered by test |
+| §2.2 | POS two-level category nav missing | ❌ Open | — |
+| §2.3 | Stocktake + manual adjustment missing | ❌ Open | No tables/endpoints/UI |
+| §2.8 | Salaries/advances/payday missing | ❌ Open | Stub kept advertised in nav |
+| §2.9 | Recipe detailed rules untraced | ❌ Open | Yield/atomicity/deactivation etc. |
+| §2.10 | Dead `recipe` waste path | ❌ Open | Remove or implement |
+| §2.12 | Report groups 2–4 knock-ons; PDF via print only | ❌ Open | — |
+| §2.13 | 5 tables missing (`salary_*`, `stocktake*`) | ❌ Open | — |
+| §2.14-1 | POS hierarchy decision unrecorded | ❌ Open | — |
+| §2.14-3 | `docker.md` omits `cache-worker` | ❌ Open | — |
+| §2.14-4 | Cashier main-stock blindness | ➖ No action | Accepted per spec |
+| W1 | Single open shift blocks multi-register | ❌ Open | Document constraint or implement slots |
+| W2 | Refund branches for sale types never produced | ❌ Open | — |
+| W3 | External refund proportional cost can over-allocate | ❌ Open | Cap + test boundary |
+| W4 | Purchase lock ordering not deterministic | ❌ Open | Sort lines by `itemId` |
+| M1 | Waste schemas reject numeric strings | ✅ Fixed | `z.coerce` parity + test |
+| M1b | Waste schemas accepted booleans as 0/1 | ✅ Fixed | `coerceStrictNumber` + test |
+| M2 | Idempotency fingerprints order-sensitive | ❌ Open | Canonicalize + test |
+| M3 | `RecipeType` drift vs DB | ❌ Open | `grossAmount` half ✅ Fixed + tested |
+| M4 | Bad-FK status codes (404 vs 400/422) | ❌ Open | Decide consciously + document |
+| §4 salaries nav | `/salaries` placeholder | ➖ No action | Keep advertised; implement §2.8 |
+| §4 offline | No offline/queue beyond error banner | ❌ Open | Confirm scope + document |
+| §4 RTL padding | Search padding inverted (POS/Refunds) | ✅ Fixed | `ps-12`/`ps-11` + test |
+| §4 cart math | Cart line float math vs exact totals | ✅ Fixed | `cartLineTotal` + test |
+| §4 refund draft | Draft dereference without guard | ✅ Fixed | Normalizer + test |
+| §4 refund updater | Updaters dropped `stockAction`/`refundedQuantity` on desync | ✅ Fixed | Init from normalizer + test |
+| §4 admin notice | Bare log instead of cashier-only message | ✅ Fixed | Notice + test |
+| §4 shift polling | Shift state fetched once, goes stale | ✅ Fixed | 30s poll + focus + checkout re-check + test |
+| §4 waste feedback | Cafe warehouse forced silently | ❌ Open | Add feedback |
+| §4 table captions | No `scope`/no `caption` | ❌ Open | Component ready (`scope` + optional `caption` ✅); call sites pass no `caption` yet |
+| §4 receipt RTL | Receipt pinned physically left | ✅ Fixed | `inset-inline-start` + test |
+| §4 expense order | Form cleared before reload | ✅ Fixed | Clear after `await load()` + test |
+| §4 transfer hint | Dead submit on invoice tab, no hint | ✅ Fixed | Hint text + disabled submit + test |
+| §4 report dates | Empty/inverted dates hit API | ✅ Fixed | `isReportRangeReady` + test |
+| S3 | CORS ≠ auth undocumented; `TRUST_PROXY` footgun | ❌ Open | Document |
+| S4 | LIKE wildcards unescaped | ✅ Fixed | `escapeLike` + test; reports repo has no LIKE search |
+| S6 | `.env.test` contract gaps | ❌ Open | Fix contract + document vars |
+| D4 | Deadlock retry only on categories | ❌ Open | Shared wrapper + concurrency tests |
+| D5 | No idempotency keys on purchases/transfers | ✅ Fixed | `client_request_id` + fingerprint on invoices/requests (`0035_purchases_transfers_idempotency.sql`); replay + mismatch tests |
+| §7.1–8 | Concurrency/boundary/race test gaps | ❌ Open | Add after fixes |
+| §7.9 | Unit-only default test; no CI | ➖ No action | By intent; run integration locally |
+| §8 | Migrate/worker healthchecks; `NEXT_PUBLIC_API_URL` rebuild coupling | ❌ Open | — |
+| E1b | `stockAction` NULL CHECK blocks recipe/external restock records | ✅ Fixed | CHECK allows `stock_action` on item/external (`schema.ts`); backfill `not_returnable` in `0034_relax_refund_action_type_chk.sql` |
+| E2 | Stacked catalog+POS discounts untested combined | ❌ Open | Pin with test |
+| E5 | Internal variants cleanup + stale `OrderLine` types | ❌ Open | — |
+| E7 | Low-stock alerting scope | ❌ Open | Spec-dependent |
+
 ## 0. Executive summary
 
-Biggest verified risks:
+Biggest verified remaining risks:
 
-- `external_product` refunds never restock nor waste ingredients — silent stock leak (`refunds.service.ts:327-338`).
-- Duplicate purchase invoice-number race returns 500 instead of 409 (`purchases.service.ts:32-37`).
 - Entire modules missing: **salaries/payday** (stub `apps/web/src/app/salaries/page.tsx:1-4`), **stocktake/manual adjustment** (no tables/endpoints/UI).
 - Single open shift system-wide blocks multi-register (`schema.ts:707`, `shifts.service.ts:54-58`).
 - Deadlock retry only on categories; purchases/orders/refunds/transfers crash under concurrent load.
-- No idempotency keys on purchases or transfer-requests — double-click creates duplicates.
+
+Recently closed (C1/C2/D5): duplicate invoice race now 409; external-product refunds restock or waste; purchases/transfers have idempotency keys.
 
 ---
 
 ## 1. Critical bugs — fix first
 
-### C1. Duplicate purchase invoice-number race returns 500 instead of 409 [High]
+### C1. Duplicate purchase invoice-number race returns 500 instead of 409 [✅ Fixed]
 
-- `apps/api/src/modules/purchases/purchases.service.ts:32-37` — pre-check `hasInvoiceNumber()` (plain `SELECT`, `purchases.repository.ts:73-85`, no `FOR UPDATE`), then insert.
-- `apps/api/src/db/schema.ts:95-99` — unique `purchase_invoices_supplier_number_uidx(supplierId, invoiceNumber)` exists, but `PurchasesService.create` has no `ER_DUP_ENTRY` catch (unlike orders/refunds/waste).
+- Pre-check `hasInvoiceNumber()` still exists; unique `purchase_invoices_supplier_number_uidx(supplierId, invoiceNumber)` remains.
+- **Fix verified:** `PurchasesService.create` catches `ER_DUP_ENTRY` and returns 409 `"رقم الفاتورة مسجل لهذا المورد من قبل"` when the loser is a duplicate invoice (not an idempotent replay). Evidence: `purchases.service.ts` `isDuplicateEntry` + catch; pinned by `purchases.service.test.ts`.
 
-**Impact:** two concurrent same `(supplierId,invoiceNumber)` both pass check; loser gets 500 not intended 409 "رقم الفاتورة مسجل لهذا المورد من قبل".
-**Fix:** catch `ER_DUP_ENTRY` → 409, same pattern as orders/refunds/waste.
+### C2. External-product refunds never restock ingredients — stock leak [✅ Fixed]
 
-### C2. External-product refunds never restock ingredients — stock leak [High]
-
-- `apps/api/src/modules/refunds/refunds.service.ts:199-338` — `type==="item"` + `return_to_stock` calls `inventory.receive` (`:279-289`); `type==="external_product"` (`:327-338`) only writes `createReturnAllocation(..., returnedBatchId:null)`, never receives.
-- Original sale did `inventory.consume` cafe ingredients (`orders.service.ts:199-209`).
-- `refunds.service.ts:311-325` — `not_returnable` item path correctly creates waste; external path does neither restock nor waste.
-
-**Impact:** refunding external-product sale leaves cafe stock permanently deducted (only cost paper-trail kept).
-**Fix:** decide: restock ingredients on external refund OR auto-create waste entry (consistent with `not_returnable`). Implement + test.
+- Original sale still `inventory.consume` cafe ingredients.
+- **Fix verified:** `type==="external_product"` + `return_to_stock` calls `inventory.receive` and stores `returnedBatchId`; `not_returnable` writes a waste entry (`targetType: "external_product"`). Evidence: `refunds.service.ts`; pinned by `refunds.test.ts` (restock + waste cases).
 
 ---
 
@@ -145,11 +193,11 @@ Local sellables removed by design (not a gap). Prepared/sub work: `POST /:id/pre
 
 ### 2.10 Waste (§11) ⚠️ Partial
 
-Item+external targets, FIFO, allocations, stored cost, reason codes, idempotency — verified (`waste.schemas.ts:12-55`, `waste.service.ts:35-201`). Gap: finished local recipe cannot be wasted — schema accepts only `item|external_product` (`:16-26`), service hardcodes `recipeId:null` (`:135-136`), while DB check still permits `targetType='recipe'` (`schema.ts:1128-1165`) = dead branch. Fix: re-add or drop branch/columns.
+Item+external targets, FIFO, allocations, stored cost, reason codes, idempotency, strict numeric coercion (booleans rejected — `coerceStrictNumber`, pinned by test) — verified (`waste.schemas.ts:11-70`, `waste.service.ts:35-201`). Gap: finished local recipe cannot be wasted — schema accepts only `item|external_product` (`:25-41`), service hardcodes `recipeId:null` (`:135-136`), while DB check still permits `targetType='recipe'` (`schema.ts:1128-1165`) = dead branch. Fix: re-add or drop branch/columns.
 
 ### 2.11 Refunds (§12) ✅ Verified — no gap
 
-Lookup, whole/partial, over-refund guards, shift attach, `return_to_stock`/`not_returnable` with recipe ingredients consumed (`refunds.service.ts:119-133,161-183`), external allocations (`:227-240`). The “refund also logged as waste” link IS implemented — the `not_returnable` path creates a `waste_entries` row with `refundLineId` set. Former gap claim removed as false positive. (External-product refund stock handling itself is still open — see C2.)
+Lookup, whole/partial, over-refund guards, shift attach, `return_to_stock`/`not_returnable` with recipe ingredients consumed (`refunds.service.ts:119-133,161-183`), external allocations (`:227-240`). The “refund also logged as waste” link IS implemented — the `not_returnable` path creates a `waste_entries` row with `refundLineId` set. Former gap claim removed as false positive. External-product refund stock handling is ✅ Fixed (C2).
 
 ### 2.12 Reports/dashboard/PDF (§14+§2)
 
@@ -166,9 +214,8 @@ All present except `salary_advances`, `salary_adjustments`, `salary_payments`, `
 
 1. POS hierarchy (§3) replaced without recorded decision in `external-products-integration-design.md` — hierarchy itself is intended; only the decision record is missing.
 2. Dead `recipe` waste path — remove or implement.
-3. `app.ts:81` vs `reports.router.ts:7` guard placement inconsistent.
-4. `docs/docker.md` omits 5th service `cache-worker` (`docker-compose.yml:93-99`, 12h refresh dependency).
-5. Cashier main-stock blindness: `cafe/page.tsx:67` fetches main only for admin — acceptable per spec but causes approval friction.
+3. `docs/docker.md` omits 5th service `cache-worker` (`docker-compose.yml:93-99`, 12h refresh dependency).
+4. Cashier main-stock blindness: `cafe/page.tsx:67` fetches main only for admin — acceptable per spec but causes approval friction.
 
 ---
 
@@ -225,11 +272,7 @@ Unknown `externalProductId`/`itemId` → 404 (`orders.service.ts:104-110`, `tran
 
 ### 4.2 Wrong implementation
 
-#### [Medium] RTL search padding inverted in POS and Refunds
-
-- Wrong: `pos/page.tsx:329-336` icon `right-4` + `pe-12 ps-4`; `refunds/page.tsx:168-175` icon `right-3` + `pe-11 ps-3` (large padding wrong side → overlap).
-- Correct refs: `warehouse/page.tsx:174-181` `pe-3 ps-9` icon `right-3`; `orders/page.tsx:141-148` same.
-- Fix: swap to `ps-*` large padding.
+> Resolved: search inputs clear the icon on the inline-start side (`pos/page.tsx` `ps-12`, `refunds/page.tsx` `ps-11`, pinned by test).
 
 > Resolved: cart lines render via the shared decimal-total helper (`cartLineTotal`, `pos/page.tsx:710`).
 
@@ -239,7 +282,7 @@ Unknown `externalProductId`/`itemId` → 404 (`orders.service.ts:104-110`, `tran
 
 - **[Low] Waste forces cafe for products silently:** `waste/page.tsx:171-176` `setWarehouse("cafe")` on `product:*` even if admin chose `main`. Add feedback.
 - **[Low] Table captions missing at call sites:** `components/ui/table.tsx:3-19` now sets `scope="col"` + optional sr-only `<caption>`, but no table passes `caption` yet. Fix: add `caption` per table.
-- **[Low] Print CSS pins receipt left in RTL:** `globals.css:263-271` `.receipt-print-root{inset:0 auto auto 0;width:80mm}`. Use `right:0` / `inset-inline-start`.
+- **[Low] Print receipt RTL — resolved:** `.receipt-print-root` anchors with `inset-inline-start` instead of physical left (pinned by test).
 
 Auth correct: cookie-first + Tauri Bearer fallback (`lib/api.ts:22-28`, `lib/auth.ts:26-30,71-87`), 401 clears (`lib/api.ts:34`), `AuthProvider` gates via `canOpenPath` (`auth-provider.tsx:47-78`).
 
@@ -266,9 +309,9 @@ Auth correct: cookie-first + Tauri Bearer fallback (`lib/api.ts:22-28`, `lib/aut
 
 ## 6. Data integrity / concurrency
 
-- **D2 (=C2)** external refund stock leak — see §1.
+- **D2 (=C2)** external refund stock leak — ✅ Fixed: `refunds.service.ts` restocks ingredients on `return_to_stock` and writes waste on `not_returnable`; pinned by `refunds.test.ts`.
 - **🟡 D4 Deadlock retry only categories [Medium]:** `categories.service.ts:11-25` `transactionWithDeadlockRetry` vs bare `repo.transaction` in orders/refunds/transfers/purchases. Locking disciplined (`FOR UPDATE` `orders.repository.ts:62,73,209`, `refunds.repository.ts:38,53,87`, `inventory.repository.ts:104,141,170`, sorted IDs) but concurrent multi-item same-ingredient sales → 1213 → 500 not retried 409. No race tests for double-sale / refund over-refund (`lockOrderLines` correct `refunds.service.ts:110-118` but untested). Fix: extract shared retry wrapper, apply to orders/refunds/transfers/purchases.
-- **🟡 D5 Idempotency missing purchases/transfers [Medium]:** orders/refunds/expenses/waste have `clientRequestId`+fingerprint+`ER_DUP_ENTRY` (good); `purchases.service.ts:28-37` only invoiceNumber uniqueness (double-click different/no number → double stock); `transfers.service.ts:14-38,97-112` none (retry → duplicate). `wasteEntries.clientRequestId` nullable-unique (`schema.ts:1076`) permits keyless rows though `waste.schemas.ts:14` requires UUID; `refunds.service.ts:311` omits key → NULL allowed (by design, fragile). Fix: add `clientRequestId`+fingerprint to purchases + transfer requests.
+- **🟢 D5 Idempotency on purchases/transfers [Fixed]:** `purchase_invoices` and `transfer_requests` have NOT NULL `client_request_id` + `request_fingerprint` (`schema.ts`, `0035_purchases_transfers_idempotency.sql` nullable add → backfill from row `id` → NOT NULL + unique). Replay and payload-mismatch 409 covered in `purchases.test.ts` / `transfers.test.ts`. `wasteEntries.clientRequestId` remains nullable-unique (by design, fragile).
 > Removed: D1 (false positive), D3 (intended negative-stock design), D6/D7 (accepted minors).
 
 ---
@@ -286,7 +329,7 @@ Gaps (highest value first):
 5. Discount boundaries — 100% pct, fixed==subtotal (total 0 cash 0), fixed>subtotal → 400, pct>100 → 400. Schema tests partial; no e2e totals.
 6. RBAC matrix e2e — cashier blocked `/api/products|/inventory|/purchases|/suppliers|/users` (only spot 403s in users/items/reports/shifts). Products/inventory/purchases/suppliers lack explicit 403 tests. (`/api/expenses` create and `/api/transfers` requests are intentionally cashier-allowed — do not assert 403 there.)
 7. Deadlock-retry orders/refunds — no test (only categories).
-8. Purchases/transfers double-submit — no test (no key, see D5); add after fix.
+8. Purchases/transfers double-submit — ✅ covered (`purchases.test.ts` / `transfers.test.ts` replay + mismatch; see D5).
 9. Structural (intent): `apps/api/package.json:13` `pnpm test` runs unit only; integration needs live MySQL excluded from default/turbo `test`. No CI / no `.github` by intent — run integration locally against live MySQL with full env instead. Document the local integration command.
 
 ---
@@ -306,27 +349,27 @@ Gaps (highest value first):
 
 | # | Edge | Status / Evidence | Severity |
 |---|---|---|---|
-| E1 | Returns/refunds | Prorated + over-refund guards good (`refunds.service.ts:99-183`). But (a) external ingredients never restocked (C2/D2 — fix in §1); (b) `refund_lines` CHECK forces `stockAction` NULL for non-`item` (`schema.ts:946-950`) so recipe/external restock unrecordable. No-exchange accepted (skip). | **High** (a) |
+| E1 | Returns/refunds | Prorated + over-refund guards good (`refunds.service.ts:99-183`). (a) C2/D2 ✅ Fixed — external `return_to_stock` restocks ingredients, `not_returnable` writes waste (`refunds.service.ts` + `refunds.test.ts`). (b) E1b ✅ Fixed — CHECK requires `stock_action` for item/external and NULL for recipe (`schema.ts`); `0034_relax_refund_action_type_chk.sql` backfills leftover external NULLs to `not_returnable`. No-exchange accepted (skip). | **Fixed** |
 | E2 | Discounts | POS pct/fixed validated (`orders.schemas.ts:39-52`, `orders.service.ts:130-141`); catalog windows per line (`external-order-line.ts:166-178`, `shared/external-discount.ts`). Gap: stacked (catalog% then POS%/fixed) computed independently, no test pinning combined total; modifier extra post-discount verify intent. | Medium |
 | E5 | Variants | Only external sizes/modifiers + sellability guards (`external-order-line.ts:96-126`). No internal variants; `recipes.type:product\|prepared` (`schema.ts:319`) vs `shared/types.ts:273` `prepared` only, orders only `external_product` lines — `OrderLine:recipe\|item` (`types.ts:483`) stale. Cleanup+doc. | Low-Med |
 | E7 | Low-stock alerts | Flags only `isLowStock/isNegativeStock` (`inventory.service.ts:266-276` + `items.test.ts:235`); `reports.stock()` qty vs minimums. No push/job, no threshold audit. | Low (spec-dep) |
 
 > Removed: E3 (no cafe→main returns — intended), E4 (=D1, false positive), E6 (no expiry/FEFO — intended), E1c (no exchange — skip).
 
-Additional frontend edges (§4.3): waste warehouse override, missing table captions, receipt print RTL.
+Additional frontend edges (§4.3): waste warehouse override, missing table captions.
 
 ---
 
 ## 10. Priority fix order
 
-1. Resolve external-product refund stock handling (C2/D2/E1a) — restock or auto-waste.
-2. Add idempotency keys to purchases + transfers (D5) with race tests; fix purchase duplicate catch (C1); canonicalize idempotency fingerprints (M2).
+1. ~~Resolve external-product refund stock handling (C2/D2/E1a)~~ ✅ Fixed — restock or auto-waste; CHECK + 0034 backfill (E1b).
+2. ~~Add idempotency keys to purchases + transfers (D5) with race tests; fix purchase duplicate catch (C1)~~ ✅ Fixed (`0035` + replay tests; C1 `ER_DUP_ENTRY` → 409). Remaining on this line: canonicalize idempotency fingerprints (M2).
 3. Share deadlock-retry beyond categories + add sales/refund/approve concurrency tests (D4, §7.1-3); sort purchase locks (W4).
 4. Build salaries module + stocktake module (§2.8, §2.3); wire salaries into cash-flow + employees report; replace `/salaries` stub.
 5. Decide dead `recipe` waste path — remove or implement (§2.10); align shared `RecipeType` drift (M3); cap external-refund proportional cost (W3); document single-register constraint or implement per-terminal slots (W1); record POS-hierarchy decision (§2.14-1).
 6. Security/config (kept): document CORS ≠ auth (S3); LIKE escaping verified (S4); fix `.env.test` contract + document vars (S6).
 7. DevOps (kept): add `migrate`/`cache-worker` healthchecks; fix `NEXT_PUBLIC_API_URL` rebuild coupling or document it.
-8. Frontend (kept): keep `/salaries` nav advertised while §2.8 is built; RTL search padding (POS/Refunds); missing table captions at call sites; waste warehouse feedback; receipt print RTL.
+8. Frontend (kept): keep `/salaries` nav advertised while §2.8 is built; missing table captions at call sites; waste warehouse feedback.
 9. Edge cases (kept): pin stacked-discount combined math with test (E2); decide low-stock alerting scope (E7).
 
 > Removed from scope: old C1–C4 (false positives / intended), §2.11 refund→waste (implemented), N1–N5, S1/S2/S5, D1/D3/D6/D7, CI/`.github` (no CI by intent), `.env.production.example` (`.env.example` is the template), pool/tsconfig/pnpm/images notes, E3/E4/E6/E1c, `apps/temp-backend/` (gitignored local clutter).
@@ -336,7 +379,7 @@ Additional frontend edges (§4.3): waste warehouse override, missing table capti
 ## Appendix A. What is solid
 
 - All stock-mutating paths (orders, transfers, purchases, refunds, waste) run document + FIFO writes inside single DB transaction via `repo.transaction(..., inventory)` — `inventory.service.ts:218-220` throw-after-partial safe via rollback.
-- Idempotency via `clientRequestId` + `ER_DUP_ENTRY` in orders/refunds/waste/expenses (purchases excepted — C1).
+- Idempotency via `clientRequestId` + `ER_DUP_ENTRY` in orders/refunds/waste/expenses/purchases/transfers (C1/D5).
 - No SQLi: Drizzle params; raw `sql` columns only.
 - `changePassword` bumps `tokenVersion` + re-issues (`auth.repository.ts:26-34`, `auth.service.ts:48-66`); admin resets also bump (`users.repository.ts:51-60`).
 - Frontend API shapes match backend (Appendix B); cookie-first + Tauri fallback, 401 clears, route gating correct.

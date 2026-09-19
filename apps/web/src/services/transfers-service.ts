@@ -8,6 +8,12 @@ import { api } from "../lib/api";
 
 export type TransferLineBody = { itemId: number; quantity: number };
 export type TransferRequestBody = {
+  clientRequestId: string;
+  notes: string | null;
+  lines: TransferLineBody[];
+};
+
+export type TransferDirectBody = {
   notes: string | null;
   lines: TransferLineBody[];
 };
@@ -49,7 +55,7 @@ export function getTransfer(id: number) {
   return api<TransferDetail>(`/api/transfers/${id}`);
 }
 
-export function createDirectTransfer(body: TransferRequestBody) {
+export function createDirectTransfer(body: TransferDirectBody) {
   return api<{ transferId: number }>("/api/transfers/direct", {
     method: "POST",
     body: JSON.stringify(body),

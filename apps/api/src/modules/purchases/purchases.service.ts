@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { HttpError } from '../../middleware/error.js';
 import type { PurchasesRepository } from './purchases.repository.js';
 import type { PurchaseInput } from './purchases.schemas.js';
@@ -17,6 +18,24 @@ const stringToScaled = (value: string, scale: number) => {
 };
 const divideRounded = (numerator: bigint, denominator: bigint) =>
   (numerator + denominator / 2n) / denominator;
+const isDuplicateEntry = (error: unknown) =>
+  typeof error === 'object' &&
+  error !== null &&
+  'code' in error &&
+  (error as { code?: unknown }).code === 'ER_DUP_ENTRY';
+const requestFingerprint = (data: PurchaseInput) =>
+  createHash('sha256')
+    .update(
+      JSON.stringify({
+        supplierId: data.supplierId,
+        invoiceNumber: data.invoiceNumber ?? null,
+        purchasedAt: data.purchasedAt,
+        paidAmount: data.paidAmount,
+        notes: data.notes ?? null,
+        lines: [...data.lines].sort((a, b) => a.itemId - b.itemId),
+      }),
+    )
+    .digest('hex');
 const MAX_INVOICE_CENTS = 999_999_999_999n;
 const MAX_STOCK_QUANTITY_MILLI = 99_999_999_999_999n;
 const MAX_UNIT_COST_SCALED = 9_999_999_999_999_999n;
@@ -24,9 +43,16 @@ const MAX_UNIT_COST_SCALED = 9_999_999_999_999_999n;
 export class PurchasesService {
   constructor(private repo: PurchasesRepository) {}
 
-  create(data: PurchaseInput, createdBy: number) {
-    return this.repo.transaction(async (repo, inventory) => {
-      const supplier = await repo.findSupplierForUpdate(data.supplierId);
+  async create(data: PurchaseInput, createdBy: number) {
+    const fingerprint = requestFingerprint(data);
+    try {
+      return await this.repo.transaction(async (repo, inventory) => {
+        const replay = await repo.findByClientRequestId(data.clientRequestId);
+        if (replay) {
+          this.assertReplay(replay, fingerprint, createdBy);
+          return replay.id;
+        }
+        const supplier = await repo.findSupplierForUpdate(data.supplierId);
       if (!supplier) throw new HttpError(404, 'المورد غير موجود');
       if (!supplier.isActive) throw new HttpError(409, 'المورد موقوف');
       if (
@@ -104,6 +130,8 @@ export class PurchasesService {
         totalAmount: formatScaled(totalAmount, 2),
         paidAmount: formatScaled(paidAmount, 2),
         createdBy,
+        clientRequestId: data.clientRequestId,
+        requestFingerprint: fingerprint,
       });
       const occurredAt = new Date(`${data.purchasedAt}T00:00:00.000Z`);
       for (const line of calculatedLines) {
@@ -138,7 +166,33 @@ export class PurchasesService {
         });
       }
       return invoiceId;
-    });
+      });
+    } catch (error) {
+      if (!isDuplicateEntry(error)) throw error;
+      // a concurrent retry with the same key lost the insert race — replay it
+      const replay = await this.repo.findByClientRequestId(
+        data.clientRequestId,
+      );
+      if (replay) {
+        this.assertReplay(replay, fingerprint, createdBy);
+        return replay.id;
+      }
+      // the unique (supplierId, invoiceNumber) index tripped instead
+      throw new HttpError(409, 'رقم الفاتورة مسجل لهذا المورد من قبل');
+    }
+  }
+
+  private assertReplay(
+    replay: { createdBy: number; requestFingerprint: string },
+    fingerprint: string,
+    createdBy: number,
+  ) {
+    if (replay.requestFingerprint !== fingerprint) {
+      throw new HttpError(409, 'معرّف الطلب مستخدم لبيانات شراء مختلفة');
+    }
+    if (replay.createdBy !== createdBy) {
+      throw new HttpError(409, 'معرّف الطلب مستخدم من مستخدم آخر');
+    }
   }
 
   list() {

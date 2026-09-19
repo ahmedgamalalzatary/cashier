@@ -6,6 +6,7 @@ import type {
 import { api } from "../lib/api";
 
 export type PurchaseCreateBody = {
+  clientRequestId: string;
   supplierId: number;
   invoiceNumber: string | null;
   purchasedAt: string;

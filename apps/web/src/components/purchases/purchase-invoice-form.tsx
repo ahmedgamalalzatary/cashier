@@ -41,6 +41,9 @@ export function PurchaseInvoiceForm() {
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("credit");
   const [partialPaid, setPartialPaid] = useState("");
   const [lines, setLines] = useState<PurchaseLineForm[]>([newPurchaseLine(1)]);
+  const [clientRequestId, setClientRequestId] = useState(() =>
+    crypto.randomUUID(),
+  );
 
   useEffect(() => {
     Promise.all([listSuppliers(), listItems()])
@@ -102,6 +105,7 @@ export function PurchaseInvoiceForm() {
     try {
       const created = await createPurchase(
         purchaseRequestBody({
+          clientRequestId,
           supplierId,
           invoiceNumber,
           purchasedAt,
@@ -111,6 +115,7 @@ export function PurchaseInvoiceForm() {
           lines: [...lines].reverse(),
         }),
       );
+      setClientRequestId(crypto.randomUUID());
       router.push(`/purchases/detail?id=${created.id}`);
     } catch (caught) {
       setError(

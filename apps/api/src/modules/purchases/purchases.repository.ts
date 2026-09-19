@@ -92,9 +92,23 @@ export class PurchasesRepository {
     totalAmount: string;
     paidAmount: string;
     createdBy: number;
+    clientRequestId: string;
+    requestFingerprint: string;
   }) {
     const [result] = await this.db.insert(purchaseInvoices).values(data);
     return result.insertId;
+  }
+
+  async findByClientRequestId(clientRequestId: string) {
+    const [row] = await this.db
+      .select({
+        id: purchaseInvoices.id,
+        createdBy: purchaseInvoices.createdBy,
+        requestFingerprint: purchaseInvoices.requestFingerprint,
+      })
+      .from(purchaseInvoices)
+      .where(eq(purchaseInvoices.clientRequestId, clientRequestId));
+    return row;
   }
 
   async createLine(data: PurchaseLineWrite) {

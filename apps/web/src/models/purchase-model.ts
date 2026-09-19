@@ -57,6 +57,7 @@ export function purchaseTotal(lines: PurchaseLineForm[]) {
 }
 
 export function purchaseRequestBody(input: {
+  clientRequestId: string;
   supplierId: string;
   invoiceNumber: string;
   purchasedAt: string;
@@ -65,6 +66,7 @@ export function purchaseRequestBody(input: {
   lines: PurchaseLineForm[];
 }): PurchaseCreateBody {
   return {
+    clientRequestId: input.clientRequestId,
     supplierId: Number(input.supplierId),
     invoiceNumber: input.invoiceNumber.trim() || null,
     purchasedAt: input.purchasedAt,

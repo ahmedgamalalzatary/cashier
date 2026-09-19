@@ -83,6 +83,7 @@ describe("purchase form model", () => {
     expect(purchaseTotal([first, second])).toBe(650);
     expect(
       purchaseRequestBody({
+        clientRequestId: "11111111-1111-4111-8111-111111111111",
         supplierId: "7",
         invoiceNumber: " ",
         purchasedAt: "2026-07-19",
@@ -91,6 +92,7 @@ describe("purchase form model", () => {
         lines: [first, second],
       }),
     ).toMatchObject({
+      clientRequestId: "11111111-1111-4111-8111-111111111111",
       supplierId: 7,
       invoiceNumber: null,
       paidAmount: 100,
