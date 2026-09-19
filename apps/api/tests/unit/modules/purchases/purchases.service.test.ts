@@ -61,3 +61,53 @@ describe("PurchasesService duplicate invoice race", () => {
     );
   });
 });
+
+describe("PurchasesService stock receive order", () => {
+  it("receives stock in itemId order even when invoice lines are reversed", async () => {
+    const receive = vi.fn();
+    const transactionRepo = {
+      findByClientRequestId: vi.fn().mockResolvedValue(undefined),
+      findSupplierForUpdate: vi
+        .fn()
+        .mockResolvedValue({ id: 1, isActive: true }),
+      hasInvoiceNumber: vi.fn().mockResolvedValue(false),
+      lockItems: vi.fn().mockResolvedValue([
+        {
+          id: 2,
+          type: "raw",
+          isActive: true,
+          stockUnit: "كجم",
+          purchaseUnit: null,
+          purchaseToStockFactor: null,
+        },
+        {
+          id: 9,
+          type: "raw",
+          isActive: true,
+          stockUnit: "كجم",
+          purchaseUnit: null,
+          purchaseToStockFactor: null,
+        },
+      ]),
+      createInvoice: vi.fn().mockResolvedValue(44),
+      createLine: vi.fn(),
+    };
+    const repo = {
+      transaction: vi.fn(async (run) => run(transactionRepo, { receive })),
+      findByClientRequestId: vi.fn().mockResolvedValue(undefined),
+    } as unknown as PurchasesRepository;
+
+    await new PurchasesService(repo).create(
+      {
+        ...purchaseInput,
+        lines: [
+          { itemId: 9, quantity: 1, unitMode: "stock", unitPrice: 10 },
+          { itemId: 2, quantity: 1, unitMode: "stock", unitPrice: 10 },
+        ],
+      } as never,
+      7,
+    );
+
+    expect(receive.mock.calls.map((call) => call[0].itemId)).toEqual([2, 9]);
+  });
+});

@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { requestFingerprint as hashRequest } from "../../lib/request-fingerprint.js";
 import { HttpError } from "../../middleware/error.js";
 import type { AuthUser } from "@cashier/shared";
 import type { TransfersRepository } from "./transfers.repository.js";
@@ -23,14 +23,10 @@ const isDeadlock = (error: unknown) =>
   (error as { code?: unknown }).code === "ER_LOCK_DEADLOCK";
 
 const requestFingerprint = (data: TransferRequestInput) =>
-  createHash("sha256")
-    .update(
-      JSON.stringify({
-        notes: data.notes ?? null,
-        lines: [...data.lines].sort((a, b) => a.itemId - b.itemId),
-      }),
-    )
-    .digest("hex");
+  hashRequest({
+    notes: data.notes ?? null,
+    lines: [...data.lines].sort((a, b) => a.itemId - b.itemId),
+  });
 
 export class TransfersService {
   constructor(private repo: TransfersRepository) {}

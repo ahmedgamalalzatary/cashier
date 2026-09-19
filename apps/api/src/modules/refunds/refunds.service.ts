@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { requestFingerprint as hashRequest } from "../../lib/request-fingerprint.js";
 import { HttpError } from "../../middleware/error.js";
 import type { RefundsRepository } from "./refunds.repository.js";
 import type { RefundInput } from "./refunds.schemas.js";
@@ -28,17 +28,65 @@ const roundDivide = (numerator: bigint, denominator: bigint) =>
   (numerator + denominator / 2n) / denominator;
 
 const fingerprint = (input: RefundInput) =>
-  createHash("sha256")
-    .update(
-      JSON.stringify({
-        orderId: input.orderId,
-        reason: input.reason,
-        lines: [...input.lines].sort(
-          (left, right) => left.orderLineId - right.orderLineId,
-        ),
-      }),
-    )
-    .digest("hex");
+  hashRequest({
+    orderId: input.orderId,
+    reason: input.reason,
+    lines: [...input.lines].sort(
+      (left, right) => left.orderLineId - right.orderLineId,
+    ),
+  });
+
+export function planExternalRefundQuantities(input: {
+  soldQuantity: bigint;
+  priorQuantity: bigint;
+  requestedQuantity: bigint;
+  allocations: Array<{
+    id: number;
+    itemId: number;
+    quantityMilli: bigint;
+    alreadyReturnedMilli: bigint;
+  }>;
+}) {
+  const remainingByItem = new Map<number, bigint>();
+  const cumulativeQuantity = input.priorQuantity + input.requestedQuantity;
+  for (const allocation of input.allocations) {
+    if (remainingByItem.has(allocation.itemId)) continue;
+    const group = input.allocations.filter(
+      (row) => row.itemId === allocation.itemId,
+    );
+    const totalAllocated = group.reduce(
+      (sum, row) => sum + row.quantityMilli,
+      0n,
+    );
+    const totalAlreadyReturned = group.reduce(
+      (sum, row) => sum + row.alreadyReturnedMilli,
+      0n,
+    );
+    const cumulativeTotal =
+      cumulativeQuantity === input.soldQuantity
+        ? totalAllocated
+        : roundDivide(totalAllocated * cumulativeQuantity, input.soldQuantity);
+    remainingByItem.set(
+      allocation.itemId,
+      cumulativeTotal > totalAlreadyReturned
+        ? cumulativeTotal - totalAlreadyReturned
+        : 0n,
+    );
+  }
+  return input.allocations.map((allocation) => {
+    const available =
+      allocation.quantityMilli - allocation.alreadyReturnedMilli;
+    let remaining = remainingByItem.get(allocation.itemId) ?? 0n;
+    const quantityMilli =
+      remaining === 0n || available <= 0n
+        ? 0n
+        : available < remaining
+          ? available
+          : remaining;
+    remainingByItem.set(allocation.itemId, remaining - quantityMilli);
+    return { id: allocation.id, quantityMilli };
+  });
+}
 
 const isDuplicateEntry = (error: unknown) =>
   typeof error === "object" &&
@@ -224,6 +272,23 @@ export class RefundsService {
             allocation: (typeof allocations)[number];
             quantity: bigint;
           }> = [];
+          const externalShares =
+            entry.line.type === "external_product"
+              ? new Map(
+                  planExternalRefundQuantities({
+                    soldQuantity: entry.soldQuantity,
+                    priorQuantity: entry.priorQuantity,
+                    requestedQuantity: entry.requestedQuantity,
+                    allocations: allocations.map((allocation) => ({
+                      id: allocation.id,
+                      itemId: allocation.itemId,
+                      quantityMilli: scaled(allocation.quantity, 3),
+                      alreadyReturnedMilli:
+                        priorReturns.get(allocation.id) ?? 0n,
+                    })),
+                  }).map((row) => [row.id, row.quantityMilli]),
+                )
+              : null;
           for (const allocation of allocations) {
             if (entry.line.type === "item" && remainingToAllocate === 0n)
               break;
@@ -232,18 +297,7 @@ export class RefundsService {
             const available = allocatedQuantity - alreadyReturned;
             const quantity =
               entry.line.type === "external_product"
-                ? (() => {
-                    const cumulativeQuantity =
-                      entry.priorQuantity + entry.requestedQuantity;
-                    const cumulativeAllocation =
-                      cumulativeQuantity === entry.soldQuantity
-                        ? allocatedQuantity
-                        : roundDivide(
-                            allocatedQuantity * cumulativeQuantity,
-                            entry.soldQuantity,
-                          );
-                    return cumulativeAllocation - alreadyReturned;
-                  })()
+                ? (externalShares?.get(allocation.id) ?? 0n)
                 : available < remainingToAllocate
                   ? available
                   : remainingToAllocate;

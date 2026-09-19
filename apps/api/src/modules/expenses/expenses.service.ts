@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
 import type { AuthUser } from "@cashier/shared";
+import { requestFingerprint } from "../../lib/request-fingerprint.js";
 import { HttpError } from "../../middleware/error.js";
 import type { CreateExpenseInput } from "./expenses.schemas.js";
 import type { ExpensesRepository } from "./expenses.repository.js";
@@ -48,9 +48,12 @@ export class ExpensesService {
   }
 
   async create(input: CreateExpenseInput, actor: AuthUser) {
-    const fingerprint = createHash("sha256")
-      .update(JSON.stringify(input))
-      .digest("hex");
+    const fingerprint = requestFingerprint({
+      categoryId: input.categoryId,
+      amount: input.amount,
+      expenseDate: input.expenseDate ?? null,
+      note: input.note ?? null,
+    });
     let id: number;
     try {
       id = await this.repo.transaction(async (repo) => {

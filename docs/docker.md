@@ -1,11 +1,12 @@
 # Docker operations runbook
 
-MiniKoshk runs as the `cashier-app` Compose project with four services:
+MiniKoshk runs as the `cashier-app` Compose project with five services:
 
 - `web`: Next.js on `127.0.0.1:3010`
 - `api`: Express on `127.0.0.1:4010`
 - `mysql`: private MySQL 8.4 database
 - `migrate`: one-shot Drizzle migration job
+- `cache-worker`: catalog refresh worker (`node dist/worker.js`, same API image; depends on `migrate` completing)
 
 Run every command from `/opt/minikoshk`. Always provide `.env.production` explicitly:
 
@@ -41,7 +42,7 @@ sudo docker compose --env-file .env.production up -d
 sudo docker compose --env-file .env.production ps
 ```
 
-The persistent MySQL volume is retained across builds and container replacements. Compose waits for MySQL, runs pending migrations, starts the API, and then starts the web service.
+The persistent MySQL volume is retained across builds and container replacements. Compose waits for MySQL, runs pending migrations, then starts the API, `cache-worker`, and web service.
 
 This update includes migration `0033_revoke_all_auth_tokens`, which invalidates every previously issued login token as part of the move to HttpOnly cookie auth. All users must log in again after this deploy; that is expected, not a failure.
 

@@ -14,6 +14,7 @@ import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table } from "@/components/ui/table";
 import { formatMoney } from "@/lib/format";
+import { warehouseForWasteTarget } from "@/lib/waste-target";
 import {
   createWaste,
   getWaste,
@@ -47,6 +48,7 @@ export default function WastePage() {
   );
   const [detail, setDetail] = useState<WasteDetail | null>(null);
   const [error, setError] = useState("");
+  const [cafeForcedNotice, setCafeForcedNotice] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
@@ -155,7 +157,12 @@ export default function WastePage() {
               disabled={saving}
               value={warehouse}
               onChange={(event) => {
-                setWarehouse(event.target.value as "main" | "cafe");
+                const next = warehouseForWasteTarget(
+                  targetKey,
+                  event.target.value as "main" | "cafe",
+                );
+                setWarehouse(next.warehouse);
+                setCafeForcedNotice(next.cafeForced);
                 setClientRequestId(crypto.randomUUID());
               }}
               className="h-11 rounded-xl border border-line bg-paper px-3"
@@ -171,8 +178,12 @@ export default function WastePage() {
             onChange={(event) => {
               setTargetKey(event.target.value);
               setClientRequestId(crypto.randomUUID());
-              if (event.target.value.startsWith("product:"))
-                setWarehouse("cafe");
+              const next = warehouseForWasteTarget(
+                event.target.value,
+                warehouse,
+              );
+              setWarehouse(next.warehouse);
+              setCafeForcedNotice(next.cafeForced);
             }}
             className="h-11 rounded-xl border border-line bg-paper px-3"
           >
@@ -184,8 +195,13 @@ export default function WastePage() {
             ))}
           </select>
           {selectedProduct && (
-            <p className="text-xs text-muted md:col-span-2">
-              منتج الوصفة يُسجل في مخزن الكافيه فقط.
+            <p
+              className="text-xs text-muted md:col-span-2"
+              role={cafeForcedNotice ? "status" : undefined}
+            >
+              {cafeForcedNotice
+                ? "تم تغيير المخزن إلى الكافيه لأن هالك المنتج يُسجل هناك فقط."
+                : "منتج الوصفة يُسجل في مخزن الكافيه فقط."}
             </p>
           )}
           <input

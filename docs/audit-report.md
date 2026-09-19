@@ -44,15 +44,15 @@ Every problem/bug in this report with its current state. States: ✅ Fixed (veri
 | §2.12 | Report groups 2–4 knock-ons; PDF via print only | ❌ Open | — |
 | §2.13 | 5 tables missing (`salary_*`, `stocktake*`) | ❌ Open | — |
 | §2.14-1 | POS hierarchy decision unrecorded | ❌ Open | — |
-| §2.14-3 | `docker.md` omits `cache-worker` | ❌ Open | — |
+| §2.14-3 | `docker.md` omits `cache-worker` | ✅ Fixed | Fifth service listed in `docs/docker.md` |
 | §2.14-4 | Cashier main-stock blindness | ➖ No action | Accepted per spec |
 | W1 | Single open shift blocks multi-register | ❌ Open | Document constraint or implement slots |
 | W2 | Refund branches for sale types never produced | ❌ Open | — |
-| W3 | External refund proportional cost can over-allocate | ❌ Open | Cap + test boundary |
-| W4 | Purchase lock ordering not deterministic | ❌ Open | Sort lines by `itemId` |
+| W3 | External refund proportional cost can over-allocate | ✅ Fixed | Per-item remaining budget; `refunds.share.test.ts` |
+| W4 | Purchase lock ordering not deterministic | ✅ Fixed | Receive/createLine sorted by `itemId`; pinned by `purchases.service.test.ts` |
 | M1 | Waste schemas reject numeric strings | ✅ Fixed | `z.coerce` parity + test |
 | M1b | Waste schemas accepted booleans as 0/1 | ✅ Fixed | `coerceStrictNumber` + test |
-| M2 | Idempotency fingerprints order-sensitive | ❌ Open | Canonicalize + test |
+| M2 | Idempotency fingerprints order-sensitive | ✅ Fixed | Stable stringify + sorted lines; expenses/orders/waste unit tests |
 | M3 | `RecipeType` drift vs DB | ❌ Open | `grossAmount` half ✅ Fixed + tested |
 | M4 | Bad-FK status codes (404 vs 400/422) | ❌ Open | Decide consciously + document |
 | §4 salaries nav | `/salaries` placeholder | ➖ No action | Keep advertised; implement §2.8 |
@@ -63,7 +63,7 @@ Every problem/bug in this report with its current state. States: ✅ Fixed (veri
 | §4 refund updater | Updaters dropped `stockAction`/`refundedQuantity` on desync | ✅ Fixed | Init from normalizer + test |
 | §4 admin notice | Bare log instead of cashier-only message | ✅ Fixed | Notice + test |
 | §4 shift polling | Shift state fetched once, goes stale | ✅ Fixed | 30s poll + focus + checkout re-check + test |
-| §4 waste feedback | Cafe warehouse forced silently | ❌ Open | Add feedback |
+| §4 waste feedback | Cafe warehouse forced silently | ✅ Fixed | Status notice when product waste forces cafe; `waste-target.test.ts` |
 | §4 table captions | No `scope`/no `caption` | ❌ Open | Component ready (`scope` + optional `caption` ✅); call sites pass no `caption` yet |
 | §4 receipt RTL | Receipt pinned physically left | ✅ Fixed | `inset-inline-start` + test |
 | §4 expense order | Form cleared before reload | ✅ Fixed | Clear after `await load()` + test |
@@ -71,7 +71,7 @@ Every problem/bug in this report with its current state. States: ✅ Fixed (veri
 | §4 report dates | Empty/inverted dates hit API | ✅ Fixed | `isReportRangeReady` + test |
 | S3 | CORS ≠ auth undocumented; `TRUST_PROXY` footgun | ❌ Open | Document |
 | S4 | LIKE wildcards unescaped | ✅ Fixed | `escapeLike` + test; reports repo has no LIKE search |
-| S6 | `.env.test` contract gaps | ❌ Open | Fix contract + document vars |
+| S6 | `.env.test` contract gaps | ✅ Fixed | Root `.env.test` includes `EXTERNAL_ORDERS_*`; `env.test.ts` parses it as complete |
 | D4 | Deadlock retry only on categories | ❌ Open | Shared wrapper + concurrency tests |
 | D5 | No idempotency keys on purchases/transfers | ✅ Fixed | `client_request_id` + fingerprint on invoices/requests (`0035_purchases_transfers_idempotency.sql`); replay + mismatch tests |
 | §7.1–8 | Concurrency/boundary/race test gaps | ❌ Open | Add after fixes |
@@ -214,7 +214,7 @@ All present except `salary_advances`, `salary_adjustments`, `salary_payments`, `
 
 1. POS hierarchy (§3) replaced without recorded decision in `external-products-integration-design.md` — hierarchy itself is intended; only the decision record is missing.
 2. Dead `recipe` waste path — remove or implement.
-3. `docs/docker.md` omits 5th service `cache-worker` (`docker-compose.yml:93-99`, 12h refresh dependency).
+3. `docs/docker.md` lists 5th service `cache-worker` (`docker-compose.yml` `cache-worker`, 12h refresh dependency). ✅ Fixed.
 4. Cashier main-stock blindness: `cafe/page.tsx:67` fetches main only for admin — acceptable per spec but causes approval friction.
 
 ---
@@ -229,17 +229,17 @@ All present except `salary_advances`, `salary_adjustments`, `salary_payments`, `
 
 Sales always `type:"external_product"` (`orders.service.ts:170-185`); refunds branch `item`/recipe (`refunds.service.ts:119,200-204,222-250,276-326`). `item` path `entry.line.itemId!` `:315` safe only because unreachable. Fix: remove branches or allow those sale types; add legacy-data guard.
 
-### W3. External refund proportional cost can over-allocate [Medium]
+### W3. External refund proportional cost can over-allocate [✅ Fixed]
 
-`refunds.service.ts:227-250` `quantity=cumulativeAllocation-alreadyReturned` with no `min(available,remaining)` cap (vs `item` `:241-243`). `roundDivide` can exceed sold. Audit-only (no stock move `:327-338`) but quantities/costs can exceed sale on rounding. Fix: cap + test boundary.
+External refunds now share a per-ingredient remaining budget (`planExternalRefundQuantities`) so per-batch rounding cannot exceed that ingredient's proportional remainder. Pinned by `refunds.share.test.ts`.
 
-### W4. Purchases lock ordering not deterministic [Low-Med]
+### W4. Purchases lock ordering not deterministic [✅ Fixed]
 
-`purchases.service.ts:109-131` `receive` in request order. Contrast `transfers.service.ts:151` sorted, `external-order-line.ts:242-243` sorted. `purchases.repository.ts:63-70` sorts item-lock query only, not receive sequence. Two concurrent same-items different-order → InnoDB deadlock → 500. Fix: sort lines by `itemId` before receive.
+Item locks were already `ORDER BY id`. Stock `receive` now also walks lines sorted by `itemId` (`purchases.service.ts`). Pinned by `purchases.service.test.ts`.
 
-### M2. Idempotency fingerprints order-sensitive → false 409s [Medium]
+### M2. Idempotency fingerprints order-sensitive → false 409s [✅ Fixed]
 
-`orders.service.ts:63-73` fingerprints raw `lines` before `normalizeLines:39-56`; `refunds.service.ts:30-41` sorts lines but not modifier/key order; `waste.service.ts:17-18`, `expenses.service.ts:51-53` `JSON.stringify(input)` key-order sensitive. Retry same logical order reordered → 409 “معرّف الطلب مستخدم لبيانات مختلفة” not replay. Fix: canonicalize (sort lines+modifiers, stable stringify).
+Shared `requestFingerprint` stable-stringifies objects. Orders hash `normalizeLines` sorted by product; refunds/purchases/transfers sort line ids; waste/expenses hash canonical fields. Pinned by expenses/orders/waste unit tests.
 
 ### M3. Response drift vs `packages/shared` [Medium]
 
@@ -280,7 +280,7 @@ Unknown `externalProductId`/`itemId` → 404 (`orders.service.ts:104-110`, `tran
 
 ### 4.3 UX / edge gaps
 
-- **[Low] Waste forces cafe for products silently:** `waste/page.tsx:171-176` `setWarehouse("cafe")` on `product:*` even if admin chose `main`. Add feedback.
+- **[Low] Waste forces cafe for products — ✅ Fixed:** choosing a product from main (or switching warehouse while a product is selected) forces cafe and shows a status notice (`waste-target.ts`, `waste/page.tsx`).
 - **[Low] Table captions missing at call sites:** `components/ui/table.tsx:3-19` now sets `scope="col"` + optional sr-only `<caption>`, but no table passes `caption` yet. Fix: add `caption` per table.
 - **[Low] Print receipt RTL — resolved:** `.receipt-print-root` anchors with `inset-inline-start` instead of physical left (pinned by test).
 
@@ -363,13 +363,13 @@ Additional frontend edges (§4.3): waste warehouse override, missing table capti
 ## 10. Priority fix order
 
 1. ~~Resolve external-product refund stock handling (C2/D2/E1a)~~ ✅ Fixed — restock or auto-waste; CHECK + 0034 backfill (E1b).
-2. ~~Add idempotency keys to purchases + transfers (D5) with race tests; fix purchase duplicate catch (C1)~~ ✅ Fixed (`0035` + replay tests; C1 `ER_DUP_ENTRY` → 409). Remaining on this line: canonicalize idempotency fingerprints (M2).
+2. ~~Add idempotency keys to purchases + transfers (D5) with race tests; fix purchase duplicate catch (C1); canonicalize idempotency fingerprints (M2)~~ ✅ Fixed.
 3. Share deadlock-retry beyond categories + add sales/refund/approve concurrency tests (D4, §7.1-3); sort purchase locks (W4).
 4. Build salaries module + stocktake module (§2.8, §2.3); wire salaries into cash-flow + employees report; replace `/salaries` stub.
 5. Decide dead `recipe` waste path — remove or implement (§2.10); align shared `RecipeType` drift (M3); cap external-refund proportional cost (W3); document single-register constraint or implement per-terminal slots (W1); record POS-hierarchy decision (§2.14-1).
 6. Security/config (kept): document CORS ≠ auth (S3); LIKE escaping verified (S4); fix `.env.test` contract + document vars (S6).
 7. DevOps (kept): add `migrate`/`cache-worker` healthchecks; fix `NEXT_PUBLIC_API_URL` rebuild coupling or document it.
-8. Frontend (kept): keep `/salaries` nav advertised while §2.8 is built; missing table captions at call sites; waste warehouse feedback.
+8. Frontend (kept): keep `/salaries` nav advertised while §2.8 is built; missing table captions at call sites. Waste warehouse feedback ✅ Fixed.
 9. Edge cases (kept): pin stacked-discount combined math with test (E2); decide low-stock alerting scope (E7).
 
 > Removed from scope: old C1–C4 (false positives / intended), §2.11 refund→waste (implemented), N1–N5, S1/S2/S5, D1/D3/D6/D7, CI/`.github` (no CI by intent), `.env.production.example` (`.env.example` is the template), pool/tsconfig/pnpm/images notes, E3/E4/E6/E1c, `apps/temp-backend/` (gitignored local clutter).

@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
 import type { AuthUser } from "@cashier/shared";
+import { requestFingerprint as hashRequest } from "../../lib/request-fingerprint.js";
 import { HttpError } from "../../middleware/error.js";
 import type { WasteInput } from "./waste.schemas.js";
 import type { WasteRepository } from "./waste.repository.js";
@@ -15,7 +15,13 @@ const format = (value: bigint, scale: number) =>
 const roundDivide = (value: bigint, divisor: bigint) =>
   (value + divisor / 2n) / divisor;
 const fingerprint = (input: WasteInput) =>
-  createHash("sha256").update(JSON.stringify(input)).digest("hex");
+  hashRequest({
+    warehouse: input.warehouse,
+    target: input.target,
+    quantity: input.quantity,
+    reason: input.reason,
+    note: input.note ?? null,
+  });
 const isDuplicate = (error: unknown) =>
   !!error &&
   typeof error === "object" &&

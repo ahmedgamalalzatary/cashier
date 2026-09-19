@@ -1,4 +1,5 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { requestFingerprint as hashRequest } from "../../lib/request-fingerprint.js";
 import { HttpError } from "../../middleware/error.js";
 import type { FifoAllocation } from "../inventory/inventory.service.js";
 import { calculateExternalOrderLine } from "./external-order-line.js";
@@ -61,15 +62,16 @@ function orderNumber(now: Date) {
 }
 
 function requestFingerprint(data: OrderInput) {
-  return createHash("sha256")
-    .update(
-      JSON.stringify({
-        lines: data.lines,
-        discount: data.discount,
-        cashReceived: data.cashReceived,
-      }),
-    )
-    .digest("hex");
+  const lines = [...normalizeLines(data.lines)].sort(
+    (left, right) =>
+      left.externalProductId - right.externalProductId ||
+      (left.externalSizeId ?? 0) - (right.externalSizeId ?? 0),
+  );
+  return hashRequest({
+    lines,
+    discount: data.discount,
+    cashReceived: data.cashReceived,
+  });
 }
 
 export class OrdersService {

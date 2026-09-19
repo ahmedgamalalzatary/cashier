@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { requestFingerprint as hashRequest } from '../../lib/request-fingerprint.js';
 import { HttpError } from '../../middleware/error.js';
 import type { PurchasesRepository } from './purchases.repository.js';
 import type { PurchaseInput } from './purchases.schemas.js';
@@ -24,18 +24,14 @@ const isDuplicateEntry = (error: unknown) =>
   'code' in error &&
   (error as { code?: unknown }).code === 'ER_DUP_ENTRY';
 const requestFingerprint = (data: PurchaseInput) =>
-  createHash('sha256')
-    .update(
-      JSON.stringify({
-        supplierId: data.supplierId,
-        invoiceNumber: data.invoiceNumber ?? null,
-        purchasedAt: data.purchasedAt,
-        paidAmount: data.paidAmount,
-        notes: data.notes ?? null,
-        lines: [...data.lines].sort((a, b) => a.itemId - b.itemId),
-      }),
-    )
-    .digest('hex');
+  hashRequest({
+    supplierId: data.supplierId,
+    invoiceNumber: data.invoiceNumber ?? null,
+    purchasedAt: data.purchasedAt,
+    paidAmount: data.paidAmount,
+    notes: data.notes ?? null,
+    lines: [...data.lines].sort((a, b) => a.itemId - b.itemId),
+  });
 const MAX_INVOICE_CENTS = 999_999_999_999n;
 const MAX_STOCK_QUANTITY_MILLI = 99_999_999_999_999n;
 const MAX_UNIT_COST_SCALED = 9_999_999_999_999_999n;
@@ -134,7 +130,10 @@ export class PurchasesService {
         requestFingerprint: fingerprint,
       });
       const occurredAt = new Date(`${data.purchasedAt}T00:00:00.000Z`);
-      for (const line of calculatedLines) {
+      const stockLines = [...calculatedLines].sort(
+        (a, b) => a.itemId - b.itemId,
+      );
+      for (const line of stockLines) {
         await repo.createLine({
           invoiceId,
           itemId: line.itemId,
