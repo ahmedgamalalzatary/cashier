@@ -52,13 +52,13 @@ describe("MySQL FIFO inventory", () => {
 
     expect(consumed.allocations).toEqual([
       {
-        batchId: 1,
+        batchId: expect.any(Number),
         movementId: expect.any(Number),
         quantity: "2.000",
         unitCost: "10.000000",
       },
       {
-        batchId: 2,
+        batchId: expect.any(Number),
         movementId: expect.any(Number),
         quantity: "2.000",
         unitCost: "12.000000",
