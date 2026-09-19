@@ -1,0 +1,99 @@
+import { describe, expect, it } from 'vitest';
+import request from 'supertest';
+import { createApp } from '../../src/app.js';
+import type { Db } from '../../src/db/index.js';
+import { signToken } from '../../src/middleware/auth.js';
+
+const db = {} as Db;
+const options = {
+  jwtSecret: 'test-only-jwt-secret-at-least-32-characters',
+  corsOrigins: [
+    'https://cashier.example.com',
+    'http://localhost:3000',
+  ],
+  externalOrders: {
+    baseUrl: 'https://orders.example.com',
+    phoneNumber: '01234567890',
+    password: 'server-only-password',
+  },
+};
+
+describe('health check', () => {
+  it('responds ok', async () => {
+    const res = await request(createApp(db, options)).get('/health');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: true });
+  });
+
+  it('allows the configured frontend origin', async () => {
+    const res = await request(createApp(db, options))
+      .options('/health')
+      .set('Origin', options.corsOrigins[0]);
+    expect(res.headers['access-control-allow-origin']).toBe(
+      options.corsOrigins[0],
+    );
+  });
+
+  it('allows another configured frontend origin', async () => {
+    const res = await request(createApp(db, options))
+      .options('/health')
+      .set('Origin', options.corsOrigins[1]);
+    expect(res.headers['access-control-allow-origin']).toBe(
+      options.corsOrigins[1],
+    );
+  });
+
+  it('permits browsers to send the HttpOnly auth cookie cross-origin', async () => {
+    const res = await request(createApp(db, options))
+      .options('/health')
+      .set('Origin', options.corsOrigins[0]);
+    expect(res.headers['access-control-allow-credentials']).toBe('true');
+  });
+
+  it('does not grant CORS access to any other origin', async () => {
+    const res = await request(createApp(db, options))
+      .options('/health')
+      .set('Origin', 'https://evil.example');
+    expect(res.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
+  it('returns 400 for malformed JSON request bodies', async () => {
+    const res = await request(createApp(db, options))
+      .post('/api/auth/login')
+      .set('Content-Type', 'application/json')
+      .send('{"username":');
+
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty('error');
+  });
+
+  it('blocks cashiers from reports at the mount', async () => {
+    const cashierDb = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => [
+              {
+                id: 1,
+                name: 'Cashier',
+                role: 'cashier',
+                isActive: true,
+                tokenVersion: 0,
+              },
+            ],
+          }),
+        }),
+      }),
+    } as unknown as Db;
+    const token = signToken(
+      { id: 1, name: 'Cashier', role: 'cashier' },
+      0,
+      options.jwtSecret,
+    );
+    const res = await request(createApp(cashierDb, options))
+      .get('/api/reports/dashboard')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(403);
+  });
+});

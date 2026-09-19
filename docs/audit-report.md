@@ -162,7 +162,7 @@ Enforcement correct at route level:
 - ✅ FIFO batches + ledger + transfer cost carry-over: `stockBatches` `schema.ts:188-218`, `stockMovements` `:953-980`, `transferLines.sourceBatchId/cafeBatchId` `:287-312`; `stockDeficitAllocations` `:984-1008` back-fills negative sales (exceeds spec, good).
 - ✅ Purchases create main FIFO batches: `purchases.service.ts:120-125`; immutable (no update/delete in `purchases.router.ts:1-10`).
 - ✅ Low/negative flags: `reports.service.ts:73-77`, `warehouse/page.tsx:97-99,267-275`, `cafe/page.tsx:94,121`, `orders/page.tsx:123`.
-- ❌ Stocktake + single-item adjustment missing: no `stocktakes`/`stocktake_lines` in `schema.ts`, `inventory.router.ts:1-13` read-only, no جرد page in `apps/web/src/app`. Only `stocktake_surplus` string in `tests/unit/modules/inventory/inventory.service.test.ts:140`.
+- ❌ Stocktake + single-item adjustment missing: no `stocktakes`/`stocktake_lines` in `schema.ts`, `inventory.router.ts:1-13` read-only, no جرد page in `apps/web/src/app`. Only `stocktake_surplus` string in `tests/inventory/inventory.service.test.ts:140`.
 - **Fix:** session/count/confirm endpoints + adjustment doc, UI in warehouse, history in reports §14-2.
 
 ### 2.4 Suppliers & purchases (§5) ✅
@@ -292,7 +292,7 @@ Auth correct: cookie-first + Tauri Bearer fallback (`lib/api.ts:22-28`, `lib/aut
 
 ### 🟡 S3 — CORS non-browser bypass; TRUST_PROXY footgun guarded [Low]
 
-- `app.ts:36-42`, `env.ts:8-47`, `docker-compose.yml:68`. `origin:(o,cb)=>cb(null,!o||includes(o))` — curl/no-Origin always passes (normal CORS, not access control). `secure:req.secure` + `trust proxy` gated by `TRUST_PROXY` (default false, compose true). Mis-set without proxy trusts spoofed `X-Forwarded-Proto`. Correct today. Covered `tests/unit/app/app.test.ts:52`.
+- `app.ts:36-42`, `env.ts:8-47`, `docker-compose.yml:68`. `origin:(o,cb)=>cb(null,!o||includes(o))` — curl/no-Origin always passes (normal CORS, not access control). `secure:req.secure` + `trust proxy` gated by `TRUST_PROXY` (default false, compose true). Mis-set without proxy trusts spoofed `X-Forwarded-Proto`. Correct today. Covered `tests/app/app.test.ts:52`.
 - Fix: document CORS ≠ auth.
 
 ### 🟢 S4 — SQLi safe; LIKE wildcards escaped [Low]
@@ -318,7 +318,7 @@ Auth correct: cookie-first + Tauri Bearer fallback (`lib/api.ts:22-28`, `lib/aut
 
 ## 7. Missing tests
 
-Exists: solid unit (schemas, services, rate-limit, env, RBAC 403s, dockerfile-contract) + integration (auth, orders replay+negative flag, refunds discounted-thirds+replay, transfers shift-close race, inventory concurrent consume/receipt, shifts single-slot race, purchases duplicate-invoice race, categories inverse-move deadlock). Web: services/models/architecture/components mapping.
+Exists: solid unit (schemas, services, rate-limit, env, RBAC 403s) + HTTP/MySQL tests (auth, orders replay+negative flag, refunds discounted-thirds+replay, transfers shift-close race, inventory concurrent consume/receipt, shifts single-slot race, purchases duplicate-invoice race, categories inverse-move deadlock). Web: services/models/architecture/components mapping.
 
 Gaps (highest value first):
 
@@ -330,7 +330,7 @@ Gaps (highest value first):
 6. RBAC matrix e2e — cashier blocked `/api/products|/inventory|/purchases|/suppliers|/users` (only spot 403s in users/items/reports/shifts). Products/inventory/purchases/suppliers lack explicit 403 tests. (`/api/expenses` create and `/api/transfers` requests are intentionally cashier-allowed — do not assert 403 there.)
 7. Deadlock-retry orders/refunds — no test (only categories).
 8. Purchases/transfers double-submit — ✅ covered (`purchases.test.ts` / `transfers.test.ts` replay + mismatch; see D5).
-9. Structural (intent): `apps/api/package.json:13` `pnpm test` runs unit only; integration needs live MySQL excluded from default/turbo `test`. No CI / no `.github` by intent — run integration locally against live MySQL with full env instead. Document the local integration command.
+9. Structural: `apps/api/package.json` `pnpm test` runs every `tests/**/*.test.ts` file (mocked and MySQL-backed together). MySQL-backed files import `tests/setup.ts` and need repo-root `.env.test`. No CI / no `.github` by intent.
 
 ---
 
@@ -341,7 +341,7 @@ Gaps (highest value first):
 - `migrate` no healthcheck/completion visibility beyond `service_completed_successfully`; `cache-worker` no healthcheck (silent catalog-stall risk). `api` healthcheck `/health` unauthenticated — fine, document public.
 - `turbo.json`: `test dependsOn ^build` good; `lint`/`typecheck` no `dependsOn` (fine, but web `lint:"eslint"` no path relies on flat-config defaults — verify lints `src`; api lints `src tests` explicitly).
 - `NEXT_PUBLIC_API_URL` baked at build (`dockerfile.web:16-17`, `next.config.ts:25-27`) — change needs rebuild.
-- Good: shared-package contract enforced by tests (`dockerfile.test.ts:41-75`), `api build` builds shared first — keep.
+- Good: `api build` builds shared first — keep.
 
 ---
 
