@@ -224,6 +224,53 @@ export const stockBatches = mysqlTable(
   ],
 );
 
+export const stocktakes = mysqlTable(
+  "stocktakes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    kind: mysqlEnum("kind", ["stocktake", "manual"])
+      .notNull()
+      .default("stocktake"),
+    warehouse: mysqlEnum("warehouse", ["main", "cafe"]).notNull(),
+    categoryId: int("category_id").references(() => categories.id),
+    status: mysqlEnum("status", ["draft", "confirmed"])
+      .notNull()
+      .default("draft"),
+    note: varchar("note", { length: 500 }),
+    createdBy: int("created_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    confirmedAt: timestamp("confirmed_at"),
+  },
+  (table) => [index("stocktakes_created_at_idx").on(table.createdAt)],
+);
+
+export const stocktakeLines = mysqlTable(
+  "stocktake_lines",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    stocktakeId: int("stocktake_id")
+      .notNull()
+      .references(() => stocktakes.id),
+    itemId: int("item_id")
+      .notNull()
+      .references(() => items.id),
+    recordedQuantity: decimal("recorded_quantity", {
+      precision: 14,
+      scale: 3,
+    }).notNull(),
+    countedQuantity: decimal("counted_quantity", { precision: 14, scale: 3 }),
+  },
+  (table) => [
+    uniqueIndex("stocktake_lines_document_item_uidx").on(
+      table.stocktakeId,
+      table.itemId,
+    ),
+    index("stocktake_lines_item_idx").on(table.itemId),
+  ],
+);
+
 export const transferRequests = mysqlTable(
   "transfer_requests",
   {

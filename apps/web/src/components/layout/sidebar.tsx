@@ -24,6 +24,7 @@ import {
   ShoppingCart,
   ShoppingBag,
   ReceiptText,
+  ClipboardCheck,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -40,6 +41,7 @@ const navIcons: Record<NavHref, LucideIcon> = {
   "/orders": ReceiptText,
   "/categories": Tags,
   "/warehouse": Warehouse,
+  "/stocktakes": ClipboardCheck,
   "/cafe": CupSoda,
   "/suppliers": Truck,
   "/purchases": ShoppingCart,

@@ -168,6 +168,35 @@ export type InventoryStockRow = {
   isNegativeStock: boolean;
 };
 
+export type StocktakeStatus = "draft" | "confirmed";
+export type StocktakeKind = "stocktake" | "manual";
+export type StocktakeLine = {
+  id: number;
+  itemId: number;
+  itemCode: number;
+  itemName: string;
+  stockUnit: string;
+  recordedQuantity: string;
+  countedQuantity: string | null;
+  difference: string | null;
+};
+export type StocktakeSummary = {
+  id: number;
+  kind: StocktakeKind;
+  warehouse: Warehouse;
+  categoryId: number | null;
+  status: StocktakeStatus;
+  note: string | null;
+  createdBy: number;
+  createdByName: string;
+  createdAt: string;
+  confirmedAt: string | null;
+  lineCount: number;
+};
+export type StocktakeDetail = Omit<StocktakeSummary, "lineCount"> & {
+  lines: StocktakeLine[];
+};
+
 export type PurchaseUnitMode = "stock" | "purchase";
 
 export type PurchaseInvoiceSummary = {

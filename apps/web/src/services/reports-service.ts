@@ -6,7 +6,12 @@ export type ReportsData = {
     "byDay" | "byProduct" | "byCategory" | "byShift" | "byCashier",
     ReportRow[]
   >;
-  stock: { current: ReportRow[]; lowStock: ReportRow[]; ledger: ReportRow[] };
+  stock: {
+    current: ReportRow[];
+    lowStock: ReportRow[];
+    ledger: ReportRow[];
+    stocktakes: ReportRow[];
+  };
   money: {
     cashFlow: ReportRow[];
     expenseBreakdown: ReportRow[];

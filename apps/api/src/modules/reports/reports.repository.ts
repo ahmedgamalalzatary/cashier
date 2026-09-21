@@ -129,6 +129,18 @@ export class ReportsRepository {
   `);
   }
 
+  stocktakes(from: Date, to: Date) {
+    return this.rows<Record<string, unknown>>(sql`
+      SELECT st.id,st.kind,st.warehouse,st.status,st.note,st.created_at createdAt,st.confirmed_at confirmedAt,
+        u.name createdByName,COUNT(sl.id) lineCount,
+        COALESCE(SUM(CASE WHEN sl.counted_quantity < sl.recorded_quantity THEN sl.recorded_quantity-sl.counted_quantity ELSE 0 END),0) shortageQuantity,
+        COALESCE(SUM(CASE WHEN sl.counted_quantity > sl.recorded_quantity THEN sl.counted_quantity-sl.recorded_quantity ELSE 0 END),0) surplusQuantity
+      FROM stocktakes st JOIN users u ON u.id=st.created_by LEFT JOIN stocktake_lines sl ON sl.stocktake_id=st.id
+      WHERE st.created_at >= ${from} AND st.created_at < ${to}
+      GROUP BY st.id,u.name ORDER BY st.created_at DESC,st.id DESC
+    `);
+  }
+
   cashFlow(from: Date, to: Date, fromDate: string, toDate: string) {
     return this.rows<Record<string, unknown>>(sql`
     SELECT * FROM (

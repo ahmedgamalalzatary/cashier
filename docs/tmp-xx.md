@@ -127,9 +127,9 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 
 ## 14. Stocktake (جرد)
 
-- [ ] `stocktakes` + `stocktake_lines` (per warehouse, all or by category)
-- [ ] Counted vs recorded diff → adjustment doc (shrinkage/surplus via FIFO)
-- [ ] Single-item manual adjustment with note
+- [x] `stocktakes` + `stocktake_lines` (per warehouse, all or by category)
+- [x] Counted vs recorded diff → adjustment doc (shrinkage/surplus via FIFO)
+- [x] Single-item manual adjustment with note
 
 ## 15. Reports & Dashboard
 

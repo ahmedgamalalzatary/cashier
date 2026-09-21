@@ -23,6 +23,8 @@ let itemCodeCounter = 0;
 export const nextTestItemCode = () => (itemCodeCounter += 1);
 
 const tables = [
+  "stocktake_lines",
+  "stocktakes",
   "expenses",
   "expense_categories",
   "waste_allocations",

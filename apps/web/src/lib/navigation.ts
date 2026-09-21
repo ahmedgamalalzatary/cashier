@@ -4,6 +4,7 @@ export const NAV_ITEMS = [
   { href: "/orders", label: "الطلبات" },
   { href: "/categories", label: "التصنيفات", adminOnly: true },
   { href: "/warehouse", label: "المخزن الرئيسي", adminOnly: true },
+  { href: "/stocktakes", label: "الجرد والتسويات", adminOnly: true },
   { href: "/cafe", label: "الكافيه" },
   { href: "/suppliers", label: "الموردين", adminOnly: true },
   { href: "/purchases", label: "المشتريات", adminOnly: true },

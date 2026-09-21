@@ -140,6 +140,20 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
           { key: "referenceType", label: "المرجع", kind: "event" },
         ],
       },
+      {
+        title: "سجل فروقات الجرد والتسويات",
+        rows: d.stock.stocktakes,
+        columns: [
+          number("id", "المستند"),
+          date("createdAt", "التاريخ"),
+          { key: "kind", label: "النوع", kind: "event" },
+          { key: "warehouse", label: "المخزن", kind: "warehouse" },
+          number("lineCount", "الأصناف"),
+          number("shortageQuantity", "العجز"),
+          number("surplusQuantity", "الزيادة"),
+          { key: "createdByName", label: "المسجل" },
+        ],
+      },
     ];
   if (tab === "money")
     return [
