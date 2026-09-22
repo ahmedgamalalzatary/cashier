@@ -191,7 +191,7 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
     return [
       {
         title: "وقت وعمل الكاشير",
-        rows: d.employees,
+        rows: d.employees.activity,
         columns: [
           { key: "name", label: "الموظف" },
           number("shiftsCount", "الورديات"),
@@ -202,6 +202,18 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
           number("wasteCount", "الهالك"),
           number("expensesCount", "المصروفات"),
           number("transferRequestsCount", "طلبات التحويل"),
+        ],
+      },
+      {
+        title: "سجل المرتبات والسلف والتسويات",
+        rows: d.employees.salaryHistory,
+        columns: [
+          date("occurredAt", "التاريخ"),
+          { key: "employeeName", label: "الموظف" },
+          { key: "type", label: "النوع" },
+          money("amount", "المبلغ"),
+          { key: "periodMonth", label: "شهر الاستحقاق" },
+          { key: "note", label: "ملاحظات" },
         ],
       },
     ];

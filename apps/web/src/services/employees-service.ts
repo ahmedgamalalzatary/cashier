@@ -17,6 +17,18 @@ export type CashierAccessBody = {
   password: string;
 };
 
+export function employeePayPayload(
+  payType: EmployeePayType | "",
+  payRate: string,
+): Pick<EmployeeSaveBody, "payType" | "payRate"> {
+  return payType === "monthly"
+    ? {
+        payType: "monthly",
+        payRate: payRate === "" ? null : Number(payRate),
+      }
+    : { payType: null, payRate: null };
+}
+
 export const listEmployees = () => api<Employee[]>("/api/employees");
 
 export const createEmployee = (body: EmployeeSaveBody) =>

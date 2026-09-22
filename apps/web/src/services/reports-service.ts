@@ -17,7 +17,7 @@ export type ReportsData = {
     expenseBreakdown: ReportRow[];
     shiftOverShort: ReportRow[];
   };
-  employees: ReportRow[];
+  employees: { activity: ReportRow[]; salaryHistory: ReportRow[] };
   wasteAndRefunds: {
     waste: ReportRow[];
     wasteSummary: ReportRow[];

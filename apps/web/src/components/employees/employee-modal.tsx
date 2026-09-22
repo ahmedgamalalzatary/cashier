@@ -7,6 +7,7 @@ import { Field, TextAreaField } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 import {
   createEmployee,
+  employeePayPayload,
   updateEmployee,
   type EmployeeSaveBody,
 } from "@/services/employees-service";
@@ -41,8 +42,7 @@ export function EmployeeModal({
       phone: phone.trim() || null,
       jobTitle: jobTitle.trim() || null,
       hireDate: hireDate || null,
-      payType: payType || null,
-      payRate: payType && payRate !== "" ? Number(payRate) : null,
+      ...employeePayPayload(payType, payRate),
       notes: notes.trim() || null,
     };
     try {
@@ -105,19 +105,33 @@ export function EmployeeModal({
             >
               <option value="">غير محدد</option>
               <option value="monthly">شهري</option>
-              <option value="daily">يومي</option>
-              <option value="hourly">بالساعة</option>
+              {employee?.payType === "daily" && (
+                <option value="daily" disabled>
+                  يومي (قديم — غيّره إلى شهري)
+                </option>
+              )}
+              {employee?.payType === "hourly" && (
+                <option value="hourly" disabled>
+                  بالساعة (قديم — غيّره إلى شهري)
+                </option>
+              )}
             </select>
           </label>
+          {(payType === "daily" || payType === "hourly") && (
+            <p className="self-end text-sm leading-6 text-warning">
+              نوع الأجر القديم سيُمسح عند الحفظ. اختر «شهري» وأدخل الراتب الشهري
+              للاحتفاظ ببيانات الراتب.
+            </p>
+          )}
           <Field
-            label="قيمة الأجر"
+            label="الراتب الشهري"
             type="number"
             min="0"
             step="0.01"
             value={payRate}
             onChange={(event) => setPayRate(event.target.value)}
-            required={Boolean(payType)}
-            disabled={!payType}
+            required={payType === "monthly"}
+            disabled={payType !== "monthly"}
             dir="ltr"
           />
         </div>

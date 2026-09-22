@@ -39,7 +39,7 @@ const employeeFields = z.object({
     (value) => (value === "" ? null : value),
     calendarDate.nullish(),
   ),
-  payType: z.enum(["monthly", "daily", "hourly"]).nullish(),
+  payType: z.literal("monthly").nullish(),
   payRate: payRate.nullish(),
   notes: optionalText(2000),
 });
@@ -63,7 +63,11 @@ export const employeeInput = employeeFields.superRefine((data, context) => {
 
 export type EmployeeInput = z.infer<typeof employeeInput>;
 
-export const employeeUpdateInput = employeeFields
+const employeeUpdateFields = employeeFields.extend({
+  payType: z.enum(["monthly", "daily", "hourly"]).nullish(),
+});
+
+export const employeeUpdateInput = employeeUpdateFields
   .partial()
   .extend({ isActive: z.literal(true).optional() })
   .superRefine((data, context) => {

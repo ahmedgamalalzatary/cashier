@@ -15,9 +15,7 @@ const base = {
 describe("employee schemas", () => {
   it("requires pay type and rate together", () => {
     expect(employeeInput.parse(base)).toMatchObject({ payType: "monthly" });
-    expect(
-      employeeInput.safeParse({ name: "أحمد" }).success,
-    ).toBe(true);
+    expect(employeeInput.safeParse({ name: "أحمد" }).success).toBe(true);
     expect(
       employeeInput.safeParse({ ...base, payType: undefined }).success,
     ).toBe(false);
@@ -26,19 +24,26 @@ describe("employee schemas", () => {
     ).toBe(false);
   });
 
+  it("accepts monthly salaries only", () => {
+    expect(employeeInput.safeParse({ ...base, payType: "daily" }).success).toBe(
+      false,
+    );
+    expect(
+      employeeInput.safeParse({ ...base, payType: "hourly" }).success,
+    ).toBe(false);
+  });
+
   it("validates hire dates and pay-rate cents", () => {
     expect(
       employeeInput.safeParse({ ...base, hireDate: "2026-02-30" }).success,
     ).toBe(false);
+    expect(employeeInput.parse({ ...base, hireDate: "" }).hireDate).toBeNull();
     expect(
-      employeeInput.parse({ ...base, hireDate: "" }).hireDate,
-    ).toBeNull();
-    expect(employeeInput.parse({ ...base, hireDate: "2026-02-28" }).hireDate).toBe(
-      "2026-02-28",
+      employeeInput.parse({ ...base, hireDate: "2026-02-28" }).hireDate,
+    ).toBe("2026-02-28");
+    expect(employeeInput.safeParse({ ...base, payRate: 10.123 }).success).toBe(
+      false,
     );
-    expect(
-      employeeInput.safeParse({ ...base, payRate: 10.123 }).success,
-    ).toBe(false);
   });
 
   it("rejects empty updates and deactivation through PUT", () => {
@@ -50,8 +55,11 @@ describe("employee schemas", () => {
       isActive: true,
     });
     expect(
-      employeeUpdateInput.safeParse({ payType: "daily" }).success,
-    ).toBe(false);
+      employeeUpdateInput.parse({ payType: "daily", payRate: 200 }),
+    ).toEqual({ payType: "daily", payRate: 200 });
+    expect(
+      employeeUpdateInput.parse({ payType: "hourly", payRate: 30 }),
+    ).toEqual({ payType: "hourly", payRate: 30 });
   });
 
   it("validates cashier access and id params", () => {
@@ -60,8 +68,10 @@ describe("employee schemas", () => {
         .success,
     ).toBe(false);
     expect(
-      cashierAccessInput.parse({ username: "cashier-1", password: "secret-123" })
-        .username,
+      cashierAccessInput.parse({
+        username: "cashier-1",
+        password: "secret-123",
+      }).username,
     ).toBe("cashier-1");
     expect(employeeIdParam.safeParse(0).success).toBe(false);
     expect(employeeIdParam.safeParse("abc").success).toBe(false);

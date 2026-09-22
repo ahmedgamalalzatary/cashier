@@ -42,6 +42,52 @@ export type Employee = {
   createdAt: string;
 };
 
+export type SalaryAdjustmentType = "bonus" | "deduction";
+export type SalaryAdvance = {
+  id: number;
+  employeeId: number;
+  employeeName: string;
+  amount: string;
+  entryDate: string;
+  note: string | null;
+  recordedByName: string;
+  createdAt: string;
+};
+export type SalaryAdjustment = SalaryAdvance & { type: SalaryAdjustmentType };
+export type SalaryPayment = {
+  id: number;
+  employeeId: number;
+  employeeName: string;
+  periodMonth: string;
+  basePay: string;
+  bonuses: string;
+  deductions: string;
+  advances: string;
+  netPay: string;
+  paidByName: string;
+  paidAt: string;
+};
+export type SalaryMonthEmployee = {
+  employeeId: number;
+  employeeName: string;
+  isActive: boolean;
+  payType: EmployeePayType | null;
+  payRate: string | null;
+  basePay: string | null;
+  bonuses: string;
+  deductions: string;
+  advances: string;
+  netPay: string | null;
+  payment: SalaryPayment | null;
+};
+export type SalaryMonth = {
+  month: string;
+  employees: SalaryMonthEmployee[];
+  advances: SalaryAdvance[];
+  adjustments: SalaryAdjustment[];
+  payments: SalaryPayment[];
+};
+
 export type ShiftTotals = {
   ordersCount: number;
   sales: string;

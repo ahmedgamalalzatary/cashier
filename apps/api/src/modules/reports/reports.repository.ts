@@ -148,6 +148,8 @@ export class ReportsRepository {
       UNION ALL SELECT created_at,'refund',CONCAT('#',id),-amount FROM refunds WHERE created_at >= ${from} AND created_at < ${to}
       UNION ALL SELECT CONCAT(expense_date,' 12:00:00'),'expense',CONCAT('#',id),-amount FROM expenses WHERE expense_date BETWEEN ${fromDate} AND ${toDate}
       UNION ALL SELECT CONCAT(paid_at,' 12:00:00'),'supplier_payment',CONCAT('#',id),-amount FROM supplier_payments WHERE paid_at BETWEEN ${fromDate} AND ${toDate}
+      UNION ALL SELECT paid_at,'salary_payment',CONCAT('#',id),-net_pay FROM salary_payments WHERE paid_at >= ${from} AND paid_at < ${to}
+      UNION ALL SELECT CONCAT(entry_date,' 12:00:00'),'salary_advance',CONCAT('#',id),-amount FROM salary_advances WHERE entry_date BETWEEN ${fromDate} AND ${toDate}
     ) x ORDER BY occurredAt DESC
   `);
   }
@@ -172,6 +174,19 @@ export class ReportsRepository {
     FROM employees e LEFT JOIN shifts s ON s.employee_id=e.id AND s.opened_at < ${to} AND COALESCE(s.closed_at,CURRENT_TIMESTAMP) >= ${from}
     GROUP BY e.id,e.name ORDER BY e.name
   `);
+  }
+
+  salaryHistory(from: Date, to: Date, fromDate: string, toDate: string) {
+    return this.rows<Record<string, unknown>>(sql`
+      SELECT * FROM (
+        SELECT sp.paid_at occurredAt,e.name employeeName,'payment' type,sp.net_pay amount,sp.period_month periodMonth,NULL note
+        FROM salary_payments sp JOIN employees e ON e.id=sp.employee_id WHERE sp.paid_at >= ${from} AND sp.paid_at < ${to}
+        UNION ALL SELECT CONCAT(sa.entry_date,' 12:00:00'),e.name,'advance',sa.amount,NULL,sa.note
+        FROM salary_advances sa JOIN employees e ON e.id=sa.employee_id WHERE sa.entry_date BETWEEN ${fromDate} AND ${toDate}
+        UNION ALL SELECT CONCAT(sj.entry_date,' 12:00:00'),e.name,sj.type,sj.amount,NULL,sj.note
+        FROM salary_adjustments sj JOIN employees e ON e.id=sj.employee_id WHERE sj.entry_date BETWEEN ${fromDate} AND ${toDate}
+      ) x ORDER BY occurredAt DESC
+    `);
   }
 
   waste(from: Date, to: Date) {

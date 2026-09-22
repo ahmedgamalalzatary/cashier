@@ -21,6 +21,7 @@ import { createExpensesModule } from "./modules/expenses/expenses.module.js";
 import { createReportsModule } from "./modules/reports/reports.module.js";
 import { createProductsModule } from "./modules/products/products.module.js";
 import { createStocktakesModule } from "./modules/stocktakes/stocktakes.module.js";
+import { createSalariesModule } from "./modules/salaries/salaries.module.js";
 
 export type AppOptions = {
   jwtSecret: string;
@@ -79,6 +80,7 @@ export function createApp(
   );
   app.use("/api/users", ...adminOnly, createUsersModule(db));
   app.use("/api/employees", ...adminOnly, createEmployeesModule(db));
+  app.use("/api/salaries", ...adminOnly, createSalariesModule(db));
   app.use("/api/reports", ...adminOnly, createReportsModule(db));
   app.use("/api/stocktakes", ...adminOnly, createStocktakesModule(db));
   app.use(

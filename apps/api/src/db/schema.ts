@@ -46,6 +46,86 @@ export const users = mysqlTable(
   (table) => [uniqueIndex("users_employee_id_uidx").on(table.employeeId)],
 );
 
+export const salaryAdvances = mysqlTable(
+  "salary_advances",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    employeeId: int("employee_id")
+      .notNull()
+      .references(() => employees.id),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    entryDate: date("entry_date", { mode: "string" }).notNull(),
+    note: varchar("note", { length: 500 }),
+    recordedBy: int("recorded_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("salary_advances_employee_date_idx").on(
+      table.employeeId,
+      table.entryDate,
+    ),
+    check("salary_advances_amount_positive_chk", sql`${table.amount} > 0`),
+  ],
+);
+
+export const salaryAdjustments = mysqlTable(
+  "salary_adjustments",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    employeeId: int("employee_id")
+      .notNull()
+      .references(() => employees.id),
+    type: mysqlEnum("type", ["bonus", "deduction"]).notNull(),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    entryDate: date("entry_date", { mode: "string" }).notNull(),
+    note: varchar("note", { length: 500 }),
+    recordedBy: int("recorded_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("salary_adjustments_employee_date_idx").on(
+      table.employeeId,
+      table.entryDate,
+    ),
+    check("salary_adjustments_amount_positive_chk", sql`${table.amount} > 0`),
+  ],
+);
+
+export const salaryPayments = mysqlTable(
+  "salary_payments",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    employeeId: int("employee_id")
+      .notNull()
+      .references(() => employees.id),
+    periodMonth: date("period_month", { mode: "string" }).notNull(),
+    basePay: decimal("base_pay", { precision: 12, scale: 2 }).notNull(),
+    bonuses: decimal("bonuses", { precision: 12, scale: 2 }).notNull(),
+    deductions: decimal("deductions", { precision: 12, scale: 2 }).notNull(),
+    advances: decimal("advances", { precision: 12, scale: 2 }).notNull(),
+    netPay: decimal("net_pay", { precision: 12, scale: 2 }).notNull(),
+    paidBy: int("paid_by")
+      .notNull()
+      .references(() => users.id),
+    paidAt: timestamp("paid_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("salary_payments_employee_month_uidx").on(
+      table.employeeId,
+      table.periodMonth,
+    ),
+    index("salary_payments_paid_at_idx").on(table.paidAt),
+    check(
+      "salary_payments_amounts_nonnegative_chk",
+      sql`${table.basePay} >= 0 AND ${table.bonuses} >= 0 AND ${table.deductions} >= 0 AND ${table.advances} >= 0 AND ${table.netPay} >= 0`,
+    ),
+  ],
+);
+
 // two levels only: main (parentId null) → sub (parentId = a main category)
 export const categories = mysqlTable(
   "categories",

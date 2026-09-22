@@ -7,6 +7,7 @@ import {
   listEmployees,
   revokeCashierAccess,
   updateEmployee,
+  employeePayPayload,
 } from "../../src/services/employees-service";
 
 vi.mock("../../src/lib/api", () => ({ api: vi.fn() }));
@@ -36,5 +37,24 @@ describe("employees service", () => {
       ["/api/employees/4/cashier-access", { method: "DELETE" }],
       ["/api/employees/4", { method: "DELETE" }],
     ]);
+  });
+
+  it("normalizes legacy employee pay fields before saving", () => {
+    expect(employeePayPayload("daily", "200.00")).toEqual({
+      payType: null,
+      payRate: null,
+    });
+    expect(employeePayPayload("hourly", "30.00")).toEqual({
+      payType: null,
+      payRate: null,
+    });
+    expect(employeePayPayload("monthly", "5000.25")).toEqual({
+      payType: "monthly",
+      payRate: 5000.25,
+    });
+    expect(employeePayPayload("monthly", "")).toEqual({
+      payType: "monthly",
+      payRate: null,
+    });
   });
 });
