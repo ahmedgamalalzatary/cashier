@@ -4,9 +4,17 @@ const coerceNumber = (value: unknown) =>
   typeof value === "string" || typeof value === "number"
     ? Number(value)
     : value;
+const coerceQuantity = (value: unknown) => {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") {
+    if (value.trim() === "") return Number.NaN;
+    return Number(value);
+  }
+  return value;
+};
 const id = z.preprocess(coerceNumber, z.number().int().positive());
 const quantity = z
-  .preprocess(coerceNumber, z.number().min(0).max(99_999_999_999.999))
+  .preprocess(coerceQuantity, z.number().min(0).max(99_999_999_999.999))
   .refine(
     (value) => Math.abs(value - Number(value.toFixed(3))) < 1e-9,
     "الكمية لا تقبل أكثر من ثلاث خانات عشرية",

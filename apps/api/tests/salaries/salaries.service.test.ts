@@ -164,6 +164,71 @@ describe("SalariesService", () => {
     });
   });
 
+  it("keeps payday arithmetic on integer cents so 0.30 minus 0.10 minus 0.20 stays payable", async () => {
+    const { service } = repository({
+      employeeForUpdate: vi.fn(async () => ({
+        id: 1,
+        name: "أحمد",
+        payType: "monthly",
+        payRate: "0.30",
+      })),
+      monthEntries: vi.fn(async () => ({
+        advances: [],
+        settledAdvances: "0.00",
+        adjustments: [
+          { type: "deduction", amount: "0.10" },
+          { type: "deduction", amount: "0.20" },
+        ],
+      })),
+    });
+    await expect(service.preview(1, "2026-09")).resolves.toMatchObject({
+      basePay: "0.30",
+      deductions: "0.30",
+      advances: "0.00",
+      netPay: "0.00",
+    });
+  });
+
+  it("rejects payday for a month on or before the latest paid month", async () => {
+    const { service, tx } = repository({
+      latestPaymentForEmployee: vi.fn(async () => ({
+        periodMonth: "2026-09-01",
+      })),
+    });
+    await expect(service.pay(1, "2026-08", 9)).rejects.toMatchObject({
+      status: 409,
+    });
+    expect(tx.createPayment).not.toHaveBeenCalled();
+  });
+
+  it("lists an unpaid earlier month as not payable after a later month is paid", async () => {
+    const { repo, service } = repository();
+    vi.mocked(repo.latestPaymentForEmployee).mockResolvedValue({
+      periodMonth: "2026-09-01",
+    });
+    vi.mocked(repo.listEmployees).mockResolvedValue([
+      {
+        id: 1,
+        name: "أحمد",
+        isActive: true,
+        payType: "monthly",
+        payRate: "5000.00",
+      },
+    ]);
+
+    await expect(service.month("2026-08")).resolves.toMatchObject({
+      employees: [
+        {
+          employeeId: 1,
+          employeeName: "أحمد",
+          basePay: null,
+          netPay: null,
+          payment: null,
+        },
+      ],
+    });
+  });
+
   it("does not hide non-409 month calculation failures", async () => {
     const { repo, service } = repository({
       monthEntries: vi.fn(async () => {

@@ -32,7 +32,8 @@ curl --fail --head http://127.0.0.1:3010/
 
 The API response should be `{"ok":true}`; `/health` is intentionally unauthenticated and safe to expose on its loopback port. The `migrate` service should show `Exited (0)` after completing; that is its normal healthy state.
 
-`migrate` and `cache-worker` have liveness healthchecks. `migrate` reports `healthy` only while its `drizzle-kit migrate` process is actually running — normal runs finish in seconds and show `Exited (0)`, while `unhealthy` means the container kept running for over a minute with no migration process (check its logs). `cache-worker` reports `healthy` while its `node dist/worker.js` process is alive; `unhealthy` means that process died while the container still ran — check `docker compose --env-file .env.production logs cache-worker`. These probes see a dead process, not a wedged one: a worker alive but stuck on a hung request still reports `healthy`.
+`migrate` and `cache-worker` have liveness healthchecks (`node scripts/process-liveness.cjs`). `migrate` reports `healthy` only while another process has `drizzle-kit` as an argument — normal runs finish in seconds and show `Exited (0)`, while `unhealthy` means the container kept running for over a minute with no migration process (check its logs). `cache-worker` reports `healthy` while another process has `dist/worker.js` as an argument; `unhealthy` means that process died while the container still ran — check `docker compose --env-file .env.production logs cache-worker`. Each probe ignores its own process and ignores `node -e` scripts whose source text mentions the marker, so the healthcheck cannot mark the service healthy by matching itself. These probes see a dead process, not a wedged one: a worker alive but stuck on a hung request still reports `healthy`.
+
 
 ## Deploy an update
 

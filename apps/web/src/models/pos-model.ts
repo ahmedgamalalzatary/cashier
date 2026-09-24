@@ -124,20 +124,11 @@ export function addCatalogSelection(
     return cart;
   }
 
-  let price = stringToScaled(size?.price ?? product.price, 2);
-  if (
-    isExternalDiscountActive(
-      product.discountPercentage,
-      product.discountStart,
-      product.discountEnd,
-      nowMs,
-    )
-  ) {
-    price -= roundDivide(
-      price * stringToScaled(product.discountPercentage!, 2),
-      BigInt(10_000),
-    );
-  }
+  let price = discountedListPriceCents(
+    size?.price ?? product.price,
+    product,
+    nowMs,
+  );
   const modifiers = normalizedModifiers
     .map((selection) => {
       const option = options.get(selection.externalModifierOptionId)!;
@@ -317,20 +308,12 @@ export function defaultExternalSize(product: ExternalProduct) {
   return defaults.length === 1 ? defaults[0]!.externalId : null;
 }
 
-/**
- * Price shown on a POS catalog tile: the default size when the product defines
- * one, otherwise the cheapest size, with any active discount applied so the
- * tile matches what the cart and the server will charge.
- */
-export function catalogTilePrice(product: ExternalProduct, nowMs: number) {
-  const defaultSizeId = defaultExternalSize(product);
-  const base =
-    product.sizes.find((size) => size.externalId === defaultSizeId)?.price ??
-    product.sizes
-      .map((size) => size.price)
-      .sort((a, b) => Number(a) - Number(b))[0] ??
-    product.price;
-  let price = stringToScaled(base, 2);
+function discountedListPriceCents(
+  listPrice: string,
+  product: ExternalProduct,
+  nowMs: number,
+) {
+  let price = stringToScaled(listPrice, 2);
   if (
     isExternalDiscountActive(
       product.discountPercentage,
@@ -344,5 +327,33 @@ export function catalogTilePrice(product: ExternalProduct, nowMs: number) {
       BigInt(10_000),
     );
   }
-  return formatScaled(price, 2);
+  return price;
+}
+
+/**
+ * Price shown on a POS size button: that size's list price with any active
+ * catalog discount, matching what the cart charges for the size.
+ */
+export function catalogSizePrice(
+  product: ExternalProduct,
+  size: { price: string },
+  nowMs: number,
+) {
+  return formatScaled(discountedListPriceCents(size.price, product, nowMs), 2);
+}
+
+/**
+ * Price shown on a POS catalog tile: the default size when the product defines
+ * one, otherwise the cheapest size, with any active discount applied so the
+ * tile matches what the cart and the server will charge.
+ */
+export function catalogTilePrice(product: ExternalProduct, nowMs: number) {
+  const defaultSizeId = defaultExternalSize(product);
+  const base =
+    product.sizes.find((size) => size.externalId === defaultSizeId)?.price ??
+    product.sizes
+      .map((size) => size.price)
+      .sort((a, b) => Number(a) - Number(b))[0] ??
+    product.price;
+  return formatScaled(discountedListPriceCents(base, product, nowMs), 2);
 }

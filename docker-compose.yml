@@ -51,8 +51,8 @@ services:
       test:
         - CMD
         - node
-        - -e
-        - let ok=false;for(const d of require('fs').readdirSync('/proc')){if(!/^\d+$/.test(d))continue;try{if(require('fs').readFileSync('/proc/'+d+'/cmdline','utf8').includes('drizzle-kit')){ok=true;break}}catch{}}process.exit(ok?0:1)
+        - scripts/process-liveness.cjs
+        - drizzle-kit
       interval: 10s
       timeout: 5s
       retries: 3
@@ -122,8 +122,8 @@ services:
       test:
         - CMD
         - node
-        - -e
-        - let ok=false;for(const d of require('fs').readdirSync('/proc')){if(!/^\d+$/.test(d))continue;try{if(require('fs').readFileSync('/proc/'+d+'/cmdline','utf8').includes('dist/worker.js')){ok=true;break}}catch{}}process.exit(ok?0:1)
+        - scripts/process-liveness.cjs
+        - dist/worker.js
       interval: 15s
       timeout: 5s
       retries: 5

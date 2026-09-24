@@ -8,9 +8,10 @@ function range(month: string) {
   d.setUTCMonth(d.getUTCMonth() + 1);
   return { start, end: d.toISOString().slice(0, 10) };
 }
+const cents = (value: string | number) => Math.round(Number(value) * 100);
 const sum = (rows: Array<{ amount: string }>) =>
-  rows.reduce((total, row) => total + Number(row.amount), 0);
-const money = (value: number) => value.toFixed(2);
+  rows.reduce((total, row) => total + cents(row.amount), 0);
+const money = (valueCents: number) => (valueCents / 100).toFixed(2);
 
 export class SalariesService {
   constructor(private repo: SalariesRepository) {}
@@ -34,10 +35,10 @@ export class SalariesService {
     const deductions = sum(
       entries.adjustments.filter((row) => row.type === "deduction"),
     );
-    const advances = sum(entries.advances) - Number(entries.settledAdvances);
+    const advances = sum(entries.advances) - cents(entries.settledAdvances);
     if (advances < 0)
       throw new HttpError(409, "بيانات السلف السابقة غير متسقة مع الدفعات");
-    const basePay = Number(employee.payRate);
+    const basePay = cents(employee.payRate);
     const netPay = basePay + bonuses - deductions - advances;
     if (netPay < 0)
       throw new HttpError(409, "صافي الراتب سالب؛ راجع الخصومات والسلف");
@@ -84,6 +85,21 @@ export class SalariesService {
               payment,
             };
           if (employee.payType !== "monthly" || employee.payRate === null)
+            return {
+              employeeId: employee.id,
+              employeeName: employee.name,
+              isActive: employee.isActive,
+              payType: employee.payType,
+              payRate: employee.payRate,
+              basePay: null,
+              bonuses: "0.00",
+              deductions: "0.00",
+              advances: "0.00",
+              netPay: null,
+              payment: null,
+            };
+          const latest = await this.repo.latestPaymentForEmployee(employee.id);
+          if (latest && latest.periodMonth.slice(0, 7) >= month)
             return {
               employeeId: employee.id,
               employeeName: employee.name,
@@ -160,6 +176,9 @@ export class SalariesService {
       const c = await this.calculation(employeeId, month, true, repo);
       if (await repo.paymentForMonth(employeeId, periodMonth))
         throw new HttpError(409, "تم صرف راتب هذا الشهر بالفعل");
+      const latest = await repo.latestPaymentForEmployee(employeeId, true);
+      if (latest && latest.periodMonth.slice(0, 7) >= month)
+        throw new HttpError(409, "لا يمكن صرف شهر سابق لشهر تم صرفه");
       const id = await repo.createPayment({
         employeeId,
         periodMonth,

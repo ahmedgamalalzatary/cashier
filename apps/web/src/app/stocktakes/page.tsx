@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Field, TextAreaField } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table } from "@/components/ui/table";
+import { countedLinesFromDraft } from "@/models/stocktake-model";
 import { listCategories } from "@/services/categories-service";
 import {
   getCafeWarehouseStock,
@@ -93,34 +94,16 @@ export default function StocktakesPage() {
   const saveCounts = () =>
     run(async () => {
       if (!active) return;
-      const lines = active.lines.map((line) => ({
-        itemId: line.itemId,
-        countedQuantity: Number(line.countedQuantity),
-      }));
-      if (
-        lines.some(
-          (line) =>
-            !Number.isFinite(line.countedQuantity) || line.countedQuantity < 0,
-        )
-      )
-        throw new Error("أدخل الكمية الفعلية لكل صنف");
-      setActive(await updateStocktakeCounts(active.id, lines));
+      const counted = countedLinesFromDraft(active.lines);
+      if (!counted.ok) throw new Error("أدخل الكمية الفعلية لكل صنف");
+      setActive(await updateStocktakeCounts(active.id, counted.lines));
     });
   const confirm = () =>
     run(async () => {
       if (!active || !note.trim()) throw new Error("اكتب سبب اعتماد الجرد");
-      const lines = active.lines.map((line) => ({
-        itemId: line.itemId,
-        countedQuantity: Number(line.countedQuantity),
-      }));
-      if (
-        lines.some(
-          (line) =>
-            !Number.isFinite(line.countedQuantity) || line.countedQuantity < 0,
-        )
-      )
-        throw new Error("أدخل الكمية الفعلية لكل صنف");
-      await updateStocktakeCounts(active.id, lines);
+      const counted = countedLinesFromDraft(active.lines);
+      if (!counted.ok) throw new Error("أدخل الكمية الفعلية لكل صنف");
+      await updateStocktakeCounts(active.id, counted.lines);
       const confirmed = await confirmStocktake(active.id, note.trim());
       setActive(confirmed);
       await load();

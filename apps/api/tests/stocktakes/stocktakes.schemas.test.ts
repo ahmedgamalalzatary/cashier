@@ -38,6 +38,16 @@ describe("stocktake schemas", () => {
         lines: [{ itemId: 7, countedQuantity: 1.0005 }],
       }),
     ).toThrow();
+    expect(() =>
+      updateStocktakeCountsInput.parse({
+        lines: [{ itemId: 7, countedQuantity: "" }],
+      }),
+    ).toThrow();
+    expect(() =>
+      updateStocktakeCountsInput.parse({
+        lines: [{ itemId: 7, countedQuantity: "   " }],
+      }),
+    ).toThrow();
     expect(() => confirmStocktakeInput.parse({ note: " " })).toThrow();
     expect(() =>
       manualAdjustmentInput.parse({

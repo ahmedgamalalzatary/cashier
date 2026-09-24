@@ -92,7 +92,7 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 ### Stocktake (جرد)
 
 - Admin starts a stocktake session for a warehouse (all items or a selected category).
-- Enters actual counted quantities; system shows difference vs. recorded stock.
+- Enters actual counted quantities; system shows difference vs. recorded stock. Every line needs a typed count before save or confirm; an empty box is missing, not zero. Typed `0` means the shelf is empty.
 - Confirming saves an **adjustment document** (with reason note): shortages consume FIFO batches and are reported as **shrinkage**; surpluses create a batch at current FIFO cost and are reported as **surplus**.
 - Admin can also make a single-item manual adjustment with a note (same mechanics).
 
@@ -178,7 +178,8 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 - **Advances (سلف):** recorded any time; cash out immediately (appears in cash-flow); accumulates against the employee until payday.
 - **Bonuses / deductions:** dated entries with amounts and notes.
 - **Payday screen:** for a chosen period per employee —
-  `net = computed pay + bonuses − deductions − advances` → confirm to record the salary payment. Full salary history retained.
+  `net = computed pay + bonuses − deductions − advances` → confirm to record the salary payment. Full salary history retained. Payday is one calendar month at a time. A month on or before the latest paid month cannot be paid; the payday screen shows those months as not payable. Net pay is computed in integer cents so two-decimal amounts do not drift.
+
 
 ---
 

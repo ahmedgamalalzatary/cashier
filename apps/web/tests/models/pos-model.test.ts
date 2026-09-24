@@ -3,6 +3,7 @@ import type { CurrentShift, ExternalProduct } from "@cashier/shared";
 import {
   addCatalogSelection,
   cartLineTotal,
+  catalogSizePrice,
   catalogTilePrice,
   cartTotals,
   defaultExternalSize,
@@ -191,6 +192,17 @@ describe("POS model", () => {
     expect(catalogTilePrice(product, nowMs)).toBe("90.00");
     expect(
       catalogTilePrice({ ...product, discountPercentage: null }, nowMs),
+    ).toBe("100.00");
+  });
+
+  it("shows the same discounted price on a size button as the cart will charge", () => {
+    expect(catalogSizePrice(product, product.sizes[0]!, nowMs)).toBe("90.00");
+    expect(
+      catalogSizePrice(
+        { ...product, discountPercentage: null },
+        product.sizes[0]!,
+        nowMs,
+      ),
     ).toBe("100.00");
   });
 

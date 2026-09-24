@@ -2,6 +2,8 @@
 
 Locked scope per [system-specs.md](system-specs.md). Order goes foundation → dependencies → money screens → reporting.
 
+Reticked 2026-09-24 against the running code. Remaining gaps are tracked in [audit-report.md](audit-report.md).
+
 ## 0. Foundations ✅
 
 - [x] Monorepo (pnpm + Turborepo), Next.js web, Express api, shared package
@@ -56,21 +58,22 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 - [x] Atomic main → cafe stock move with original FIFO batch costs
 - [x] Cafe stock, request review, transfer history, and transfer detail screens
 
-## 6. Recipes ✅
+## 6. Recipes ⚠️ Partial
 
 - [x] `recipes` + `recipe_sizes` + `recipe_ingredients`
-- [x] Recipe products with size variants (S/M/L, own price + quantities)
+- [ ] Sellable recipe products with size selling prices (create is `prepared` only; the recipes “products” tab is the external catalog)
 - [x] Sub-recipes (prepared items) + "prepare batch" action (`preparations`)
-- [x] Live FIFO ingredient cost + margin per size
+- [ ] Live cost-% / margin next to selling price (`RecipeMargin` unused). Prepared recipes show FIFO unit cost
 - [x] Atomic cafe FIFO consumption, costed prepared-output batches, and immutable preparation allocation history
 - [x] Admin recipe/preparation screens with lifecycle controls and shortage visibility
 
-## 7. POS (Sales)
+## 7. POS (Sales) ⚠️ Partial
 
 - [x] `orders` + `order_lines` (price + FIFO cost snapshot)
-- [x] POS screen: category tabs → product grid → cart → cash + change
+- [ ] Internal main/sub tabs plus a flat external group. Current POS is a flat external-catalog chip list → product grid → cart → cash + change
 - [x] Discounts (percent / fixed, logged per cashier)
-- [x] Stock deduction from cafe (recipes → ingredients, as-is → item)
+- [x] Catalog size buttons, tiles, and cart show the same discounted catalog price
+- [ ] Cafe stock deduction for `recipe` / `item` lines. Current sales are `external_product` only and deduct mapped external ingredients
 - [x] Negative-stock flag (sale never blocked)
 - [x] 80mm Arabic thermal receipt (auto-print + reprint)
 
@@ -80,7 +83,7 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 - [x] Each shift records the authenticated cashier user and linked employee
 - [x] Cashier-only open with counted float; admin cannot open
 - [x] Shift screen: worked duration and running order, sales, discount, and transfer-request totals
-- [x] Refund, expense, and waste total fields are ready for their later modules
+- [x] Shift screen running totals include refunds, expenses, and waste entries
 - [x] Close with counted drawer → expected vs actual → over/short per cashier
 - [x] Orders blocked unless the authenticated cashier owns the open shift
 - [x] Cashier transfer requests blocked without the cashier's open shift and linked to it
@@ -92,15 +95,15 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 
 - [x] `refunds` + `refund_lines` (against original order, full or per line)
 - [x] Cash refund reduces current shift expected drawer
-- [x] As-is items: return to stock or mark as waste; recipes stay consumed
+- [x] External / as-is lines: return to stock or mark as waste; recipe lines (if present) stay consumed. Live sales currently produce `external_product` only
 - [x] Reason logging + immutable refund history ready for the reports feed
 
-## 10. Waste ✅
+## 10. Waste ⚠️ Partial
 
 - [x] Refund-linked cafe `waste_entries` foundation (item, qty, reason, exact source-allocation FIFO cost)
 - [x] General `waste_entries` support (warehouse, item or recipe product, qty, reason, FIFO cost)
 - [x] Cashier: cafe waste only with an owned open shift; admin: anywhere
-- [x] Recipe-product waste deducts ingredients atomically
+- [ ] Waste of a sellable recipe product (catalog currently lists prepared recipes and deducts their formula)
 
 ## 11. Expenses ✅
 
@@ -110,7 +113,7 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 
 ## 12. Employees & Cashier Work Time
 
-- [x] `employees` (profile, pay type/rate, notes, active flag; no PIN)
+- [x] `employees` (profile, monthly pay type/rate on create, notes, active flag; no PIN). Daily/hourly remain in spec/DB; payday is monthly-only
 - [x] Employees have no login access by default; admin can grant/revoke cashier access
 - [x] One-to-one employee ↔ user link (required for cashier users) with preserved employee history
 - [x] Existing cashier users are migrated to linked employee records
@@ -118,29 +121,32 @@ Locked scope per [system-specs.md](system-specs.md). Order goes foundation → d
 - [x] Cashier shift open/close provides worked-time tracking
 - [x] Non-cashier employees have no login, PIN, attendance, or worked-hours tracking
 
-## 13. Salaries
+## 13. Salaries ⚠️ Partial
 
-- [ ] Salary calculations for monthly / daily / hourly pay types (automatic worked hours only for cashiers from shifts)
-- [ ] `salary_advances` (cash out immediately) + `salary_adjustments` (bonus/deduction)
-- [ ] Payday screen: net = pay + bonuses − deductions − advances → `salary_payments`
-- [ ] Salary history per employee
+- [x] Monthly salary calculations and payday (`net = monthly pay + bonuses − deductions − advances` → `salary_payments`; integer cents; cannot pay a month on or before the latest paid month)
 
-## 14. Stocktake (جرد)
+- [ ] Daily / hourly computed pay (schema enum still has those types; payday 409s unless monthly)
+- [x] `salary_advances` (cash out immediately) + `salary_adjustments` (bonus/deduction)
+- [x] Salary history per employee (reports employee history + payday screen)
+
+## 14. Stocktake (جرد) ✅
 
 - [x] `stocktakes` + `stocktake_lines` (per warehouse, all or by category)
 - [x] Counted vs recorded diff → adjustment doc (shrinkage/surplus via FIFO)
+- [x] Blank counted-quantity boxes are missing, not zero; save/confirm blocked until every line has a number (typed 0 is a real count)
 - [x] Single-item manual adjustment with note
 
-## 15. Reports & Dashboard
+## 15. Reports & Dashboard ⚠️ Partial
 
 - [x] Admin dashboard: today sales/profit, open shift, low stock, negative stock, pending transfers
-- [x] Sales & profit (day/product/category/shift/cashier, COGS, discounts, refunds)
-- [x] Stock & movement ledger (stocktake history deferred with the stocktake module)
-- [x] Money & expenses (cash flow, category breakdown, over/short, supplier balances; payroll deferred)
-- [x] Employees, cashier worked-time, and cashier actions (salary history deferred with salaries)
+- [x] Sales & profit (day/product/shift/cashier, COGS, discounts, refunds)
+- [ ] Sales by category for live external POS sales (query still inner-joins local recipe/item categories)
+- [x] Stock & movement ledger including stocktake history
+- [x] Money & expenses (cash flow including salary payments and advances, category breakdown, over/short, supplier balances)
+- [x] Employees, cashier worked-time, cashier actions, and salary history
 - [x] Waste & refunds report
 - [x] Suppliers report (purchases and balances; existing supplier statements remain linked from suppliers)
-- [x] Arabic print / PDF export for every currently available report
+- [ ] Dedicated PDF export. Current print is browser `window.print()` (Arabic page, English codes remain on several row types)
 
 ## Deferred technical decisions
 

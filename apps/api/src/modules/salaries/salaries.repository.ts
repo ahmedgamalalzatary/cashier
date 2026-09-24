@@ -175,13 +175,15 @@ export class SalariesRepository {
       .for("update");
     return row;
   }
-  async latestPaymentForEmployee(employeeId: number) {
-    const [row] = await this.db
-      .select({ periodMonth: salaryPayments.periodMonth })
-      .from(salaryPayments)
-      .where(eq(salaryPayments.employeeId, employeeId))
-      .orderBy(desc(salaryPayments.periodMonth))
-      .limit(1);
+  async latestPaymentForEmployee(employeeId: number, forUpdate = false) {
+    const query = () =>
+      this.db
+        .select({ periodMonth: salaryPayments.periodMonth })
+        .from(salaryPayments)
+        .where(eq(salaryPayments.employeeId, employeeId))
+        .orderBy(desc(salaryPayments.periodMonth))
+        .limit(1);
+    const [row] = forUpdate ? await query().for("update") : await query();
     return row;
   }
   async createAdvance(input: AdvanceInput & { recordedBy: number }) {

@@ -38,6 +38,7 @@ import { catalogRefreshOutcome } from "@/models/catalog-refresh";
 import {
   addCatalogSelection,
   cartLineTotal,
+  catalogSizePrice,
   catalogTilePrice,
   cartTotals,
   defaultExternalSize,
@@ -513,6 +514,7 @@ export default function PosPage() {
       {selecting && (
         <ProductSelectionModal
           product={selecting}
+          nowMs={nowMs}
           onClose={() => setSelecting(null)}
           onAdd={(sizeId, modifiers) =>
             addProduct(selecting, sizeId, modifiers)
@@ -543,10 +545,12 @@ export default function PosPage() {
 
 function ProductSelectionModal({
   product,
+  nowMs,
   onClose,
   onAdd,
 }: {
   product: ExternalProduct;
+  nowMs: number;
   onClose: () => void;
   onAdd: (
     sizeId: number | null,
@@ -582,7 +586,8 @@ function ProductSelectionModal({
                   onClick={() => setSizeId(size.externalId)}
                   className={`rounded-lg border px-3 py-2 text-sm ${sizeId === size.externalId ? "border-primary bg-primary text-white" : "border-line"}`}
                 >
-                  {size.nameAr} · {formatMoney(size.price)}
+                  {size.nameAr} ·{" "}
+                  {formatMoney(catalogSizePrice(product, size, nowMs))}
                 </button>
               ))}
             </div>
