@@ -38,13 +38,13 @@ Only ❌ Open items. All ✅ Fixed and ➖ No-action rows were verified on 2026-
 | W1          | Single open shift blocks multi-register                                                        | ❌ Open | `schema.ts:754,768` unique `openSlot`; `shifts.repository.ts:76,111,126,136-141`; `shifts.service.ts:64-65` 409; pinned by `tests/db/shifts.test.ts:81`                                                                                    |
 | W2 + E5     | Refund branches for sale types sales never produce (internal `recipe`/`item` POS sales unrestored) | ❌ Open | Sales always `type:"external_product"` (`orders.service.ts:183-198`); refunds validate all three (`refunds.service.ts:169-189`) with restore branches only for `item`/external (`:338-442`, recipe falls through)                         |
 | §4 offline  | No offline/queue beyond error banner                                                           | ❌ Open | `web/src/lib/api.ts:29-31` throws only; no offline/queue/cache in `web/src`; POS inline banner only (`pos/page.tsx:312-319`)                                                                                                             |
-| §7.1–8      | Concurrency/boundary/race test gaps (partial — some coverage exists)                           | ❌ Open | Missing: double-spend/over-refund/double-approve races, full discount-boundary sweep, consolidated RBAC matrix, concurrent double-submit DB test. Exists: `inventory.test.ts:108`, `refunds.test.ts:283`, `transfers.test.ts:153`, `shifts.test.ts:81` |
-| D4-partial  | Deadlock-retry wrapper applied, but no transfers-specific retry test (claim was "one per service") | ❌ Open | Wrapper `lib/deadlock-retry.ts:10-18` used by orders/refunds/purchases/transfers/categories; `tests/lib/deadlock-retry.test.ts` covers wrapper + categories/orders/purchases/refunds, no transfers case (`grep transfers` = none)      |
-| §8          | Migrate/worker healthchecks missing; `NEXT_PUBLIC_API_URL` rebuild coupling                    | ❌ Open | `docker-compose.yml`: mysql/api/web have `healthcheck`, `migrate:37-53` and `cache-worker:93-115` have none; coupling `dockerfile.web:16-17`, `next.config.ts:25-27`, documented in `docker.md:162-169`                                   |
+| §7.1–8      | Concurrency/boundary/race test gaps (partial — some coverage exists)                           | ❌ Open | Missing: over-refund race, consolidated RBAC matrix, concurrent double-submit DB test. Exists: `inventory.test.ts:108`, `refunds.test.ts:283`, `transfers.test.ts:153,339`, `shifts.test.ts:81`, fixed-discount boundary e2e + orders double-spend race (`tests/db/orders.test.ts`) |
 | E7          | Low-stock alerting scope (flags only, no push/job)                                             | ❌ Open | Flags `reports.service.ts:76,122-125`, `inventory.service.ts:272-273`; no alert path in `api/src` (worker = catalog refresh only). Spec-dependent                                                                                        |
 
 Removed 2026-09-21 (verified fixed, deleted from report): C1, C2, §2.1, §2.3, §2.10, W3, W4, M1, M1b, M2, §4 RTL padding, §4 cart math, §4 refund draft, §4 refund updater, §4 admin notice, §4 shift polling, §4 waste feedback, §4 receipt RTL, §4 expense order, §4 transfer hint, §4 report dates, S4, S6, D5, E1b, E2, §2.14-3, §2.12-group-2 (stocktake history).
 Removed 2026-09-22 (verified fixed, deleted from report): §2.8 salaries/payday, §2.12 groups 3–4 salary reporting, §2.13 salary tables, §4.1 salaries placeholder.
+Removed 2026-09-22 (test added, deleted from report): D4-partial — transfers deadlock-retry case now in `apps/api/tests/lib/deadlock-retry.test.ts`; wrapper covered for all 5 wrapped services (categories/orders/purchases/refunds/transfers).
+Removed 2026-09-22 (closed, deleted from report): §8 — migrate/cache-worker healthchecks added (`/proc` probes, documented in docker.md Status and health); `NEXT_PUBLIC_API_URL` rebuild coupling documented and accepted in docker.md.
 Removed 2026-09-21 (no-action / skipped per owner or intent, deleted from report): §2.14-4, M4, §4 table captions, §7.9, plus previously removed false positives (D1, D3, D6/D7, S1/S2/S5, N1–N5, E3/E4/E6/E1c, old C1–C4, §2.11 refund→waste).
 Removed 2026-09-21 (pin tests added, deleted from report): M3-pin, S3-pin, §2.14-1-pin — tests now at `apps/web/tests/shared/recipe-type.test.ts`, `security-docs.test.ts`, `pos-hierarchy.test.ts`.
 
@@ -56,7 +56,6 @@ Biggest verified remaining risks:
 
 - Single open shift system-wide blocks multi-register (`schema.ts:754,768`, `shifts.service.ts:64-65`).
 - Refund/sales line-type mismatch is real: sales only produce `external_product`, refunds still branch `item`/`recipe` (internal POS sales unrestored).
-- Deadlock-retry has no transfers-specific test case (D4-partial).
 
 ---
 
@@ -139,31 +138,24 @@ No open items (S3-pin closed 2026-09-21 — see removed list).
 
 ## 6. Data integrity / concurrency
 
-- **D4-partial — deadlock retry shared, transfers case untested:** shared wrapper `apps/api/src/lib/deadlock-retry.ts:10-18` wraps the whole document transaction in orders, refunds, purchases, transfers, and categories (incl. `create`). Code is correct. But `apps/api/tests/lib/deadlock-retry.test.ts` covers wrapper + categories/orders/purchases/refunds only — no transfers-specific deadlock case (`grep transfers` = none), contrary to the "one retry test per service" claim. Still open under §7: true concurrency race tests (double-sale, over-refund, double-approve).
+No open items (D4-partial closed 2026-09-22 — transfers deadlock-retry test added; see removed list).
 
 ---
 
 ## 7. Missing tests
 
-Exists: solid unit (schemas, services, rate-limit, env, RBAC 403s) + HTTP/MySQL tests (auth, orders replay+negative flag, refunds discounted-thirds+replay, transfers shift-close race, inventory concurrent consume/receipt, shifts single-slot race, purchases duplicate-invoice race, categories inverse-move deadlock, stacked discounts, purchases/transfers replay+mismatch). Web: services/models/architecture/components mapping; shared-contract pins (`tests/shared/`: recipe type ↔ DB enum parity, flat external-category hierarchy, security-docs notes).
+Exists: solid unit (schemas, services, rate-limit, env, RBAC 403s) + HTTP/MySQL tests (auth, orders replay+negative flag, refunds discounted-thirds+replay, transfers shift-close race, inventory concurrent consume/receipt, shifts single-slot race, purchases duplicate-invoice race, categories inverse-move deadlock, deadlock-retry per service incl. transfers, stacked discounts, fixed-discount boundary e2e, orders double-spend race, transfer double-approve race (`transfers.test.ts:339`), purchases/transfers replay+mismatch). Web: services/models/architecture/components mapping; shared-contract pins (`tests/shared/`: recipe type ↔ DB enum parity, flat external-category hierarchy, security-docs notes).
 
 Gaps (highest value first):
 
-1. Concurrent POS double-spend — two simultaneous sales same cafe batch; assert one 409 + deficit accounting. (`inventory.test.ts:108` covers primitive, not order path.)
-2. Concurrent refunds over-refund race — two refunds same line racing `refundedQuantities` (`refunds.service.ts:88-118`; `refunds.test.ts:283` covers sequential thirds only).
-3. Transfer double-approve race — two `approveRequest`; second must 409 (`transfers.service.ts:52-55` `lockRequest` untested; `transfers.test.ts:153` covers request×close only).
-4. Deadlock-retry transfers case (see D4-partial).
-5. Discount boundaries — fixed==subtotal (total 0 cash 0), fixed>subtotal → 400; pct>100 → 400 covered at schema level (`orders.schemas.test.ts:75`) but no e2e totals sweep. (100% pct covered.)
-6. RBAC matrix e2e — cashier blocked `/api/products|/inventory|/purchases|/suppliers|/users` (only spot 403s in users/items/reports/shifts). Products/inventory/purchases/suppliers lack explicit 403 tests. (`/api/expenses` create and `/api/transfers` requests are intentionally cashier-allowed — do not assert 403 there.)
+1. Concurrent refunds over-refund race — two refunds same line racing `refundedQuantities` (`refunds.service.ts:88-118`; `refunds.test.ts:283` covers sequential thirds only).
+2. RBAC matrix e2e — cashier blocked `/api/products|/inventory|/purchases|/suppliers|/users` (only spot 403s in users/items/reports/shifts). Products/inventory/purchases/suppliers lack explicit 403 tests. (`/api/expenses` create and `/api/transfers` requests are intentionally cashier-allowed — do not assert 403 there.)
 
 ---
 
 ## 8. DevOps / config gaps
 
-- `docker-compose.yml`, `dockerfile.api`, `dockerfile.web`, `turbo.json`, `api/package.json`, `web/package.json`, `tsconfig.base.json`.
-- `migrate:37-53` no healthcheck/completion visibility beyond `service_completed_successfully`; `cache-worker:93-115` no healthcheck (silent catalog-stall risk). `api` healthcheck `/health` unauthenticated — fine, document public. (mysql/api/web healthchecks exist.)
-- `NEXT_PUBLIC_API_URL` baked at build (`dockerfile.web:16-17`, `next.config.ts:25-27`, compose `:123`) — change needs rebuild. Documented in `docker.md:162-169`.
-- Good: `api build` builds shared first — keep.
+No open items (2026-09-22: migrate/cache-worker healthchecks added; `NEXT_PUBLIC_API_URL` rebuild coupling documented and accepted in `docker.md` — see removed list).
 
 ---
 
@@ -179,11 +171,10 @@ Gaps (highest value first):
 
 1. Resolve sales/refund line-type mismatch (W2 + E5): restore internal `recipe`/`item` POS sales per amended spec §7/§10, or remove/guard dead refund branches.
 2. Document single-register constraint or implement per-terminal slots (W1).
-3. Add deadlock-retry transfers case (D4-partial); then concurrency race tests (§7.1-3).
+3. Add concurrency race test: over-refund (§7.1).
 4. Decide POS two-level nav (§2.2): map external categories or amend spec; record recipe detailed rules (§2.9).
 5. Reports: decide server-PDF vs print-only (§2.12).
-6. DevOps (§8): add `migrate`/`cache-worker` healthchecks; fix `NEXT_PUBLIC_API_URL` rebuild coupling or document it.
-7. Frontend: confirm offline scope + document (§4 offline); decide low-stock alerting scope (E7).
+6. Frontend: confirm offline scope + document (§4 offline); decide low-stock alerting scope (E7).
 
 ---
 
@@ -193,6 +184,7 @@ Gaps (highest value first):
 - Idempotency via `clientRequestId` + `ER_DUP_ENTRY` in orders/refunds/waste/expenses/purchases/transfers (C1/D5).
 - Duplicate purchase invoice race returns 409 (C1); external-product refunds restock or waste (C2); purchases/transfers idempotency keys (D5); shared deadlock retry (D4 code); stable idempotency fingerprints (M2); recipe waste incl. recipe target (C2/§2.10/E1); stacked-discount math pinned (E2); stocktake + manual adjustment (E1/§2.3); reports guard at mount (§2.1); LIKE escaping (S4); env contract (S6).
 - No SQLi: Drizzle params; raw `sql` columns only.
+- `api build` builds `@cashier/shared` first (`api/package.json`) — keep.
 - `changePassword` bumps `tokenVersion` + re-issues (`auth.repository.ts:26-34`, `auth.service.ts:48-66`); admin resets also bump (`users.repository.ts:51-60`).
 - Frontend API shapes match backend (Appendix B); cookie-first + Tauri fallback, 401 clears, route gating correct; RTL padding, cart math, refund draft/updaters, cashier notice, shift polling, waste feedback, receipt RTL, expense order, transfer hint, report dates — all fixed and pinned.
 

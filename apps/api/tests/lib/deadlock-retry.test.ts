@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { AuthUser } from "@cashier/shared";
 import type { CategoriesRepository } from "../../src/modules/categories/categories.repository.js";
 import { CategoriesService } from "../../src/modules/categories/categories.service.js";
 import type { OrdersRepository } from "../../src/modules/orders/orders.repository.js";
@@ -7,6 +8,8 @@ import type { PurchasesRepository } from "../../src/modules/purchases/purchases.
 import { PurchasesService } from "../../src/modules/purchases/purchases.service.js";
 import type { RefundsRepository } from "../../src/modules/refunds/refunds.repository.js";
 import { RefundsService } from "../../src/modules/refunds/refunds.service.js";
+import type { TransfersRepository } from "../../src/modules/transfers/transfers.repository.js";
+import { TransfersService } from "../../src/modules/transfers/transfers.service.js";
 import { transactionWithDeadlockRetry } from "../../src/lib/deadlock-retry.js";
 
 const deadlock = Object.assign(new Error("deadlock"), {
@@ -275,6 +278,43 @@ describe("refunds.create retries after a deadlock", () => {
     );
 
     expect(refund.id).toBe(7);
+    expect(repo.transaction).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("transfers.createRequest retries after a deadlock", () => {
+  it("retries the request transaction once", async () => {
+    const tx = {
+      findRequestByClientRequestId: vi.fn().mockResolvedValue(undefined),
+      findOpenShiftForCashier: vi.fn().mockResolvedValue({ id: 1 }),
+      lockItems: vi
+        .fn()
+        .mockResolvedValue([{ id: 5, name: "حليب", isActive: true }]),
+      createRequest: vi.fn().mockResolvedValue(31),
+      createRequestLine: vi.fn().mockResolvedValue(undefined),
+    };
+    const repo = {
+      transaction: vi
+        .fn()
+        .mockRejectedValueOnce(deadlock)
+        .mockImplementationOnce(
+          async (run: (r: typeof tx, inv: object) => Promise<number>) =>
+            run(tx, {}),
+        ),
+    } as unknown as TransfersRepository & {
+      transaction: ReturnType<typeof vi.fn>;
+    };
+
+    const id = await new TransfersService(repo).createRequest(
+      {
+        clientRequestId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        notes: null,
+        lines: [{ itemId: 5, quantity: 2 }],
+      } as never,
+      { id: 7, name: "كاشير", role: "cashier" } as AuthUser,
+    );
+
+    expect(id).toBe(31);
     expect(repo.transaction).toHaveBeenCalledTimes(2);
   });
 });

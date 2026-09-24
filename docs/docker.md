@@ -30,7 +30,9 @@ curl --fail http://127.0.0.1:4010/health
 curl --fail --head http://127.0.0.1:3010/
 ```
 
-The API response should be `{"ok":true}`. The `migrate` service should show `Exited (0)` after completing; that is its normal healthy state.
+The API response should be `{"ok":true}`; `/health` is intentionally unauthenticated and safe to expose on its loopback port. The `migrate` service should show `Exited (0)` after completing; that is its normal healthy state.
+
+`migrate` and `cache-worker` have liveness healthchecks. `migrate` reports `healthy` only while its `drizzle-kit migrate` process is actually running — normal runs finish in seconds and show `Exited (0)`, while `unhealthy` means the container kept running for over a minute with no migration process (check its logs). `cache-worker` reports `healthy` while its `node dist/worker.js` process is alive; `unhealthy` means that process died while the container still ran — check `docker compose --env-file .env.production logs cache-worker`. These probes see a dead process, not a wedged one: a worker alive but stuck on a hung request still reports `healthy`.
 
 ## Deploy an update
 
@@ -161,12 +163,14 @@ sudo docker compose --env-file .env.production up -d --force-recreate api cache-
 
 ### Web is unhealthy or shows an old API URL
 
-`NEXT_PUBLIC_API_URL` is embedded during the web image build. Rebuild the web image after changing it:
+`NEXT_PUBLIC_API_URL` is baked into the web bundle at build time: Next.js inlines `NEXT_PUBLIC_*` variables into the client JavaScript while the image is built, so changing `.env.production` alone has no effect on an already-built image. The value reaches the build as a Compose build arg from `.env.production` (see the `web` service's `build.args` in `docker-compose.yml`). After changing it there, rebuild the web image:
 
 ```bash
 sudo docker compose --env-file .env.production build --no-cache web
 sudo docker compose --env-file .env.production up -d --force-recreate web
 ```
+
+This rebuild requirement is an accepted trade-off; making the API URL runtime-configurable is out of scope.
 
 ### MySQL is unhealthy
 

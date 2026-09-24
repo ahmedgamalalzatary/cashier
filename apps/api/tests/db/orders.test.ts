@@ -269,4 +269,83 @@ describe("external-product POS orders", () => {
       .where(eq(stockBatches.id, fixture.batchId));
     expect(batch.remainingQuantity).toBe("0.920");
   });
+
+  it("totals a fixed discount equal to the subtotal down to zero cash", async () => {
+    await createExternalProductFixture();
+
+    const response = await request(app())
+      .post("/api/orders")
+      .set(cashierAuthorization)
+      .send({
+        ...saleBody(),
+        discount: { type: "fixed", value: 260 },
+        cashReceived: 0,
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({
+      subtotal: "260.00",
+      discountType: "fixed",
+      discountValue: "260.00",
+      discountAmount: "260.00",
+      total: "0.00",
+      cashReceived: "0.00",
+      changeAmount: "0.00",
+    });
+  });
+
+  it("rejects a fixed discount larger than the subtotal", async () => {
+    await createExternalProductFixture();
+
+    const response = await request(app())
+      .post("/api/orders")
+      .set(cashierAuthorization)
+      .send({ ...saleBody(), discount: { type: "fixed", value: 260.01 } });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe("الخصم الثابت أكبر من إجمالي الطلب");
+    expect(await db.select().from(orders)).toHaveLength(0);
+  });
+
+  it("serializes concurrent double-spend so exactly one sale takes the deficit", async () => {
+    const fixture = await createExternalProductFixture();
+    await db
+      .update(stockBatches)
+      .set({ remainingQuantity: "0.100" })
+      .where(eq(stockBatches.id, fixture.batchId));
+
+    const responses = await Promise.all([
+      request(app()).post("/api/orders").set(cashierAuthorization).send(saleBody()),
+      request(app()).post("/api/orders").set(cashierAuthorization).send(saleBody()),
+    ]);
+
+    expect(responses.map((response) => response.status)).toEqual([201, 201]);
+    const covered = responses.filter(
+      (response) => !response.body.isNegativeStock,
+    );
+    const deficit = responses.filter(
+      (response) => response.body.isNegativeStock,
+    );
+    expect(covered).toHaveLength(1);
+    expect(deficit).toHaveLength(1);
+
+    expect(covered[0]!.body.lines[0]).toMatchObject({
+      hasStockDeficit: false,
+      allocations: [{ batchId: fixture.batchId, quantity: "0.080" }],
+    });
+    expect(deficit[0]!.body.lines[0]).toMatchObject({
+      hasStockDeficit: true,
+      totalCost: "0.20",
+      allocations: [
+        { batchId: fixture.batchId, quantity: "0.020" },
+        { batchId: null, quantity: "0.060" },
+      ],
+    });
+
+    const [batch] = await db
+      .select({ remainingQuantity: stockBatches.remainingQuantity })
+      .from(stockBatches)
+      .where(eq(stockBatches.id, fixture.batchId));
+    expect(batch.remainingQuantity).toBe("0.000");
+  });
 });
