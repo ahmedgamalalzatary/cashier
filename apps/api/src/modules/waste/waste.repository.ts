@@ -1,3 +1,8 @@
+import {
+  branchCondition,
+  branchValues,
+  branchTransaction,
+} from "../../db/branch-context.js";
 import { and, asc, desc, eq } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import {
@@ -20,7 +25,7 @@ export class WasteRepository {
   transaction<T>(
     fn: (repo: WasteRepository, inventory: InventoryTransaction) => Promise<T>,
   ) {
-    return this.db.transaction((tx) => {
+    return branchTransaction(this.db, (tx) => {
       const transactionDb = tx as unknown as Db;
       return fn(
         new WasteRepository(transactionDb),
@@ -33,7 +38,12 @@ export class WasteRepository {
     const [row] = await this.db
       .select({ id: shifts.id })
       .from(shifts)
-      .where(and(eq(shifts.openSlot, 1), eq(shifts.cashierUserId, userId)))
+      .where(
+        branchCondition(
+          shifts,
+          and(eq(shifts.openSlot, 1), eq(shifts.cashierUserId, userId)),
+        ),
+      )
       .for("update");
     return row;
   }
@@ -47,7 +57,7 @@ export class WasteRepository {
         isActive: items.isActive,
       })
       .from(items)
-      .where(eq(items.id, id))
+      .where(branchCondition(items, eq(items.id, id)))
       .for("update");
     return row;
   }
@@ -60,31 +70,38 @@ export class WasteRepository {
         recordedBy: wasteEntries.recordedBy,
       })
       .from(wasteEntries)
-      .where(eq(wasteEntries.clientRequestId, clientRequestId));
+      .where(
+        branchCondition(
+          wasteEntries,
+          eq(wasteEntries.clientRequestId, clientRequestId),
+        ),
+      );
     return row;
   }
 
   async create(data: typeof wasteEntries.$inferInsert) {
-    const [result] = await this.db.insert(wasteEntries).values(data);
+    const [result] = await this.db
+      .insert(wasteEntries)
+      .values(branchValues(data));
     return result.insertId;
   }
 
   createAllocation(data: typeof wasteAllocations.$inferInsert) {
-    return this.db.insert(wasteAllocations).values(data);
+    return this.db.insert(wasteAllocations).values(branchValues(data));
   }
 
   updateCost(id: number, totalCost: string) {
     return this.db
       .update(wasteEntries)
       .set({ totalCost })
-      .where(eq(wasteEntries.id, id));
+      .where(branchCondition(wasteEntries, eq(wasteEntries.id, id)));
   }
 
   listCatalogItems() {
     return this.db
       .select({ id: items.id, name: items.name, stockUnit: items.stockUnit })
       .from(items)
-      .where(eq(items.isActive, true))
+      .where(branchCondition(items, eq(items.isActive, true)))
       .orderBy(asc(items.name));
   }
 
@@ -103,14 +120,20 @@ export class WasteRepository {
         isActive: recipes.isActive,
       })
       .from(recipes)
-      .where(eq(recipes.id, recipeId))
+      .where(branchCondition(recipes, eq(recipes.id, recipeId)))
       .for("update");
     if (!recipe) return undefined;
     const [size] = await this.db
       .select({ sizeId: recipeSizes.id, sizeName: recipeSizes.name })
       .from(recipeSizes)
       .where(
-        and(eq(recipeSizes.id, recipeSizeId), eq(recipeSizes.recipeId, recipeId)),
+        branchCondition(
+          recipeSizes,
+          and(
+            eq(recipeSizes.id, recipeSizeId),
+            eq(recipeSizes.recipeId, recipeId),
+          ),
+        ),
       )
       .for("update");
     if (!size) throw new Error("RECIPE_SIZE_MISMATCH");
@@ -121,8 +144,16 @@ export class WasteRepository {
         quantity: recipeIngredients.quantity,
       })
       .from(recipeIngredients)
-      .innerJoin(items, eq(items.id, recipeIngredients.itemId))
-      .where(eq(recipeIngredients.recipeSizeId, recipeSizeId))
+      .innerJoin(
+        items,
+        branchCondition(items, eq(items.id, recipeIngredients.itemId)),
+      )
+      .where(
+        branchCondition(
+          recipeIngredients,
+          eq(recipeIngredients.recipeSizeId, recipeSizeId),
+        ),
+      )
       .orderBy(asc(recipeIngredients.id))
       .for("update");
     return { ...recipe, ...size, ingredients };
@@ -173,12 +204,18 @@ export class WasteRepository {
         sizeName: recipeSizes.name,
       })
       .from(recipes)
-      .innerJoin(recipeSizes, eq(recipeSizes.recipeId, recipes.id))
+      .innerJoin(
+        recipeSizes,
+        branchCondition(recipeSizes, eq(recipeSizes.recipeId, recipes.id)),
+      )
       .innerJoin(
         recipeIngredients,
-        eq(recipeIngredients.recipeSizeId, recipeSizes.id),
+        branchCondition(
+          recipeIngredients,
+          eq(recipeIngredients.recipeSizeId, recipeSizes.id),
+        ),
       )
-      .where(eq(recipes.isActive, true))
+      .where(branchCondition(recipes, eq(recipes.isActive, true)))
       .orderBy(asc(recipes.name), asc(recipeSizes.sortOrder));
     const seen = new Set<string>();
     const result: Array<{
@@ -214,9 +251,18 @@ export class WasteRepository {
         occurredAt: wasteEntries.occurredAt,
       })
       .from(wasteEntries)
-      .innerJoin(users, eq(wasteEntries.recordedBy, users.id));
+      .innerJoin(users, eq(wasteEntries.recordedBy, users.id))
+      .$dynamic()
+      .where(branchCondition(wasteEntries));
     return (
-      warehouse ? query.where(eq(wasteEntries.warehouse, warehouse)) : query
+      warehouse
+        ? query.where(
+            branchCondition(
+              wasteEntries,
+              eq(wasteEntries.warehouse, warehouse),
+            ),
+          )
+        : query
     )
       .orderBy(desc(wasteEntries.occurredAt), desc(wasteEntries.id))
       .limit(100);
@@ -241,7 +287,7 @@ export class WasteRepository {
       })
       .from(wasteEntries)
       .innerJoin(users, eq(wasteEntries.recordedBy, users.id))
-      .where(eq(wasteEntries.id, id));
+      .where(branchCondition(wasteEntries, eq(wasteEntries.id, id)));
     return row;
   }
 
@@ -256,7 +302,12 @@ export class WasteRepository {
         unitCost: wasteAllocations.unitCost,
       })
       .from(wasteAllocations)
-      .where(eq(wasteAllocations.wasteEntryId, id))
+      .where(
+        branchCondition(
+          wasteAllocations,
+          eq(wasteAllocations.wasteEntryId, id),
+        ),
+      )
       .orderBy(asc(wasteAllocations.id));
   }
 }

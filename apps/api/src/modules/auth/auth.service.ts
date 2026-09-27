@@ -24,11 +24,18 @@ export class AuthService {
       password,
       user?.passwordHash ?? DUMMY_PASSWORD_HASH,
     );
-    if (!user || !user.isActive || !ok) throw invalid;
+    if (
+      !user ||
+      !user.isActive ||
+      !ok ||
+      (user.role === "cashier" && !user.branchIsActive)
+    )
+      throw invalid;
     const authUser: AuthUser = {
       id: user.id,
       name: user.name,
       role: user.role,
+      branchId: user.role === "cashier" ? user.branchId : null,
     };
     return {
       token: signToken(authUser, user.tokenVersion, this.jwtSecret),
@@ -38,7 +45,7 @@ export class AuthService {
 
   async changePassword(userId: number, input: ChangePasswordInput) {
     const user = await this.repo.findById(userId);
-    if (!user?.isActive)
+    if (!user?.isActive || (user.role === "cashier" && !user.branchIsActive))
       throw new HttpError(401, "انتهت الجلسة — سجّل الدخول من جديد");
     if (
       !(await this.comparePassword(input.currentPassword, user.passwordHash))
@@ -51,14 +58,12 @@ export class AuthService {
     );
     const updatedUser = await this.repo.findById(userId);
     if (!updatedUser?.isActive)
-      throw new HttpError(
-        401,
-        "انتهت الجلسة — سجّل الدخول من جديد",
-      );
+      throw new HttpError(401, "انتهت الجلسة — سجّل الدخول من جديد");
     const authUser: AuthUser = {
       id: updatedUser.id,
       name: updatedUser.name,
       role: updatedUser.role,
+      branchId: updatedUser.role === "cashier" ? updatedUser.branchId : null,
     };
     return {
       token: signToken(authUser, updatedUser.tokenVersion, this.jwtSecret),

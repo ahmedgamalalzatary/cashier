@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Coffee,
+  Building2,
   LayoutDashboard,
   Warehouse,
   CupSoda,
@@ -54,6 +55,7 @@ const navIcons: Record<NavHref, LucideIcon> = {
   "/refunds": RotateCcw,
   "/recipes": BookOpen,
   "/reports": BarChart3,
+  "/branches": Building2,
 };
 
 /**

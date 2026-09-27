@@ -1,7 +1,7 @@
 import { api } from "@/lib/api";
 export type ReportRow = Record<string, string | number | null>;
 export type ReportsData = {
-  range: { from: string; to: string };
+  range: { from: string; to: string; branchId?: number };
   sales: Record<
     "byDay" | "byProduct" | "byCategory" | "byShift" | "byCashier",
     ReportRow[]

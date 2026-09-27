@@ -1,36 +1,36 @@
-import bcrypt from 'bcryptjs';
-import { describe, expect, it, vi } from 'vitest';
-import type { AuthRepository } from '../../src/modules/auth/auth.repository.js';
-import { AuthService } from '../../src/modules/auth/auth.service.js';
+import bcrypt from "bcryptjs";
+import { describe, expect, it, vi } from "vitest";
+import type { AuthRepository } from "../../src/modules/auth/auth.repository.js";
+import { AuthService } from "../../src/modules/auth/auth.service.js";
 
-describe('AuthService credential work', () => {
-  it('compares unknown users against a production-cost dummy hash', async () => {
+describe("AuthService credential work", () => {
+  it("compares unknown users against a production-cost dummy hash", async () => {
     const repo = {
       findByUsername: vi.fn().mockResolvedValue(undefined),
     } as unknown as AuthRepository;
     const compare = vi.fn().mockResolvedValue(false);
     const service = new AuthService(
       repo,
-      'test-only-jwt-secret-at-least-32-characters',
+      "test-only-jwt-secret-at-least-32-characters",
       compare,
     );
 
     await expect(
-      service.login({ username: 'missing', password: 'guess' }),
+      service.login({ username: "missing", password: "guess" }),
     ).rejects.toMatchObject({ status: 401 });
     expect(compare).toHaveBeenCalledOnce();
     expect(bcrypt.getRounds(compare.mock.calls[0][1])).toBe(10);
   });
 
-  it('finishes password comparison before rejecting an inactive user', async () => {
-    const storedHash = await bcrypt.hash('secret123', 4);
+  it("finishes password comparison before rejecting an inactive user", async () => {
+    const storedHash = await bcrypt.hash("secret123", 4);
     const repo = {
       findByUsername: vi.fn().mockResolvedValue({
         id: 1,
-        name: 'Inactive',
-        username: 'inactive',
+        name: "Inactive",
+        username: "inactive",
         passwordHash: storedHash,
-        role: 'cashier',
+        role: "cashier",
         isActive: false,
       }),
     } as unknown as AuthRepository;
@@ -43,13 +43,13 @@ describe('AuthService credential work', () => {
     );
     const service = new AuthService(
       repo,
-      'test-only-jwt-secret-at-least-32-characters',
+      "test-only-jwt-secret-at-least-32-characters",
       compare,
     );
 
     const pending = service.login({
-      username: 'inactive',
-      password: 'secret123',
+      username: "inactive",
+      password: "secret123",
     });
     let settled = false;
     void pending.then(
@@ -61,7 +61,7 @@ describe('AuthService credential work', () => {
       },
     );
     await Promise.resolve();
-    expect(compare).toHaveBeenCalledWith('secret123', storedHash);
+    expect(compare).toHaveBeenCalledWith("secret123", storedHash);
     expect(settled).toBe(false);
 
     resolveCompare(true);
@@ -70,21 +70,23 @@ describe('AuthService credential work', () => {
   });
 });
 
-const JWT_SECRET = 'test-only-jwt-secret-at-least-32-characters';
+const JWT_SECRET = "test-only-jwt-secret-at-least-32-characters";
 
 const activeUser = (overrides: Record<string, unknown> = {}) => ({
   id: 1,
-  name: 'Cashier',
-  username: 'cashier',
-  passwordHash: 'stored-hash',
-  role: 'cashier',
+  name: "Cashier",
+  username: "cashier",
+  passwordHash: "stored-hash",
+  role: "cashier",
   isActive: true,
+  branchId: 1,
+  branchIsActive: true,
   tokenVersion: 0,
   ...overrides,
 });
 
-describe('AuthService login outcomes', () => {
-  it('returns a token and safe profile for valid credentials', async () => {
+describe("AuthService login outcomes", () => {
+  it("returns a token and safe profile for valid credentials", async () => {
     const repo = {
       findByUsername: vi.fn().mockResolvedValue(activeUser()),
     } as unknown as AuthRepository;
@@ -95,16 +97,21 @@ describe('AuthService login outcomes', () => {
     );
 
     const session = await service.login({
-      username: 'cashier',
-      password: 'secret123',
+      username: "cashier",
+      password: "secret123",
     });
 
-    expect(session.user).toEqual({ id: 1, name: 'Cashier', role: 'cashier' });
-    expect(typeof session.token).toBe('string');
-    expect(session).not.toHaveProperty('passwordHash');
+    expect(session.user).toEqual({
+      id: 1,
+      name: "Cashier",
+      role: "cashier",
+      branchId: 1,
+    });
+    expect(typeof session.token).toBe("string");
+    expect(session).not.toHaveProperty("passwordHash");
   });
 
-  it('uses one identical 401 for unknown users and wrong passwords', async () => {
+  it("uses one identical 401 for unknown users and wrong passwords", async () => {
     const unknownRepo = {
       findByUsername: vi.fn().mockResolvedValue(undefined),
     } as unknown as AuthRepository;
@@ -117,14 +124,14 @@ describe('AuthService login outcomes', () => {
       JWT_SECRET,
       vi.fn().mockResolvedValue(false),
     )
-      .login({ username: 'missing', password: 'guess' })
+      .login({ username: "missing", password: "guess" })
       .catch((error: unknown) => error);
     const wrongFailure = await new AuthService(
       wrongPasswordRepo,
       JWT_SECRET,
       vi.fn().mockResolvedValue(false),
     )
-      .login({ username: 'cashier', password: 'guess' })
+      .login({ username: "cashier", password: "guess" })
       .catch((error: unknown) => error);
 
     expect(unknownFailure).toMatchObject({ status: 401 });
@@ -135,8 +142,8 @@ describe('AuthService login outcomes', () => {
   });
 });
 
-describe('AuthService changePassword guards', () => {
-  it('401s a missing or inactive user before checking the password', async () => {
+describe("AuthService changePassword guards", () => {
+  it("401s a missing or inactive user before checking the password", async () => {
     for (const user of [undefined, activeUser({ isActive: false })]) {
       const repo = {
         findById: vi.fn().mockResolvedValue(user),
@@ -145,31 +152,34 @@ describe('AuthService changePassword guards', () => {
 
       await expect(
         new AuthService(repo, JWT_SECRET, compare).changePassword(1, {
-          currentPassword: 'old',
-          newPassword: 'new-secret-123',
+          currentPassword: "old",
+          newPassword: "new-secret-123",
         }),
       ).rejects.toMatchObject({ status: 401 });
       expect(compare).not.toHaveBeenCalled();
     }
   });
 
-  it('400s a wrong current password without updating anything', async () => {
+  it("400s a wrong current password without updating anything", async () => {
     const repo = {
       findById: vi.fn().mockResolvedValue(activeUser()),
       updatePassword: vi.fn(),
     } as unknown as AuthRepository;
 
     await expect(
-      new AuthService(repo, JWT_SECRET, vi.fn().mockResolvedValue(false))
-        .changePassword(1, {
-          currentPassword: 'wrong',
-          newPassword: 'new-secret-123',
-        }),
+      new AuthService(
+        repo,
+        JWT_SECRET,
+        vi.fn().mockResolvedValue(false),
+      ).changePassword(1, {
+        currentPassword: "wrong",
+        newPassword: "new-secret-123",
+      }),
     ).rejects.toMatchObject({ status: 400 });
     expect(repo.updatePassword).not.toHaveBeenCalled();
   });
 
-  it('401s when the account is deactivated mid-change', async () => {
+  it("401s when the account is deactivated mid-change", async () => {
     const repo = {
       findById: vi
         .fn()
@@ -179,15 +189,18 @@ describe('AuthService changePassword guards', () => {
     } as unknown as AuthRepository;
 
     await expect(
-      new AuthService(repo, JWT_SECRET, vi.fn().mockResolvedValue(true))
-        .changePassword(1, {
-          currentPassword: 'secret123',
-          newPassword: 'new-secret-123',
-        }),
+      new AuthService(
+        repo,
+        JWT_SECRET,
+        vi.fn().mockResolvedValue(true),
+      ).changePassword(1, {
+        currentPassword: "secret123",
+        newPassword: "new-secret-123",
+      }),
     ).rejects.toMatchObject({ status: 401 });
   });
 
-  it('returns a fresh session after a successful change', async () => {
+  it("returns a fresh session after a successful change", async () => {
     const repo = {
       findById: vi.fn().mockResolvedValue(activeUser({ tokenVersion: 2 })),
       updatePassword: vi.fn(async () => undefined),
@@ -198,12 +211,17 @@ describe('AuthService changePassword guards', () => {
       JWT_SECRET,
       vi.fn().mockResolvedValue(true),
     ).changePassword(1, {
-      currentPassword: 'secret123',
-      newPassword: 'new-secret-123',
+      currentPassword: "secret123",
+      newPassword: "new-secret-123",
     });
 
     expect(repo.updatePassword).toHaveBeenCalledTimes(1);
-    expect(session.user).toEqual({ id: 1, name: 'Cashier', role: 'cashier' });
-    expect(typeof session.token).toBe('string');
+    expect(session.user).toEqual({
+      id: 1,
+      name: "Cashier",
+      role: "cashier",
+      branchId: 1,
+    });
+    expect(typeof session.token).toBe("string");
   });
 });

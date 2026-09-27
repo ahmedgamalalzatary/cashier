@@ -1,5 +1,10 @@
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
-import type { Db } from '../../db/index.js';
+import {
+  branchCondition,
+  branchValues,
+  branchTransaction,
+} from "../../db/branch-context.js";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import type { Db } from "../../db/index.js";
 import {
   items,
   purchaseInvoices,
@@ -7,15 +12,15 @@ import {
   supplierPayments,
   suppliers,
   users,
-} from '../../db/schema.js';
-import { InventoryRepository } from '../inventory/inventory.repository.js';
-import { InventoryTransaction } from '../inventory/inventory.service.js';
+} from "../../db/schema.js";
+import { InventoryRepository } from "../inventory/inventory.repository.js";
+import { InventoryTransaction } from "../inventory/inventory.service.js";
 
 export type PurchaseLineWrite = {
   invoiceId: number;
   itemId: number;
   quantity: string;
-  unitMode: 'stock' | 'purchase';
+  unitMode: "stock" | "purchase";
   stockQuantity: string;
   unitPrice: string;
   unitCost: string;
@@ -31,7 +36,7 @@ export class PurchasesRepository {
       inventory: InventoryTransaction,
     ) => Promise<T>,
   ): Promise<T> {
-    return this.db.transaction((tx) => {
+    return branchTransaction(this.db, (tx) => {
       const transactionDb = tx as unknown as Db;
       return fn(
         new PurchasesRepository(transactionDb),
@@ -44,8 +49,8 @@ export class PurchasesRepository {
     const [row] = await this.db
       .select({ id: suppliers.id, isActive: suppliers.isActive })
       .from(suppliers)
-      .where(eq(suppliers.id, id))
-      .for('update');
+      .where(branchCondition(suppliers, eq(suppliers.id, id)))
+      .for("update");
     return row;
   }
 
@@ -61,13 +66,16 @@ export class PurchasesRepository {
       })
       .from(items)
       .where(
-        inArray(
-          items.id,
-          [...ids].sort((a, b) => a - b),
+        branchCondition(
+          items,
+          inArray(
+            items.id,
+            [...ids].sort((a, b) => a - b),
+          ),
         ),
       )
       .orderBy(asc(items.id))
-      .for('update');
+      .for("update");
   }
 
   async hasInvoiceNumber(supplierId: number, invoiceNumber: string) {
@@ -75,9 +83,12 @@ export class PurchasesRepository {
       .select({ id: purchaseInvoices.id })
       .from(purchaseInvoices)
       .where(
-        and(
-          eq(purchaseInvoices.supplierId, supplierId),
-          eq(purchaseInvoices.invoiceNumber, invoiceNumber),
+        branchCondition(
+          purchaseInvoices,
+          and(
+            eq(purchaseInvoices.supplierId, supplierId),
+            eq(purchaseInvoices.invoiceNumber, invoiceNumber),
+          ),
         ),
       )
       .limit(1);
@@ -95,7 +106,9 @@ export class PurchasesRepository {
     clientRequestId: string;
     requestFingerprint: string;
   }) {
-    const [result] = await this.db.insert(purchaseInvoices).values(data);
+    const [result] = await this.db
+      .insert(purchaseInvoices)
+      .values(branchValues(data));
     return result.insertId;
   }
 
@@ -107,12 +120,17 @@ export class PurchasesRepository {
         requestFingerprint: purchaseInvoices.requestFingerprint,
       })
       .from(purchaseInvoices)
-      .where(eq(purchaseInvoices.clientRequestId, clientRequestId));
+      .where(
+        branchCondition(
+          purchaseInvoices,
+          eq(purchaseInvoices.clientRequestId, clientRequestId),
+        ),
+      );
     return row;
   }
 
   async createLine(data: PurchaseLineWrite) {
-    await this.db.insert(purchaseLines).values(data);
+    await this.db.insert(purchaseLines).values(branchValues(data));
   }
 
   async createPayment(data: {
@@ -121,7 +139,7 @@ export class PurchasesRepository {
     amount: string;
     paidAt: string;
   }) {
-    await this.db.insert(supplierPayments).values(data);
+    await this.db.insert(supplierPayments).values(branchValues(data));
   }
 
   list() {
@@ -141,8 +159,15 @@ export class PurchasesRepository {
         createdAt: purchaseInvoices.createdAt,
       })
       .from(purchaseInvoices)
-      .innerJoin(suppliers, eq(purchaseInvoices.supplierId, suppliers.id))
+      .innerJoin(
+        suppliers,
+        branchCondition(
+          suppliers,
+          eq(purchaseInvoices.supplierId, suppliers.id),
+        ),
+      )
       .innerJoin(users, eq(purchaseInvoices.createdBy, users.id))
+      .where(branchCondition(purchaseInvoices))
       .orderBy(desc(purchaseInvoices.purchasedAt), desc(purchaseInvoices.id));
   }
 
@@ -163,9 +188,15 @@ export class PurchasesRepository {
         createdAt: purchaseInvoices.createdAt,
       })
       .from(purchaseInvoices)
-      .innerJoin(suppliers, eq(purchaseInvoices.supplierId, suppliers.id))
+      .innerJoin(
+        suppliers,
+        branchCondition(
+          suppliers,
+          eq(purchaseInvoices.supplierId, suppliers.id),
+        ),
+      )
       .innerJoin(users, eq(purchaseInvoices.createdBy, users.id))
-      .where(eq(purchaseInvoices.id, id));
+      .where(branchCondition(purchaseInvoices, eq(purchaseInvoices.id, id)));
     return row;
   }
 
@@ -186,13 +217,18 @@ export class PurchasesRepository {
         lineTotal: purchaseLines.lineTotal,
       })
       .from(purchaseLines)
-      .innerJoin(items, eq(purchaseLines.itemId, items.id))
-      .where(eq(purchaseLines.invoiceId, invoiceId))
+      .innerJoin(
+        items,
+        branchCondition(items, eq(purchaseLines.itemId, items.id)),
+      )
+      .where(
+        branchCondition(purchaseLines, eq(purchaseLines.invoiceId, invoiceId)),
+      )
       .orderBy(purchaseLines.id);
     return rows.map(({ purchaseUnit, ...row }) => ({
       ...row,
       unitName:
-        row.unitMode === 'purchase'
+        row.unitMode === "purchase"
           ? (purchaseUnit ?? row.stockUnit)
           : row.stockUnit,
     }));

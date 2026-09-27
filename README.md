@@ -1,7 +1,8 @@
 # Cashier + Warehouse System
 
-POS + inventory system for a cafe with a main warehouse and a cafe sub-warehouse.
+POS + inventory system with independent branch workspaces, each with a main warehouse and a cafe sub-warehouse.
 Full specification: [docs/system-specs.md](docs/system-specs.md).
+Branch management, access, and migration details: [docs/branches.md](docs/branches.md).
 
 ## Structure
 
@@ -28,21 +29,21 @@ cp .env.example .env   # then edit DATABASE_URL, JWT_SECRET and deployment origi
 
 ## Commands (run from repo root — build/lint/test/typecheck go through Turborepo)
 
-| Command | What it does |
-|---|---|
-| `pnpm dev` | Runs API (port 4000) and web (port 3000) together (`turbo run dev`) |
-| `pnpm dev:api` / `pnpm dev:web` | Run one app only |
-| `pnpm build` | Build all workspaces (`turbo run build`) |
-| `pnpm test` | Run all tests with Vitest (`turbo run test`) |
-| `pnpm lint` | Lint all workspaces (`turbo run lint`) |
-| `pnpm typecheck` | TypeScript check all workspaces (`turbo run typecheck`) |
-| `pnpm format` | Prettier write |
+| Command                         | What it does                                                        |
+| ------------------------------- | ------------------------------------------------------------------- |
+| `pnpm dev`                      | Runs API (port 4000) and web (port 3000) together (`turbo run dev`) |
+| `pnpm dev:api` / `pnpm dev:web` | Run one app only                                                    |
+| `pnpm build`                    | Build all workspaces (`turbo run build`)                            |
+| `pnpm test`                     | Run all tests with Vitest (`turbo run test`)                        |
+| `pnpm lint`                     | Lint all workspaces (`turbo run lint`)                              |
+| `pnpm typecheck`                | TypeScript check all workspaces (`turbo run typecheck`)             |
+| `pnpm format`                   | Prettier write                                                      |
 
 ### Database (run in `apps/api`)
 
-| Command | What it does |
-|---|---|
+| Command            | What it does                                    |
+| ------------------ | ----------------------------------------------- |
 | `pnpm db:generate` | Generate SQL migrations from `src/db/schema.ts` |
-| `pnpm db:migrate` | Apply migrations |
-| `pnpm db:push` | Push schema directly (dev only) |
-| `pnpm db:studio` | Browse the database in Drizzle Studio |
+| `pnpm db:migrate`  | Apply migrations                                |
+| `pnpm db:push`     | Push schema directly (dev only)                 |
+| `pnpm db:studio`   | Browse the database in Drizzle Studio           |

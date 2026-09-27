@@ -1,3 +1,9 @@
+import {
+  branchCondition,
+  branchValues,
+  branchTable,
+  branchTransaction,
+} from "../../db/branch-context.js";
 import { and, asc, desc, eq, or, sql } from "drizzle-orm";
 import type { Warehouse } from "@cashier/shared";
 import type { Db } from "../../db/index.js";
@@ -77,7 +83,7 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
   transaction<T>(
     fn: (repo: StocktakesRepositoryPort) => Promise<T>,
   ): Promise<T> {
-    return this.db.transaction((tx) =>
+    return branchTransaction(this.db, (tx) =>
       fn(new StocktakesRepository(tx as unknown as Db)),
     );
   }
@@ -90,25 +96,31 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
   }) {
     const [result] = await this.db
       .insert(stocktakes)
-      .values({ ...data, kind: data.kind ?? "stocktake" });
+      .values(branchValues({ ...data, kind: data.kind ?? "stocktake" }));
     return result.insertId;
   }
   snapshotItems(warehouse: Warehouse, categoryId: number | null) {
-    const recordedQuantity = sql<string>`CAST(COALESCE((SELECT SUM(sm.quantity) FROM stock_movements sm WHERE sm.item_id=${items.id} AND sm.warehouse=${warehouse}),0) AS DECIMAL(14,3))`;
+    const recordedQuantity = sql<string>`CAST(COALESCE((SELECT SUM(sm.quantity) FROM ${branchTable("stock_movements")} sm WHERE sm.item_id=${items.id} AND sm.warehouse=${warehouse}),0) AS DECIMAL(14,3))`;
     return this.db
       .select({ itemId: items.id, recordedQuantity })
       .from(items)
-      .leftJoin(categories, eq(categories.id, items.categoryId))
+      .leftJoin(
+        categories,
+        branchCondition(categories, eq(categories.id, items.categoryId)),
+      )
       .where(
-        categoryId === null
-          ? eq(items.isActive, true)
-          : and(
-              eq(items.isActive, true),
-              or(
-                eq(items.categoryId, categoryId),
-                eq(categories.parentId, categoryId),
+        branchCondition(
+          items,
+          categoryId === null
+            ? eq(items.isActive, true)
+            : and(
+                eq(items.isActive, true),
+                or(
+                  eq(items.categoryId, categoryId),
+                  eq(categories.parentId, categoryId),
+                ),
               ),
-            ),
+        ),
       )
       .orderBy(asc(items.id));
   }
@@ -116,7 +128,7 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
     if (rows.length)
       await this.db
         .insert(stocktakeLines)
-        .values(rows.map((row) => ({ stocktakeId, ...row })));
+        .values(branchValues(rows.map((row) => ({ stocktakeId, ...row }))));
   }
   async findSessionForUpdate(id: number) {
     const [row] = await this.db
@@ -127,7 +139,7 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
         createdBy: stocktakes.createdBy,
       })
       .from(stocktakes)
-      .where(eq(stocktakes.id, id))
+      .where(branchCondition(stocktakes, eq(stocktakes.id, id)))
       .for("update");
     return row;
   }
@@ -140,7 +152,9 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
         countedQuantity: stocktakeLines.countedQuantity,
       })
       .from(stocktakeLines)
-      .where(eq(stocktakeLines.stocktakeId, id))
+      .where(
+        branchCondition(stocktakeLines, eq(stocktakeLines.stocktakeId, id)),
+      )
       .orderBy(asc(stocktakeLines.itemId))
       .for("update");
   }
@@ -153,9 +167,12 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
         .update(stocktakeLines)
         .set({ countedQuantity: line.countedQuantity.toFixed(3) })
         .where(
-          and(
-            eq(stocktakeLines.stocktakeId, id),
-            eq(stocktakeLines.itemId, line.itemId),
+          branchCondition(
+            stocktakeLines,
+            and(
+              eq(stocktakeLines.stocktakeId, id),
+              eq(stocktakeLines.itemId, line.itemId),
+            ),
           ),
         );
       if (result.affectedRows !== 1)
@@ -169,7 +186,7 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
     if (!item) throw new HttpError(404, "الصنف غير موجود");
     if (!item.isActive) throw new HttpError(409, "الصنف موقوف");
     const [row] = await this.db.execute(
-      sql`SELECT CAST(COALESCE(SUM(quantity),0) AS DECIMAL(14,3)) quantity FROM stock_movements WHERE item_id=${itemId} AND warehouse=${warehouse}`,
+      sql`SELECT CAST(COALESCE(SUM(quantity),0) AS DECIMAL(14,3)) quantity FROM ${branchTable("stock_movements")} stock_movements WHERE item_id=${itemId} AND warehouse=${warehouse}`,
     );
     return String(
       (row as unknown as Array<{ quantity: string }>)[0]?.quantity ?? "0.000",
@@ -181,7 +198,12 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
     // would hide its cost from every later sale's COGS. Rows with stock still
     // come first and stay in FIFO order, so the stocked case is unchanged.
     const [row] = await this.db.execute(
-      sql`SELECT unit_cost unitCost FROM stock_batches WHERE item_id=${itemId} AND warehouse=${warehouse} ORDER BY (remaining_quantity>0) DESC, received_at ASC, id ASC LIMIT 1`,
+      sql`SELECT unit_cost unitCost FROM ${branchTable("stock_batches")} stock_batches
+        WHERE item_id=${itemId} AND warehouse=${warehouse}
+        ORDER BY (remaining_quantity>0) DESC,
+          CASE WHEN remaining_quantity>0 THEN received_at END ASC,
+          CASE WHEN remaining_quantity>0 THEN id END ASC,
+          received_at DESC, id DESC LIMIT 1`,
     );
     return String(
       (row as unknown as Array<{ unitCost: string }>)[0]?.unitCost ??
@@ -192,7 +214,7 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
     await this.db
       .update(stocktakes)
       .set({ status: "confirmed", note, confirmedAt: new Date() })
-      .where(eq(stocktakes.id, id));
+      .where(branchCondition(stocktakes, eq(stocktakes.id, id)));
   }
   async detail(id: number) {
     const [header] = await this.db
@@ -210,7 +232,7 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
       })
       .from(stocktakes)
       .innerJoin(users, eq(users.id, stocktakes.createdBy))
-      .where(eq(stocktakes.id, id));
+      .where(branchCondition(stocktakes, eq(stocktakes.id, id)));
     if (!header) return undefined;
     const lines = await this.db
       .select({
@@ -226,8 +248,13 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
         >`CASE WHEN ${stocktakeLines.countedQuantity} IS NULL THEN NULL ELSE CAST(${stocktakeLines.countedQuantity}-${stocktakeLines.recordedQuantity} AS DECIMAL(14,3)) END`,
       })
       .from(stocktakeLines)
-      .innerJoin(items, eq(items.id, stocktakeLines.itemId))
-      .where(eq(stocktakeLines.stocktakeId, id))
+      .innerJoin(
+        items,
+        branchCondition(items, eq(items.id, stocktakeLines.itemId)),
+      )
+      .where(
+        branchCondition(stocktakeLines, eq(stocktakeLines.stocktakeId, id)),
+      )
       .orderBy(asc(items.name));
     return { ...header, lines };
   }
@@ -248,7 +275,14 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
       })
       .from(stocktakes)
       .innerJoin(users, eq(users.id, stocktakes.createdBy))
-      .leftJoin(stocktakeLines, eq(stocktakeLines.stocktakeId, stocktakes.id))
+      .leftJoin(
+        stocktakeLines,
+        branchCondition(
+          stocktakeLines,
+          eq(stocktakeLines.stocktakeId, stocktakes.id),
+        ),
+      )
+      .where(branchCondition(stocktakes))
       .groupBy(stocktakes.id, users.name)
       .orderBy(desc(stocktakes.createdAt), desc(stocktakes.id));
   }
@@ -265,7 +299,7 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
     recordedQuantity: string;
     countedQuantity: string;
   }) {
-    await this.db.insert(stocktakeLines).values(data);
+    await this.db.insert(stocktakeLines).values(branchValues(data));
   }
   receive(input: Record<string, unknown>) {
     return this.inventory.receive(

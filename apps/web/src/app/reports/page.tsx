@@ -8,6 +8,7 @@ import { cairoCalendarDate } from "@/lib/cairo-date";
 import type { ReportTable as TableData } from "@/models/reports-model";
 import { isReportRangeReady } from "@/models/reports-model";
 import { getReports, type ReportsData } from "@/services/reports-service";
+import { useBranch } from "@/components/branches/branch-provider";
 
 const today = cairoCalendarDate(),
   monthStart = `${today.slice(0, 7)}-01`;
@@ -134,7 +135,12 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
           number("code", "الكود"),
           { key: "itemName", label: "الصنف" },
           { key: "warehouse", label: "المخزن", kind: "warehouse" },
-          { key: "movementType", label: "الحركة", kind: "event", labelSet: "movement" },
+          {
+            key: "movementType",
+            label: "الحركة",
+            kind: "event",
+            labelSet: "movement",
+          },
           number("quantity", "الكمية"),
           money("totalCost", "التكلفة"),
           {
@@ -151,7 +157,12 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
         columns: [
           number("id", "المستند"),
           date("createdAt", "التاريخ"),
-          { key: "kind", label: "النوع", kind: "event", labelSet: "stocktakeKind" },
+          {
+            key: "kind",
+            label: "النوع",
+            kind: "event",
+            labelSet: "stocktakeKind",
+          },
           { key: "warehouse", label: "المخزن", kind: "warehouse" },
           number("lineCount", "الأصناف"),
           number("shortageQuantity", "العجز"),
@@ -215,7 +226,12 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
         columns: [
           date("occurredAt", "التاريخ"),
           { key: "employeeName", label: "الموظف" },
-          { key: "type", label: "النوع", kind: "event", labelSet: "salaryHistory" },
+          {
+            key: "type",
+            label: "النوع",
+            kind: "event",
+            labelSet: "salaryHistory",
+          },
           money("amount", "المبلغ"),
           { key: "periodMonth", label: "شهر الاستحقاق" },
           { key: "note", label: "ملاحظات" },
@@ -323,6 +339,7 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
   ];
 }
 export default function ReportsPage() {
+  const { branch } = useBranch();
   const [from, setFrom] = useState(monthStart),
     [to, setTo] = useState(today),
     [tab, setTab] = useState<Tab>("sales");
@@ -413,6 +430,7 @@ export default function ReportsPage() {
         ))}
       </nav>
       <div className="hidden print:block">
+        <p>{branch.name}</p>
         <p>
           الفترة: {from} — {to}
         </p>

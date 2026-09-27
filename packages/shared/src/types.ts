@@ -6,6 +6,15 @@ export type AuthUser = {
   id: number;
   name: string;
   role: Role;
+  /** Cashiers belong to one branch; admins can select any branch. */
+  branchId?: number | null;
+};
+
+export type Branch = {
+  id: number;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
 };
 
 export type Session = {

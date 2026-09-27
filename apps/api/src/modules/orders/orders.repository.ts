@@ -1,11 +1,9 @@
 import {
-  and,
-  asc,
-  desc,
-  eq,
-  inArray,
-  sql,
-} from "drizzle-orm";
+  branchCondition,
+  branchValues,
+  branchTransaction,
+} from "../../db/branch-context.js";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import {
   externalModifierGroups,
@@ -34,7 +32,7 @@ export class OrdersRepository {
   transaction<T>(
     fn: (repo: OrdersRepository, inventory: InventoryTransaction) => Promise<T>,
   ): Promise<T> {
-    return this.db.transaction((tx) => {
+    return branchTransaction(this.db, (tx) => {
       const transactionDb = tx as unknown as Db;
       return fn(
         new OrdersRepository(transactionDb),
@@ -53,9 +51,12 @@ export class OrdersRepository {
       })
       .from(items)
       .where(
-        inArray(
-          items.id,
-          [...new Set(ids)].sort((a, b) => a - b),
+        branchCondition(
+          items,
+          inArray(
+            items.id,
+            [...new Set(ids)].sort((a, b) => a - b),
+          ),
         ),
       )
       .orderBy(asc(items.id))
@@ -68,18 +69,33 @@ export class OrdersRepository {
     const productsRows = await this.db
       .select()
       .from(externalProducts)
-      .where(inArray(externalProducts.externalId, productIds))
+      .where(
+        branchCondition(
+          externalProducts,
+          inArray(externalProducts.externalId, productIds),
+        ),
+      )
       .orderBy(asc(externalProducts.externalId))
       .for("update");
     const [sizes, groups, baseIngredients] = await Promise.all([
       this.db
         .select()
         .from(externalProductSizes)
-        .where(inArray(externalProductSizes.externalProductId, productIds)),
+        .where(
+          branchCondition(
+            externalProductSizes,
+            inArray(externalProductSizes.externalProductId, productIds),
+          ),
+        ),
       this.db
         .select()
         .from(externalModifierGroups)
-        .where(inArray(externalModifierGroups.externalProductId, productIds)),
+        .where(
+          branchCondition(
+            externalModifierGroups,
+            inArray(externalModifierGroups.externalProductId, productIds),
+          ),
+        ),
       this.db
         .select({
           externalProductId: externalProductIngredients.externalProductId,
@@ -88,9 +104,18 @@ export class OrdersRepository {
           quantity: externalProductIngredients.quantity,
         })
         .from(externalProductIngredients)
-        .innerJoin(items, eq(externalProductIngredients.itemId, items.id))
+        .innerJoin(
+          items,
+          branchCondition(
+            items,
+            eq(externalProductIngredients.itemId, items.id),
+          ),
+        )
         .where(
-          inArray(externalProductIngredients.externalProductId, productIds),
+          branchCondition(
+            externalProductIngredients,
+            inArray(externalProductIngredients.externalProductId, productIds),
+          ),
         ),
     ]);
 
@@ -105,7 +130,13 @@ export class OrdersRepository {
             .select()
             .from(externalModifierOptions)
             .where(
-              inArray(externalModifierOptions.externalModifierGroupId, groupIds),
+              branchCondition(
+                externalModifierOptions,
+                inArray(
+                  externalModifierOptions.externalModifierGroupId,
+                  groupIds,
+                ),
+              ),
             ),
       sizeIds.length === 0
         ? []
@@ -117,8 +148,19 @@ export class OrdersRepository {
               quantity: externalSizeIngredients.quantity,
             })
             .from(externalSizeIngredients)
-            .innerJoin(items, eq(externalSizeIngredients.itemId, items.id))
-            .where(inArray(externalSizeIngredients.externalSizeId, sizeIds)),
+            .innerJoin(
+              items,
+              branchCondition(
+                items,
+                eq(externalSizeIngredients.itemId, items.id),
+              ),
+            )
+            .where(
+              branchCondition(
+                externalSizeIngredients,
+                inArray(externalSizeIngredients.externalSizeId, sizeIds),
+              ),
+            ),
     ]);
 
     const optionIds = options.map((option) => option.externalId);
@@ -136,20 +178,25 @@ export class OrdersRepository {
             .from(externalModifierIngredients)
             .innerJoin(
               items,
-              eq(externalModifierIngredients.itemId, items.id),
+              branchCondition(
+                items,
+                eq(externalModifierIngredients.itemId, items.id),
+              ),
             )
             .where(
-              inArray(
-                externalModifierIngredients.externalModifierOptionId,
-                optionIds,
+              branchCondition(
+                externalModifierIngredients,
+                inArray(
+                  externalModifierIngredients.externalModifierOptionId,
+                  optionIds,
+                ),
               ),
             );
 
     return productsRows.map((product) => ({
       ...product,
       ingredients: baseIngredients.filter(
-        (ingredient) =>
-          ingredient.externalProductId === product.externalId,
+        (ingredient) => ingredient.externalProductId === product.externalId,
       ),
       sizes: sizes
         .filter(
@@ -190,12 +237,14 @@ export class OrdersRepository {
     return this.db
       .select({ externalId: externalProducts.externalId })
       .from(externalProducts)
-      .where(eq(externalProducts.isCurrent, true))
+      .where(
+        branchCondition(externalProducts, eq(externalProducts.isCurrent, true)),
+      )
       .orderBy(asc(externalProducts.externalId));
   }
 
   async createOrder(data: typeof orders.$inferInsert) {
-    const [result] = await this.db.insert(orders).values(data);
+    const [result] = await this.db.insert(orders).values(branchValues(data));
     return result.insertId;
   }
 
@@ -204,7 +253,10 @@ export class OrdersRepository {
       .select({ id: shifts.id })
       .from(shifts)
       .where(
-        and(eq(shifts.openSlot, 1), eq(shifts.cashierUserId, cashierUserId)),
+        branchCondition(
+          shifts,
+          and(eq(shifts.openSlot, 1), eq(shifts.cashierUserId, cashierUserId)),
+        ),
       )
       .for("update");
     return row;
@@ -218,35 +270,45 @@ export class OrdersRepository {
         requestFingerprint: orders.requestFingerprint,
       })
       .from(orders)
-      .where(eq(orders.clientRequestId, clientRequestId));
+      .where(
+        branchCondition(orders, eq(orders.clientRequestId, clientRequestId)),
+      );
     return row;
   }
 
   async createLine(data: typeof orderLines.$inferInsert) {
-    const [result] = await this.db.insert(orderLines).values(data);
+    const [result] = await this.db
+      .insert(orderLines)
+      .values(branchValues(data));
     return result.insertId;
   }
 
   async createLineModifier(data: typeof orderLineModifiers.$inferInsert) {
-    await this.db.insert(orderLineModifiers).values(data);
+    await this.db.insert(orderLineModifiers).values(branchValues(data));
   }
 
   async updateLine(
     id: number,
     data: Pick<typeof orderLines.$inferInsert, "totalCost" | "hasStockDeficit">,
   ) {
-    await this.db.update(orderLines).set(data).where(eq(orderLines.id, id));
+    await this.db
+      .update(orderLines)
+      .set(data)
+      .where(branchCondition(orderLines, eq(orderLines.id, id)));
   }
 
   async updateOrder(
     id: number,
     data: Pick<typeof orders.$inferInsert, "totalCost" | "isNegativeStock">,
   ) {
-    await this.db.update(orders).set(data).where(eq(orders.id, id));
+    await this.db
+      .update(orders)
+      .set(data)
+      .where(branchCondition(orders, eq(orders.id, id)));
   }
 
   async createAllocation(data: typeof orderLineAllocations.$inferInsert) {
-    await this.db.insert(orderLineAllocations).values(data);
+    await this.db.insert(orderLineAllocations).values(branchValues(data));
   }
 
   listRecent(limit = 50) {
@@ -270,6 +332,7 @@ export class OrdersRepository {
       })
       .from(orders)
       .innerJoin(users, eq(orders.cashierId, users.id))
+      .where(branchCondition(orders))
       .orderBy(desc(orders.createdAt), desc(orders.id))
       .limit(limit);
   }
@@ -295,7 +358,7 @@ export class OrdersRepository {
       })
       .from(orders)
       .innerJoin(users, eq(orders.cashierId, users.id))
-      .where(eq(orders.id, id));
+      .where(branchCondition(orders, eq(orders.id, id)));
     return row;
   }
 
@@ -318,7 +381,7 @@ export class OrdersRepository {
         hasStockDeficit: orderLines.hasStockDeficit,
       })
       .from(orderLines)
-      .where(eq(orderLines.orderId, orderId))
+      .where(branchCondition(orderLines, eq(orderLines.orderId, orderId)))
       .orderBy(asc(orderLines.id));
   }
 
@@ -342,13 +405,30 @@ export class OrdersRepository {
         )`,
       })
       .from(orderLineAllocations)
-      .innerJoin(items, eq(orderLineAllocations.itemId, items.id))
-      .leftJoin(stockBatches, eq(orderLineAllocations.batchId, stockBatches.id))
+      .innerJoin(
+        items,
+        branchCondition(items, eq(orderLineAllocations.itemId, items.id)),
+      )
+      .leftJoin(
+        stockBatches,
+        branchCondition(
+          stockBatches,
+          eq(orderLineAllocations.batchId, stockBatches.id),
+        ),
+      )
       .innerJoin(
         stockMovements,
-        eq(orderLineAllocations.stockMovementId, stockMovements.id),
+        branchCondition(
+          stockMovements,
+          eq(orderLineAllocations.stockMovementId, stockMovements.id),
+        ),
       )
-      .where(inArray(orderLineAllocations.orderLineId, orderLineIds))
+      .where(
+        branchCondition(
+          orderLineAllocations,
+          inArray(orderLineAllocations.orderLineId, orderLineIds),
+        ),
+      )
       .orderBy(asc(orderLineAllocations.id));
   }
 
@@ -357,7 +437,12 @@ export class OrdersRepository {
     return this.db
       .select()
       .from(orderLineModifiers)
-      .where(inArray(orderLineModifiers.orderLineId, orderLineIds))
+      .where(
+        branchCondition(
+          orderLineModifiers,
+          inArray(orderLineModifiers.orderLineId, orderLineIds),
+        ),
+      )
       .orderBy(asc(orderLineModifiers.id));
   }
 }

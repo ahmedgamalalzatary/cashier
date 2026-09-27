@@ -1,3 +1,8 @@
+import {
+  branchCondition,
+  branchValues,
+  branchTransaction,
+} from "../../db/branch-context.js";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import {
@@ -33,16 +38,31 @@ export class ProductsRepository implements ProductsRepositoryContract {
   ) {}
 
   applyCatalog(catalog: ExternalCatalog): Promise<void> {
-    return this.db.transaction(async (tx) => {
+    return branchTransaction(this.db, async (tx) => {
       const now = new Date();
       // Products first: a checkout locks external_products FOR UPDATE before
       // reading sizes, groups and options, so touching products first makes a
       // concurrent refresh block there instead of changing prices mid-sale.
-      await tx.update(externalProducts).set({ isCurrent: false });
-      await tx.update(externalCategories).set({ isCurrent: false });
-      await tx.update(externalProductSizes).set({ isCurrent: false });
-      await tx.update(externalModifierGroups).set({ isCurrent: false });
-      await tx.update(externalModifierOptions).set({ isCurrent: false });
+      await tx
+        .update(externalProducts)
+        .set({ isCurrent: false })
+        .where(branchCondition(externalProducts));
+      await tx
+        .update(externalCategories)
+        .set({ isCurrent: false })
+        .where(branchCondition(externalCategories));
+      await tx
+        .update(externalProductSizes)
+        .set({ isCurrent: false })
+        .where(branchCondition(externalProductSizes));
+      await tx
+        .update(externalModifierGroups)
+        .set({ isCurrent: false })
+        .where(branchCondition(externalModifierGroups));
+      await tx
+        .update(externalModifierOptions)
+        .set({ isCurrent: false })
+        .where(branchCondition(externalModifierOptions));
 
       const categoryRows = catalog.categories.map((category) => ({
         ...category,
@@ -52,7 +72,7 @@ export class ProductsRepository implements ProductsRepositoryContract {
       for (const categoryChunk of chunks(categoryRows)) {
         await tx
           .insert(externalCategories)
-          .values(categoryChunk)
+          .values(branchValues(categoryChunk))
           .onDuplicateKeyUpdate({
             set: {
               nameAr: sql`values(name_ar)`,
@@ -77,7 +97,7 @@ export class ProductsRepository implements ProductsRepositoryContract {
       for (const productChunk of chunks(productRows)) {
         await tx
           .insert(externalProducts)
-          .values(productChunk)
+          .values(branchValues(productChunk))
           .onDuplicateKeyUpdate({
             set: {
               externalCategoryId: sql`values(external_category_id)`,
@@ -110,7 +130,7 @@ export class ProductsRepository implements ProductsRepositoryContract {
       for (const sizeChunk of chunks(sizeRows)) {
         await tx
           .insert(externalProductSizes)
-          .values(sizeChunk)
+          .values(branchValues(sizeChunk))
           .onDuplicateKeyUpdate({
             set: {
               externalProductId: sql`values(external_product_id)`,
@@ -134,7 +154,7 @@ export class ProductsRepository implements ProductsRepositoryContract {
       for (const groupChunk of chunks(groupRows)) {
         await tx
           .insert(externalModifierGroups)
-          .values(groupChunk)
+          .values(branchValues(groupChunk))
           .onDuplicateKeyUpdate({
             set: {
               externalProductId: sql`values(external_product_id)`,
@@ -160,7 +180,7 @@ export class ProductsRepository implements ProductsRepositoryContract {
       for (const optionChunk of chunks(optionRows)) {
         await tx
           .insert(externalModifierOptions)
-          .values(optionChunk)
+          .values(branchValues(optionChunk))
           .onDuplicateKeyUpdate({
             set: {
               nameAr: sql`values(name_ar)`,
@@ -175,12 +195,14 @@ export class ProductsRepository implements ProductsRepositoryContract {
       if (this.recordCatalogSuccess) {
         await tx
           .insert(externalCatalogSync)
-          .values({
-            id: 1,
-            lastSuccessfulSyncAt: now,
-            lastAttemptAt: now,
-            lastError: null,
-          })
+          .values(
+            branchValues({
+              id: 1,
+              lastSuccessfulSyncAt: now,
+              lastAttemptAt: now,
+              lastError: null,
+            }),
+          )
           .onDuplicateKeyUpdate({
             set: {
               lastSuccessfulSyncAt: now,
@@ -196,7 +218,7 @@ export class ProductsRepository implements ProductsRepositoryContract {
     const now = new Date();
     await this.db
       .insert(externalCatalogSync)
-      .values({ id: 1, lastAttemptAt: now, lastError: message })
+      .values(branchValues({ id: 1, lastAttemptAt: now, lastError: message }))
       .onDuplicateKeyUpdate({
         set: { lastAttemptAt: now, lastError: message },
       });
@@ -206,7 +228,9 @@ export class ProductsRepository implements ProductsRepositoryContract {
     const [sync] = await this.db
       .select()
       .from(externalCatalogSync)
-      .where(eq(externalCatalogSync.id, 1));
+      .where(
+        branchCondition(externalCatalogSync, eq(externalCatalogSync.id, 1)),
+      );
     if (!sync?.lastSuccessfulSyncAt) return null;
 
     const [
@@ -222,25 +246,50 @@ export class ProductsRepository implements ProductsRepositoryContract {
       this.db
         .select()
         .from(externalCategories)
-        .where(eq(externalCategories.isCurrent, true))
+        .where(
+          branchCondition(
+            externalCategories,
+            eq(externalCategories.isCurrent, true),
+          ),
+        )
         .orderBy(asc(externalCategories.displayOrder)),
       this.db
         .select()
         .from(externalProducts)
-        .where(eq(externalProducts.isCurrent, true))
+        .where(
+          branchCondition(
+            externalProducts,
+            eq(externalProducts.isCurrent, true),
+          ),
+        )
         .orderBy(asc(externalProducts.nameAr)),
       this.db
         .select()
         .from(externalProductSizes)
-        .where(eq(externalProductSizes.isCurrent, true)),
+        .where(
+          branchCondition(
+            externalProductSizes,
+            eq(externalProductSizes.isCurrent, true),
+          ),
+        ),
       this.db
         .select()
         .from(externalModifierGroups)
-        .where(eq(externalModifierGroups.isCurrent, true)),
+        .where(
+          branchCondition(
+            externalModifierGroups,
+            eq(externalModifierGroups.isCurrent, true),
+          ),
+        ),
       this.db
         .select()
         .from(externalModifierOptions)
-        .where(eq(externalModifierOptions.isCurrent, true)),
+        .where(
+          branchCondition(
+            externalModifierOptions,
+            eq(externalModifierOptions.isCurrent, true),
+          ),
+        ),
       this.db
         .select({
           externalProductId: externalProductIngredients.externalProductId,
@@ -250,12 +299,20 @@ export class ProductsRepository implements ProductsRepositoryContract {
         .from(externalProductIngredients)
         .innerJoin(
           externalProducts,
-          eq(
-            externalProductIngredients.externalProductId,
-            externalProducts.externalId,
+          branchCondition(
+            externalProducts,
+            eq(
+              externalProductIngredients.externalProductId,
+              externalProducts.externalId,
+            ),
           ),
         )
-        .where(eq(externalProducts.isCurrent, true)),
+        .where(
+          branchCondition(
+            externalProductIngredients,
+            eq(externalProducts.isCurrent, true),
+          ),
+        ),
       this.db
         .select({
           externalSizeId: externalSizeIngredients.externalSizeId,
@@ -265,12 +322,20 @@ export class ProductsRepository implements ProductsRepositoryContract {
         .from(externalSizeIngredients)
         .innerJoin(
           externalProductSizes,
-          eq(
-            externalSizeIngredients.externalSizeId,
-            externalProductSizes.externalId,
+          branchCondition(
+            externalProductSizes,
+            eq(
+              externalSizeIngredients.externalSizeId,
+              externalProductSizes.externalId,
+            ),
           ),
         )
-        .where(eq(externalProductSizes.isCurrent, true)),
+        .where(
+          branchCondition(
+            externalSizeIngredients,
+            eq(externalProductSizes.isCurrent, true),
+          ),
+        ),
       this.db
         .select({
           externalModifierOptionId:
@@ -281,12 +346,20 @@ export class ProductsRepository implements ProductsRepositoryContract {
         .from(externalModifierIngredients)
         .innerJoin(
           externalModifierOptions,
-          eq(
-            externalModifierIngredients.externalModifierOptionId,
-            externalModifierOptions.externalId,
+          branchCondition(
+            externalModifierOptions,
+            eq(
+              externalModifierIngredients.externalModifierOptionId,
+              externalModifierOptions.externalId,
+            ),
           ),
         )
-        .where(eq(externalModifierOptions.isCurrent, true)),
+        .where(
+          branchCondition(
+            externalModifierIngredients,
+            eq(externalModifierOptions.isCurrent, true),
+          ),
+        ),
     ]);
 
     return {
@@ -366,9 +439,12 @@ export class ProductsRepository implements ProductsRepositoryContract {
       .select({ externalId: externalProducts.externalId })
       .from(externalProducts)
       .where(
-        and(
-          eq(externalProducts.externalId, externalProductId),
-          eq(externalProducts.isCurrent, true),
+        branchCondition(
+          externalProducts,
+          and(
+            eq(externalProducts.externalId, externalProductId),
+            eq(externalProducts.isCurrent, true),
+          ),
         ),
       );
     if (!product) {
@@ -379,9 +455,12 @@ export class ProductsRepository implements ProductsRepositoryContract {
         .select({ externalId: externalProductSizes.externalId })
         .from(externalProductSizes)
         .where(
-          and(
-            eq(externalProductSizes.externalProductId, externalProductId),
-            eq(externalProductSizes.isCurrent, true),
+          branchCondition(
+            externalProductSizes,
+            and(
+              eq(externalProductSizes.externalProductId, externalProductId),
+              eq(externalProductSizes.isCurrent, true),
+            ),
           ),
         ),
       this.db
@@ -389,16 +468,22 @@ export class ProductsRepository implements ProductsRepositoryContract {
         .from(externalModifierOptions)
         .innerJoin(
           externalModifierGroups,
-          eq(
-            externalModifierOptions.externalModifierGroupId,
-            externalModifierGroups.externalId,
+          branchCondition(
+            externalModifierGroups,
+            eq(
+              externalModifierOptions.externalModifierGroupId,
+              externalModifierGroups.externalId,
+            ),
           ),
         )
         .where(
-          and(
-            eq(externalModifierGroups.externalProductId, externalProductId),
-            eq(externalModifierGroups.isCurrent, true),
-            eq(externalModifierOptions.isCurrent, true),
+          branchCondition(
+            externalModifierOptions,
+            and(
+              eq(externalModifierGroups.externalProductId, externalProductId),
+              eq(externalModifierGroups.isCurrent, true),
+              eq(externalModifierOptions.isCurrent, true),
+            ),
           ),
         ),
     ]);
@@ -413,14 +498,17 @@ export class ProductsRepository implements ProductsRepositoryContract {
     externalProductId: number,
     data: ProductStockSetupInput,
   ): Promise<void> {
-    return this.db.transaction(async (tx) => {
+    return branchTransaction(this.db, async (tx) => {
       const [product] = await tx
         .select({ externalId: externalProducts.externalId })
         .from(externalProducts)
         .where(
-          and(
-            eq(externalProducts.externalId, externalProductId),
-            eq(externalProducts.isCurrent, true),
+          branchCondition(
+            externalProducts,
+            and(
+              eq(externalProducts.externalId, externalProductId),
+              eq(externalProducts.isCurrent, true),
+            ),
           ),
         )
         .for("update");
@@ -429,9 +517,12 @@ export class ProductsRepository implements ProductsRepositoryContract {
         .select({ externalId: externalProductSizes.externalId })
         .from(externalProductSizes)
         .where(
-          and(
-            eq(externalProductSizes.externalProductId, externalProductId),
-            eq(externalProductSizes.isCurrent, true),
+          branchCondition(
+            externalProductSizes,
+            and(
+              eq(externalProductSizes.externalProductId, externalProductId),
+              eq(externalProductSizes.isCurrent, true),
+            ),
           ),
         )
         .orderBy(asc(externalProductSizes.externalId))
@@ -441,16 +532,22 @@ export class ProductsRepository implements ProductsRepositoryContract {
         .from(externalModifierOptions)
         .innerJoin(
           externalModifierGroups,
-          eq(
-            externalModifierOptions.externalModifierGroupId,
-            externalModifierGroups.externalId,
+          branchCondition(
+            externalModifierGroups,
+            eq(
+              externalModifierOptions.externalModifierGroupId,
+              externalModifierGroups.externalId,
+            ),
           ),
         )
         .where(
-          and(
-            eq(externalModifierGroups.externalProductId, externalProductId),
-            eq(externalModifierGroups.isCurrent, true),
-            eq(externalModifierOptions.isCurrent, true),
+          branchCondition(
+            externalModifierOptions,
+            and(
+              eq(externalModifierGroups.externalProductId, externalProductId),
+              eq(externalModifierGroups.isCurrent, true),
+              eq(externalModifierOptions.isCurrent, true),
+            ),
           ),
         )
         .orderBy(asc(externalModifierOptions.externalId))
@@ -497,9 +594,12 @@ export class ProductsRepository implements ProductsRepositoryContract {
               .select({ itemId: externalProductIngredients.itemId })
               .from(externalProductIngredients)
               .where(
-                eq(
-                  externalProductIngredients.externalProductId,
-                  externalProductId,
+                branchCondition(
+                  externalProductIngredients,
+                  eq(
+                    externalProductIngredients.externalProductId,
+                    externalProductId,
+                  ),
                 ),
               ),
             lockedSizes.length > 0
@@ -507,9 +607,12 @@ export class ProductsRepository implements ProductsRepositoryContract {
                   .select({ itemId: externalSizeIngredients.itemId })
                   .from(externalSizeIngredients)
                   .where(
-                    inArray(
-                      externalSizeIngredients.externalSizeId,
-                      lockedSizes.map((size) => size.externalId),
+                    branchCondition(
+                      externalSizeIngredients,
+                      inArray(
+                        externalSizeIngredients.externalSizeId,
+                        lockedSizes.map((size) => size.externalId),
+                      ),
                     ),
                   )
               : Promise.resolve([]),
@@ -518,9 +621,12 @@ export class ProductsRepository implements ProductsRepositoryContract {
                   .select({ itemId: externalModifierIngredients.itemId })
                   .from(externalModifierIngredients)
                   .where(
-                    inArray(
-                      externalModifierIngredients.externalModifierOptionId,
-                      lockedOptions.map((option) => option.externalId),
+                    branchCondition(
+                      externalModifierIngredients,
+                      inArray(
+                        externalModifierIngredients.externalModifierOptionId,
+                        lockedOptions.map((option) => option.externalId),
+                      ),
                     ),
                   )
               : Promise.resolve([]),
@@ -533,7 +639,7 @@ export class ProductsRepository implements ProductsRepositoryContract {
         const validItems = await tx
           .select({ id: items.id, isActive: items.isActive })
           .from(items)
-          .where(inArray(items.id, uniqueItemIds))
+          .where(branchCondition(items, inArray(items.id, uniqueItemIds)))
           .orderBy(asc(items.id))
           .for("update");
         if (
@@ -552,7 +658,10 @@ export class ProductsRepository implements ProductsRepositoryContract {
       await tx
         .delete(externalProductIngredients)
         .where(
-          eq(externalProductIngredients.externalProductId, externalProductId),
+          branchCondition(
+            externalProductIngredients,
+            eq(externalProductIngredients.externalProductId, externalProductId),
+          ),
         );
       const baseIngredientRows = data.baseIngredients.map((ingredient) => ({
         externalProductId,
@@ -560,7 +669,9 @@ export class ProductsRepository implements ProductsRepositoryContract {
         quantity: ingredient.quantity.toFixed(3),
       }));
       for (const ingredientChunk of chunks(baseIngredientRows)) {
-        await tx.insert(externalProductIngredients).values(ingredientChunk);
+        await tx
+          .insert(externalProductIngredients)
+          .values(branchValues(ingredientChunk));
       }
 
       const sizeIngredientRows = data.sizes.flatMap((size) =>
@@ -574,11 +685,16 @@ export class ProductsRepository implements ProductsRepositoryContract {
         await tx
           .delete(externalSizeIngredients)
           .where(
-            eq(externalSizeIngredients.externalSizeId, size.externalSizeId),
+            branchCondition(
+              externalSizeIngredients,
+              eq(externalSizeIngredients.externalSizeId, size.externalSizeId),
+            ),
           );
       }
       for (const ingredientChunk of chunks(sizeIngredientRows)) {
-        await tx.insert(externalSizeIngredients).values(ingredientChunk);
+        await tx
+          .insert(externalSizeIngredients)
+          .values(branchValues(ingredientChunk));
       }
 
       const modifierIngredientRows = data.modifiers.flatMap((modifier) =>
@@ -594,23 +710,31 @@ export class ProductsRepository implements ProductsRepositoryContract {
         await tx
           .delete(externalModifierIngredients)
           .where(
-            eq(
-              externalModifierIngredients.externalModifierOptionId,
-              modifier.externalModifierOptionId,
+            branchCondition(
+              externalModifierIngredients,
+              eq(
+                externalModifierIngredients.externalModifierOptionId,
+                modifier.externalModifierOptionId,
+              ),
             ),
           );
         await tx
           .update(externalModifierOptions)
           .set({ stockEffect: modifier.stockEffect })
           .where(
-            eq(
-              externalModifierOptions.externalId,
-              modifier.externalModifierOptionId,
+            branchCondition(
+              externalModifierOptions,
+              eq(
+                externalModifierOptions.externalId,
+                modifier.externalModifierOptionId,
+              ),
             ),
           );
       }
       for (const ingredientChunk of chunks(modifierIngredientRows)) {
-        await tx.insert(externalModifierIngredients).values(ingredientChunk);
+        await tx
+          .insert(externalModifierIngredients)
+          .values(branchValues(ingredientChunk));
       }
     });
   }

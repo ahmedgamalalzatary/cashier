@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Coffee, Menu } from "lucide-react";
 import { normalizePath } from "@/lib/auth";
 import { Sidebar } from "./sidebar";
+import { WorkspaceBar } from "../branches/workspace-bar";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = normalizePath(usePathname());
@@ -23,7 +24,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [navOpen]);
 
-  if (pathname === "/login") return <main className="min-h-screen">{children}</main>;
+  if (pathname === "/login")
+    return <main className="min-h-screen">{children}</main>;
 
   return (
     <div className="min-h-screen lg:flex">
@@ -44,7 +46,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         </button>
       </header>
       <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
-      <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
+      <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
+        <WorkspaceBar />
+        {children}
+      </main>
     </div>
   );
 }

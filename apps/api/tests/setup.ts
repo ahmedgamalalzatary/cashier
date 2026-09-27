@@ -84,6 +84,10 @@ beforeEach(async () => {
   await cleanupConnection.query("SET FOREIGN_KEY_CHECKS = 0");
   try {
     await cleanupConnection.query(deletes);
+    await cleanupConnection.query("DELETE FROM branches WHERE id <> 1");
+    await cleanupConnection.query(
+      "UPDATE branches SET name = 'الفرع الرئيسي', is_active = true WHERE id = 1",
+    );
   } finally {
     await cleanupConnection.query("SET FOREIGN_KEY_CHECKS = 1");
   }

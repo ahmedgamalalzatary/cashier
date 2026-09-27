@@ -1,3 +1,8 @@
+import {
+  branchCondition,
+  branchValues,
+  branchTransaction,
+} from "../../db/branch-context.js";
 import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import { employees, shifts, users } from "../../db/schema.js";
@@ -10,7 +15,7 @@ export class EmployeesRepository {
   constructor(private db: Db) {}
 
   transaction<T>(fn: (repo: EmployeesRepository) => Promise<T>): Promise<T> {
-    return this.db.transaction((tx) =>
+    return branchTransaction(this.db, (tx) =>
       fn(new EmployeesRepository(tx as unknown as Db)),
     );
   }
@@ -34,17 +39,20 @@ export class EmployeesRepository {
       })
       .from(employees)
       .leftJoin(users, eq(users.employeeId, employees.id))
+      .where(branchCondition(employees))
       .orderBy(employees.name);
   }
 
   async create(data: EmployeeInput) {
-    const [result] = await this.db.insert(employees).values({
-      ...data,
-      payRate:
-        data.payRate === null || data.payRate === undefined
-          ? null
-          : data.payRate.toFixed(2),
-    });
+    const [result] = await this.db.insert(employees).values(
+      branchValues({
+        ...data,
+        payRate:
+          data.payRate === null || data.payRate === undefined
+            ? null
+            : data.payRate.toFixed(2),
+      }),
+    );
     return result.insertId;
   }
 
@@ -58,21 +66,21 @@ export class EmployeesRepository {
           ? { payRate: payRate === null ? null : payRate.toFixed(2) }
           : {}),
       })
-      .where(eq(employees.id, id));
+      .where(branchCondition(employees, eq(employees.id, id)));
   }
 
   async syncCashierName(employeeId: number, name: string) {
     await this.db
       .update(users)
       .set({ name })
-      .where(eq(users.employeeId, employeeId));
+      .where(branchCondition(users, eq(users.employeeId, employeeId)));
   }
 
   async findByIdForUpdate(id: number) {
     const [row] = await this.db
       .select()
       .from(employees)
-      .where(eq(employees.id, id))
+      .where(branchCondition(employees, eq(employees.id, id)))
       .for("update");
     return row;
   }
@@ -81,7 +89,7 @@ export class EmployeesRepository {
     const [row] = await this.db
       .select()
       .from(users)
-      .where(eq(users.employeeId, employeeId))
+      .where(branchCondition(users, eq(users.employeeId, employeeId)))
       .for("update");
     return row;
   }
@@ -92,10 +100,12 @@ export class EmployeesRepository {
     username: string;
     passwordHash: string;
   }) {
-    const [result] = await this.db.insert(users).values({
-      ...input,
-      role: "cashier",
-    });
+    const [result] = await this.db.insert(users).values(
+      branchValues({
+        ...input,
+        role: "cashier",
+      }),
+    );
     return result.insertId;
   }
 
@@ -106,14 +116,19 @@ export class EmployeesRepository {
         isActive: false,
         tokenVersion: sql`${users.tokenVersion} + 1`,
       })
-      .where(eq(users.id, userId));
+      .where(branchCondition(users, eq(users.id, userId)));
   }
 
   async hasOpenShift(employeeId: number) {
     const [row] = await this.db
       .select({ id: shifts.id })
       .from(shifts)
-      .where(and(eq(shifts.employeeId, employeeId), eq(shifts.openSlot, 1)))
+      .where(
+        branchCondition(
+          shifts,
+          and(eq(shifts.employeeId, employeeId), eq(shifts.openSlot, 1)),
+        ),
+      )
       .limit(1);
     return row?.id !== undefined;
   }
@@ -131,13 +146,13 @@ export class EmployeesRepository {
         isActive: true,
         tokenVersion: sql`${users.tokenVersion} + 1`,
       })
-      .where(eq(users.id, input.userId));
+      .where(branchCondition(users, eq(users.id, input.userId)));
   }
 
   async deactivate(employeeId: number) {
     await this.db
       .update(employees)
       .set({ isActive: false })
-      .where(eq(employees.id, employeeId));
+      .where(branchCondition(employees, eq(employees.id, employeeId)));
   }
 }

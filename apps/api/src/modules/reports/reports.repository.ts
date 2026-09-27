@@ -1,3 +1,4 @@
+import { branchTable } from "../../db/branch-context.js";
 import { sql, type SQL } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 
@@ -12,34 +13,34 @@ export class ReportsRepository {
   dashboard(start: Date, end: Date) {
     return this.rows<Record<string, unknown>>(sql`
       SELECT
-        COALESCE((SELECT SUM(total) FROM orders WHERE created_at >= ${start} AND created_at < ${end}), 0) AS sales,
-        COALESCE((SELECT SUM(amount) FROM refunds WHERE created_at >= ${start} AND created_at < ${end}), 0) AS refunds,
-        COALESCE((SELECT SUM(discount_amount) FROM orders WHERE created_at >= ${start} AND created_at < ${end}), 0) AS discounts,
-        COALESCE((SELECT SUM(total - total_cost) FROM orders WHERE created_at >= ${start} AND created_at < ${end}), 0)
-          - COALESCE((SELECT SUM(amount - total_cost_returned) FROM refunds WHERE created_at >= ${start} AND created_at < ${end}), 0) AS grossProfit,
-        (SELECT COUNT(*) FROM orders WHERE created_at >= ${start} AND created_at < ${end}) AS ordersCount,
-        (SELECT COUNT(*) FROM transfer_requests WHERE status = 'pending') AS pendingTransfers,
-        (SELECT COUNT(*) FROM orders WHERE is_negative_stock = 1 AND created_at >= ${start} AND created_at < ${end}) AS negativeStockOrders
+        COALESCE((SELECT SUM(total) FROM ${branchTable("orders")} orders WHERE created_at >= ${start} AND created_at < ${end}), 0) AS sales,
+        COALESCE((SELECT SUM(amount) FROM ${branchTable("refunds")} refunds WHERE created_at >= ${start} AND created_at < ${end}), 0) AS refunds,
+        COALESCE((SELECT SUM(discount_amount) FROM ${branchTable("orders")} orders WHERE created_at >= ${start} AND created_at < ${end}), 0) AS discounts,
+        COALESCE((SELECT SUM(total - total_cost) FROM ${branchTable("orders")} orders WHERE created_at >= ${start} AND created_at < ${end}), 0)
+          - COALESCE((SELECT SUM(amount - total_cost_returned) FROM ${branchTable("refunds")} refunds WHERE created_at >= ${start} AND created_at < ${end}), 0) AS grossProfit,
+        (SELECT COUNT(*) FROM ${branchTable("orders")} orders WHERE created_at >= ${start} AND created_at < ${end}) AS ordersCount,
+        (SELECT COUNT(*) FROM ${branchTable("transfer_requests")} transfer_requests WHERE status = 'pending') AS pendingTransfers,
+        (SELECT COUNT(*) FROM ${branchTable("orders")} orders WHERE is_negative_stock = 1 AND created_at >= ${start} AND created_at < ${end}) AS negativeStockOrders
     `);
   }
 
   openShift() {
     return this.rows<Record<string, unknown>>(sql`
       SELECT s.id, e.name AS cashierName, s.opening_float AS openingFloat, s.opened_at AS openedAt,
-        COALESCE((SELECT SUM(o.total) FROM orders o WHERE o.shift_id=s.id),0) AS sales,
-        COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.shift_id=s.id),0) AS refunds,
-        COALESCE((SELECT SUM(x.amount) FROM expenses x WHERE x.shift_id=s.id),0) AS expenses
-      FROM shifts s JOIN employees e ON e.id=s.employee_id WHERE s.open_slot=1 LIMIT 1
+        COALESCE((SELECT SUM(o.total) FROM ${branchTable("orders")} o WHERE o.shift_id=s.id),0) AS sales,
+        COALESCE((SELECT SUM(r.amount) FROM ${branchTable("refunds")} r WHERE r.shift_id=s.id),0) AS refunds,
+        COALESCE((SELECT SUM(x.amount) FROM ${branchTable("expenses")} x WHERE x.shift_id=s.id),0) AS expenses
+      FROM ${branchTable("shifts")} s JOIN ${branchTable("employees")} e ON e.id=s.employee_id WHERE s.open_slot=1 LIMIT 1
     `);
   }
 
   stock() {
     return this.rows<Record<string, unknown>>(sql`
       SELECT i.id AS itemId, i.code, i.name, i.is_active AS isActive, c.name AS categoryName, i.stock_unit AS stockUnit, w.warehouse,
-        COALESCE((SELECT SUM(sm.quantity) FROM stock_movements sm WHERE sm.item_id=i.id AND sm.warehouse=w.warehouse),0) AS quantity,
-        COALESCE((SELECT SUM(sb.remaining_quantity*sb.unit_cost) FROM stock_batches sb WHERE sb.item_id=i.id AND sb.warehouse=w.warehouse),0) AS stockValue,
+        COALESCE((SELECT SUM(sm.quantity) FROM ${branchTable("stock_movements")} sm WHERE sm.item_id=i.id AND sm.warehouse=w.warehouse),0) AS quantity,
+        COALESCE((SELECT SUM(sb.remaining_quantity*sb.unit_cost) FROM ${branchTable("stock_batches")} sb WHERE sb.item_id=i.id AND sb.warehouse=w.warehouse),0) AS stockValue,
         CASE WHEN w.warehouse='main' THEN i.main_minimum_level ELSE i.cafe_minimum_level END AS minimumLevel
-      FROM items i JOIN categories c ON c.id=i.category_id
+      FROM ${branchTable("items")} i JOIN ${branchTable("categories")} c ON c.id=i.category_id
       CROSS JOIN (SELECT 'main' AS warehouse UNION ALL SELECT 'cafe') w
       ORDER BY i.name,w.warehouse
     `);
@@ -50,10 +51,10 @@ export class ReportsRepository {
       SELECT * FROM (
         SELECT created_at createdAt,total sales,discount_amount discounts,0 refunds,
           total_cost cost,0 returnedCost,1 ordersCount
-        FROM orders WHERE created_at >= ${from} AND created_at < ${to}
+        FROM ${branchTable("orders")} orders WHERE created_at >= ${from} AND created_at < ${to}
         UNION ALL
         SELECT created_at,0,0,amount,0,total_cost_returned,0
-        FROM refunds WHERE created_at >= ${from} AND created_at < ${to}
+        FROM ${branchTable("refunds")} refunds WHERE created_at >= ${from} AND created_at < ${to}
       ) x ORDER BY createdAt
     `);
   }
@@ -65,11 +66,11 @@ export class ReportsRepository {
       FROM (
         SELECT ol.product_name productName,ol.size_name sizeName,SUM(ol.quantity) quantity,
           SUM(COALESCE(ol.line_subtotal * o.total / NULLIF(o.subtotal,0),0)) sales,0 refunds,SUM(ol.total_cost) cost,0 returnedCost
-        FROM order_lines ol JOIN orders o ON o.id=ol.order_id
+        FROM ${branchTable("order_lines")} ol JOIN ${branchTable("orders")} o ON o.id=ol.order_id
         WHERE o.created_at >= ${from} AND o.created_at < ${to} GROUP BY ol.product_name,ol.size_name
         UNION ALL
         SELECT rl.product_name,rl.size_name,-SUM(rl.quantity),0,SUM(rl.refund_amount),0,SUM(rl.returned_cost)
-        FROM refund_lines rl JOIN refunds r ON r.id=rl.refund_id
+        FROM ${branchTable("refund_lines")} rl JOIN ${branchTable("refunds")} r ON r.id=rl.refund_id
         WHERE r.created_at >= ${from} AND r.created_at < ${to} GROUP BY rl.product_name,rl.size_name
       ) x GROUP BY productName,sizeName ORDER BY sales DESC
     `);
@@ -81,28 +82,28 @@ export class ReportsRepository {
         SUM(returnedCost) returnedCost,SUM(sales-refunds-cost+returnedCost) profit FROM (
         SELECT COALESCE(pc.name,c.name) mainCategory,c.name category,
           SUM(COALESCE(ol.line_subtotal * o.total / NULLIF(o.subtotal,0),0)) sales,0 refunds,SUM(ol.total_cost) cost,0 returnedCost
-        FROM order_lines ol JOIN orders o ON o.id=ol.order_id
-        LEFT JOIN recipes rp ON rp.id=ol.recipe_id LEFT JOIN items i ON i.id=ol.item_id
-        JOIN categories c ON c.id=COALESCE(rp.category_id,i.category_id) LEFT JOIN categories pc ON pc.id=c.parent_id
+        FROM ${branchTable("order_lines")} ol JOIN ${branchTable("orders")} o ON o.id=ol.order_id
+        LEFT JOIN ${branchTable("recipes")} rp ON rp.id=ol.recipe_id LEFT JOIN ${branchTable("items")} i ON i.id=ol.item_id
+        JOIN ${branchTable("categories")} c ON c.id=COALESCE(rp.category_id,i.category_id) LEFT JOIN ${branchTable("categories")} pc ON pc.id=c.parent_id
         WHERE o.created_at >= ${from} AND o.created_at < ${to} GROUP BY COALESCE(pc.name,c.name),c.name
         UNION ALL
         SELECT COALESCE(pc.name,c.name),c.name,0,SUM(rl.refund_amount),0,SUM(rl.returned_cost)
-        FROM refund_lines rl JOIN refunds r ON r.id=rl.refund_id JOIN order_lines ol ON ol.id=rl.order_line_id
-        LEFT JOIN recipes rp ON rp.id=ol.recipe_id LEFT JOIN items i ON i.id=ol.item_id
-        JOIN categories c ON c.id=COALESCE(rp.category_id,i.category_id) LEFT JOIN categories pc ON pc.id=c.parent_id
+        FROM ${branchTable("refund_lines")} rl JOIN ${branchTable("refunds")} r ON r.id=rl.refund_id JOIN ${branchTable("order_lines")} ol ON ol.id=rl.order_line_id
+        LEFT JOIN ${branchTable("recipes")} rp ON rp.id=ol.recipe_id LEFT JOIN ${branchTable("items")} i ON i.id=ol.item_id
+        JOIN ${branchTable("categories")} c ON c.id=COALESCE(rp.category_id,i.category_id) LEFT JOIN ${branchTable("categories")} pc ON pc.id=c.parent_id
         WHERE r.created_at >= ${from} AND r.created_at < ${to} GROUP BY COALESCE(pc.name,c.name),c.name
         UNION ALL
         SELECT ec.name_ar mainCategory,ec.name_ar category,
           SUM(COALESCE(ol.line_subtotal * o.total / NULLIF(o.subtotal,0),0)) sales,0 refunds,SUM(ol.total_cost) cost,0 returnedCost
-        FROM order_lines ol JOIN orders o ON o.id=ol.order_id
-        JOIN external_products ep ON ep.external_id=ol.external_product_id
-        JOIN external_categories ec ON ec.external_id=ep.external_category_id
+        FROM ${branchTable("order_lines")} ol JOIN ${branchTable("orders")} o ON o.id=ol.order_id
+        JOIN ${branchTable("external_products")} ep ON ep.external_id=ol.external_product_id
+        JOIN ${branchTable("external_categories")} ec ON ec.external_id=ep.external_category_id
         WHERE o.created_at >= ${from} AND o.created_at < ${to} GROUP BY ec.name_ar
         UNION ALL
         SELECT ec.name_ar,ec.name_ar,0,SUM(rl.refund_amount),0,SUM(rl.returned_cost)
-        FROM refund_lines rl JOIN refunds r ON r.id=rl.refund_id JOIN order_lines ol ON ol.id=rl.order_line_id
-        JOIN external_products ep ON ep.external_id=ol.external_product_id
-        JOIN external_categories ec ON ec.external_id=ep.external_category_id
+        FROM ${branchTable("refund_lines")} rl JOIN ${branchTable("refunds")} r ON r.id=rl.refund_id JOIN ${branchTable("order_lines")} ol ON ol.id=rl.order_line_id
+        JOIN ${branchTable("external_products")} ep ON ep.external_id=ol.external_product_id
+        JOIN ${branchTable("external_categories")} ec ON ec.external_id=ep.external_category_id
         WHERE r.created_at >= ${from} AND r.created_at < ${to} GROUP BY ec.name_ar
       ) x GROUP BY mainCategory,category ORDER BY sales DESC
     `);
@@ -113,10 +114,10 @@ export class ReportsRepository {
       SELECT s.id shiftId,e.name cashierName,s.opened_at openedAt,s.closed_at closedAt,
         s.over_short overShort,
         COALESCE(SUM(o.total),0) sales,COALESCE(SUM(o.discount_amount),0) discounts,
-        COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.shift_id=s.id),0) refunds,
+        COALESCE((SELECT SUM(r.amount) FROM ${branchTable("refunds")} r WHERE r.shift_id=s.id),0) refunds,
         COALESCE(SUM(o.total_cost),0) cost,
-        COALESCE(SUM(o.total-o.total_cost),0)-COALESCE((SELECT SUM(r.amount-r.total_cost_returned) FROM refunds r WHERE r.shift_id=s.id),0) profit
-      FROM shifts s JOIN employees e ON e.id=s.employee_id LEFT JOIN orders o ON o.shift_id=s.id
+        COALESCE(SUM(o.total-o.total_cost),0)-COALESCE((SELECT SUM(r.amount-r.total_cost_returned) FROM ${branchTable("refunds")} r WHERE r.shift_id=s.id),0) profit
+      FROM ${branchTable("shifts")} s JOIN ${branchTable("employees")} e ON e.id=s.employee_id LEFT JOIN ${branchTable("orders")} o ON o.shift_id=s.id
       WHERE s.opened_at >= ${from} AND s.opened_at < ${to} GROUP BY s.id,e.name,s.opened_at,s.closed_at ORDER BY s.opened_at DESC
     `);
   }
@@ -125,10 +126,10 @@ export class ReportsRepository {
     return this.rows<Record<string, unknown>>(sql`
       SELECT e.id employeeId,e.name cashierName,COUNT(DISTINCT o.id) ordersCount,
         COALESCE(SUM(o.total),0) sales,COALESCE(SUM(o.discount_amount),0) discounts,
-        COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.cashier_id=u.id AND r.created_at >= ${from} AND r.created_at < ${to}),0) refunds,
+        COALESCE((SELECT SUM(r.amount) FROM ${branchTable("refunds")} r WHERE r.cashier_id=u.id AND r.created_at >= ${from} AND r.created_at < ${to}),0) refunds,
         COALESCE(SUM(o.total_cost),0) cost,
-        COALESCE(SUM(o.total-o.total_cost),0)-COALESCE((SELECT SUM(r.amount-r.total_cost_returned) FROM refunds r WHERE r.cashier_id=u.id AND r.created_at >= ${from} AND r.created_at < ${to}),0) profit
-      FROM users u JOIN employees e ON e.id=u.employee_id LEFT JOIN orders o ON o.cashier_id=u.id AND o.created_at >= ${from} AND o.created_at < ${to}
+        COALESCE(SUM(o.total-o.total_cost),0)-COALESCE((SELECT SUM(r.amount-r.total_cost_returned) FROM ${branchTable("refunds")} r WHERE r.cashier_id=u.id AND r.created_at >= ${from} AND r.created_at < ${to}),0) profit
+      FROM users u JOIN ${branchTable("employees")} e ON e.id=u.employee_id LEFT JOIN ${branchTable("orders")} o ON o.cashier_id=u.id AND o.created_at >= ${from} AND o.created_at < ${to}
       WHERE u.role='cashier' GROUP BY e.id,e.name,u.id ORDER BY sales DESC
     `);
   }
@@ -137,7 +138,7 @@ export class ReportsRepository {
     return this.rows<Record<string, unknown>>(sql`
     SELECT sm.id,sm.occurred_at occurredAt,i.code,i.name itemName,sm.warehouse,sm.movement_type movementType,
       sm.quantity,sm.unit_cost unitCost,sm.quantity*sm.unit_cost totalCost,sm.reference_type referenceType,sm.reference_id referenceId,sm.notes
-    FROM stock_movements sm JOIN items i ON i.id=sm.item_id WHERE sm.occurred_at >= ${from} AND sm.occurred_at < ${to}
+    FROM ${branchTable("stock_movements")} sm JOIN ${branchTable("items")} i ON i.id=sm.item_id WHERE sm.occurred_at >= ${from} AND sm.occurred_at < ${to}
     ORDER BY sm.occurred_at DESC,sm.id DESC
   `);
   }
@@ -148,7 +149,7 @@ export class ReportsRepository {
         u.name createdByName,COUNT(sl.id) lineCount,
         COALESCE(SUM(CASE WHEN sl.counted_quantity < sl.recorded_quantity THEN sl.recorded_quantity-sl.counted_quantity ELSE 0 END),0) shortageQuantity,
         COALESCE(SUM(CASE WHEN sl.counted_quantity > sl.recorded_quantity THEN sl.counted_quantity-sl.recorded_quantity ELSE 0 END),0) surplusQuantity
-      FROM stocktakes st JOIN users u ON u.id=st.created_by LEFT JOIN stocktake_lines sl ON sl.stocktake_id=st.id
+      FROM ${branchTable("stocktakes")} st JOIN users u ON u.id=st.created_by LEFT JOIN ${branchTable("stocktake_lines")} sl ON sl.stocktake_id=st.id
       WHERE st.created_at >= ${from} AND st.created_at < ${to}
       GROUP BY st.id,u.name ORDER BY st.created_at DESC,st.id DESC
     `);
@@ -157,19 +158,19 @@ export class ReportsRepository {
   cashFlow(from: Date, to: Date, fromDate: string, toDate: string) {
     return this.rows<Record<string, unknown>>(sql`
     SELECT * FROM (
-      SELECT created_at occurredAt,'sale' type,order_number reference,total amount FROM orders WHERE created_at >= ${from} AND created_at < ${to}
-      UNION ALL SELECT created_at,'refund',CONCAT('#',id),-amount FROM refunds WHERE created_at >= ${from} AND created_at < ${to}
-      UNION ALL SELECT CONCAT(expense_date,' 12:00:00'),'expense',CONCAT('#',id),-amount FROM expenses WHERE expense_date BETWEEN ${fromDate} AND ${toDate}
-      UNION ALL SELECT CONCAT(paid_at,' 12:00:00'),'supplier_payment',CONCAT('#',id),-amount FROM supplier_payments WHERE paid_at BETWEEN ${fromDate} AND ${toDate}
-      UNION ALL SELECT paid_at,'salary_payment',CONCAT('#',id),-net_pay FROM salary_payments WHERE paid_at >= ${from} AND paid_at < ${to}
-      UNION ALL SELECT CONCAT(entry_date,' 12:00:00'),'salary_advance',CONCAT('#',id),-amount FROM salary_advances WHERE entry_date BETWEEN ${fromDate} AND ${toDate}
+      SELECT created_at occurredAt,'sale' type,order_number reference,total amount FROM ${branchTable("orders")} orders WHERE created_at >= ${from} AND created_at < ${to}
+      UNION ALL SELECT created_at,'refund',CONCAT('#',id),-amount FROM ${branchTable("refunds")} refunds WHERE created_at >= ${from} AND created_at < ${to}
+      UNION ALL SELECT CONCAT(expense_date,' 12:00:00'),'expense',CONCAT('#',id),-amount FROM ${branchTable("expenses")} expenses WHERE expense_date BETWEEN ${fromDate} AND ${toDate}
+      UNION ALL SELECT CONCAT(paid_at,' 12:00:00'),'supplier_payment',CONCAT('#',id),-amount FROM ${branchTable("supplier_payments")} supplier_payments WHERE paid_at BETWEEN ${fromDate} AND ${toDate}
+      UNION ALL SELECT paid_at,'salary_payment',CONCAT('#',id),-net_pay FROM ${branchTable("salary_payments")} salary_payments WHERE paid_at >= ${from} AND paid_at < ${to}
+      UNION ALL SELECT CONCAT(entry_date,' 12:00:00'),'salary_advance',CONCAT('#',id),-amount FROM ${branchTable("salary_advances")} salary_advances WHERE entry_date BETWEEN ${fromDate} AND ${toDate}
     ) x ORDER BY occurredAt DESC
   `);
   }
 
   expenseBreakdown(from: string, to: string) {
     return this.rows<Record<string, unknown>>(sql`
-    SELECT ec.name categoryName,COUNT(*) entriesCount,SUM(e.amount) amount FROM expenses e JOIN expense_categories ec ON ec.id=e.category_id
+    SELECT ec.name categoryName,COUNT(*) entriesCount,SUM(e.amount) amount FROM ${branchTable("expenses")} e JOIN ${branchTable("expense_categories")} ec ON ec.id=e.category_id
     WHERE e.expense_date BETWEEN ${from} AND ${to} GROUP BY ec.id,ec.name ORDER BY amount DESC
   `);
   }
@@ -178,28 +179,30 @@ export class ReportsRepository {
     return this.rows<Record<string, unknown>>(sql`
     WITH open_segments AS (
       SELECT s.employee_id,e.shift_id,e.occurred_at startedAt,s.closed_at,
-        (SELECT MIN(c.occurred_at) FROM shift_events c
-          WHERE c.shift_id=e.shift_id AND c.occurred_at > e.occurred_at
+        (SELECT MIN(c.occurred_at) FROM ${branchTable("shift_events")} c
+          WHERE c.shift_id=e.shift_id
+            AND (c.occurred_at > e.occurred_at OR
+              (c.occurred_at=e.occurred_at AND c.id>e.id))
             AND c.action IN ('close','admin_close')) endedAt
-      FROM shift_events e JOIN shifts s ON s.id=e.shift_id
+      FROM ${branchTable("shift_events")} e JOIN ${branchTable("shifts")} s ON s.id=e.shift_id
       WHERE e.action IN ('open','reopen')
     ),
     worked AS (
       SELECT employee_id,
-        SUM(GREATEST(0,TIMESTAMPDIFF(MINUTE,GREATEST(startedAt,${from}),
-          LEAST(COALESCE(endedAt,closed_at,CURRENT_TIMESTAMP),${to})))) workedMinutes
+        FLOOR(SUM(GREATEST(0,TIMESTAMPDIFF(SECOND,GREATEST(startedAt,${from}),
+          LEAST(COALESCE(endedAt,closed_at,CURRENT_TIMESTAMP),${to}))))/60) workedMinutes
       FROM open_segments GROUP BY employee_id
     )
     SELECT e.id,e.name,COUNT(DISTINCT s.id) shiftsCount,
       COALESCE(w.workedMinutes,0) workedMinutes,
-      COALESCE((SELECT COUNT(*) FROM orders o JOIN users u ON u.id=o.cashier_id WHERE u.employee_id=e.id AND o.created_at >= ${from} AND o.created_at < ${to}),0) ordersCount,
-      COALESCE((SELECT COUNT(*) FROM refunds r JOIN users u ON u.id=r.cashier_id WHERE u.employee_id=e.id AND r.created_at >= ${from} AND r.created_at < ${to}),0) refundsCount,
-      COALESCE((SELECT SUM(o.discount_amount) FROM orders o JOIN users u ON u.id=o.cashier_id WHERE u.employee_id=e.id AND o.created_at >= ${from} AND o.created_at < ${to}),0) discounts,
-      COALESCE((SELECT COUNT(*) FROM waste_entries w JOIN users u ON u.id=w.recorded_by WHERE u.employee_id=e.id AND w.occurred_at >= ${from} AND w.occurred_at < ${to}),0) wasteCount,
-      COALESCE((SELECT COUNT(*) FROM expenses x JOIN users u ON u.id=x.recorded_by WHERE u.employee_id=e.id AND x.expense_date BETWEEN ${fromDate} AND ${toDate}),0) expensesCount,
-      COALESCE((SELECT COUNT(*) FROM transfer_requests tr JOIN users u ON u.id=tr.requested_by WHERE u.employee_id=e.id AND tr.created_at >= ${from} AND tr.created_at < ${to}),0) transferRequestsCount
-    FROM employees e
-    LEFT JOIN shifts s ON s.employee_id=e.id AND s.opened_at < ${to} AND COALESCE(s.closed_at,CURRENT_TIMESTAMP) >= ${from}
+      COALESCE((SELECT COUNT(*) FROM ${branchTable("orders")} o JOIN users u ON u.id=o.cashier_id WHERE u.employee_id=e.id AND o.created_at >= ${from} AND o.created_at < ${to}),0) ordersCount,
+      COALESCE((SELECT COUNT(*) FROM ${branchTable("refunds")} r JOIN users u ON u.id=r.cashier_id WHERE u.employee_id=e.id AND r.created_at >= ${from} AND r.created_at < ${to}),0) refundsCount,
+      COALESCE((SELECT SUM(o.discount_amount) FROM ${branchTable("orders")} o JOIN users u ON u.id=o.cashier_id WHERE u.employee_id=e.id AND o.created_at >= ${from} AND o.created_at < ${to}),0) discounts,
+      COALESCE((SELECT COUNT(*) FROM ${branchTable("waste_entries")} w JOIN users u ON u.id=w.recorded_by WHERE u.employee_id=e.id AND w.occurred_at >= ${from} AND w.occurred_at < ${to}),0) wasteCount,
+      COALESCE((SELECT COUNT(*) FROM ${branchTable("expenses")} x JOIN users u ON u.id=x.recorded_by WHERE u.employee_id=e.id AND x.expense_date BETWEEN ${fromDate} AND ${toDate}),0) expensesCount,
+      COALESCE((SELECT COUNT(*) FROM ${branchTable("transfer_requests")} tr JOIN users u ON u.id=tr.requested_by WHERE u.employee_id=e.id AND tr.created_at >= ${from} AND tr.created_at < ${to}),0) transferRequestsCount
+    FROM ${branchTable("employees")} e
+    LEFT JOIN ${branchTable("shifts")} s ON s.employee_id=e.id AND s.opened_at < ${to} AND COALESCE(s.closed_at,CURRENT_TIMESTAMP) >= ${from}
     LEFT JOIN worked w ON w.employee_id=e.id
     GROUP BY e.id,e.name,w.workedMinutes ORDER BY e.name
   `);
@@ -209,11 +212,11 @@ export class ReportsRepository {
     return this.rows<Record<string, unknown>>(sql`
       SELECT * FROM (
         SELECT sp.paid_at occurredAt,e.name employeeName,'payment' type,sp.net_pay amount,sp.period_month periodMonth,NULL note
-        FROM salary_payments sp JOIN employees e ON e.id=sp.employee_id WHERE sp.paid_at >= ${from} AND sp.paid_at < ${to}
+        FROM ${branchTable("salary_payments")} sp JOIN ${branchTable("employees")} e ON e.id=sp.employee_id WHERE sp.paid_at >= ${from} AND sp.paid_at < ${to}
         UNION ALL SELECT CONCAT(sa.entry_date,' 12:00:00'),e.name,'advance',sa.amount,NULL,sa.note
-        FROM salary_advances sa JOIN employees e ON e.id=sa.employee_id WHERE sa.entry_date BETWEEN ${fromDate} AND ${toDate}
+        FROM ${branchTable("salary_advances")} sa JOIN ${branchTable("employees")} e ON e.id=sa.employee_id WHERE sa.entry_date BETWEEN ${fromDate} AND ${toDate}
         UNION ALL SELECT CONCAT(sj.entry_date,' 12:00:00'),e.name,sj.type,sj.amount,NULL,sj.note
-        FROM salary_adjustments sj JOIN employees e ON e.id=sj.employee_id WHERE sj.entry_date BETWEEN ${fromDate} AND ${toDate}
+        FROM ${branchTable("salary_adjustments")} sj JOIN ${branchTable("employees")} e ON e.id=sj.employee_id WHERE sj.entry_date BETWEEN ${fromDate} AND ${toDate}
       ) x ORDER BY occurredAt DESC
     `);
   }
@@ -222,7 +225,7 @@ export class ReportsRepository {
     return this.rows<Record<string, unknown>>(sql`
     SELECT w.id,w.occurred_at occurredAt,w.target_name targetName,w.size_name sizeName,w.warehouse,w.quantity,
       w.reason_code reasonCode,w.reason,w.note,w.total_cost totalCost,u.name recordedByName
-    FROM waste_entries w JOIN users u ON u.id=w.recorded_by WHERE w.occurred_at >= ${from} AND w.occurred_at < ${to}
+    FROM ${branchTable("waste_entries")} w JOIN users u ON u.id=w.recorded_by WHERE w.occurred_at >= ${from} AND w.occurred_at < ${to}
     ORDER BY w.occurred_at DESC,w.id DESC
   `);
   }
@@ -231,7 +234,7 @@ export class ReportsRepository {
     return this.rows<Record<string, unknown>>(sql`
     SELECT w.target_name targetName,w.size_name sizeName,w.warehouse,w.reason,u.name recordedByName,
       SUM(w.quantity) quantity,SUM(w.total_cost) totalCost,COUNT(*) entriesCount
-    FROM waste_entries w JOIN users u ON u.id=w.recorded_by WHERE w.occurred_at >= ${from} AND w.occurred_at < ${to}
+    FROM ${branchTable("waste_entries")} w JOIN users u ON u.id=w.recorded_by WHERE w.occurred_at >= ${from} AND w.occurred_at < ${to}
     GROUP BY w.target_name,w.size_name,w.warehouse,w.reason,u.name ORDER BY totalCost DESC
   `);
   }
@@ -239,7 +242,7 @@ export class ReportsRepository {
   refunds(from: Date, to: Date) {
     return this.rows<Record<string, unknown>>(sql`
     SELECT r.id,r.created_at occurredAt,o.order_number orderNumber,u.name cashierName,r.reason,r.amount,r.total_cost_returned totalCostReturned
-    FROM refunds r JOIN orders o ON o.id=r.order_id JOIN users u ON u.id=r.cashier_id
+    FROM ${branchTable("refunds")} r JOIN ${branchTable("orders")} o ON o.id=r.order_id JOIN users u ON u.id=r.cashier_id
     WHERE r.created_at >= ${from} AND r.created_at < ${to} ORDER BY r.created_at DESC,r.id DESC
   `);
   }
@@ -248,7 +251,7 @@ export class ReportsRepository {
     return this.rows<Record<string, unknown>>(sql`
     SELECT rl.product_name productName,rl.size_name sizeName,r.reason,u.name cashierName,
       SUM(rl.quantity) quantity,SUM(rl.refund_amount) amount,SUM(rl.returned_cost) returnedCost,COUNT(DISTINCT r.id) refundsCount
-    FROM refund_lines rl JOIN refunds r ON r.id=rl.refund_id JOIN users u ON u.id=r.cashier_id
+    FROM ${branchTable("refund_lines")} rl JOIN ${branchTable("refunds")} r ON r.id=rl.refund_id JOIN users u ON u.id=r.cashier_id
     WHERE r.created_at >= ${from} AND r.created_at < ${to}
     GROUP BY rl.product_name,rl.size_name,r.reason,u.name ORDER BY amount DESC
   `);
@@ -257,17 +260,17 @@ export class ReportsRepository {
   suppliers() {
     return this.rows<Record<string, unknown>>(sql`
     SELECT s.id,s.name,s.opening_balance openingBalance,
-      COALESCE((SELECT SUM(p.total_amount) FROM purchase_invoices p WHERE p.supplier_id=s.id),0) purchases,
-      COALESCE((SELECT SUM(sp.amount) FROM supplier_payments sp WHERE sp.supplier_id=s.id),0) payments,
-      s.opening_balance+COALESCE((SELECT SUM(p.total_amount) FROM purchase_invoices p WHERE p.supplier_id=s.id),0)-COALESCE((SELECT SUM(sp.amount) FROM supplier_payments sp WHERE sp.supplier_id=s.id),0) balance
-    FROM suppliers s ORDER BY s.name
+      COALESCE((SELECT SUM(p.total_amount) FROM ${branchTable("purchase_invoices")} p WHERE p.supplier_id=s.id),0) purchases,
+      COALESCE((SELECT SUM(sp.amount) FROM ${branchTable("supplier_payments")} sp WHERE sp.supplier_id=s.id),0) payments,
+      s.opening_balance+COALESCE((SELECT SUM(p.total_amount) FROM ${branchTable("purchase_invoices")} p WHERE p.supplier_id=s.id),0)-COALESCE((SELECT SUM(sp.amount) FROM ${branchTable("supplier_payments")} sp WHERE sp.supplier_id=s.id),0) balance
+    FROM ${branchTable("suppliers")} s ORDER BY s.name
   `);
   }
 
   supplierPurchases(from: string, to: string) {
     return this.rows<Record<string, unknown>>(sql`
     SELECT p.id,p.purchased_at purchasedAt,p.invoice_number invoiceNumber,s.name supplierName,p.total_amount totalAmount,p.paid_amount paidAmount
-    FROM purchase_invoices p JOIN suppliers s ON s.id=p.supplier_id WHERE p.purchased_at BETWEEN ${from} AND ${to}
+    FROM ${branchTable("purchase_invoices")} p JOIN ${branchTable("suppliers")} s ON s.id=p.supplier_id WHERE p.purchased_at BETWEEN ${from} AND ${to}
     ORDER BY p.purchased_at DESC,p.id DESC
   `);
   }
@@ -275,7 +278,7 @@ export class ReportsRepository {
   supplierPayments(from: string, to: string) {
     return this.rows<Record<string, unknown>>(sql`
     SELECT sp.id,sp.paid_at paidAt,s.name supplierName,sp.amount,sp.notes
-    FROM supplier_payments sp JOIN suppliers s ON s.id=sp.supplier_id WHERE sp.paid_at BETWEEN ${from} AND ${to}
+    FROM ${branchTable("supplier_payments")} sp JOIN ${branchTable("suppliers")} s ON s.id=sp.supplier_id WHERE sp.paid_at BETWEEN ${from} AND ${to}
     ORDER BY sp.paid_at DESC,sp.id DESC
   `);
   }

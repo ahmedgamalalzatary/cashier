@@ -1,3 +1,9 @@
+import {
+  branchCondition,
+  branchValues,
+  branchTable,
+  branchTransaction,
+} from "../../db/branch-context.js";
 import { asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import type { Db } from "../../db/index.js";
@@ -27,7 +33,7 @@ export class RecipesRepository {
       inventory: InventoryTransaction,
     ) => Promise<T>,
   ): Promise<T> {
-    return this.db.transaction((tx) => {
+    return branchTransaction(this.db, (tx) => {
       const transactionDb = tx as unknown as Db;
       return fn(
         new RecipesRepository(transactionDb),
@@ -52,9 +58,15 @@ export class RecipesRepository {
         updatedAt: recipes.updatedAt,
       })
       .from(recipes)
-      .innerJoin(categories, eq(recipes.categoryId, categories.id))
-      .leftJoin(outputItem, eq(recipes.outputItemId, outputItem.id))
-      .where(eq(recipes.type, "prepared"))
+      .innerJoin(
+        categories,
+        branchCondition(categories, eq(recipes.categoryId, categories.id)),
+      )
+      .leftJoin(
+        outputItem,
+        branchCondition(outputItem, eq(recipes.outputItemId, outputItem.id)),
+      )
+      .where(branchCondition(recipes, eq(recipes.type, "prepared")))
       .orderBy(desc(recipes.createdAt), desc(recipes.id));
   }
 
@@ -74,9 +86,15 @@ export class RecipesRepository {
         updatedAt: recipes.updatedAt,
       })
       .from(recipes)
-      .innerJoin(categories, eq(recipes.categoryId, categories.id))
-      .leftJoin(outputItem, eq(recipes.outputItemId, outputItem.id))
-      .where(eq(recipes.id, id));
+      .innerJoin(
+        categories,
+        branchCondition(categories, eq(recipes.categoryId, categories.id)),
+      )
+      .leftJoin(
+        outputItem,
+        branchCondition(outputItem, eq(recipes.outputItemId, outputItem.id)),
+      )
+      .where(branchCondition(recipes, eq(recipes.id, id)));
     return row;
   }
 
@@ -84,14 +102,14 @@ export class RecipesRepository {
     const [row] = await this.db
       .select()
       .from(recipes)
-      .where(eq(recipes.id, id))
+      .where(branchCondition(recipes, eq(recipes.id, id)))
       .for("update");
     return row;
   }
 
   async findCategory(id: number) {
     const childCount = sql<number>`(
-      SELECT COUNT(*) FROM categories child WHERE child.parent_id = ${categories.id}
+      SELECT COUNT(*) FROM ${branchTable("categories")} child WHERE child.parent_id = ${categories.id}
     )`;
     const [row] = await this.db
       .select({
@@ -100,7 +118,7 @@ export class RecipesRepository {
         childCount,
       })
       .from(categories)
-      .where(eq(categories.id, id))
+      .where(branchCondition(categories, eq(categories.id, id)))
       .for("update");
     return row;
   }
@@ -116,7 +134,7 @@ export class RecipesRepository {
         isActive: items.isActive,
       })
       .from(items)
-      .where(inArray(items.id, orderedIds))
+      .where(branchCondition(items, inArray(items.id, orderedIds)))
       .orderBy(asc(items.id))
       .for("update");
   }
@@ -126,9 +144,12 @@ export class RecipesRepository {
       .select({ id: recipes.id })
       .from(recipes)
       .where(
-        exceptId === undefined
-          ? eq(recipes.outputItemId, outputItemId)
-          : sql`${recipes.outputItemId} = ${outputItemId} AND ${recipes.id} <> ${exceptId}`,
+        branchCondition(
+          recipes,
+          exceptId === undefined
+            ? eq(recipes.outputItemId, outputItemId)
+            : sql`${recipes.outputItemId} = ${outputItemId} AND ${recipes.id} <> ${exceptId}`,
+        ),
       );
     return row;
   }
@@ -141,12 +162,18 @@ export class RecipesRepository {
         ingredientItemId: recipeIngredients.itemId,
       })
       .from(recipes)
-      .innerJoin(recipeSizes, eq(recipeSizes.recipeId, recipes.id))
+      .innerJoin(
+        recipeSizes,
+        branchCondition(recipeSizes, eq(recipeSizes.recipeId, recipes.id)),
+      )
       .innerJoin(
         recipeIngredients,
-        eq(recipeIngredients.recipeSizeId, recipeSizes.id),
+        branchCondition(
+          recipeIngredients,
+          eq(recipeIngredients.recipeSizeId, recipeSizes.id),
+        ),
       )
-      .where(eq(recipes.type, "prepared"));
+      .where(branchCondition(recipes, eq(recipes.type, "prepared")));
   }
 
   async createRecipe(data: {
@@ -155,7 +182,7 @@ export class RecipesRepository {
     categoryId: number;
     outputItemId: number | null;
   }) {
-    const [result] = await this.db.insert(recipes).values(data);
+    const [result] = await this.db.insert(recipes).values(branchValues(data));
     return result.insertId;
   }
 
@@ -168,7 +195,10 @@ export class RecipesRepository {
       outputItemId: number | null;
     },
   ) {
-    await this.db.update(recipes).set(data).where(eq(recipes.id, id));
+    await this.db
+      .update(recipes)
+      .set(data)
+      .where(branchCondition(recipes, eq(recipes.id, id)));
   }
 
   async createSize(data: {
@@ -178,7 +208,9 @@ export class RecipesRepository {
     outputQuantity: string | null;
     sortOrder: number;
   }) {
-    const [result] = await this.db.insert(recipeSizes).values(data);
+    const [result] = await this.db
+      .insert(recipeSizes)
+      .values(branchValues(data));
     return result.insertId;
   }
 
@@ -187,28 +219,35 @@ export class RecipesRepository {
     itemId: number;
     quantity: string;
   }) {
-    await this.db.insert(recipeIngredients).values(data);
+    await this.db.insert(recipeIngredients).values(branchValues(data));
   }
 
   async deleteRecipeChildren(recipeId: number) {
     const sizes = await this.db
       .select({ id: recipeSizes.id })
       .from(recipeSizes)
-      .where(eq(recipeSizes.recipeId, recipeId));
+      .where(branchCondition(recipeSizes, eq(recipeSizes.recipeId, recipeId)));
     const sizeIds = sizes.map((size) => size.id);
     if (sizeIds.length > 0) {
       await this.db
         .delete(recipeIngredients)
-        .where(inArray(recipeIngredients.recipeSizeId, sizeIds));
+        .where(
+          branchCondition(
+            recipeIngredients,
+            inArray(recipeIngredients.recipeSizeId, sizeIds),
+          ),
+        );
     }
-    await this.db.delete(recipeSizes).where(eq(recipeSizes.recipeId, recipeId));
+    await this.db
+      .delete(recipeSizes)
+      .where(branchCondition(recipeSizes, eq(recipeSizes.recipeId, recipeId)));
   }
 
   listSizes(recipeId: number) {
     return this.db
       .select()
       .from(recipeSizes)
-      .where(eq(recipeSizes.recipeId, recipeId))
+      .where(branchCondition(recipeSizes, eq(recipeSizes.recipeId, recipeId)))
       .orderBy(recipeSizes.sortOrder, recipeSizes.id);
   }
 
@@ -228,10 +267,18 @@ export class RecipesRepository {
       .from(recipeIngredients)
       .innerJoin(
         recipeSizes,
-        eq(recipeIngredients.recipeSizeId, recipeSizes.id),
+        branchCondition(
+          recipeSizes,
+          eq(recipeIngredients.recipeSizeId, recipeSizes.id),
+        ),
       )
-      .innerJoin(items, eq(recipeIngredients.itemId, items.id))
-      .where(eq(recipeSizes.recipeId, recipeId))
+      .innerJoin(
+        items,
+        branchCondition(items, eq(recipeIngredients.itemId, items.id)),
+      )
+      .where(
+        branchCondition(recipeIngredients, eq(recipeSizes.recipeId, recipeId)),
+      )
       .orderBy(recipeSizes.sortOrder, recipeIngredients.id);
   }
 
@@ -244,13 +291,19 @@ export class RecipesRepository {
       })
       .from(stockBatches)
       .where(
-        sql`${stockBatches.itemId} = ${itemId} AND ${stockBatches.warehouse} = 'cafe' AND ${stockBatches.remainingQuantity} > 0`,
+        branchCondition(
+          stockBatches,
+          sql`${stockBatches.itemId} = ${itemId} AND ${stockBatches.warehouse} = 'cafe' AND ${stockBatches.remainingQuantity} > 0`,
+        ),
       )
       .orderBy(stockBatches.receivedAt, stockBatches.id);
   }
 
   async setActive(id: number, isActive: boolean) {
-    await this.db.update(recipes).set({ isActive }).where(eq(recipes.id, id));
+    await this.db
+      .update(recipes)
+      .set({ isActive })
+      .where(branchCondition(recipes, eq(recipes.id, id)));
   }
 
   async createPreparation(data: {
@@ -263,12 +316,14 @@ export class RecipesRepository {
     notes: string | null;
     occurredAt: Date;
   }) {
-    const [result] = await this.db.insert(preparations).values({
-      ...data,
-      totalCost: "0.00",
-      unitCost: "0.000000",
-      outputBatchId: null,
-    });
+    const [result] = await this.db.insert(preparations).values(
+      branchValues({
+        ...data,
+        totalCost: "0.00",
+        unitCost: "0.000000",
+        outputBatchId: null,
+      }),
+    );
     return result.insertId;
   }
 
@@ -276,7 +331,10 @@ export class RecipesRepository {
     id: number,
     data: { totalCost: string; unitCost: string; outputBatchId: number },
   ) {
-    await this.db.update(preparations).set(data).where(eq(preparations.id, id));
+    await this.db
+      .update(preparations)
+      .set(data)
+      .where(branchCondition(preparations, eq(preparations.id, id)));
   }
 
   async createPreparationAllocation(data: {
@@ -287,7 +345,7 @@ export class RecipesRepository {
     unitCost: string;
     sourceBatchId: number;
   }) {
-    await this.db.insert(preparationAllocations).values(data);
+    await this.db.insert(preparationAllocations).values(branchValues(data));
   }
 
   listPreparations() {
@@ -311,7 +369,14 @@ export class RecipesRepository {
       })
       .from(preparations)
       .innerJoin(preparer, eq(preparations.preparedBy, preparer.id))
-      .innerJoin(outputItem, eq(preparations.outputItemId, outputItem.id))
+      .innerJoin(
+        outputItem,
+        branchCondition(
+          outputItem,
+          eq(preparations.outputItemId, outputItem.id),
+        ),
+      )
+      .where(branchCondition(preparations))
       .orderBy(desc(preparations.occurredAt), desc(preparations.id));
   }
 
@@ -336,8 +401,14 @@ export class RecipesRepository {
       })
       .from(preparations)
       .innerJoin(preparer, eq(preparations.preparedBy, preparer.id))
-      .innerJoin(outputItem, eq(preparations.outputItemId, outputItem.id))
-      .where(eq(preparations.id, id));
+      .innerJoin(
+        outputItem,
+        branchCondition(
+          outputItem,
+          eq(preparations.outputItemId, outputItem.id),
+        ),
+      )
+      .where(branchCondition(preparations, eq(preparations.id, id)));
     return row;
   }
 
@@ -356,8 +427,19 @@ export class RecipesRepository {
         sourceBatchId: preparationAllocations.sourceBatchId,
       })
       .from(preparationAllocations)
-      .innerJoin(items, eq(preparationAllocations.ingredientItemId, items.id))
-      .where(eq(preparationAllocations.preparationId, preparationId))
+      .innerJoin(
+        items,
+        branchCondition(
+          items,
+          eq(preparationAllocations.ingredientItemId, items.id),
+        ),
+      )
+      .where(
+        branchCondition(
+          preparationAllocations,
+          eq(preparationAllocations.preparationId, preparationId),
+        ),
+      )
       .orderBy(preparationAllocations.id);
   }
 }

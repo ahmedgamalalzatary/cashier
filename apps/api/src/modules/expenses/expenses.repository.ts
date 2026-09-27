@@ -1,11 +1,11 @@
+import {
+  branchCondition,
+  branchValues,
+  branchTransaction,
+} from "../../db/branch-context.js";
 import { and, asc, desc, eq } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
-import {
-  expenseCategories,
-  expenses,
-  shifts,
-  users,
-} from "../../db/schema.js";
+import { expenseCategories, expenses, shifts, users } from "../../db/schema.js";
 
 const expenseColumns = {
   id: expenses.id,
@@ -25,16 +25,26 @@ export class ExpensesRepository {
   constructor(private db: Db) {}
 
   transaction<T>(fn: (repo: ExpensesRepository) => Promise<T>) {
-    return this.db.transaction((tx) =>
+    return branchTransaction(this.db, (tx) =>
       fn(new ExpensesRepository(tx as unknown as Db)),
     );
   }
 
   categories(includeInactive: boolean) {
-    const query = this.db.select().from(expenseCategories);
-    return (includeInactive
-      ? query
-      : query.where(eq(expenseCategories.isActive, true))
+    const query = this.db
+      .select()
+      .from(expenseCategories)
+      .$dynamic()
+      .where(branchCondition(expenseCategories));
+    return (
+      includeInactive
+        ? query
+        : query.where(
+            branchCondition(
+              expenseCategories,
+              eq(expenseCategories.isActive, true),
+            ),
+          )
     ).orderBy(asc(expenseCategories.name));
   }
 
@@ -42,14 +52,16 @@ export class ExpensesRepository {
     let query = this.db
       .select()
       .from(expenseCategories)
-      .where(eq(expenseCategories.id, id));
+      .where(branchCondition(expenseCategories, eq(expenseCategories.id, id)));
     if (lock) query = query.for("update") as typeof query;
     const [row] = await query;
     return row;
   }
 
   async createCategory(name: string) {
-    const [result] = await this.db.insert(expenseCategories).values({ name });
+    const [result] = await this.db
+      .insert(expenseCategories)
+      .values(branchValues({ name }));
     return this.category(result.insertId);
   }
 
@@ -60,7 +72,7 @@ export class ExpensesRepository {
     await this.db
       .update(expenseCategories)
       .set(input)
-      .where(eq(expenseCategories.id, id));
+      .where(branchCondition(expenseCategories, eq(expenseCategories.id, id)));
     return this.category(id);
   }
 
@@ -68,7 +80,12 @@ export class ExpensesRepository {
     const [row] = await this.db
       .select({ id: shifts.id })
       .from(shifts)
-      .where(and(eq(shifts.openSlot, 1), eq(shifts.cashierUserId, userId)))
+      .where(
+        branchCondition(
+          shifts,
+          and(eq(shifts.openSlot, 1), eq(shifts.cashierUserId, userId)),
+        ),
+      )
       .for("update");
     return row;
   }
@@ -81,12 +98,17 @@ export class ExpensesRepository {
         requestFingerprint: expenses.requestFingerprint,
       })
       .from(expenses)
-      .where(eq(expenses.clientRequestId, clientRequestId));
+      .where(
+        branchCondition(
+          expenses,
+          eq(expenses.clientRequestId, clientRequestId),
+        ),
+      );
     return row;
   }
 
   async create(data: typeof expenses.$inferInsert) {
-    const [result] = await this.db.insert(expenses).values(data);
+    const [result] = await this.db.insert(expenses).values(branchValues(data));
     return result.insertId;
   }
 
@@ -94,9 +116,15 @@ export class ExpensesRepository {
     const [row] = await this.db
       .select(expenseColumns)
       .from(expenses)
-      .innerJoin(expenseCategories, eq(expenses.categoryId, expenseCategories.id))
+      .innerJoin(
+        expenseCategories,
+        branchCondition(
+          expenseCategories,
+          eq(expenses.categoryId, expenseCategories.id),
+        ),
+      )
       .innerJoin(users, eq(expenses.recordedBy, users.id))
-      .where(eq(expenses.id, id));
+      .where(branchCondition(expenses, eq(expenses.id, id)));
     return row;
   }
 
@@ -104,11 +132,22 @@ export class ExpensesRepository {
     const query = this.db
       .select(expenseColumns)
       .from(expenses)
-      .innerJoin(expenseCategories, eq(expenses.categoryId, expenseCategories.id))
-      .innerJoin(users, eq(expenses.recordedBy, users.id));
-    return (recordedBy === undefined
-      ? query
-      : query.where(eq(expenses.recordedBy, recordedBy))
+      .innerJoin(
+        expenseCategories,
+        branchCondition(
+          expenseCategories,
+          eq(expenses.categoryId, expenseCategories.id),
+        ),
+      )
+      .innerJoin(users, eq(expenses.recordedBy, users.id))
+      .$dynamic()
+      .where(branchCondition(expenses));
+    return (
+      recordedBy === undefined
+        ? query
+        : query.where(
+            branchCondition(expenses, eq(expenses.recordedBy, recordedBy)),
+          )
     )
       .orderBy(desc(expenses.expenseDate), desc(expenses.id))
       .limit(200);

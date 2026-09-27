@@ -74,15 +74,13 @@ describe("stocktake API", () => {
     const app = createApp(db, appOptions);
     const authorization = await loginAs(app, "admin");
     const [category] = await db.insert(categories).values({ name: "خامات" });
-    const [item] = await db
-      .insert(items)
-      .values({
-        code: nextTestItemCode(),
-        name: "لبن",
-        categoryId: category.insertId,
-        type: "raw",
-        stockUnit: "لتر",
-      });
+    const [item] = await db.insert(items).values({
+      code: nextTestItemCode(),
+      name: "لبن",
+      categoryId: category.insertId,
+      type: "raw",
+      stockUnit: "لتر",
+    });
     const inventory = new InventoryService(new InventoryRepository(db));
     const started = await request(app)
       .post("/api/stocktakes")
@@ -106,49 +104,71 @@ describe("stocktake API", () => {
     expect(response.status).toBe(409);
   });
 
-  it("values surplus found on an empty shelf at the last known batch cost", async () => {
-    const app = createApp(db, appOptions);
-    const authorization = await loginAs(app, "admin");
-    const [category] = await db.insert(categories).values({ name: "خامات" });
-    const [item] = await db.insert(items).values({
-      code: nextTestItemCode(),
-      name: "سكر",
-      categoryId: category.insertId,
-      type: "raw",
-      stockUnit: "كجم",
-    });
-    const inventory = new InventoryService(new InventoryRepository(db));
-    await inventory.receive({
-      itemId: item.insertId,
-      warehouse: "main",
-      quantity: 2,
-      unitCost: "12.50",
-      movementType: "purchase",
-    });
-    // Empty the shelf, so the only batch left has zero remaining quantity.
-    await inventory.consume({
-      itemId: item.insertId,
-      warehouse: "main",
-      quantity: 2,
-      movementType: "waste",
-    });
-
-    await request(app)
-      .post("/api/stocktakes/manual-adjustments")
-      .set(authorization)
-      .send({
-        warehouse: "main",
+  it.each([
+    {
+      receiptOrder: "different receipt times",
+      receipts: [
+        { unitCost: "17.75", occurredAt: new Date("2026-09-02T10:00:00Z") },
+        { unitCost: "12.50", occurredAt: new Date("2026-09-01T10:00:00Z") },
+      ],
+      expectedCost: "17.750000",
+    },
+    {
+      receiptOrder: "equal receipt times",
+      receipts: [
+        { unitCost: "12.50", occurredAt: new Date("2026-09-02T10:00:00Z") },
+        { unitCost: "18.25", occurredAt: new Date("2026-09-02T10:00:00Z") },
+      ],
+      expectedCost: "18.250000",
+    },
+  ])(
+    "values empty-shelf surplus at the newest cost with $receiptOrder",
+    async ({ receipts, expectedCost }) => {
+      const app = createApp(db, appOptions);
+      const authorization = await loginAs(app, "admin");
+      const [category] = await db.insert(categories).values({ name: "خامات" });
+      const [item] = await db.insert(items).values({
+        code: nextTestItemCode(),
+        name: "سكر",
+        categoryId: category.insertId,
+        type: "raw",
+        stockUnit: "كجم",
+      });
+      const inventory = new InventoryService(new InventoryRepository(db));
+      for (const receipt of receipts) {
+        await inventory.receive({
+          itemId: item.insertId,
+          warehouse: "main",
+          quantity: 2,
+          movementType: "purchase",
+          ...receipt,
+        });
+      }
+      // Empty both batches; receipt time and then ID determine the latest cost.
+      await inventory.consume({
         itemId: item.insertId,
-        countedQuantity: 3,
-        note: "جرد اكتشاف زيادة",
-      })
-      .expect(201);
+        warehouse: "main",
+        quantity: 4,
+        movementType: "waste",
+      });
 
-    const movements = await db.select().from(stockMovements);
-    const surplus = movements.at(-1);
-    expect(surplus?.movementType).toBe("stocktake_surplus");
-    expect(surplus?.unitCost).toBe("12.500000");
-  });
+      await request(app)
+        .post("/api/stocktakes/manual-adjustments")
+        .set(authorization)
+        .send({
+          warehouse: "main",
+          itemId: item.insertId,
+          countedQuantity: 3,
+          note: "جرد اكتشاف زيادة",
+        })
+        .expect(201);
+
+      const movements = await db.select().from(stockMovements);
+      const surplus = movements.at(-1);
+      expect(surplus?.movementType).toBe("stocktake_surplus");
+      expect(surplus?.unitCost).toBe(expectedCost);
+    },
+  );
 
   it("still values surplus from a stocked shelf at the oldest batch cost", async () => {
     const app = createApp(db, appOptions);

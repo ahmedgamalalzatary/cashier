@@ -22,6 +22,8 @@ import { createReportsModule } from "./modules/reports/reports.module.js";
 import { createProductsModule } from "./modules/products/products.module.js";
 import { createStocktakesModule } from "./modules/stocktakes/stocktakes.module.js";
 import { createSalariesModule } from "./modules/salaries/salaries.module.js";
+import { createBranchesModule } from "./modules/branches/branches.module.js";
+import { selectBranch } from "./middleware/branch.js";
 
 export type AppOptions = {
   jwtSecret: string;
@@ -49,6 +51,12 @@ export function createApp(
   });
 
   app.use("/api/auth", createAuthModule(db, jwtSecret));
+  app.use(
+    "/api/branches",
+    authenticate(db, jwtSecret),
+    createBranchesModule(db),
+  );
+  app.use("/api", authenticate(db, jwtSecret), selectBranch(db));
   app.use("/api/orders", authenticate(db, jwtSecret), createOrdersModule(db));
   app.use("/api/shifts", authenticate(db, jwtSecret), createShiftsModule(db));
   app.use("/api/refunds", authenticate(db, jwtSecret), createRefundsModule(db));

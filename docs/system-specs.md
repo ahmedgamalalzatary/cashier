@@ -1,8 +1,8 @@
 # Cashier + Warehouse System — Specification
 
-**Date:** 2026-07-19 (amended 2026-09-19 — internal POS sales restored, see §7/§10)
+**Date:** 2026-07-19 (amended 2026-09-19 — internal POS sales restored; 2026-09-27 — independent branch workspaces)
 **Status:** Approved by owner
-**Scope:** Single branch — one main warehouse + one cafe (sub-warehouse)
+**Scope:** Multiple independent branches — each has one main warehouse + one cafe (sub-warehouse)
 
 ---
 
@@ -10,15 +10,15 @@
 
 A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inventory management. Goods are purchased from suppliers into the **main warehouse**, transferred on request to the **cafe**, and sold there either as **recipe products** (deducting ingredients) or **as-is items**. The system also manages shifts, employee records, salaries, expenses, waste, refunds, and full reporting.
 
-| Decision   | Locked choice                                               |
-| ---------- | ----------------------------------------------------------- |
-| Deployment | Cloud web app (internet required at shop)                   |
-| Roles      | Admin + Cashier                                             |
-| Language   | Arabic only, RTL layout                                     |
-| Currency   | EGP                                                         |
-| Branches   | One branch (main warehouse + one cafe)                      |
-| Costing    | FIFO with purchase batches                                  |
-| Stack      | Next.js frontend + Express.js backend + MySQL (Drizzle ORM) |
+| Decision   | Locked choice                                                |
+| ---------- | ------------------------------------------------------------ |
+| Deployment | Cloud web app (internet required at shop)                    |
+| Roles      | Admin + Cashier                                              |
+| Language   | Arabic only, RTL layout                                      |
+| Currency   | EGP                                                          |
+| Branches   | Independent workspaces; main warehouse + cafe in each branch |
+| Costing    | FIFO with purchase batches                                   |
+| Stack      | Next.js frontend + Express.js backend + MySQL (Drizzle ORM)  |
 
 ---
 
@@ -32,6 +32,8 @@ A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inv
 
 ### Roles & permissions
 
+Branch access is enforced independently of the capability matrix below. Admins manage/select all branches; each cashier belongs to one branch and cannot change it. The revised capability/CRUD requirements remain tracked as AUTH-1/CRUD-1 in `docs/audit-report.md`; branch isolation does not mark those separate changes implemented.
+
 Only admins and cashiers can sign in. An employee record is a staff/HR record and has no system access by default.
 
 - An admin can grant an employee cashier access ("promote to cashier"). This creates one linked `users` account with the `cashier` role and login credentials.
@@ -40,6 +42,17 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 - Revoking or deactivating the linked user blocks login without deleting or deactivating the employee record.
 - Cashier actions are stored against the authenticated user and are reportable through the linked employee, including shifts, orders, discounts, refunds, shift expenses, waste entries, and transfer requests where applicable.
 - There is no employee PIN or standalone attendance clock. Only cashiers have worked-time tracking, derived from their shift open and close times.
+
+### Branch workspaces
+
+- Admin creates, renames, archives, and restores branches from the Branches page and selects the active workspace from the application header.
+- Existing records and cashier accounts migrate to **الفرع الرئيسي** (Main Branch). New branches start without operational records; cached online catalog data can be copied, with stock ingredient/modifier setup reset for independent configuration.
+- Every branch owns its employees/payroll, categories/items, supplier accounts, purchases, stock/batches/movements, recipes/preparations, transfer queue, shifts, orders, refunds, expenses, waste, catalog configuration, and report data.
+- A cashier account belongs to exactly one branch through its employee record. Moving a person to another branch requires a new employee/account record; past records remain in the original branch.
+- Admin identities are global and may act within any selected workspace. Application requests carry `X-Branch-Id`; the server validates the selection against the current account. Cashiers default to their assigned branch and cannot override it.
+- Archive preserves history, blocks cashier login and operational writes, and skips worker refreshes. Admin can read archived records and restore the branch. A branch with an open shift, or the last active branch, cannot be archived.
+- Background catalog/order caching runs separately in each active branch with independent refresh state and leases. Online order stock deduction is a separate pending feature.
+- See `docs/branches.md` for API and rollout details.
 
 | Capability                              | Admin | Cashier            |
 | --------------------------------------- | ----- | ------------------ |
@@ -122,7 +135,7 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 - **Request → approve flow:**
   1. Cashier creates a **transfer request**: items + quantities + note.
   2. Admin reviews, may edit each requested quantity (without adding or dropping item lines), then **approves** → stock moves main → cafe immediately; or **rejects** with a reason.
-- All cashiers and admins see the shared request queue for the single cafe. Request lines preserve the originally requested quantities; approved quantities are stored on the resulting transfer.
+- Cashiers and admins working in the same branch see that branch's cafe request queue. Other branches have separate queues. Request lines preserve the originally requested quantities; approved quantities are stored on the resulting transfer.
 - Approval is atomic. If any approved quantity is unavailable in the main warehouse, no stock moves, the API returns a conflict, and the request remains pending for adjustment and retry.
 - Admin can also create a **direct transfer** (no request) in one step.
 - Reviewed requests and completed transfers are immutable audit records. Every transfer document lists items, quantities, source and cafe batch IDs, carried FIFO costs, requester, approver, and timestamps.
@@ -147,7 +160,7 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 
 ## 8. Shifts
 
-- **One open shift at a time** (single drawer). Orders, refunds, and shift expenses can only be recorded while a shift is open, and attach to it.
+- **Owner-confirmed target:** one open shift per cashier account, with multiple cashiers able to work simultaneously within/across branches. Branch isolation currently separates drawer slots across branches; the within-branch concurrency change remains W1 in the audit. Orders, refunds, and shift expenses require and attach to the owning cashier's open shift.
 - **Open:** cashier logs in and enters the counted **starting float**.
 - Each shift records the authenticated cashier user and, through that user's required employee link, the employee who operated it.
 - A cashier's worked time is the shift duration from open to close. Non-cashier employees have no attendance or worked-hours tracking.
@@ -179,7 +192,6 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 - **Bonuses / deductions:** dated entries with amounts and notes.
 - **Payday screen:** for a chosen period per employee —
   `net = computed pay + bonuses − deductions − advances` → confirm to record the salary payment. Full salary history retained. Payday is one calendar month at a time. A month on or before the latest paid month cannot be paid; the payday screen shows those months as not payable. Net pay is computed in integer cents so two-decimal amounts do not drift.
-
 
 ---
 
@@ -263,11 +275,13 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 
 All stock changes go through `stock_movements` + `stock_batches` so every quantity and cost is traceable to a document.
 
+`branches` stores workspace lifecycle. Operational tables carry `branch_id`; local uniqueness and external IDs are scoped by branch. Composite references prevent cross-branch links between owned records. Global administrator identities remain shared; cashier/employee assignment and all operational reads/writes are branch-scoped.
+
 ---
 
 ## 16. Out of Scope (explicitly excluded)
 
-- Multiple branches; dine-in/delivery orders; card or wallet payments.
+- Dine-in/delivery POS orders; card or wallet payments.
 - Expiry-date tracking; purchase returns to suppliers.
 - Customer accounts/loyalty; kitchen display screens.
 - English interface; currencies other than EGP.

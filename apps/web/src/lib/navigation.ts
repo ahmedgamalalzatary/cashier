@@ -17,6 +17,7 @@ export const NAV_ITEMS = [
   { href: "/refunds", label: "المرتجع" },
   { href: "/recipes", label: "الوصفات", adminOnly: true },
   { href: "/reports", label: "التقارير", adminOnly: true },
+  { href: "/branches", label: "الفروع", adminOnly: true },
 ] as const;
 
 export const ADMIN_PATHS = NAV_ITEMS.filter(

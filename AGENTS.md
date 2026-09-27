@@ -31,7 +31,7 @@ These instructions apply to the entire repository. Follow the user's explicit in
 ## Mid-to-high complexity workflow
 1. Establish a baseline for the requested area ( if u are updating/going to update something in this part, ensure that this specific part is green before u even start, green === lint, build, typecheck, test )
 2. implement the requested changes in full 
-3. First confirm specific green in the touched area (targeted build/lint/typecheck/tests). Do not run the full
+3. First confirm specific green in the touched area (targeted build/lint/typecheck/tests). Do not run the full suite yet.
 4. if the complixity is high, touching mulitple areas/scopes run/ensure everything is green accorss everything ( the entire codebase is green )
 5. If context is compacted, re-read every instruction or reference document read at the start of the task. Do not rely only on the compaction summary.
 ## VPS and out-of-scope environment commands

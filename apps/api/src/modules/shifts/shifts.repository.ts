@@ -1,3 +1,8 @@
+import {
+  branchCondition,
+  branchValues,
+  branchTransaction,
+} from "../../db/branch-context.js";
 import { desc, eq, sql } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import {
@@ -31,7 +36,7 @@ export class ShiftsRepository {
   constructor(private db: Db) {}
 
   transaction<T>(fn: (repo: ShiftsRepository) => Promise<T>): Promise<T> {
-    return this.db.transaction((tx) =>
+    return branchTransaction(this.db, (tx) =>
       fn(new ShiftsRepository(tx as unknown as Db)),
     );
   }
@@ -44,12 +49,12 @@ export class ShiftsRepository {
         employeeId: users.employeeId,
       })
       .from(users)
-      .where(eq(users.id, userId));
+      .where(branchCondition(users, eq(users.id, userId)));
     if (!link?.employeeId) return undefined;
     const [employee] = await this.db
       .select({ id: employees.id, isActive: employees.isActive })
       .from(employees)
-      .where(eq(employees.id, link.employeeId))
+      .where(branchCondition(employees, eq(employees.id, link.employeeId)))
       .for("update");
     const [user] = await this.db
       .select({
@@ -58,7 +63,7 @@ export class ShiftsRepository {
         employeeId: users.employeeId,
       })
       .from(users)
-      .where(eq(users.id, userId))
+      .where(branchCondition(users, eq(users.id, userId)))
       .for("update");
     if (!user || user.employeeId !== employee?.id) return undefined;
     return { ...user, employeeIsActive: employee.isActive };
@@ -70,11 +75,13 @@ export class ShiftsRepository {
     openingFloat: string;
     openedAt: Date;
   }) {
-    const [result] = await this.db.insert(shifts).values({
-      ...input,
-      status: "open",
-      openSlot: 1,
-    });
+    const [result] = await this.db.insert(shifts).values(
+      branchValues({
+        ...input,
+        status: "open",
+        openSlot: 1,
+      }),
+    );
     return result.insertId;
   }
 
@@ -82,8 +89,11 @@ export class ShiftsRepository {
     const [row] = await this.db
       .select(shiftColumns)
       .from(shifts)
-      .innerJoin(employees, eq(shifts.employeeId, employees.id))
-      .where(eq(shifts.id, id));
+      .innerJoin(
+        employees,
+        branchCondition(employees, eq(shifts.employeeId, employees.id)),
+      )
+      .where(branchCondition(shifts, eq(shifts.id, id)));
     return row;
   }
 
@@ -91,7 +101,7 @@ export class ShiftsRepository {
     const [row] = await this.db
       .select()
       .from(shifts)
-      .where(eq(shifts.id, id))
+      .where(branchCondition(shifts, eq(shifts.id, id)))
       .for("update");
     return row;
   }
@@ -115,7 +125,7 @@ export class ShiftsRepository {
         expectedCash: input.expectedCash,
         overShort: input.overShort,
       })
-      .where(eq(shifts.id, input.id));
+      .where(branchCondition(shifts, eq(shifts.id, input.id)));
   }
 
   async reopen(id: number) {
@@ -130,64 +140,77 @@ export class ShiftsRepository {
         expectedCash: null,
         overShort: null,
       })
-      .where(eq(shifts.id, id));
+      .where(branchCondition(shifts, eq(shifts.id, id)));
   }
 
   async findCurrent() {
     const [row] = await this.db
       .select({ id: shifts.id, cashierUserId: shifts.cashierUserId })
       .from(shifts)
-      .where(eq(shifts.openSlot, 1));
+      .where(branchCondition(shifts, eq(shifts.openSlot, 1)));
     return row;
   }
 
   listIds(cashierUserId?: number) {
-    const query = this.db.select({ id: shifts.id }).from(shifts);
+    const query = this.db
+      .select({ id: shifts.id })
+      .from(shifts)
+      .$dynamic()
+      .where(branchCondition(shifts));
     return (
       cashierUserId === undefined
         ? query
-        : query.where(eq(shifts.cashierUserId, cashierUserId))
+        : query.where(
+            branchCondition(shifts, eq(shifts.cashierUserId, cashierUserId)),
+          )
     )
       .orderBy(desc(shifts.openedAt), desc(shifts.id))
       .limit(100);
   }
 
   async totals(id: number) {
-    const [[orderTotals], [requestTotals], [refundTotals], [wasteTotals], [expenseTotals]] =
-      await Promise.all([
-        this.db
-          .select({
-            ordersCount: sql<number>`CAST(COUNT(${orders.id}) AS UNSIGNED)`,
-            sales: sql<string>`CAST(COALESCE(SUM(${orders.total}), 0) AS DECIMAL(12,2))`,
-            discounts: sql<string>`CAST(COALESCE(SUM(${orders.discountAmount}), 0) AS DECIMAL(12,2))`,
-          })
-          .from(orders)
-          .where(eq(orders.shiftId, id)),
-        this.db
-          .select({
-            transferRequests: sql<number>`CAST(COUNT(${transferRequests.id}) AS UNSIGNED)`,
-          })
-          .from(transferRequests)
-          .where(eq(transferRequests.shiftId, id)),
-        this.db
-          .select({
-            refunds: sql<string>`CAST(COALESCE(SUM(${refunds.amount}), 0) AS DECIMAL(12,2))`,
-          })
-          .from(refunds)
-          .where(eq(refunds.shiftId, id)),
-        this.db
-          .select({
-            wasteEntries: sql<number>`CAST(COUNT(${wasteEntries.id}) AS UNSIGNED)`,
-          })
-          .from(wasteEntries)
-          .where(eq(wasteEntries.shiftId, id)),
-        this.db
-          .select({
-            expenses: sql<string>`CAST(COALESCE(SUM(${expenses.amount}), 0) AS DECIMAL(12,2))`,
-          })
-          .from(expenses)
-          .where(eq(expenses.shiftId, id)),
-      ]);
+    const [
+      [orderTotals],
+      [requestTotals],
+      [refundTotals],
+      [wasteTotals],
+      [expenseTotals],
+    ] = await Promise.all([
+      this.db
+        .select({
+          ordersCount: sql<number>`CAST(COUNT(${orders.id}) AS UNSIGNED)`,
+          sales: sql<string>`CAST(COALESCE(SUM(${orders.total}), 0) AS DECIMAL(12,2))`,
+          discounts: sql<string>`CAST(COALESCE(SUM(${orders.discountAmount}), 0) AS DECIMAL(12,2))`,
+        })
+        .from(orders)
+        .where(branchCondition(orders, eq(orders.shiftId, id))),
+      this.db
+        .select({
+          transferRequests: sql<number>`CAST(COUNT(${transferRequests.id}) AS UNSIGNED)`,
+        })
+        .from(transferRequests)
+        .where(
+          branchCondition(transferRequests, eq(transferRequests.shiftId, id)),
+        ),
+      this.db
+        .select({
+          refunds: sql<string>`CAST(COALESCE(SUM(${refunds.amount}), 0) AS DECIMAL(12,2))`,
+        })
+        .from(refunds)
+        .where(branchCondition(refunds, eq(refunds.shiftId, id))),
+      this.db
+        .select({
+          wasteEntries: sql<number>`CAST(COUNT(${wasteEntries.id}) AS UNSIGNED)`,
+        })
+        .from(wasteEntries)
+        .where(branchCondition(wasteEntries, eq(wasteEntries.shiftId, id))),
+      this.db
+        .select({
+          expenses: sql<string>`CAST(COALESCE(SUM(${expenses.amount}), 0) AS DECIMAL(12,2))`,
+        })
+        .from(expenses)
+        .where(branchCondition(expenses, eq(expenses.shiftId, id))),
+    ]);
     return {
       ...orderTotals,
       ...requestTotals,
@@ -211,12 +234,12 @@ export class ShiftsRepository {
         occurredAt: shiftEvents.occurredAt,
       })
       .from(shiftEvents)
-      .where(eq(shiftEvents.shiftId, shiftId))
+      .where(branchCondition(shiftEvents, eq(shiftEvents.shiftId, shiftId)))
       .orderBy(shiftEvents.occurredAt, shiftEvents.id);
   }
 
   async createEvent(data: typeof shiftEvents.$inferInsert) {
-    await this.db.insert(shiftEvents).values(data);
+    await this.db.insert(shiftEvents).values(branchValues(data));
   }
 
   async correct(input: {
@@ -234,6 +257,6 @@ export class ShiftsRepository {
         expectedCash: input.expectedCash,
         overShort: input.overShort,
       })
-      .where(eq(shifts.id, input.id));
+      .where(branchCondition(shifts, eq(shifts.id, input.id)));
   }
 }

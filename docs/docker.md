@@ -34,7 +34,6 @@ The API response should be `{"ok":true}`; `/health` is intentionally unauthentic
 
 `migrate` and `cache-worker` have liveness healthchecks (`node scripts/process-liveness.cjs`). `migrate` reports `healthy` only while another process has `drizzle-kit` as an argument — normal runs finish in seconds and show `Exited (0)`, while `unhealthy` means the container kept running for over a minute with no migration process (check its logs). `cache-worker` reports `healthy` while another process has `dist/worker.js` as an argument; `unhealthy` means that process died while the container still ran — check `docker compose --env-file .env.production logs cache-worker`. Each probe ignores its own process and ignores `node -e` scripts whose source text mentions the marker, so the healthcheck cannot mark the service healthy by matching itself. These probes see a dead process, not a wedged one: a worker alive but stuck on a hung request still reports `healthy`.
 
-
 ## Deploy an update
 
 ```bash
@@ -48,6 +47,29 @@ sudo docker compose --env-file .env.production ps
 The persistent MySQL volume is retained across builds and container replacements. Compose waits for MySQL, runs pending migrations, then starts the API, `cache-worker`, and web service.
 
 This update includes migration `0033_revoke_all_auth_tokens`, which invalidates every previously issued login token as part of the move to HttpOnly cookie auth. All users must log in again after this deploy; that is expected, not a failure.
+
+### First branch-workspace rollout (0039/0040)
+
+Take the normal backup first. Stop old application traffic and the old worker before changing the schema: older code makes unscoped queries, so it must not overlap the new branch-aware deployment.
+
+```bash
+sudo docker compose --env-file .env.production stop web api cache-worker
+```
+
+Build the updated images and run the migration job before starting the application:
+
+```bash
+sudo docker compose --env-file .env.production build
+sudo docker compose --env-file .env.production run --rm migrate
+```
+
+After successful migration, start the updated stack:
+
+```bash
+sudo docker compose --env-file .env.production up -d --force-recreate api cache-worker web
+```
+
+Existing records remain in **الفرع الرئيسي**. MySQL DDL does not roll back on failure; inspect logs and the partial schema before retrying a failed migration. Branch ownership is implemented throughout the API, worker, and web client, so deploy those versions together. Further API/usage details are in `branches.md`.
 
 ## Admin account
 

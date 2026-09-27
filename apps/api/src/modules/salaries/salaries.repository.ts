@@ -1,3 +1,8 @@
+import {
+  branchCondition,
+  branchValues,
+  branchTransaction,
+} from "../../db/branch-context.js";
 import { and, asc, desc, eq, gte, lt, sql } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import {
@@ -47,7 +52,7 @@ const paymentColumns = {
 export class SalariesRepository {
   constructor(private db: Db) {}
   transaction<T>(fn: (repo: SalariesRepository) => Promise<T>) {
-    return this.db.transaction((tx) =>
+    return branchTransaction(this.db, (tx) =>
       fn(new SalariesRepository(tx as unknown as Db)),
     );
   }
@@ -61,20 +66,21 @@ export class SalariesRepository {
         payRate: employees.payRate,
       })
       .from(employees)
+      .where(branchCondition(employees))
       .orderBy(asc(employees.name));
   }
   async employee(id: number) {
     const [row] = await this.db
       .select()
       .from(employees)
-      .where(eq(employees.id, id));
+      .where(branchCondition(employees, eq(employees.id, id)));
     return row;
   }
   async employeeForUpdate(id: number) {
     const [row] = await this.db
       .select()
       .from(employees)
-      .where(eq(employees.id, id))
+      .where(branchCondition(employees, eq(employees.id, id)))
       .for("update");
     return row;
   }
@@ -82,12 +88,18 @@ export class SalariesRepository {
     return this.db
       .select(advanceColumns)
       .from(salaryAdvances)
-      .innerJoin(employees, eq(employees.id, salaryAdvances.employeeId))
+      .innerJoin(
+        employees,
+        branchCondition(employees, eq(employees.id, salaryAdvances.employeeId)),
+      )
       .innerJoin(users, eq(users.id, salaryAdvances.recordedBy))
       .where(
-        and(
-          gte(salaryAdvances.entryDate, start),
-          lt(salaryAdvances.entryDate, end),
+        branchCondition(
+          salaryAdvances,
+          and(
+            gte(salaryAdvances.entryDate, start),
+            lt(salaryAdvances.entryDate, end),
+          ),
         ),
       )
       .orderBy(desc(salaryAdvances.entryDate), desc(salaryAdvances.id));
@@ -96,12 +108,21 @@ export class SalariesRepository {
     return this.db
       .select(adjustmentColumns)
       .from(salaryAdjustments)
-      .innerJoin(employees, eq(employees.id, salaryAdjustments.employeeId))
+      .innerJoin(
+        employees,
+        branchCondition(
+          employees,
+          eq(employees.id, salaryAdjustments.employeeId),
+        ),
+      )
       .innerJoin(users, eq(users.id, salaryAdjustments.recordedBy))
       .where(
-        and(
-          gte(salaryAdjustments.entryDate, start),
-          lt(salaryAdjustments.entryDate, end),
+        branchCondition(
+          salaryAdjustments,
+          and(
+            gte(salaryAdjustments.entryDate, start),
+            lt(salaryAdjustments.entryDate, end),
+          ),
         ),
       )
       .orderBy(desc(salaryAdjustments.entryDate), desc(salaryAdjustments.id));
@@ -110,12 +131,18 @@ export class SalariesRepository {
     return this.db
       .select(paymentColumns)
       .from(salaryPayments)
-      .innerJoin(employees, eq(employees.id, salaryPayments.employeeId))
+      .innerJoin(
+        employees,
+        branchCondition(employees, eq(employees.id, salaryPayments.employeeId)),
+      )
       .innerJoin(users, eq(users.id, salaryPayments.paidBy))
       .where(
-        and(
-          gte(salaryPayments.periodMonth, start),
-          lt(salaryPayments.periodMonth, end),
+        branchCondition(
+          salaryPayments,
+          and(
+            gte(salaryPayments.periodMonth, start),
+            lt(salaryPayments.periodMonth, end),
+          ),
         ),
       )
       .orderBy(desc(salaryPayments.paidAt));
@@ -126,9 +153,12 @@ export class SalariesRepository {
         .select({ amount: salaryAdvances.amount })
         .from(salaryAdvances)
         .where(
-          and(
-            eq(salaryAdvances.employeeId, employeeId),
-            lt(salaryAdvances.entryDate, end),
+          branchCondition(
+            salaryAdvances,
+            and(
+              eq(salaryAdvances.employeeId, employeeId),
+              lt(salaryAdvances.entryDate, end),
+            ),
           ),
         ),
       this.db
@@ -138,10 +168,13 @@ export class SalariesRepository {
         })
         .from(salaryAdjustments)
         .where(
-          and(
-            eq(salaryAdjustments.employeeId, employeeId),
-            gte(salaryAdjustments.entryDate, start),
-            lt(salaryAdjustments.entryDate, end),
+          branchCondition(
+            salaryAdjustments,
+            and(
+              eq(salaryAdjustments.employeeId, employeeId),
+              gte(salaryAdjustments.entryDate, start),
+              lt(salaryAdjustments.entryDate, end),
+            ),
           ),
         ),
       this.db
@@ -150,9 +183,12 @@ export class SalariesRepository {
         })
         .from(salaryPayments)
         .where(
-          and(
-            eq(salaryPayments.employeeId, employeeId),
-            lt(salaryPayments.periodMonth, start),
+          branchCondition(
+            salaryPayments,
+            and(
+              eq(salaryPayments.employeeId, employeeId),
+              lt(salaryPayments.periodMonth, start),
+            ),
           ),
         ),
     ]);
@@ -167,9 +203,12 @@ export class SalariesRepository {
       .select()
       .from(salaryPayments)
       .where(
-        and(
-          eq(salaryPayments.employeeId, employeeId),
-          eq(salaryPayments.periodMonth, month),
+        branchCondition(
+          salaryPayments,
+          and(
+            eq(salaryPayments.employeeId, employeeId),
+            eq(salaryPayments.periodMonth, month),
+          ),
         ),
       )
       .for("update");
@@ -180,7 +219,12 @@ export class SalariesRepository {
       this.db
         .select({ periodMonth: salaryPayments.periodMonth })
         .from(salaryPayments)
-        .where(eq(salaryPayments.employeeId, employeeId))
+        .where(
+          branchCondition(
+            salaryPayments,
+            eq(salaryPayments.employeeId, employeeId),
+          ),
+        )
         .orderBy(desc(salaryPayments.periodMonth))
         .limit(1);
     const [row] = forUpdate ? await query().for("update") : await query();
@@ -189,26 +233,31 @@ export class SalariesRepository {
   async createAdvance(input: AdvanceInput & { recordedBy: number }) {
     const [result] = await this.db
       .insert(salaryAdvances)
-      .values({ ...input, amount: input.amount.toFixed(2) });
+      .values(branchValues({ ...input, amount: input.amount.toFixed(2) }));
     return { id: result.insertId };
   }
   async createAdjustment(input: AdjustmentInput & { recordedBy: number }) {
     const [result] = await this.db
       .insert(salaryAdjustments)
-      .values({ ...input, amount: input.amount.toFixed(2) });
+      .values(branchValues({ ...input, amount: input.amount.toFixed(2) }));
     return { id: result.insertId };
   }
   async createPayment(input: typeof salaryPayments.$inferInsert) {
-    const [result] = await this.db.insert(salaryPayments).values(input);
+    const [result] = await this.db
+      .insert(salaryPayments)
+      .values(branchValues(input));
     return result.insertId;
   }
   async payment(id: number) {
     const [row] = await this.db
       .select(paymentColumns)
       .from(salaryPayments)
-      .innerJoin(employees, eq(employees.id, salaryPayments.employeeId))
+      .innerJoin(
+        employees,
+        branchCondition(employees, eq(employees.id, salaryPayments.employeeId)),
+      )
       .innerJoin(users, eq(users.id, salaryPayments.paidBy))
-      .where(eq(salaryPayments.id, id));
+      .where(branchCondition(salaryPayments, eq(salaryPayments.id, id)));
     return row;
   }
 }

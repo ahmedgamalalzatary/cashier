@@ -1,3 +1,8 @@
+import {
+  branchCondition,
+  branchValues,
+  branchTransaction,
+} from "../../db/branch-context.js";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import {
@@ -19,9 +24,12 @@ export class RefundsRepository {
   constructor(private db: Db) {}
 
   transaction<T>(
-    fn: (repo: RefundsRepository, inventory: InventoryTransaction) => Promise<T>,
+    fn: (
+      repo: RefundsRepository,
+      inventory: InventoryTransaction,
+    ) => Promise<T>,
   ): Promise<T> {
-    return this.db.transaction((tx) => {
+    return branchTransaction(this.db, (tx) => {
       const transactionDb = tx as unknown as Db;
       return fn(
         new RefundsRepository(transactionDb),
@@ -34,7 +42,12 @@ export class RefundsRepository {
     const [row] = await this.db
       .select({ id: shifts.id })
       .from(shifts)
-      .where(and(eq(shifts.openSlot, 1), eq(shifts.cashierUserId, cashierId)))
+      .where(
+        branchCondition(
+          shifts,
+          and(eq(shifts.openSlot, 1), eq(shifts.cashierUserId, cashierId)),
+        ),
+      )
       .for("update");
     return row;
   }
@@ -49,7 +62,7 @@ export class RefundsRepository {
         total: orders.total,
       })
       .from(orders)
-      .where(eq(orders.id, id))
+      .where(branchCondition(orders, eq(orders.id, id)))
       .for("update");
     return row;
   }
@@ -58,7 +71,7 @@ export class RefundsRepository {
     const [row] = await this.db
       .select({ id: orders.id })
       .from(orders)
-      .where(eq(orders.id, id));
+      .where(branchCondition(orders, eq(orders.id, id)));
     return row;
   }
 
@@ -80,9 +93,15 @@ export class RefundsRepository {
       })
       .from(orderLines)
       .where(
-        and(
-          eq(orderLines.orderId, orderId),
-          inArray(orderLines.id, [...lineIds].sort((a, b) => a - b)),
+        branchCondition(
+          orderLines,
+          and(
+            eq(orderLines.orderId, orderId),
+            inArray(
+              orderLines.id,
+              [...lineIds].sort((a, b) => a - b),
+            ),
+          ),
         ),
       )
       .orderBy(asc(orderLines.id))
@@ -98,7 +117,9 @@ export class RefundsRepository {
         grossAmount: sql<string>`CAST(SUM(${refundLines.grossAmount}) AS DECIMAL(12,2))`,
       })
       .from(refundLines)
-      .where(inArray(refundLines.orderLineId, lineIds))
+      .where(
+        branchCondition(refundLines, inArray(refundLines.orderLineId, lineIds)),
+      )
       .groupBy(refundLines.orderLineId);
   }
 
@@ -109,8 +130,11 @@ export class RefundsRepository {
         refundedQuantity: sql<string>`CAST(SUM(${refundLines.quantity}) AS DECIMAL(14,3))`,
       })
       .from(refundLines)
-      .innerJoin(orderLines, eq(refundLines.orderLineId, orderLines.id))
-      .where(eq(orderLines.orderId, orderId))
+      .innerJoin(
+        orderLines,
+        branchCondition(orderLines, eq(refundLines.orderLineId, orderLines.id)),
+      )
+      .where(branchCondition(refundLines, eq(orderLines.orderId, orderId)))
       .groupBy(refundLines.orderLineId)
       .orderBy(asc(refundLines.orderLineId));
   }
@@ -122,8 +146,11 @@ export class RefundsRepository {
         refunded: sql<string>`CAST(COALESCE(SUM(${refundLines.refundAmount}), 0) AS DECIMAL(12,2))`,
       })
       .from(refundLines)
-      .innerJoin(refunds, eq(refundLines.refundId, refunds.id))
-      .where(eq(refunds.orderId, orderId));
+      .innerJoin(
+        refunds,
+        branchCondition(refunds, eq(refundLines.refundId, refunds.id)),
+      )
+      .where(branchCondition(refundLines, eq(refunds.orderId, orderId)));
     return row;
   }
 
@@ -135,7 +162,9 @@ export class RefundsRepository {
         requestFingerprint: refunds.requestFingerprint,
       })
       .from(refunds)
-      .where(eq(refunds.clientRequestId, clientRequestId));
+      .where(
+        branchCondition(refunds, eq(refunds.clientRequestId, clientRequestId)),
+      );
     return row;
   }
 
@@ -149,7 +178,12 @@ export class RefundsRepository {
         unitCost: orderLineAllocations.unitCost,
       })
       .from(orderLineAllocations)
-      .where(eq(orderLineAllocations.orderLineId, orderLineId))
+      .where(
+        branchCondition(
+          orderLineAllocations,
+          eq(orderLineAllocations.orderLineId, orderLineId),
+        ),
+      )
       .orderBy(asc(orderLineAllocations.id));
   }
 
@@ -162,37 +196,42 @@ export class RefundsRepository {
       })
       .from(refundLineAllocations)
       .where(
-        inArray(
-          refundLineAllocations.orderLineAllocationId,
-          orderLineAllocationIds,
+        branchCondition(
+          refundLineAllocations,
+          inArray(
+            refundLineAllocations.orderLineAllocationId,
+            orderLineAllocationIds,
+          ),
         ),
       )
       .groupBy(refundLineAllocations.orderLineAllocationId);
   }
 
   async createRefund(data: typeof refunds.$inferInsert) {
-    const [result] = await this.db.insert(refunds).values(data);
+    const [result] = await this.db.insert(refunds).values(branchValues(data));
     return result.insertId;
   }
 
   async createLine(data: typeof refundLines.$inferInsert) {
-    const [result] = await this.db.insert(refundLines).values(data);
+    const [result] = await this.db
+      .insert(refundLines)
+      .values(branchValues(data));
     return result.insertId;
   }
 
   createReturnAllocation(data: typeof refundLineAllocations.$inferInsert) {
-    return this.db.insert(refundLineAllocations).values(data);
+    return this.db.insert(refundLineAllocations).values(branchValues(data));
   }
 
   createWaste(data: typeof wasteEntries.$inferInsert) {
-    return this.db.insert(wasteEntries).values(data);
+    return this.db.insert(wasteEntries).values(branchValues(data));
   }
 
   updateTotalCost(id: number, totalCostReturned: string) {
     return this.db
       .update(refunds)
       .set({ totalCostReturned })
-      .where(eq(refunds.id, id));
+      .where(branchCondition(refunds, eq(refunds.id, id)));
   }
 
   list(limit = 100) {
@@ -210,8 +249,12 @@ export class RefundsRepository {
         createdAt: refunds.createdAt,
       })
       .from(refunds)
-      .innerJoin(orders, eq(refunds.orderId, orders.id))
+      .innerJoin(
+        orders,
+        branchCondition(orders, eq(refunds.orderId, orders.id)),
+      )
       .innerJoin(users, eq(refunds.cashierId, users.id))
+      .where(branchCondition(refunds))
       .orderBy(desc(refunds.createdAt), desc(refunds.id))
       .limit(limit);
   }
@@ -231,34 +274,48 @@ export class RefundsRepository {
         createdAt: refunds.createdAt,
       })
       .from(refunds)
-      .innerJoin(orders, eq(refunds.orderId, orders.id))
+      .innerJoin(
+        orders,
+        branchCondition(orders, eq(refunds.orderId, orders.id)),
+      )
       .innerJoin(users, eq(refunds.cashierId, users.id))
-      .where(eq(refunds.id, id));
+      .where(branchCondition(refunds, eq(refunds.id, id)));
     return row;
   }
 
   listLines(refundId: number) {
-    return this.db
-      .select({
-        id: refundLines.id,
-        orderLineId: refundLines.orderLineId,
-        type: refundLines.type,
-        productName: refundLines.productName,
-        sizeName: refundLines.sizeName,
-        quantity: refundLines.quantity,
-        unitPrice: refundLines.unitPrice,
-        grossAmount: refundLines.grossAmount,
-        refundAmount: refundLines.refundAmount,
-        stockAction: refundLines.stockAction,
-        returnedCost: refundLines.returnedCost,
-        itemCode: items.code,
-      })
-      .from(refundLines)
-      // order_lines.item_id references one items.id row. Keep that 1:1
-      // relationship if the schema changes so this join cannot multiply lines.
-      .leftJoin(orderLines, eq(refundLines.orderLineId, orderLines.id))
-      .leftJoin(items, eq(orderLines.itemId, items.id))
-      .where(eq(refundLines.refundId, refundId))
-      .orderBy(asc(refundLines.id));
+    return (
+      this.db
+        .select({
+          id: refundLines.id,
+          orderLineId: refundLines.orderLineId,
+          type: refundLines.type,
+          productName: refundLines.productName,
+          sizeName: refundLines.sizeName,
+          quantity: refundLines.quantity,
+          unitPrice: refundLines.unitPrice,
+          grossAmount: refundLines.grossAmount,
+          refundAmount: refundLines.refundAmount,
+          stockAction: refundLines.stockAction,
+          returnedCost: refundLines.returnedCost,
+          itemCode: items.code,
+        })
+        .from(refundLines)
+        // order_lines.item_id references one items.id row. Keep that 1:1
+        // relationship if the schema changes so this join cannot multiply lines.
+        .leftJoin(
+          orderLines,
+          branchCondition(
+            orderLines,
+            eq(refundLines.orderLineId, orderLines.id),
+          ),
+        )
+        .leftJoin(
+          items,
+          branchCondition(items, eq(orderLines.itemId, items.id)),
+        )
+        .where(branchCondition(refundLines, eq(refundLines.refundId, refundId)))
+        .orderBy(asc(refundLines.id))
+    );
   }
 }

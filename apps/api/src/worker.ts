@@ -2,7 +2,10 @@ import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import { closeDb, createDb } from "./db/index.js";
 import { loadRuntimeEnv } from "./env.js";
-import { createCacheRefreshService } from "./modules/external/cache-refresh.module.js";
+import {
+  createCacheRefreshService,
+  refreshActiveBranches,
+} from "./modules/external/cache-refresh.module.js";
 
 const environment = loadRuntimeEnv();
 const db = createDb(environment.DATABASE_URL);
@@ -26,7 +29,7 @@ process.once("SIGINT", () => {
 
 while (!shutdown.signal.aborted) {
   try {
-    await refresh.runDue(shutdown.signal);
+    await refreshActiveBranches(db, refresh, shutdown.signal);
   } catch (error) {
     console.error("Cache refresh failed", error);
   }

@@ -53,6 +53,73 @@ describe("reports", () => {
     expect(response.status).toBe(403);
   });
 
+  it("includes negative stock without a minimum in dashboard and report alerts", async () => {
+    const auth = await loginAs(app, "admin");
+    const [category] = await db
+      .insert(categories)
+      .values({ name: "Stock alerts" });
+    for (const fixture of [
+      {
+        name: "negative",
+        quantity: "-1.000",
+        minimum: "0.000",
+        isActive: true,
+      },
+      {
+        name: "inactive",
+        quantity: "-1.000",
+        minimum: "0.000",
+        isActive: false,
+      },
+      { name: "empty", quantity: "0.000", minimum: "0.000", isActive: true },
+      { name: "positive", quantity: "1.000", minimum: "0.000", isActive: true },
+      {
+        name: "threshold",
+        quantity: "5.000",
+        minimum: "5.000",
+        isActive: true,
+      },
+    ]) {
+      const [item] = await db.insert(items).values({
+        code: nextTestItemCode(),
+        name: fixture.name,
+        categoryId: category.insertId,
+        type: "raw",
+        stockUnit: "kg",
+        cafeMinimumLevel: fixture.minimum,
+        isActive: fixture.isActive,
+      });
+      if (fixture.quantity !== "0.000") {
+        await db.insert(stockMovements).values({
+          itemId: item.insertId,
+          warehouse: "cafe",
+          movementType: "adjustment",
+          quantity: fixture.quantity,
+          unitCost: "0.000000",
+          occurredAt: new Date("2026-09-01T10:00:00Z"),
+        });
+      }
+    }
+
+    const dashboard = await request(app)
+      .get("/api/reports/dashboard")
+      .set(auth);
+    const report = await request(app)
+      .get("/api/reports?from=2026-09-01&to=2026-09-30")
+      .set(auth);
+    expect(dashboard.status).toBe(200);
+    expect(report.status).toBe(200);
+    for (const alerts of [dashboard.body.stock, report.body.stock.lowStock]) {
+      expect(alerts.map((row: { name: string }) => row.name)).toEqual([
+        "negative",
+        "threshold",
+      ]);
+      expect(
+        alerts.every((row: { warehouse: string }) => row.warehouse === "cafe"),
+      ).toBe(true);
+    }
+  });
+
   async function createExternalCategoryFixture() {
     const now = new Date();
     const [itemCategory] = await db
@@ -121,9 +188,9 @@ describe("reports", () => {
     });
   }
 
-  async function sellLatte(
-    cashierAuthorization: { readonly Authorization: string },
-  ) {
+  async function sellLatte(cashierAuthorization: {
+    readonly Authorization: string;
+  }) {
     const sale = await request(app)
       .post("/api/orders")
       .set(cashierAuthorization)
@@ -213,73 +280,101 @@ describe("reports", () => {
     expect(Number(rows[0].profit)).toBeCloseTo(79.6, 6);
   });
 
-  it("counts only the open segments of a reopened shift as worked minutes", async () => {
-    const adminAuthorization = await loginAs(app, "admin");
-    await loginAs(app, "cashier");
-    const [[cashier], [admin]] = await Promise.all([
-      db
-        .select({ id: users.id, employeeId: users.employeeId })
-        .from(users)
-        .where(eq(users.username, "cashier")),
-      db.select({ id: users.id }).from(users).where(eq(users.username, "admin")),
-    ]);
+  it.each([
+    {
+      scenario: "an overnight closed gap",
+      firstClose: "2026-09-10T10:00:00Z",
+      reopen: "2026-09-11T08:00:00Z",
+      lastClose: "2026-09-11T09:00:00Z",
+      expectedMinutes: 180,
+    },
+    {
+      scenario: "a close in the same second as opening",
+      firstClose: "2026-09-10T08:00:00Z",
+      reopen: "2026-09-11T08:00:00Z",
+      lastClose: "2026-09-11T09:00:00Z",
+      expectedMinutes: 60,
+    },
+    {
+      scenario: "two forty-second work segments",
+      firstClose: "2026-09-10T08:00:40Z",
+      reopen: "2026-09-10T08:01:00Z",
+      lastClose: "2026-09-10T08:01:40Z",
+      expectedMinutes: 1,
+    },
+  ])(
+    "counts only worked time with $scenario",
+    async ({ firstClose, reopen, lastClose, expectedMinutes }) => {
+      const adminAuthorization = await loginAs(app, "admin");
+      await loginAs(app, "cashier");
+      const [[cashier], [admin]] = await Promise.all([
+        db
+          .select({ id: users.id, employeeId: users.employeeId })
+          .from(users)
+          .where(eq(users.username, "cashier")),
+        db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.username, "admin")),
+      ]);
 
-    // opened, closed, left closed overnight, reopened, closed again
-    const [shift] = await db.insert(shifts).values({
-      cashierUserId: cashier.id,
-      employeeId: cashier.employeeId!,
-      status: "closed",
-      openingFloat: "0.00",
-      openedAt: new Date("2026-09-10T08:00:00.000Z"),
-      closedAt: new Date("2026-09-11T09:00:00.000Z"),
-    });
-    await db.insert(shiftEvents).values([
-      {
-        shiftId: shift.insertId,
-        action: "open",
-        actorUserId: cashier.id,
-        occurredAt: new Date("2026-09-10T08:00:00.000Z"),
-      },
-      {
-        shiftId: shift.insertId,
-        action: "close",
-        actorUserId: cashier.id,
-        occurredAt: new Date("2026-09-10T10:00:00.000Z"),
-      },
-      {
-        shiftId: shift.insertId,
-        action: "reopen",
-        actorUserId: admin.id,
-        occurredAt: new Date("2026-09-11T08:00:00.000Z"),
-      },
-      {
-        shiftId: shift.insertId,
-        action: "close",
-        actorUserId: admin.id,
-        occurredAt: new Date("2026-09-11T09:00:00.000Z"),
-      },
-    ]);
+      // Closed gaps do not count, and sub-minute segments round only after summing.
+      const [shift] = await db.insert(shifts).values({
+        cashierUserId: cashier.id,
+        employeeId: cashier.employeeId!,
+        status: "closed",
+        openingFloat: "0.00",
+        openedAt: new Date("2026-09-10T08:00:00.000Z"),
+        closedAt: new Date(lastClose),
+      });
+      await db.insert(shiftEvents).values([
+        {
+          shiftId: shift.insertId,
+          action: "open",
+          actorUserId: cashier.id,
+          occurredAt: new Date("2026-09-10T08:00:00.000Z"),
+        },
+        {
+          shiftId: shift.insertId,
+          action: "close",
+          actorUserId: cashier.id,
+          occurredAt: new Date(firstClose),
+        },
+        {
+          shiftId: shift.insertId,
+          action: "reopen",
+          actorUserId: admin.id,
+          occurredAt: new Date(reopen),
+        },
+        {
+          shiftId: shift.insertId,
+          action: "close",
+          actorUserId: admin.id,
+          occurredAt: new Date(lastClose),
+        },
+      ]);
 
-    const report = await request(app)
-      .get("/api/reports?from=2026-09-01&to=2026-09-30")
-      .set(adminAuthorization);
+      const report = await request(app)
+        .get("/api/reports?from=2026-09-01&to=2026-09-30")
+        .set(adminAuthorization);
 
-    expect(report.status).toBe(200);
-    const row = report.body.employees.activity.find(
-      (entry: { id: number }) => entry.id === cashier.employeeId,
-    );
-    // 120 minutes before the gap + 60 minutes after it; the overnight
-    // closed stretch must not be paid as work
-    expect(Number(row.workedMinutes)).toBe(180);
-    expect(Number(row.shiftsCount)).toBe(1);
+      expect(report.status).toBe(200);
+      const row = report.body.employees.activity.find(
+        (entry: { id: number }) => entry.id === cashier.employeeId,
+      );
+      expect(Number(row.workedMinutes)).toBe(expectedMinutes);
+      expect(Number(row.shiftsCount)).toBe(1);
 
-    // the report must agree with the shift screen, which already walked the
-    // same events
-    const shiftList = await request(app).get("/api/shifts").set(adminAuthorization);
-    expect(shiftList.status).toBe(200);
-    const detail = shiftList.body.find(
-      (entry: { id: number }) => entry.id === shift.insertId,
-    );
-    expect(detail.workedMinutes).toBe(180);
-  });
+      // the report must agree with the shift screen, which already walked the
+      // same events
+      const shiftList = await request(app)
+        .get("/api/shifts")
+        .set(adminAuthorization);
+      expect(shiftList.status).toBe(200);
+      const detail = shiftList.body.find(
+        (entry: { id: number }) => entry.id === shift.insertId,
+      );
+      expect(detail.workedMinutes).toBe(expectedMinutes);
+    },
+  );
 });

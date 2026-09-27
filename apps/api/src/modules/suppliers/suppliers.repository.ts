@@ -1,15 +1,20 @@
-import { and, eq, sql } from 'drizzle-orm';
-import type { Db } from '../../db/index.js';
+import {
+  branchCondition,
+  branchValues,
+  branchTransaction,
+} from "../../db/branch-context.js";
+import { and, eq, sql } from "drizzle-orm";
+import type { Db } from "../../db/index.js";
 import {
   purchaseInvoices,
   supplierPayments,
   suppliers,
-} from '../../db/schema.js';
+} from "../../db/schema.js";
 import type {
   PaymentInput,
   SupplierInput,
   SupplierUpdateInput,
-} from './suppliers.schemas.js';
+} from "./suppliers.schemas.js";
 
 // balance = opening balance + purchase invoices − payments.
 // Qualified names are spelled out because drizzle strips table prefixes
@@ -37,7 +42,7 @@ export class SuppliersRepository {
   constructor(private db: Db) {}
 
   transaction<T>(fn: (repo: SuppliersRepository) => Promise<T>): Promise<T> {
-    return this.db.transaction((tx) =>
+    return branchTransaction(this.db, (tx) =>
       fn(new SuppliersRepository(tx as unknown as Db)),
     );
   }
@@ -46,6 +51,7 @@ export class SuppliersRepository {
     return this.db
       .select(supplierColumns)
       .from(suppliers)
+      .where(branchCondition(suppliers))
       .orderBy(suppliers.name);
   }
 
@@ -53,7 +59,7 @@ export class SuppliersRepository {
     const [row] = await this.db
       .select(supplierColumns)
       .from(suppliers)
-      .where(eq(suppliers.id, id));
+      .where(branchCondition(suppliers, eq(suppliers.id, id)));
     return row;
   }
 
@@ -61,8 +67,8 @@ export class SuppliersRepository {
     const [row] = await this.db
       .select(supplierColumns)
       .from(suppliers)
-      .where(eq(suppliers.id, id))
-      .for('update');
+      .where(branchCondition(suppliers, eq(suppliers.id, id)))
+      .for("update");
     return row;
   }
 
@@ -70,7 +76,12 @@ export class SuppliersRepository {
     const [row] = await this.db
       .select({ id: supplierPayments.id })
       .from(supplierPayments)
-      .where(eq(supplierPayments.supplierId, supplierId))
+      .where(
+        branchCondition(
+          supplierPayments,
+          eq(supplierPayments.supplierId, supplierId),
+        ),
+      )
       .limit(1);
     return Boolean(row);
   }
@@ -79,7 +90,12 @@ export class SuppliersRepository {
     const [row] = await this.db
       .select({ id: purchaseInvoices.id })
       .from(purchaseInvoices)
-      .where(eq(purchaseInvoices.supplierId, supplierId))
+      .where(
+        branchCondition(
+          purchaseInvoices,
+          eq(purchaseInvoices.supplierId, supplierId),
+        ),
+      )
       .limit(1);
     return Boolean(row);
   }
@@ -87,7 +103,12 @@ export class SuppliersRepository {
   async create(data: SupplierInput) {
     const [result] = await this.db
       .insert(suppliers)
-      .values({ ...data, openingBalance: data.openingBalance.toFixed(2) });
+      .values(
+        branchValues({
+          ...data,
+          openingBalance: data.openingBalance.toFixed(2),
+        }),
+      );
     return result.insertId;
   }
 
@@ -101,7 +122,7 @@ export class SuppliersRepository {
           ? { openingBalance: openingBalance.toFixed(2) }
           : {}),
       })
-      .where(eq(suppliers.id, id));
+      .where(branchCondition(suppliers, eq(suppliers.id, id)));
     return result.affectedRows > 0;
   }
 
@@ -109,17 +130,24 @@ export class SuppliersRepository {
     const [result] = await this.db
       .update(suppliers)
       .set({ isActive: false })
-      .where(and(eq(suppliers.id, id), eq(suppliers.isActive, true)));
+      .where(
+        branchCondition(
+          suppliers,
+          and(eq(suppliers.id, id), eq(suppliers.isActive, true)),
+        ),
+      );
     return result.affectedRows > 0;
   }
 
   async createPayment(supplierId: number, data: PaymentInput) {
-    const [result] = await this.db.insert(supplierPayments).values({
-      supplierId,
-      amount: data.amount.toFixed(2),
-      paidAt: data.paidAt,
-      notes: data.notes,
-    });
+    const [result] = await this.db.insert(supplierPayments).values(
+      branchValues({
+        supplierId,
+        amount: data.amount.toFixed(2),
+        paidAt: data.paidAt,
+        notes: data.notes,
+      }),
+    );
     return result.insertId;
   }
 
@@ -127,7 +155,12 @@ export class SuppliersRepository {
     return this.db
       .select()
       .from(supplierPayments)
-      .where(eq(supplierPayments.supplierId, supplierId))
+      .where(
+        branchCondition(
+          supplierPayments,
+          eq(supplierPayments.supplierId, supplierId),
+        ),
+      )
       .orderBy(supplierPayments.paidAt, supplierPayments.id);
   }
 
@@ -140,7 +173,12 @@ export class SuppliersRepository {
         totalAmount: purchaseInvoices.totalAmount,
       })
       .from(purchaseInvoices)
-      .where(eq(purchaseInvoices.supplierId, supplierId))
+      .where(
+        branchCondition(
+          purchaseInvoices,
+          eq(purchaseInvoices.supplierId, supplierId),
+        ),
+      )
       .orderBy(purchaseInvoices.purchasedAt, purchaseInvoices.id);
   }
 }

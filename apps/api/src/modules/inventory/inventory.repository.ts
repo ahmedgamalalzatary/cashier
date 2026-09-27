@@ -1,3 +1,9 @@
+import {
+  branchCondition,
+  branchValues,
+  branchTable,
+  branchTransaction,
+} from "../../db/branch-context.js";
 import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import {
@@ -91,7 +97,7 @@ export class InventoryRepository implements InventoryRepositoryPort {
   transaction<T>(
     fn: (repo: InventoryRepositoryPort) => Promise<T>,
   ): Promise<T> {
-    return this.db.transaction((tx) =>
+    return branchTransaction(this.db, (tx) =>
       fn(new InventoryRepository(tx as unknown as Db)),
     );
   }
@@ -100,25 +106,29 @@ export class InventoryRepository implements InventoryRepositoryPort {
     const [row] = await this.db
       .select({ id: items.id, isActive: items.isActive })
       .from(items)
-      .where(eq(items.id, id))
+      .where(branchCondition(items, eq(items.id, id)))
       .for("update");
     return row;
   }
 
   async createBatch(data: Omit<StockBatchRecord, "id">) {
-    const [result] = await this.db.insert(stockBatches).values(data);
+    const [result] = await this.db
+      .insert(stockBatches)
+      .values(branchValues(data));
     return result.insertId;
   }
 
   async createMovement(data: StockMovementWrite) {
-    const [result] = await this.db.insert(stockMovements).values(data);
+    const [result] = await this.db
+      .insert(stockMovements)
+      .values(branchValues(data));
     return result.insertId;
   }
 
   outstandingDeficits(itemId: number, warehouse: Warehouse) {
     const allocatedQuantity = sql<string>`COALESCE((
       SELECT SUM(sda.quantity)
-      FROM stock_deficit_allocations sda
+      FROM ${branchTable("stock_deficit_allocations")} sda
       WHERE sda.deficit_movement_id = ${stockMovements.id}
     ), 0)`;
     const remainingQuantity = sql<string>`CAST(
@@ -129,12 +139,15 @@ export class InventoryRepository implements InventoryRepositoryPort {
       .select({ movementId: stockMovements.id, remainingQuantity })
       .from(stockMovements)
       .where(
-        and(
-          eq(stockMovements.itemId, itemId),
-          eq(stockMovements.warehouse, warehouse),
-          isNull(stockMovements.batchId),
-          lt(stockMovements.quantity, "0"),
-          sql`${remainingQuantity} > 0`,
+        branchCondition(
+          stockMovements,
+          and(
+            eq(stockMovements.itemId, itemId),
+            eq(stockMovements.warehouse, warehouse),
+            isNull(stockMovements.batchId),
+            lt(stockMovements.quantity, "0"),
+            sql`${remainingQuantity} > 0`,
+          ),
         ),
       )
       .orderBy(stockMovements.occurredAt, stockMovements.id)
@@ -142,7 +155,7 @@ export class InventoryRepository implements InventoryRepositoryPort {
   }
 
   async createDeficitAllocation(data: StockDeficitAllocationWrite) {
-    await this.db.insert(stockDeficitAllocations).values(data);
+    await this.db.insert(stockDeficitAllocations).values(branchValues(data));
   }
 
   lockAvailableBatches(itemId: number, warehouse: Warehouse) {
@@ -160,10 +173,13 @@ export class InventoryRepository implements InventoryRepositoryPort {
       })
       .from(stockBatches)
       .where(
-        and(
-          eq(stockBatches.itemId, itemId),
-          eq(stockBatches.warehouse, warehouse),
-          gt(stockBatches.remainingQuantity, "0"),
+        branchCondition(
+          stockBatches,
+          and(
+            eq(stockBatches.itemId, itemId),
+            eq(stockBatches.warehouse, warehouse),
+            gt(stockBatches.remainingQuantity, "0"),
+          ),
         ),
       )
       .orderBy(stockBatches.receivedAt, stockBatches.id)
@@ -174,18 +190,18 @@ export class InventoryRepository implements InventoryRepositoryPort {
     await this.db
       .update(stockBatches)
       .set({ remainingQuantity })
-      .where(eq(stockBatches.id, id));
+      .where(branchCondition(stockBatches, eq(stockBatches.id, id)));
   }
 
   listStock(warehouse: Warehouse) {
     const quantity = sql<string>`COALESCE((
       SELECT SUM(sm.quantity)
-      FROM stock_movements sm
+      FROM ${branchTable("stock_movements")} sm
       WHERE sm.item_id = items.id AND sm.warehouse = ${warehouse}
     ), 0)`;
     const stockValue = sql<string>`COALESCE((
       SELECT SUM(sb.remaining_quantity * sb.unit_cost)
-      FROM stock_batches sb
+      FROM ${branchTable("stock_batches")} sb
       WHERE sb.item_id = items.id AND sb.warehouse = ${warehouse}
     ), 0)`;
     const minimumLevel =
@@ -206,7 +222,11 @@ export class InventoryRepository implements InventoryRepositoryPort {
         minimumLevel,
       })
       .from(items)
-      .innerJoin(categories, eq(items.categoryId, categories.id))
+      .innerJoin(
+        categories,
+        branchCondition(categories, eq(items.categoryId, categories.id)),
+      )
+      .where(branchCondition(items))
       .orderBy(items.name);
   }
 }

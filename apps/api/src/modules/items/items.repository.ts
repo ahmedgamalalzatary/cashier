@@ -1,3 +1,9 @@
+import {
+  branchCondition,
+  branchValues,
+  branchTable,
+  branchTransaction,
+} from "../../db/branch-context.js";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import {
@@ -10,7 +16,7 @@ import {
 } from "../../db/schema.js";
 import type { ItemInput, ItemUpdateInput } from "./items.schemas.js";
 
-const itemColumns = {
+const itemColumns = () => ({
   id: items.id,
   code: items.code,
   name: items.name,
@@ -24,12 +30,12 @@ const itemColumns = {
   mainMinimumLevel: items.mainMinimumLevel,
   cafeMinimumLevel: items.cafeMinimumLevel,
   hasStockHistory: sql<number>`EXISTS (
-    SELECT 1 FROM stock_movements stock_history
-    WHERE stock_history.item_id = ${items.id}
+    SELECT 1 FROM ${branchTable("stock_movements")} stock_history
+    WHERE stock_history.item_id = \`items\`.\`id\`
   )`,
   isActive: items.isActive,
   createdAt: items.createdAt,
-};
+});
 
 function toDatabaseValues(data: ItemUpdateInput) {
   const {
@@ -65,16 +71,20 @@ export class ItemsRepository {
   constructor(private db: Db) {}
 
   transaction<T>(fn: (repo: ItemsRepository) => Promise<T>): Promise<T> {
-    return this.db.transaction((tx) =>
+    return branchTransaction(this.db, (tx) =>
       fn(new ItemsRepository(tx as unknown as Db)),
     );
   }
 
   async list() {
     const rows = await this.db
-      .select(itemColumns)
+      .select(itemColumns())
       .from(items)
-      .innerJoin(categories, eq(items.categoryId, categories.id))
+      .innerJoin(
+        categories,
+        branchCondition(categories, eq(items.categoryId, categories.id)),
+      )
+      .where(branchCondition(items))
       .orderBy(items.name);
     return rows.map((row) => ({
       ...row,
@@ -83,7 +93,10 @@ export class ItemsRepository {
   }
 
   async findById(id: number) {
-    const [row] = await this.db.select().from(items).where(eq(items.id, id));
+    const [row] = await this.db
+      .select()
+      .from(items)
+      .where(branchCondition(items, eq(items.id, id)));
     return row;
   }
 
@@ -91,7 +104,7 @@ export class ItemsRepository {
     const [row] = await this.db
       .select()
       .from(items)
-      .where(eq(items.id, id))
+      .where(branchCondition(items, eq(items.id, id)))
       .for("update");
     return row;
   }
@@ -101,9 +114,12 @@ export class ItemsRepository {
       .select()
       .from(categories)
       .where(
-        inArray(
-          categories.id,
-          [...new Set(ids)].sort((a, b) => a - b),
+        branchCondition(
+          categories,
+          inArray(
+            categories.id,
+            [...new Set(ids)].sort((a, b) => a - b),
+          ),
         ),
       )
       .orderBy(categories.id)
@@ -114,7 +130,7 @@ export class ItemsRepository {
     const [row] = await this.db
       .select({ id: categories.id })
       .from(categories)
-      .where(eq(categories.parentId, categoryId))
+      .where(branchCondition(categories, eq(categories.parentId, categoryId)))
       .limit(1);
     return Boolean(row);
   }
@@ -123,7 +139,7 @@ export class ItemsRepository {
     const [row] = await this.db
       .select({ id: stockMovements.id })
       .from(stockMovements)
-      .where(eq(stockMovements.itemId, itemId))
+      .where(branchCondition(stockMovements, eq(stockMovements.itemId, itemId)))
       .limit(1);
     return Boolean(row);
   }
@@ -132,17 +148,26 @@ export class ItemsRepository {
     const [row] = await this.db
       .select({ id: recipes.id })
       .from(recipes)
-      .leftJoin(recipeSizes, eq(recipeSizes.recipeId, recipes.id))
+      .leftJoin(
+        recipeSizes,
+        branchCondition(recipeSizes, eq(recipeSizes.recipeId, recipes.id)),
+      )
       .leftJoin(
         recipeIngredients,
-        eq(recipeIngredients.recipeSizeId, recipeSizes.id),
+        branchCondition(
+          recipeIngredients,
+          eq(recipeIngredients.recipeSizeId, recipeSizes.id),
+        ),
       )
       .where(
-        and(
-          eq(recipes.isActive, true),
-          or(
-            eq(recipes.outputItemId, itemId),
-            eq(recipeIngredients.itemId, itemId),
+        branchCondition(
+          recipes,
+          and(
+            eq(recipes.isActive, true),
+            or(
+              eq(recipes.outputItemId, itemId),
+              eq(recipeIngredients.itemId, itemId),
+            ),
           ),
         ),
       )
@@ -156,30 +181,33 @@ export class ItemsRepository {
     const [row] = await this.db
       .select({ maximum: sql<number | null>`MAX(${items.code})` })
       .from(items)
+      .where(branchCondition(items))
       .for("update");
     return (row?.maximum ?? 0) + 1;
   }
 
   async create(data: ItemInput, code: number) {
-    const [result] = await this.db.insert(items).values({
-      code,
-      name: data.name,
-      categoryId: data.categoryId,
-      type: data.type,
-      sellingPrice:
-        data.sellingPrice === null || data.sellingPrice === undefined
-          ? null
-          : data.sellingPrice.toFixed(2),
-      stockUnit: data.stockUnit,
-      purchaseUnit: data.purchaseUnit,
-      purchaseToStockFactor:
-        data.purchaseToStockFactor === null ||
-        data.purchaseToStockFactor === undefined
-          ? null
-          : data.purchaseToStockFactor.toFixed(6),
-      mainMinimumLevel: data.mainMinimumLevel.toFixed(3),
-      cafeMinimumLevel: data.cafeMinimumLevel.toFixed(3),
-    });
+    const [result] = await this.db.insert(items).values(
+      branchValues({
+        code,
+        name: data.name,
+        categoryId: data.categoryId,
+        type: data.type,
+        sellingPrice:
+          data.sellingPrice === null || data.sellingPrice === undefined
+            ? null
+            : data.sellingPrice.toFixed(2),
+        stockUnit: data.stockUnit,
+        purchaseUnit: data.purchaseUnit,
+        purchaseToStockFactor:
+          data.purchaseToStockFactor === null ||
+          data.purchaseToStockFactor === undefined
+            ? null
+            : data.purchaseToStockFactor.toFixed(6),
+        mainMinimumLevel: data.mainMinimumLevel.toFixed(3),
+        cafeMinimumLevel: data.cafeMinimumLevel.toFixed(3),
+      }),
+    );
     return result.insertId;
   }
 
@@ -187,7 +215,7 @@ export class ItemsRepository {
     const [result] = await this.db
       .update(items)
       .set(toDatabaseValues(data))
-      .where(eq(items.id, id));
+      .where(branchCondition(items, eq(items.id, id)));
     return result.affectedRows > 0;
   }
 
@@ -195,7 +223,9 @@ export class ItemsRepository {
     const [result] = await this.db
       .update(items)
       .set({ isActive: false })
-      .where(and(eq(items.id, id), eq(items.isActive, true)));
+      .where(
+        branchCondition(items, and(eq(items.id, id), eq(items.isActive, true))),
+      );
     return result.affectedRows > 0;
   }
 }

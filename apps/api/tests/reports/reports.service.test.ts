@@ -101,7 +101,7 @@ describe("report Cairo calendar boundaries", () => {
 });
 
 describe("ReportsService.dashboard", () => {
-  it("keeps only active low stock and nulls a missing open shift", async () => {
+  it("keeps active low and negative stock and nulls a missing open shift", async () => {
     const repo = {
       dashboard: vi.fn(async () => [{ sales: "10.00" }]),
       openShift: vi.fn(async () => []),
@@ -110,6 +110,11 @@ describe("ReportsService.dashboard", () => {
         { id: 2, isActive: true, quantity: "9.000", minimumLevel: "5.000" },
         { id: 3, isActive: false, quantity: "0.000", minimumLevel: "5.000" },
         { id: 4, isActive: 1, quantity: "1.000", minimumLevel: "5.000" },
+        { id: 5, isActive: true, quantity: "-1.000", minimumLevel: "0.000" },
+        { id: 6, isActive: false, quantity: "-1.000", minimumLevel: "0.000" },
+        { id: 7, isActive: true, quantity: "1.000", minimumLevel: "0.000" },
+        { id: 8, isActive: true, quantity: "0.000", minimumLevel: "0.000" },
+        { id: 9, isActive: true, quantity: "5.000", minimumLevel: "5.000" },
       ]),
     } as unknown as ReportsRepository;
 
@@ -117,7 +122,7 @@ describe("ReportsService.dashboard", () => {
 
     expect(dashboard.summary).toEqual({ sales: "10.00" });
     expect(dashboard.openShift).toBeNull();
-    expect(dashboard.stock.map((row) => row.id)).toEqual([1, 4]);
+    expect(dashboard.stock.map((row) => row.id)).toEqual([1, 4, 5, 9]);
   });
 
   it("does not flag an item that has no minimum level set", async () => {

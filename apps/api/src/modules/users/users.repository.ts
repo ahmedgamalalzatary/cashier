@@ -1,4 +1,5 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
+import { currentBranchId } from "../../db/branch-context.js";
 import type { Db } from "../../db/index.js";
 import { users } from "../../db/schema.js";
 import type { UserInput, UserUpdateInput } from "./users.schemas.js";
@@ -8,6 +9,9 @@ const safeUserColumns = {
   name: users.name,
   username: users.username,
   role: users.role,
+  branchId: sql<
+    number | null
+  >`CASE WHEN ${users.role}='cashier' THEN ${users.branchId} ELSE NULL END`,
   isActive: users.isActive,
   createdAt: users.createdAt,
 };
@@ -22,14 +26,23 @@ export class UsersRepository {
   }
 
   list() {
-    return this.db.select(safeUserColumns).from(users).orderBy(users.name);
+    return this.db
+      .select(safeUserColumns)
+      .from(users)
+      .where(or(eq(users.role, "admin"), eq(users.branchId, currentBranchId())))
+      .orderBy(users.name);
   }
 
   async findByIdForUpdate(id: number) {
     const [row] = await this.db
       .select()
       .from(users)
-      .where(eq(users.id, id))
+      .where(
+        and(
+          eq(users.id, id),
+          or(eq(users.role, "admin"), eq(users.branchId, currentBranchId())),
+        ),
+      )
       .for("update");
     return row;
   }

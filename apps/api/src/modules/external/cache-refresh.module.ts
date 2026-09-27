@@ -1,4 +1,7 @@
 import type { Db } from "../../db/index.js";
+import { eq } from "drizzle-orm";
+import { branches } from "../../db/schema.js";
+import { withBranch } from "../../db/branch-context.js";
 import {
   ExternalOrdersClient,
   type ExternalOrdersConfig,
@@ -24,4 +27,29 @@ export function createCacheRefreshService(
     new ExternalOrdersRepository(db),
     { now: () => new Date(), owner },
   );
+}
+
+export async function refreshActiveBranches(
+  db: Db,
+  refresh: Pick<CacheRefreshService, "runDue">,
+  signal?: AbortSignal,
+  onError: (branchId: number, error: unknown) => void = (id, error) =>
+    console.error(`Cache refresh failed for branch ${id}`, error),
+) {
+  const active = await db
+    .select({ id: branches.id })
+    .from(branches)
+    .where(eq(branches.isActive, true))
+    .orderBy(branches.id);
+  // A refresh service holds one lease connection; finish each workspace before
+  // moving to the next. A failed workspace does not stop the remaining ones.
+  for (const branch of active) {
+    signal?.throwIfAborted();
+    try {
+      await withBranch(branch.id, () => refresh.runDue(signal));
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      onError(branch.id, error);
+    }
+  }
 }

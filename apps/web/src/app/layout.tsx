@@ -3,6 +3,7 @@ import { IBM_Plex_Sans_Arabic } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
+import { BranchProvider } from "@/components/branches/branch-provider";
 
 const plexArabic = IBM_Plex_Sans_Arabic({
   variable: "--font-plex-arabic",
@@ -21,10 +22,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ar" dir="rtl" className={`${plexArabic.variable} h-full antialiased`}>
+    <html
+      lang="ar"
+      dir="rtl"
+      className={`${plexArabic.variable} h-full antialiased`}
+    >
       <body className="min-h-full">
         <AuthProvider>
-          <AppShell>{children}</AppShell>
+          <BranchProvider>
+            <AppShell>{children}</AppShell>
+          </BranchProvider>
         </AuthProvider>
       </body>
     </html>

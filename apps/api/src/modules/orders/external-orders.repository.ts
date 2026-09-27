@@ -1,3 +1,4 @@
+import { branchCondition, branchValues } from "../../db/branch-context.js";
 import type { ExternalOrderSummary } from "@cashier/shared";
 import { and, desc, like, or, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
@@ -33,7 +34,7 @@ export class ExternalOrdersRepository {
       }));
       await this.db
         .insert(externalOrdersCache)
-        .values(rows)
+        .values(branchValues(rows))
         .onDuplicateKeyUpdate({
           set: { externalId: sql`external_id` },
         });
@@ -68,7 +69,7 @@ export class ExternalOrdersRepository {
       this.db
         .select()
         .from(externalOrdersCache)
-        .where(where)
+        .where(branchCondition(externalOrdersCache, where))
         .orderBy(
           desc(externalOrdersCache.externalCreatedAt),
           desc(externalOrdersCache.externalId),
@@ -83,7 +84,7 @@ export class ExternalOrdersRepository {
           pendingCount: sql<number>`COALESCE(SUM(${externalOrdersCache.orderStatus} = 'pending'), 0)`,
         })
         .from(externalOrdersCache)
-        .where(where),
+        .where(branchCondition(externalOrdersCache, where)),
     ]);
     const totalCount = Number(summary?.totalCount ?? 0);
     const totalPages = Math.ceil(totalCount / params.pageSize);

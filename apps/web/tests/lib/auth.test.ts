@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   AUTH_CHANGED_EVENT,
+  canOpenPath,
   SESSION_KEY,
   loginPathFor,
   postLoginPath,
@@ -161,6 +162,11 @@ describe("tokenless persisted session", () => {
 });
 
 describe("login redirects", () => {
+  it("reserves branch management and its deep links for admins", () => {
+    expect(canOpenPath("cashier", "/branches")).toBe(false);
+    expect(canOpenPath("cashier", "/branches/edit")).toBe(false);
+    expect(canOpenPath("admin", "/branches")).toBe(true);
+  });
   it("treats the trailing-slash login pathname as the login route", () => {
     expect(loginPathFor("/login/")).toBe("/login");
   });

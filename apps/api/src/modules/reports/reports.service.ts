@@ -1,5 +1,6 @@
 import type { ReportRange } from "./reports.schemas.js";
 import type { ReportsRepository } from "./reports.repository.js";
+import { currentBranchId } from "../../db/branch-context.js";
 
 const cairoDate = () =>
   new Intl.DateTimeFormat("en-CA", {
@@ -56,12 +57,12 @@ export function aggregateSalesDays(rows: Record<string, unknown>[]) {
   }));
 }
 
-// A minimum level of 0 is the "not configured" default, so such an item must
-// not be raised as low stock. Matches the rule the items list already uses.
+// Zero disables threshold alerts, but a negative balance always needs attention.
 const isLowStock = (row: Record<string, unknown>) =>
   Boolean(row.isActive) &&
-  Number(row.minimumLevel) > 0 &&
-  Number(row.quantity) <= Number(row.minimumLevel);
+  (Number(row.quantity) < 0 ||
+    (Number(row.minimumLevel) > 0 &&
+      Number(row.quantity) <= Number(row.minimumLevel)));
 
 export class ReportsService {
   constructor(private repo: ReportsRepository) {}
@@ -126,7 +127,7 @@ export class ReportsService {
     ]);
     const lowStock = stock.filter(isLowStock);
     return {
-      range: { from, to },
+      range: { from, to, branchId: currentBranchId() },
       sales: {
         byDay: aggregateSalesDays(byDay),
         byProduct,

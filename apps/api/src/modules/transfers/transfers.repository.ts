@@ -1,3 +1,9 @@
+import {
+  branchCondition,
+  branchValues,
+  branchTable,
+  branchTransaction,
+} from "../../db/branch-context.js";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import type { Db } from "../../db/index.js";
@@ -27,7 +33,7 @@ export class TransfersRepository {
       inventory: InventoryTransaction,
     ) => Promise<T>,
   ): Promise<T> {
-    return this.db.transaction((tx) => {
+    return branchTransaction(this.db, (tx) => {
       const transactionDb = tx as unknown as Db;
       return fn(
         new TransfersRepository(transactionDb),
@@ -41,9 +47,12 @@ export class TransfersRepository {
       .select({ id: items.id, name: items.name, isActive: items.isActive })
       .from(items)
       .where(
-        inArray(
-          items.id,
-          [...ids].sort((a, b) => a - b),
+        branchCondition(
+          items,
+          inArray(
+            items.id,
+            [...ids].sort((a, b) => a - b),
+          ),
         ),
       )
       .orderBy(asc(items.id))
@@ -55,7 +64,10 @@ export class TransfersRepository {
       .select({ id: shifts.id })
       .from(shifts)
       .where(
-        and(eq(shifts.openSlot, 1), eq(shifts.cashierUserId, cashierUserId)),
+        branchCondition(
+          shifts,
+          and(eq(shifts.openSlot, 1), eq(shifts.cashierUserId, cashierUserId)),
+        ),
       )
       .for("update");
     return row;
@@ -68,7 +80,9 @@ export class TransfersRepository {
     clientRequestId: string;
     requestFingerprint: string;
   }) {
-    const [result] = await this.db.insert(transferRequests).values(data);
+    const [result] = await this.db
+      .insert(transferRequests)
+      .values(branchValues(data));
     return result.insertId;
   }
 
@@ -80,7 +94,12 @@ export class TransfersRepository {
         requestFingerprint: transferRequests.requestFingerprint,
       })
       .from(transferRequests)
-      .where(eq(transferRequests.clientRequestId, clientRequestId));
+      .where(
+        branchCondition(
+          transferRequests,
+          eq(transferRequests.clientRequestId, clientRequestId),
+        ),
+      );
     return row;
   }
 
@@ -89,13 +108,13 @@ export class TransfersRepository {
     itemId: number;
     quantity: string;
   }) {
-    await this.db.insert(transferRequestLines).values(data);
+    await this.db.insert(transferRequestLines).values(branchValues(data));
   }
 
   listRequests() {
     const lineCount = sql<number>`(
       SELECT COUNT(*)
-      FROM transfer_request_lines trl
+      FROM ${branchTable("transfer_request_lines")} trl
       WHERE trl.request_id = ${transferRequests.id}
     )`;
     return this.db
@@ -116,6 +135,7 @@ export class TransfersRepository {
       .from(transferRequests)
       .innerJoin(requester, eq(transferRequests.requestedBy, requester.id))
       .leftJoin(reviewer, eq(transferRequests.reviewedBy, reviewer.id))
+      .where(branchCondition(transferRequests))
       .orderBy(desc(transferRequests.createdAt), desc(transferRequests.id));
   }
 
@@ -137,7 +157,7 @@ export class TransfersRepository {
       .from(transferRequests)
       .innerJoin(requester, eq(transferRequests.requestedBy, requester.id))
       .leftJoin(reviewer, eq(transferRequests.reviewedBy, reviewer.id))
-      .where(eq(transferRequests.id, id));
+      .where(branchCondition(transferRequests, eq(transferRequests.id, id)));
     return row;
   }
 
@@ -145,7 +165,7 @@ export class TransfersRepository {
     const [row] = await this.db
       .select()
       .from(transferRequests)
-      .where(eq(transferRequests.id, id))
+      .where(branchCondition(transferRequests, eq(transferRequests.id, id)))
       .for("update");
     return row;
   }
@@ -161,8 +181,16 @@ export class TransfersRepository {
         quantity: transferRequestLines.quantity,
       })
       .from(transferRequestLines)
-      .innerJoin(items, eq(transferRequestLines.itemId, items.id))
-      .where(eq(transferRequestLines.requestId, requestId))
+      .innerJoin(
+        items,
+        branchCondition(items, eq(transferRequestLines.itemId, items.id)),
+      )
+      .where(
+        branchCondition(
+          transferRequestLines,
+          eq(transferRequestLines.requestId, requestId),
+        ),
+      )
       .orderBy(transferRequestLines.id);
   }
 
@@ -172,7 +200,7 @@ export class TransfersRepository {
     approvedBy: number;
     notes: string | null;
   }) {
-    const [result] = await this.db.insert(transfers).values(data);
+    const [result] = await this.db.insert(transfers).values(branchValues(data));
     return result.insertId;
   }
 
@@ -184,14 +212,14 @@ export class TransfersRepository {
     sourceBatchId: number;
     cafeBatchId: number;
   }) {
-    await this.db.insert(transferLines).values(data);
+    await this.db.insert(transferLines).values(branchValues(data));
   }
 
   async approveRequest(id: number, reviewedBy: number) {
     await this.db
       .update(transferRequests)
       .set({ status: "approved", reviewedBy, reviewedAt: new Date() })
-      .where(eq(transferRequests.id, id));
+      .where(branchCondition(transferRequests, eq(transferRequests.id, id)));
   }
 
   async rejectRequest(id: number, reviewedBy: number, reason: string) {
@@ -203,13 +231,13 @@ export class TransfersRepository {
         rejectionReason: reason,
         reviewedAt: new Date(),
       })
-      .where(eq(transferRequests.id, id));
+      .where(branchCondition(transferRequests, eq(transferRequests.id, id)));
   }
 
   listTransfers() {
     const totalCost = sql<string>`CAST(COALESCE((
       SELECT SUM(ROUND(tl.quantity * tl.unit_cost, 2))
-      FROM transfer_lines tl
+      FROM ${branchTable("transfer_lines")} tl
       WHERE tl.transfer_id = ${transfers.id}
     ), 0) AS DECIMAL(30,2))`;
     return this.db
@@ -230,13 +258,14 @@ export class TransfersRepository {
         transferApprover,
         eq(transfers.approvedBy, transferApprover.id),
       )
+      .where(branchCondition(transfers))
       .orderBy(desc(transfers.createdAt), desc(transfers.id));
   }
 
   async findTransferById(id: number) {
     const totalCost = sql<string>`CAST(COALESCE((
       SELECT SUM(ROUND(tl.quantity * tl.unit_cost, 2))
-      FROM transfer_lines tl
+      FROM ${branchTable("transfer_lines")} tl
       WHERE tl.transfer_id = ${transfers.id}
     ), 0) AS DECIMAL(30,2))`;
     const [row] = await this.db
@@ -257,7 +286,7 @@ export class TransfersRepository {
         transferApprover,
         eq(transfers.approvedBy, transferApprover.id),
       )
-      .where(eq(transfers.id, id));
+      .where(branchCondition(transfers, eq(transfers.id, id)));
     return row;
   }
 
@@ -276,8 +305,16 @@ export class TransfersRepository {
         cafeBatchId: transferLines.cafeBatchId,
       })
       .from(transferLines)
-      .innerJoin(items, eq(transferLines.itemId, items.id))
-      .where(eq(transferLines.transferId, transferId))
+      .innerJoin(
+        items,
+        branchCondition(items, eq(transferLines.itemId, items.id)),
+      )
+      .where(
+        branchCondition(
+          transferLines,
+          eq(transferLines.transferId, transferId),
+        ),
+      )
       .orderBy(transferLines.id);
   }
 }

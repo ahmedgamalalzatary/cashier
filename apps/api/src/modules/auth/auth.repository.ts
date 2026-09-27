@@ -1,14 +1,15 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, getTableColumns } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
-import { users } from "../../db/schema.js";
+import { branches, users } from "../../db/schema.js";
 
 export class AuthRepository {
   constructor(private db: Db) {}
 
   async findByUsername(username: string) {
     const [row] = await this.db
-      .select()
+      .select({ ...getTableColumns(users), branchIsActive: branches.isActive })
       .from(users)
+      .leftJoin(branches, eq(users.branchId, branches.id))
       .where(eq(users.username, username))
       .limit(1);
     return row;
@@ -16,8 +17,9 @@ export class AuthRepository {
 
   async findById(id: number) {
     const [row] = await this.db
-      .select()
+      .select({ ...getTableColumns(users), branchIsActive: branches.isActive })
       .from(users)
+      .leftJoin(branches, eq(users.branchId, branches.id))
       .where(eq(users.id, id))
       .limit(1);
     return row;
