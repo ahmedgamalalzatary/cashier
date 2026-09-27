@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-27 (owner requirements clarified and missing findings added; prior 2026-09-26 fixes remain recorded below)
 **Scope:** `apps/api` (Express + Drizzle + MySQL), `apps/web` (Next.js Arabic RTL), `packages/shared`, `docker-compose.yml` / Dockerfiles, `docs/system-specs.md`, `docs/docker.md`, `README.md`, `docs/tmp-xx.md`
-**Method:** 5 parallel sub-agent audits — (1) re-verify prior open items, (2) spec vs implementation, (3) backend correctness, (4) frontend correctness, (5) security / data / tests / DevOps. Every finding below was re-checked by file reads. Evidence format `path:line`.
+**Method:** Source review covering prior open items, specification alignment, backend and frontend correctness, security, data integrity, tests, and DevOps. Every finding below was re-checked by file reads. Evidence format `path:line`.
 
 **2026-09-27 follow-up:** Read-only frontend → API → storage tracing, targeted unit/web tests, and direct owner clarification. No agents were used for this follow-up; database integration tests and the live deployment were not rerun. Section 1 records the confirmed requirements, not implemented behavior. The old single-branch, permission, and single-drawer specification needs updating to match these decisions (DOC-REQ).
 

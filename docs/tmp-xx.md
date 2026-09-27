@@ -140,13 +140,13 @@ Reticked 2026-09-24 against the running code. Remaining gaps are tracked in [aud
 
 - [x] Admin dashboard: today sales/profit, open shift, low stock, negative stock, pending transfers
 - [x] Sales & profit (day/product/shift/cashier, COGS, discounts, refunds)
-- [ ] Sales by category for live external POS sales (query still inner-joins local recipe/item categories)
+- [x] Sales by category for live external POS sales, including refunds under the external category
 - [x] Stock & movement ledger including stocktake history
 - [x] Money & expenses (cash flow including salary payments and advances, category breakdown, over/short, supplier balances)
 - [x] Employees, cashier worked-time, cashier actions, and salary history
 - [x] Waste & refunds report
 - [x] Suppliers report (purchases and balances; existing supplier statements remain linked from suppliers)
-- [ ] Dedicated PDF export. Current print is browser `window.print()` (Arabic page, English codes remain on several row types)
+- [ ] Dedicated PDF export. Current print is browser `window.print()` with Arabic report labels
 
 ## Deferred technical decisions
 
