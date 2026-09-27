@@ -55,6 +55,23 @@ const labelSets: Record<string, Record<string, string>> = {
   stocktakeKind: stocktakeKindLabels,
   salaryHistory: salaryHistoryLabels,
   wasteReason: wasteReasonLabels,
+  status: {
+    open: "مفتوحة",
+    closed: "مغلقة",
+    pending: "قيد المراجعة",
+    approved: "معتمد",
+    rejected: "مرفوض",
+    draft: "مسودة",
+    confirmed: "مؤكد",
+  },
+  shiftAction: {
+    open: "فتح",
+    close: "إغلاق",
+    admin_close: "إغلاق إداري",
+    reopen: "إعادة فتح",
+    correction: "تصحيح",
+  },
+  expenseType: { shift: "مصروف وردية", general: "مصروف عام" },
 };
 function valueOf(
   value: string | number | null,
@@ -64,7 +81,12 @@ function valueOf(
   if (value == null || value === "") return "—";
   if (kind === "money") return formatMoney(value);
   if (kind === "number") return arabicNumber.format(Number(value));
-  if (kind === "date") return new Date(value).toLocaleString("ar-EG");
+  if (kind === "date") {
+    const options = { timeZone: "Africa/Cairo" };
+    return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T12:00:00Z`).toLocaleDateString("ar-EG", options)
+      : new Date(value).toLocaleString("ar-EG", options);
+  }
   if (kind === "warehouse") return value === "main" ? "الرئيسي" : "الكافيه";
   if (kind === "event") {
     const set = labelSet ? labelSets[labelSet] : eventLabels;
@@ -72,13 +94,14 @@ function valueOf(
   }
   return String(value);
 }
-export function ReportTable({ title, rows, columns }: ReportTableData) {
+export function ReportTable({ title, rows, columns, note }: ReportTableData) {
   return (
     <section className="break-inside-avoid space-y-3">
       <div className="flex items-baseline justify-between">
         <h2 className="font-bold">{title}</h2>
         <span className="text-xs text-muted">{rows.length} سجل</span>
       </div>
+      {note && <p className="text-sm text-muted">{note}</p>}
       {rows.length ? (
         <Table headers={columns.map((column) => column.label)}>
           {rows.map((row, index) => (
@@ -100,7 +123,7 @@ export function ReportTable({ title, rows, columns }: ReportTableData) {
         </Table>
       ) : (
         <p className="rounded-xl border border-dashed border-line p-5 text-center text-sm text-muted">
-          لا توجد بيانات في الفترة المحددة
+          لا توجد بيانات
         </p>
       )}
     </section>

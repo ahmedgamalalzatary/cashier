@@ -3,7 +3,9 @@ import mysql from "mysql2/promise";
 import * as schema from "./schema.js";
 
 export function createDb(url: string) {
-  const pool = mysql.createPool(url);
+  // Drizzle serializes timestamp columns as UTC. Raw-query parameters and
+  // results must use the same timezone, regardless of the host's timezone.
+  const pool = mysql.createPool({ uri: url, timezone: "Z" });
   return drizzle(pool, { schema, mode: "default" });
 }
 

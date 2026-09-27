@@ -5,20 +5,20 @@ import { ReportTable } from "@/components/reports/report-table";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { cairoCalendarDate } from "@/lib/cairo-date";
+import { formatMoney } from "@/lib/format";
 import type { ReportTable as TableData } from "@/models/reports-model";
-import { isReportRangeReady } from "@/models/reports-model";
+import { isReportRangeReady, reportTotal } from "@/models/reports-model";
 import { getReports, type ReportsData } from "@/services/reports-service";
 import { useBranch } from "@/components/branches/branch-provider";
 
-const today = cairoCalendarDate(),
-  monthStart = `${today.slice(0, 7)}-01`;
 const tabs = [
-  ["sales", "المبيعات والربح"],
+  ["sales", "المبيعات ومجمل الربح"],
   ["stock", "المخزون والحركة"],
   ["money", "الأموال والمصروفات"],
   ["employees", "الموظفون ووقت العمل"],
   ["waste", "الهالك والمرتجعات"],
   ["suppliers", "الموردون"],
+  ["operations", "التحويلات والتحضير"],
 ] as const;
 type Tab = (typeof tabs)[number][0];
 const money = (key: string, label: string) => ({
@@ -48,7 +48,7 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
           money("discounts", "الخصومات"),
           money("refunds", "المرتجعات"),
           money("cost", "التكلفة"),
-          money("profit", "الربح"),
+          money("profit", "مجمل الربح"),
           number("ordersCount", "الطلبات"),
         ],
       },
@@ -62,7 +62,7 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
           money("sales", "المبيعات"),
           money("refunds", "المرتجعات"),
           money("cost", "التكلفة"),
-          money("profit", "الربح"),
+          money("profit", "مجمل الربح"),
         ],
       },
       {
@@ -74,11 +74,12 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
           money("sales", "المبيعات"),
           money("refunds", "المرتجعات"),
           money("cost", "التكلفة"),
-          money("profit", "الربح"),
+          money("profit", "مجمل الربح"),
         ],
       },
       {
-        title: "حسب الوردية",
+        title: "مبيعات الورديات خلال الفترة",
+        note: "المبيعات والخصومات والمرتجعات والتكلفة تخص الفترة المختارة، ولو فتحت الوردية قبلها.",
         rows: d.sales.byShift,
         columns: [
           number("shiftId", "الوردية"),
@@ -86,7 +87,10 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
           date("openedAt", "الفتح"),
           money("sales", "المبيعات"),
           money("refunds", "المرتجعات"),
-          money("profit", "الربح"),
+          money("discounts", "الخصومات"),
+          money("cost", "تكلفة المبيعات"),
+          money("returnedCost", "التكلفة المرتجعة"),
+          money("profit", "مجمل الربح"),
         ],
       },
       {
@@ -98,7 +102,7 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
           money("sales", "المبيعات"),
           money("discounts", "الخصومات"),
           money("refunds", "المرتجعات"),
-          money("profit", "الربح"),
+          money("profit", "مجمل الربح"),
         ],
       },
     ];
@@ -106,18 +110,21 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
     return [
       {
         title: "المخزون الحالي وقيمة FIFO",
+        note: "الأرصدة الحالية وقت تحميل التقرير؛ لا تمثل رصيد نهاية الفترة المختارة.",
         rows: d.stock.current,
         columns: [
           number("code", "الكود"),
           { key: "name", label: "الصنف" },
           { key: "warehouse", label: "المخزن", kind: "warehouse" },
           number("quantity", "الكمية"),
+          { key: "stockUnit", label: "الوحدة" },
           money("stockValue", "القيمة"),
           number("minimumLevel", "حد التنبيه"),
         ],
       },
       {
         title: "قائمة المخزون المنخفض والسالب",
+        note: "تنبيهات الأرصدة الحالية وقت تحميل التقرير.",
         rows: d.stock.lowStock,
         columns: [
           number("code", "الكود"),
@@ -149,6 +156,8 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
             kind: "event",
             labelSet: "reference",
           },
+          number("referenceId", "رقم المرجع"),
+          { key: "notes", label: "ملاحظات" },
         ],
       },
       {
@@ -168,6 +177,9 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
           number("shortageQuantity", "العجز"),
           number("surplusQuantity", "الزيادة"),
           { key: "createdByName", label: "المسجل" },
+          { key: "status", label: "الحالة", kind: "event", labelSet: "status" },
+          date("confirmedAt", "التأكيد"),
+          { key: "note", label: "ملاحظات" },
         ],
       },
     ];
@@ -193,13 +205,43 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
         ],
       },
       {
+        title: "تفاصيل المصروفات",
+        rows: d.money.expenses,
+        columns: [
+          number("id", "المستند"),
+          date("expenseDate", "التاريخ"),
+          { key: "categoryName", label: "التصنيف" },
+          {
+            key: "type",
+            label: "النوع",
+            kind: "event",
+            labelSet: "expenseType",
+          },
+          number("shiftId", "الوردية"),
+          money("amount", "المبلغ"),
+          { key: "recordedByName", label: "المسجل" },
+          { key: "note", label: "ملاحظات" },
+        ],
+      },
+      {
         title: "زيادة / عجز الورديات",
+        note: "أحداث الإغلاق والتصحيح التي حدثت خلال الفترة. المبالغ لقطة تسوية الوردية كاملة عند كل حدث؛ ليست حركة نقدية إضافية ولا تجمع الأحداث المتكررة للوردية نفسها.",
         rows: d.money.shiftOverShort,
         columns: [
           number("shiftId", "الوردية"),
           { key: "cashierName", label: "الكاشير" },
-          date("openedAt", "الفتح"),
+          date("occurredAt", "التاريخ"),
+          {
+            key: "action",
+            label: "الإجراء",
+            kind: "event",
+            labelSet: "shiftAction",
+          },
+          money("expectedCash", "النقد المتوقع"),
+          money("actualCash", "النقد الفعلي"),
           money("overShort", "الزيادة / العجز"),
+          { key: "actorName", label: "المنفذ" },
+          { key: "note", label: "ملاحظات" },
         ],
       },
     ];
@@ -218,6 +260,42 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
           number("wasteCount", "الهالك"),
           number("expensesCount", "المصروفات"),
           number("transferRequestsCount", "طلبات التحويل"),
+        ],
+      },
+      {
+        title: "الورديات الكاملة المرتبطة بالفترة",
+        note: "الأرقام التالية تخص الوردية كاملة حتى وقت تحميل التقرير، وليست مبيعات الفترة فقط. المتوقع يشمل العهدة + المبيعات − المرتجعات − مصروفات الوردية.",
+        rows: d.sales.byShift,
+        columns: [
+          number("shiftId", "الوردية"),
+          { key: "cashierName", label: "الكاشير" },
+          date("openedAt", "الفتح"),
+          date("closedAt", "آخر إغلاق"),
+          { key: "status", label: "الحالة", kind: "event", labelSet: "status" },
+          money("openingFloat", "العهدة"),
+          money("lifetimeSales", "كل المبيعات"),
+          money("lifetimeRefunds", "كل المرتجعات"),
+          money("lifetimeExpenses", "كل المصروفات"),
+          money("expectedCash", "النقد المتوقع عند التسوية"),
+          money("actualCash", "النقد الفعلي عند التسوية"),
+          money("overShort", "آخر زيادة / عجز"),
+        ],
+      },
+      {
+        title: "سجل إجراءات الورديات",
+        rows: d.employees.shiftHistory,
+        columns: [
+          date("occurredAt", "التاريخ"),
+          number("shiftId", "الوردية"),
+          { key: "cashierName", label: "الكاشير" },
+          {
+            key: "action",
+            label: "الإجراء",
+            kind: "event",
+            labelSet: "shiftAction",
+          },
+          { key: "actorName", label: "المنفذ" },
+          { key: "note", label: "ملاحظات" },
         ],
       },
       {
@@ -303,9 +381,91 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
         ],
       },
     ];
+  if (tab === "operations")
+    return [
+      {
+        title: "التحويلات المنفذة من الرئيسي إلى الكافيه",
+        rows: d.operations.transfers,
+        columns: [
+          number("id", "التحويل"),
+          date("occurredAt", "التاريخ"),
+          number("requestId", "الطلب"),
+          number("itemCount", "عدد الأصناف"),
+          money("totalCost", "التكلفة المنقولة"),
+          { key: "createdByName", label: "المسجل" },
+          { key: "approvedByName", label: "المعتمد" },
+          { key: "notes", label: "ملاحظات" },
+        ],
+      },
+      {
+        title: "أصناف التحويلات المنفذة",
+        rows: d.operations.transferLines,
+        columns: [
+          number("transferId", "التحويل"),
+          date("occurredAt", "التاريخ"),
+          { key: "itemName", label: "الصنف" },
+          number("quantity", "الكمية"),
+          { key: "stockUnit", label: "الوحدة" },
+          money("totalCost", "التكلفة"),
+        ],
+      },
+      {
+        title: "طلبات التحويل",
+        note: "الطلبات المنشأة خلال الفترة مع حالتها الحالية وقت تحميل التقرير.",
+        rows: d.operations.requests,
+        columns: [
+          number("id", "الطلب"),
+          date("createdAt", "الإنشاء"),
+          { key: "status", label: "الحالة", kind: "event", labelSet: "status" },
+          number("itemCount", "عدد الأصناف"),
+          { key: "requestedByName", label: "الطالب" },
+          { key: "reviewedByName", label: "المراجع" },
+          date("reviewedAt", "المراجعة"),
+          { key: "rejectionReason", label: "سبب الرفض" },
+          { key: "notes", label: "ملاحظات" },
+        ],
+      },
+      {
+        title: "أصناف طلبات التحويل",
+        rows: d.operations.requestLines,
+        columns: [
+          number("requestId", "الطلب"),
+          { key: "itemName", label: "الصنف" },
+          number("quantity", "الكمية"),
+          { key: "stockUnit", label: "الوحدة" },
+        ],
+      },
+      {
+        title: "تحضير الوصفات",
+        rows: d.operations.preparations,
+        columns: [
+          number("id", "التحضير"),
+          date("occurredAt", "التاريخ"),
+          { key: "recipeName", label: "الوصفة" },
+          { key: "outputItemName", label: "الصنف المنتج" },
+          number("producedQuantity", "الكمية المنتجة"),
+          { key: "stockUnit", label: "الوحدة" },
+          money("totalCost", "التكلفة"),
+          { key: "preparedByName", label: "المحضر" },
+          { key: "notes", label: "ملاحظات" },
+        ],
+      },
+      {
+        title: "المكونات المستهلكة في التحضير",
+        rows: d.operations.ingredients,
+        columns: [
+          number("preparationId", "التحضير"),
+          { key: "itemName", label: "المكون" },
+          number("quantity", "الكمية"),
+          { key: "stockUnit", label: "الوحدة" },
+          money("totalCost", "التكلفة"),
+        ],
+      },
+    ];
   return [
     {
       title: "ملخص أرصدة الموردين",
+      note: "رصيد حالي يشمل الرصيد الافتتاحي وجميع المشتريات والمدفوعات، وليس رصيد نهاية الفترة المختارة.",
       rows: d.suppliers.summary,
       columns: [
         { key: "name", label: "المورد" },
@@ -324,6 +484,22 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
         { key: "invoiceNumber", label: "رقم الفاتورة" },
         money("totalAmount", "الإجمالي"),
         money("paidAmount", "المدفوع"),
+        { key: "createdByName", label: "المسجل" },
+        { key: "notes", label: "ملاحظات" },
+      ],
+    },
+    {
+      title: "أصناف فواتير المشتريات",
+      rows: d.suppliers.purchaseLines,
+      columns: [
+        number("invoiceId", "الفاتورة"),
+        date("purchasedAt", "التاريخ"),
+        { key: "supplierName", label: "المورد" },
+        { key: "itemName", label: "الصنف" },
+        number("stockQuantity", "كمية المخزون"),
+        { key: "stockUnit", label: "الوحدة" },
+        money("unitCost", "تكلفة الوحدة"),
+        money("lineTotal", "الإجمالي"),
       ],
     },
     {
@@ -333,33 +509,42 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
         date("paidAt", "التاريخ"),
         { key: "supplierName", label: "المورد" },
         money("amount", "المبلغ"),
+        number("purchaseInvoiceId", "الفاتورة المرتبطة"),
         { key: "notes", label: "ملاحظات" },
       ],
     },
   ];
 }
 export default function ReportsPage() {
+  const today = cairoCalendarDate(),
+    monthStart = `${today.slice(0, 7)}-01`;
   const { branch } = useBranch();
   const [from, setFrom] = useState(monthStart),
     [to, setTo] = useState(today),
     [tab, setTab] = useState<Tab>("sales");
-  const [data, setData] = useState<ReportsData | null>(null),
+  const [loadedData, setData] = useState<ReportsData | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState("");
+  const [request, setRequest] = useState({
+    from: monthStart,
+    to: today,
+    revision: 0,
+  });
   const load = (start = from, end = to) => {
     if (!isReportRangeReady(start, end)) return;
     setLoading(true);
     setError("");
-    getReports(start, end)
-      .then(setData)
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
+    setData(null);
+    setRequest({ from: start, to: end, revision: request.revision + 1 });
   };
   useEffect(() => {
     let cancelled = false;
-    getReports(monthStart, today)
+    getReports(request.from, request.to)
       .then((value) => {
-        if (!cancelled) setData(value);
+        if (cancelled) return;
+        if (value.range.branchId !== branch.id)
+          throw new Error("التقرير لا يخص الفرع الحالي؛ أعد تحميله");
+        setData(value);
       })
       .catch((cause: Error) => {
         if (!cancelled) setError(cause.message);
@@ -370,7 +555,8 @@ export default function ReportsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [request, branch.id]);
+  const data = loadedData?.range.branchId === branch.id ? loadedData : null;
   const visible = useMemo(() => (data ? tables(data, tab) : []), [data, tab]);
   return (
     <div className="report-print-root space-y-6">
@@ -386,7 +572,23 @@ export default function ReportsPage() {
               <RefreshCw className="size-4" />
               تحديث
             </Button>
-            <Button onClick={() => window.print()} disabled={!data}>
+            <Button
+              onClick={() => {
+                if (
+                  data &&
+                  !loading &&
+                  !error &&
+                  data.range.branchId === branch.id
+                )
+                  window.print();
+              }}
+              disabled={
+                !data ||
+                loading ||
+                Boolean(error) ||
+                data.range.branchId !== branch.id
+              }
+            >
               <Printer className="size-4" />
               طباعة / PDF
             </Button>
@@ -429,15 +631,61 @@ export default function ReportsPage() {
           </button>
         ))}
       </nav>
-      <div className="hidden print:block">
-        <p>{branch.name}</p>
-        <p>
-          الفترة: {from} — {to}
-        </p>
-        <h2 className="text-xl font-bold">
-          {tabs.find(([key]) => key === tab)?.[1]}
-        </h2>
-      </div>
+      {data && (
+        <div className="space-y-2 rounded-xl border border-line bg-surface p-4 print:border-0">
+          <p>{branch.name}</p>
+          <p>
+            الفترة: {data.range.from} — {data.range.to}
+          </p>
+          <p className="text-xs text-muted">
+            توقيت القاهرة · وقت التحميل:{" "}
+            {new Date(data.range.generatedAt).toLocaleString("ar-EG", {
+              timeZone: "Africa/Cairo",
+            })}
+          </p>
+          <h2 className="text-xl font-bold">
+            {tabs.find(([key]) => key === tab)?.[1]}
+          </h2>
+          {(from !== data.range.from || to !== data.range.to) && (
+            <p className="print-controls text-sm text-muted">
+              التواريخ المختارة لم تطبق بعد. حدّث التقرير؛ الطباعة تستخدم الفترة
+              المحملة أعلاه.
+            </p>
+          )}
+          <p className="text-sm text-muted">
+            تقارير العمليات المسجلة في هذا الفرع. مبيعات الأونلاين وتكاليف خصمها
+            وسجل تعديل المعاملات لم تتوفر بعد.
+          </p>
+          {tab === "sales" && (
+            <>
+              <p className="text-sm text-muted">
+                مجمل الربح = المبيعات − المرتجعات − تكلفة المبيعات + التكلفة
+                المرتجعة. لا تخصم منه المصروفات أو الرواتب أو الهالك.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {[
+                  [
+                    "صافي المبيعات",
+                    reportTotal(data.sales.byDay, "sales") -
+                      reportTotal(data.sales.byDay, "refunds"),
+                  ],
+                  [
+                    "صافي تكلفة المبيعات",
+                    reportTotal(data.sales.byDay, "cost") -
+                      reportTotal(data.sales.byDay, "returnedCost"),
+                  ],
+                  ["مجمل الربح", reportTotal(data.sales.byDay, "profit")],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg bg-paper p-3">
+                    <p className="text-sm text-muted">{label}</p>
+                    <p className="tnum font-bold">{formatMoney(value)}</p>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
       {error && (
         <p role="alert" className="rounded-xl bg-danger/10 p-3 text-danger">
           {error}

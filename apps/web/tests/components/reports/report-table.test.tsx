@@ -60,7 +60,9 @@ describe("ReportTable event labels", () => {
   });
 
   it("labels a stocktake document kind", () => {
-    const html = render([{ value: "stocktake" }], { labelSet: "stocktakeKind" });
+    const html = render([{ value: "stocktake" }], {
+      labelSet: "stocktakeKind",
+    });
 
     expect(html).toContain("جرد مخزون");
   });
@@ -84,7 +86,9 @@ describe("ReportTable event labels", () => {
 
   // A refund reason is free-typed text, so the waste codes must not rewrite it.
   it("leaves a free-typed refund reason untouched", () => {
-    const html = render([{ value: "الزبون غير راضٍ" }], { labelSet: "wasteReason" });
+    const html = render([{ value: "الزبون غير راضٍ" }], {
+      labelSet: "wasteReason",
+    });
 
     expect(html).toContain("الزبون غير راضٍ");
   });
@@ -111,7 +115,9 @@ describe("ReportTable event labels", () => {
   });
 
   it("labels a salary adjustment deduction row", () => {
-    const html = render([{ value: "deduction" }], { labelSet: "salaryHistory" });
+    const html = render([{ value: "deduction" }], {
+      labelSet: "salaryHistory",
+    });
 
     expect(html).toContain("خصم");
     expect(html).not.toContain("deduction");
@@ -121,5 +127,29 @@ describe("ReportTable event labels", () => {
     const html = render([{ value: "totally_unknown_code" }]);
 
     expect(html).toContain("totally_unknown_code");
+  });
+
+  it("labels document status and shift actions in Arabic", () => {
+    expect(
+      render([{ value: "approved" }], {
+        labelSet: "status" as Column["labelSet"],
+      }),
+    ).toContain("معتمد");
+    expect(
+      render([{ value: "admin_close" }], {
+        labelSet: "shiftAction" as Column["labelSet"],
+      }),
+    ).toContain("إغلاق إداري");
+  });
+
+  it("renders timestamps in Cairo and calendar dates without a midnight time", () => {
+    const expected = new Date("2026-07-01T22:30:00Z").toLocaleString("ar-EG", {
+      timeZone: "Africa/Cairo",
+    });
+    expect(
+      render([{ value: "2026-07-01T22:30:00Z" }], { kind: "date" }),
+    ).toContain(expected);
+    const dateOnly = render([{ value: "2026-07-01" }], { kind: "date" });
+    expect(dateOnly).not.toMatch(/[٠-٩]+:[٠-٩]+/);
   });
 });

@@ -141,7 +141,7 @@ Reticked 2026-09-24 against the running code. Remaining gaps are tracked in [aud
 
 ## 15. Reports & Dashboard ⚠️ Partial
 
-- [x] Admin dashboard: today sales/profit, open shift, low stock, negative stock, pending transfers
+- [x] Admin dashboard: today sales/profit, open shifts, low stock, negative stock, pending transfers
 - [x] Sales & profit (day/product/shift/cashier, COGS, discounts, refunds)
 - [x] Sales by category for live external POS sales, including refunds under the external category
 - [x] Stock & movement ledger including stocktake history
@@ -149,7 +149,11 @@ Reticked 2026-09-24 against the running code. Remaining gaps are tracked in [aud
 - [x] Employees, cashier worked-time, cashier actions, and salary history
 - [x] Waste & refunds report
 - [x] Suppliers report (purchases and balances; existing supplier statements remain linked from suppliers)
-- [ ] Dedicated PDF export. Current print is browser `window.print()` with Arabic report labels
+- [x] Transfer/request/preparation reports with item/ingredient quantities, costs and responsible staff
+- [x] Purchase-line and expense-entry details, dated shift action and cash-reconciliation history
+- [x] Loaded/printed date range, Cairo/DST boundaries, consistent snapshot, period shift totals, gross-profit and current-balance labels
+- [x] Browser Print / Save as PDF with Arabic labels (owner accepted); visual print-preview verification remains pending because no browser was connected
+- [ ] Online sales counted once with per-branch stock costs; retained transaction edit/delete history (dependent features pending)
 
 ## Deferred technical decisions
 

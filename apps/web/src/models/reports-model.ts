@@ -12,12 +12,16 @@ export type Column = {
     | "cashFlow"
     | "stocktakeKind"
     | "salaryHistory"
-    | "wasteReason";
+    | "wasteReason"
+    | "status"
+    | "shiftAction"
+    | "expenseType";
 };
 export type ReportTable = {
   title: string;
   rows: ReportRow[];
   columns: Column[];
+  note?: string;
 };
 export function reportTotal(rows: ReportRow[], key: string) {
   return rows.reduce((sum, row) => sum + Number(row[key] ?? 0), 0);

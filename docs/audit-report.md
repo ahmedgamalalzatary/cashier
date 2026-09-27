@@ -8,6 +8,10 @@
 
 **Concurrent shifts follow-up:** W1, SHIFT-UI, and SHIFT-HIST are implemented in this workspace. Migration `0041` enforces one open shift per cashier account; Home/POS have direct controls and own-history access, admin views show every open branch shift, and history is paginated. HTTP/MySQL and client regression tests cover the requirements in §1.6. Production migration/deployment remains a separate rollout step; see [shifts.md](shifts.md).
 
+**Reports follow-up, 2026-09-27:** Owner selected complete reporting for currently working flows and accepted browser Print / Save as PDF. REPORT-2/3/5 are fixed. Existing local coverage now includes dedicated transfer/request/preparation reports, purchase and expense details, dated shift events and separate lifetime reconciliation. Report sections share a read-only consistent database snapshot; UTC/Cairo handling, DST-start boundaries and closed-gap worked-shift counts are corrected. REPORT-1 remains open only for reporting dependent on the unfinished online/correction features. See [reports.md](reports.md). No schema migration is added; visual print-preview verification was unavailable because no browser was connected.
+
+**Reports CodeRabbit follow-up:** CLI review of all 16 uncommitted files returned one minor finding. Added a current-branch display guard so a reused Reports page cannot show an old branch's range/figures under the new branch name, even without the existing workspace remount. The new component regression and all 27 report-focused web tests pass. Web lint/type/build checks cover the correction; the prior full repository checks remain recorded in `reports.md`.
+
 > How to use this doc: fix in priority order in §10. Only open problems are listed. Check off (delete the row/section) as you go.
 
 ---
@@ -35,27 +39,23 @@
 
 Only ❌ Open items. ✅ Fixed and ➖ No-action rows were removed after re-verification.
 
-| ID       | Problem                                                                                            | State   | Evidence / note                                                                                                                                                                                  |
-| -------- | -------------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| W2 + E5  | Internal POS `recipe`/`item` sales unrestored; refunds still branch those types                    | ❌ Open | Spec §7/§10 (2026-09-19). Sales always `type:"external_product"` (`orders.service.ts:185`, `orders.schemas.ts:15-56`). Refunds still validate all three (`refunds.service.ts:169-189`)           |
-| §2.2     | POS two-level nav missing (internal main/sub + flat external)                                      | ❌ Open | `pos/page.tsx:357-375` flat external chips; `pos-model.ts:202-216`; `ExternalCategory` (`packages/shared/src/types.ts:480-489`) has no `parentId`                                                |
-| §2.9     | Recipe products + live cost-%/margin UI missing (cycle/yield/prepare exist)                        | ❌ Open | API create is `type:"prepared"` only (`recipes.schemas.ts:34`). `RecipeMargin` unused (`recipe-controls.tsx:133-152`). Cycle guard present (`recipes.service.ts:376-415`, `recipes.test.ts:281`) |
-| DATA-1   | Concurrent refunds of the same line can over-refund under REPEATABLE READ                          | ❌ Open | Snapshot starts at non-locking `findByClientRequestId` (`refunds.repository.ts:130-139`); later `refundedQuantities` is a non-locking `SUM` (`:92-102`)                                          |
-| B5       | Multi-item waste locks in catalog order with no deadlock retry                                     | ❌ Open | `waste.service.ts:196-211`; no `transactionWithDeadlockRetry`. Sales lock items by id (`orders.repository.ts` lock path)                                                                         |
-| B6       | Waste “recipe” catalog lists prepared recipes and deducts their formula                            | ❌ Open | `waste.repository.ts:167-197`; `loadRecipeProduct` (`:98-128`) has no `type='product'` filter; only prepared recipes exist                                                                       |
-| B7       | Daily/hourly pay types exist in spec/DB; payday is monthly-only                                    | ❌ Open | Spec §9; `schema.ts:26`; create monthly-only (`employees.schemas.ts:42`); payday 409 (`salaries.service.ts:28-29`); UI wipes daily/hourly on save (`employee-modal.tsx:107-124`)                 |
-| §2.12    | PDF export uses browser print only                                                                 | ❌ Open | `reports/page.tsx:357` `window.print()`; salary cash-flow and employee history exist                                                                                                             |
-| AUTH-1   | Cashier permissions and admin restrictions conflict with confirmed access                          | ❌ Open | `apps/web/src/lib/navigation.ts:9,10,12,18`; `apps/api/src/app.ts:72-75`; cashier-only sales/refunds/shift routes. See §1.1.                                                                     |
-| CRUD-1   | Full transaction CRUD with reversal and retained history absent                                    | ❌ Open | Orders/purchases/refunds/waste/expenses routers lack transaction update/delete routes; online orders are GET-only. See §1.3.                                                                     |
-| ONLINE-1 | Immediate, branch-controlled online stock deduction absent                                         | ❌ Open | `cache-refresh.service.ts:4,110`: 12-hour summary import; `external-orders.client.ts:48,177` retains quantity count only. See §1.4.                                                              |
-| ONLINE-2 | Online order updates remain frozen after first import                                              | ❌ Open | `external-orders.repository.ts:15,37` inserts unseen rows; duplicate update changes no stored values. See §1.4.                                                                                  |
-| ONLINE-3 | Branch-local online CRUD, backend-priority reconciliation, and cancellation stock decisions absent | ❌ Open | `orders.router.ts:7` exposes GET `/external`; cached summaries have no branch processing/reversal history. See §1.3–1.4.                                                                         |
-| RECIPE-1 | Imported-product setup cannot reference a reusable live recipe                                     | ❌ Open | UI `product-stock-setup-modal.tsx:17,330`; input `products.schemas.ts:12`; mappings `schema.ts:632,655,678` reference items only. See §1.5.                                                      |
-| REPORT-1 | Basic reports do not cover all flows or distinguish global online sales from branch deductions     | ❌ Open | `reports.service.ts:84-157`; `reports.repository.ts` reads local sales only; transfers/preparations appear in ledger without dedicated flow reports. See §1.7.                                   |
-| REPORT-2 | Printed date range can label stale report figures                                                  | ❌ Open | `app/reports/page.tsx:332,372,417`: loaded data and editable dates are separate; print uses input dates.                                                                                         |
-| REPORT-3 | Shift sales use lifetime totals rather than transactions within the selected dates                 | ❌ Open | `reports.repository.ts:111-120` filters shift opening date only; joined orders/refund sums are not range-limited.                                                                                |
-| REPORT-5 | Profit and snapshot labels do not clearly describe their scope                                     | ❌ Open | `reports.service.ts:55` computes gross profit; `app/reports/page.tsx:50` says profit. `stock()`/`suppliers()` use current/all-time data. See §1.7.                                               |
-| DOC-REQ  | Capability matrix and transaction correction rules still need the confirmed permission/CRUD target | ❌ Open | Branch scope and cashier-shift target were updated in `system-specs.md`; AUTH-1/CRUD-1 implementation and matching legacy capability descriptions remain pending.                                |
+| ID       | Problem                                                                                                    | State   | Evidence / note                                                                                                                                                                                               |
+| -------- | ---------------------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| W2 + E5  | Internal POS `recipe`/`item` sales unrestored; refunds still branch those types                            | ❌ Open | Spec §7/§10 (2026-09-19). Sales always `type:"external_product"` (`orders.service.ts:185`, `orders.schemas.ts:15-56`). Refunds still validate all three (`refunds.service.ts:169-189`)                        |
+| §2.2     | POS two-level nav missing (internal main/sub + flat external)                                              | ❌ Open | `pos/page.tsx:357-375` flat external chips; `pos-model.ts:202-216`; `ExternalCategory` (`packages/shared/src/types.ts:480-489`) has no `parentId`                                                             |
+| §2.9     | Recipe products + live cost-%/margin UI missing (cycle/yield/prepare exist)                                | ❌ Open | API create is `type:"prepared"` only (`recipes.schemas.ts:34`). `RecipeMargin` unused (`recipe-controls.tsx:133-152`). Cycle guard present (`recipes.service.ts:376-415`, `recipes.test.ts:281`)              |
+| DATA-1   | Concurrent refunds of the same line can over-refund under REPEATABLE READ                                  | ❌ Open | Snapshot starts at non-locking `findByClientRequestId` (`refunds.repository.ts:130-139`); later `refundedQuantities` is a non-locking `SUM` (`:92-102`)                                                       |
+| B5       | Multi-item waste locks in catalog order with no deadlock retry                                             | ❌ Open | `waste.service.ts:196-211`; no `transactionWithDeadlockRetry`. Sales lock items by id (`orders.repository.ts` lock path)                                                                                      |
+| B6       | Waste “recipe” catalog lists prepared recipes and deducts their formula                                    | ❌ Open | `waste.repository.ts:167-197`; `loadRecipeProduct` (`:98-128`) has no `type='product'` filter; only prepared recipes exist                                                                                    |
+| B7       | Daily/hourly pay types exist in spec/DB; payday is monthly-only                                            | ❌ Open | Spec §9; `schema.ts:26`; create monthly-only (`employees.schemas.ts:42`); payday 409 (`salaries.service.ts:28-29`); UI wipes daily/hourly on save (`employee-modal.tsx:107-124`)                              |
+| AUTH-1   | Cashier permissions and admin restrictions conflict with confirmed access                                  | ❌ Open | `apps/web/src/lib/navigation.ts:9,10,12,18`; `apps/api/src/app.ts:72-75`; cashier-only sales/refunds/shift routes. See §1.1.                                                                                  |
+| CRUD-1   | Full transaction CRUD with reversal and retained history absent                                            | ❌ Open | Orders/purchases/refunds/waste/expenses routers lack transaction update/delete routes; online orders are GET-only. See §1.3.                                                                                  |
+| ONLINE-1 | Immediate, branch-controlled online stock deduction absent                                                 | ❌ Open | `cache-refresh.service.ts:4,110`: 12-hour summary import; `external-orders.client.ts:48,177` retains quantity count only. See §1.4.                                                                           |
+| ONLINE-2 | Online order updates remain frozen after first import                                                      | ❌ Open | `external-orders.repository.ts:15,37` inserts unseen rows; duplicate update changes no stored values. See §1.4.                                                                                               |
+| ONLINE-3 | Branch-local online CRUD, backend-priority reconciliation, and cancellation stock decisions absent         | ❌ Open | `orders.router.ts:7` exposes GET `/external`; cached summaries have no branch processing/reversal history. See §1.3–1.4.                                                                                      |
+| RECIPE-1 | Imported-product setup cannot reference a reusable live recipe                                             | ❌ Open | UI `product-stock-setup-modal.tsx:17,330`; input `products.schemas.ts:12`; mappings `schema.ts:632,655,678` reference items only. See §1.5.                                                                   |
+| REPORT-1 | Online revenue/branch deductions and retained transaction-correction reports depend on unfinished features | ❌ Open | Current local flow coverage is implemented, including transfers/preparations and details. Global online recognition and branch processing/correction history still require ONLINE-1/2/3 and CRUD-1. See §1.7. |
+| DOC-REQ  | Capability matrix and transaction correction rules still need the confirmed permission/CRUD target         | ❌ Open | Branch scope and cashier-shift target were updated in `system-specs.md`; AUTH-1/CRUD-1 implementation and matching legacy capability descriptions remain pending.                                             |
 
 Removed 2026-09-26 (tier 3 of the §10 order, fixed with TDD): B4 — the employees report no longer measures `TIMESTAMPDIFF(opened_at, closed_at)`. It builds the same open segments the shift screen already walks: each `open`/`reopen` event starts a segment that ends at the next `close`/`admin_close` (or `closed_at`/now), clipped to the report range, so the overnight gap after an admin reopen is no longer paid as work (`reports.repository.ts` `employees`; `tests/db/reports.test.ts` asserts 180 minutes for a 2h + 1h pair, and that the report agrees with `GET /api/shifts` for the same shift). B8 — a fully discounted (zero-cash) sale can now be refunded and restocked: the service rejects only a negative amount instead of `<= 0`, and `refunds_amount_positive_chk` became `amount >= 0` (`schema.ts`; migration `0038_allow_zero_refund_amount.sql`). The over-refund guard on remaining cash is unchanged, so real over-refunds still 409 (`tests/db/refunds.test.ts` asserts a 0.00 refund with a `refund_return` movement and no waste; `tests/refunds/refunds.service.test.ts` "409s a zero-value refund" was inverted into "allows a zero-cash refund for a fully discounted order"). §7.5,§7.3 — concurrent same-`clientRequestId` double-submit is now pinned for purchases and refunds: both requests return 201 with one id and exactly one document, batch and stock movement (`tests/db/purchases.test.ts`, `tests/db/refunds.test.ts`). The existing `ER_DUP_ENTRY` replay path held, so these are characterisation tests; they were mutation-checked by removing the replay branch (refunds → 500, purchases → 409) and confirming both tests fail.
 
@@ -151,15 +151,16 @@ Confirmed directly with the owner on 2026-09-27. These requirements supersede co
 - Keep all successive shift history reachable; the current latest-100 list needs pagination or equivalent retrieval, not deletion of older records.
 - **Current state: implemented.** Migration `0041_cashier_concurrent_shifts` enforces unique `(cashier_user_id, open_slot)`. Current-shift lookup is cashier-specific; each transaction retains its own branch/shift effects. Admin dashboard and Shifts show every open shift; reopen conflicts only with another open shift for the same cashier. Home/POS provide counted-float opening, counted-cash closing, and the cashier's own paginated history with event details. Admin history has pagination and audit details. Home's Cairo-day lookup includes all today's shifts instead of truncating them at 100. See [shifts.md](shifts.md) for API and rollout details.
 
-### 1.7 Basic informative reporting of every flow (REPORT-1/2/3/5; REPORT-4 fixed)
+### 1.7 Basic informative reporting of every flow (REPORT-1 dependencies pending; REPORT-2/3/4/5 fixed)
 
 - Owner requires **basic, informative operational reports covering every business flow**. Cover sales (POS and online), discounts, stock/value/movements, transfers, recipe preparation, purchases/suppliers/payments, expenses, waste, refunds, employee/payroll activity, and shifts, with relevant dates, quantities, amounts, costs, status, and responsible staff. Apply branch boundaries and clear date semantics.
 - Count an online sale **once across the system**, using the backend's amount and status. Recognize only **completed** online orders; cancelled orders are excluded. Show each branch's own stock deduction/cost and branch-local changes separately. Never multiply online revenue by the number of branches that consumed stock.
-- The six existing report tabs are a foundation, not full coverage. Existing report queries now isolate the selected branch and print its name. They still read local POS transactions rather than online sales; transfers/preparations appear as movements without a dedicated basic flow report, and new transaction correction histories remain absent.
-- **REPORT-2 — printed range:** `reports/page.tsx:332,372,417` permits new input dates to label old loaded data. Display/print the loaded report's actual range; refresh failures or pending requests must not allow old figures to masquerade as a new period.
-- **REPORT-3 — shift range:** `reports.repository.ts:111-120` selects shifts by opening time, then sums lifetime transactions. Period totals must count transactions within the requested period, including overnight/reopened shifts, with lifetime shift reconciliation clearly distinguished.
-- **REPORT-5 — labels:** current profit is **gross profit** (`sales - refunds - cost + returned cost`), not profit after payroll/operating expenses/waste. Label it accurately. Current stock and all-time supplier balances are snapshots, not historical balances for the selected report period; make that scope explicit.
-- Advanced accounting, a new net-profit calculation, historical balance reconstruction, and a comprehensive permission-change audit report were not confirmed as additions. The older PDF item remains tracked separately (§2.12); the owner's basic-report answer did not resolve it.
+- **Current local coverage: implemented.** Seven report groups isolate the selected branch and include dedicated transfers/requests and preparations/ingredients, purchase-line and expense-entry detail, dated shift actions/close corrections and separate lifetime shift reconciliation. Existing sales/discounts, stock/movements/stocktakes, cash flow, payroll, waste/refunds and supplier reports remain. Report sections share a consistent read-only transaction. See `reports.md` for the complete contract and date semantics.
+- **REPORT-2 — fixed:** display/print reads the loaded `range`, including branch/generation time. Edited inputs show an unapplied-period notice; refresh clears previous data and blocks printing until a successful response. Obsolete responses are ignored.
+- **REPORT-3 — fixed:** shift sales/refunds use their transaction dates, even for shifts opened earlier or reopened. Lifetime amounts and dated whole-shift close/correction snapshots are labelled separately. Employee worked-shift counts exclude closed gaps between segments.
+- **REPORT-5 — fixed:** all profit labels say **gross profit** and explain `sales - refunds - cost + returned cost`, excluding expenses/payroll/waste. Current stock and all-time supplier balances are explicitly current snapshots, not historical closing balances. UTC raw-query parameters/results and Cairo rendering are aligned; the first valid instant is used when DST skips midnight. Date-only entries have no invented time.
+- **REPORT-1 still pending:** global completed-only online revenue counted once, each branch's online stock/cost/local corrections and retained transaction edit/delete history cannot be reported until ONLINE-1/2/3 and CRUD-1 are implemented. Cached online summaries are not treated as POS revenue or cash flow. This task's owner-approved scope is current working flows with those dependencies identified.
+- Advanced accounting, a new net-profit calculation, historical balance reconstruction, and a comprehensive permission-change audit report were not confirmed as additions. Browser Print / Save as PDF was explicitly accepted on 2026-09-27; the older separate PDF-export gap is closed. Print-preview layout remains visually unverified because no browser was connected.
 
 ---
 
@@ -167,16 +168,16 @@ Confirmed directly with the owner on 2026-09-27. These requirements supersede co
 
 Source: `docs/system-specs.md`, `docs/docker.md`, `README.md` vs `apps/api/src`, `apps/web/src`, `packages/shared/src`.
 
-| #    | Spec module (§)                        | Status                                                                         |
-| ---- | -------------------------------------- | ------------------------------------------------------------------------------ |
-| §3   | Categories (main → sub tree)           | ⚠️ Partial — local tree OK; POS two-level nav lost                             |
-| §7   | POS three line types                   | ⚠️ Gap — external catalog only                                                 |
-| §9b  | Salaries / advances / bonuses / payday | ⚠️ Partial — monthly implemented; daily/hourly unrestored (B7)                 |
-| §10  | Recipes (prepared/sub-recipes)         | ⚠️ Partial — prepared flow works; product recipes unrestored                   |
-| §11  | Waste                                  | ⚠️ Partial — item + external work; recipe path hits prepared (B6)              |
-| §14b | Reports (6 groups)                     | ⚠️ Partial — local coverage exists; missing flows and correctness gaps in §1.7 |
-| §14c | PDF export                             | ⚠️ Partial — browser print-to-PDF only                                         |
-| §15  | Data model                             | ✅ Implemented                                                                 |
+| #    | Spec module (§)                        | Status                                                                   |
+| ---- | -------------------------------------- | ------------------------------------------------------------------------ |
+| §3   | Categories (main → sub tree)           | ⚠️ Partial — local tree OK; POS two-level nav lost                       |
+| §7   | POS three line types                   | ⚠️ Gap — external catalog only                                           |
+| §9b  | Salaries / advances / bonuses / payday | ⚠️ Partial — monthly implemented; daily/hourly unrestored (B7)           |
+| §10  | Recipes (prepared/sub-recipes)         | ⚠️ Partial — prepared flow works; product recipes unrestored             |
+| §11  | Waste                                  | ⚠️ Partial — item + external work; recipe path hits prepared (B6)        |
+| §14b | Reports (7 groups)                     | ✅ Current flows covered; online/correction dependencies remain in §1.7  |
+| §14c | PDF export                             | ✅ Owner accepted browser Print / Save as PDF; visual preview unverified |
+| §15  | Data model                             | ✅ Implemented                                                           |
 
 Branch ownership/assignment is implemented across the existing flows. Roles/full CRUD, online stock deduction and complete report coverage still need their separate §1 changes. Current admin POS checkout remains blocked (`requireRole("cashier")` + POS banner), which conflicts with the full-access target; cashier report-page exclusion remains intended.
 
@@ -206,11 +207,12 @@ Still missing vs spec §10:
 ### 2.12 Reports/dashboard/PDF (§14+§2)
 
 - ✅ Dashboard: local POS sales/refunds/discounts/gross profit/orders, all open shifts in the selected branch, configured low-stock and active negative-stock alerts, pending transfers (`reports.service.ts`, `reports.repository.ts`). REPORT-4's zero-minimum regression is fixed and tested in both dashboard and reports.
-- ⚠️ Groups 1 (by day/product/shift/cashier), 5 (waste&refunds), 6 (suppliers) return local data; group 2 stocktake history exists. Date selection exists, but shift totals and print labels need fixing (REPORT-2/3); current stock/supplier summaries are snapshots (REPORT-5).
+- ✅ Local sales, waste/refunds, suppliers and stocktake reports; loaded-range printing, period shift totals, gross-profit/current-snapshot labels and Cairo/DST boundaries are fixed (REPORT-2/3/5).
 - ✅ Group 3 includes salary payments and advances in cash-flow; group 4 includes salary history (`reports.repository.ts` `cashFlow`, `salaryHistory`).
 - ✅ Group 1 by category includes live external sales and refunds under their external categories (`reports.repository.ts` `salesByCategory`).
-- ⚠️ PDF = `window.print()` (`reports/page.tsx:357`). No library/server PDF, no per-report download. Excel correctly absent (§16).
-- ❌ Online sales, branch coverage, dedicated transfer/preparation flow reports, and complete correction histories remain missing against §1.7 (REPORT-1).
+- ✅ Dedicated transfers/requests, preparation outputs/ingredients, purchase-line/expense-entry detail and dated shift-event/reconciliation reports are branch-scoped.
+- ✅ Browser `window.print()` / Save as PDF is the owner-accepted export strategy (2026-09-27). No separate download is required; Excel remains excluded (§16). Visual print-preview verification was unavailable.
+- ❌ Global online revenue, branch online deductions/costs/local changes and complete transaction correction histories remain dependent on ONLINE-1/2/3 and CRUD-1 (REPORT-1).
 
 ### 2.13 Data model (§15) ✅
 
@@ -244,7 +246,7 @@ Spec §9 payday is `net = computed pay + bonuses − deductions − advances` fo
 
 ### 4.1 Broken / missing flows
 
-Session handling remains in place: cookie-first + Tauri Bearer fallback (`lib/api.ts:22-28`, `lib/auth.ts:26-30,71-87`), 401 clears (`lib/api.ts:34`), `AuthProvider` gates via `canOpenPath` (`auth-provider.tsx`). The permission policy itself needs AUTH-1: admin checkout is currently blocked and cashier Suppliers/Purchases/Recipes remain inaccessible. Home/POS shift controls and reachable complete history are implemented (§1.6). Accurate loaded/printed report ranges remain REPORT-2. Cashier report-page exclusion remains intended.
+Session handling remains in place: cookie-first + Tauri Bearer fallback (`lib/api.ts:22-28`, `lib/auth.ts:26-30,71-87`), 401 clears (`lib/api.ts:34`), `AuthProvider` gates via `canOpenPath` (`auth-provider.tsx`). The permission policy itself needs AUTH-1: admin checkout is currently blocked and cashier Suppliers/Purchases/Recipes remain inaccessible. Home/POS shift controls and reachable complete history are implemented (§1.6). Loaded/printed report ranges are fixed (REPORT-2, §1.7). Cashier report-page exclusion remains intended.
 
 ---
 
@@ -290,8 +292,8 @@ Owner-requirement acceptance coverage to add with implementation (not assertions
 - ONLINE-1/2/3: missing-config pending alert/retry, negative-stock deduction, upstream version changes, backend-priority rollback of local modifications, and staff cancellation return/waste exactly once using original allocations.
 - RECIPE-1: one live recipe linked to several imported targets, future deductions use its changed formula, prior allocations/costs remain unchanged, and branch mappings stay isolated.
 - W1/SHIFT-UI/SHIFT-HIST: covered by `tests/db/shifts.test.ts` and web shift-component/access tests: distinct cashiers concurrently within/across branches, same-account duplicate rejection, five transaction flows with separate cash totals, branch isolation, direct Home/POS controls, reopen guards, selected-shift preservation during refresh, event details, and history/Home daily totals beyond 100.
-- REPORT-1: all basic flows, completed-only backend online sales counted once, per-branch deductions/costs/local changes, cancellation exclusion, and branch-safe totals.
-- REPORT-2/3/5: changed dates without refresh and failed refresh cannot mislabel printed figures; overnight/reopened-shift period totals reconcile; gross-profit/snapshot scope is explicit. REPORT-4's negative-stock/zero-minimum cases are now covered by unit and database tests.
+- REPORT-1: current local transfers/preparations/purchase/expense details and branch-safe totals are covered. Completed-only global online sales, branch deductions/costs/local changes, cancellation exclusion and retained correction history remain acceptance work for their dependent features.
+- REPORT-2/3/5: covered by report component and real HTTP/MySQL tests: changed dates, failed/successful refreshes, obsolete responses, overnight/reopened/refund-only period totals, concurrent database snapshots, closed-gap shift counts, Cairo midnight/DST, calendar-date rendering and gross-profit/current-snapshot labels. REPORT-4's negative-stock/zero-minimum cases remain covered.
 
 `apps/web/tests/architecture/*` still greps page source. `apps/web/tests/shared/` is empty (old pin files gone). `apps/api/tests/docs/` is empty. Prefer service/component tests over new file-contract tests.
 
@@ -332,22 +334,22 @@ Ordered easy → hard, because severity and effort do not line up here: DATA-1 i
 
 **Tier 4 — hard (concurrency; must not change lock order)**
 
-10. DATA-1 — concurrent over-refund race, plus the `Promise.all` test. ← next up
-11. B5 — stable waste lock order + `transactionWithDeadlockRetry`.
-12. B6 — recipe waste catalog only lists `type='product'`. Blocked on the W2 decision.
+9. DATA-1 — concurrent over-refund race, plus the `Promise.all` test. ← next up
+10. B5 — stable waste lock order + `transactionWithDeadlockRetry`.
+11. B6 — recipe waste catalog only lists `type='product'`. Blocked on the W2 decision.
 
 **Tier 5 — hard (features / spec decisions)**
 
-13. §2.12 — server-side PDF vs print-only.
-14. B7 — daily/hourly payroll, or amend spec §9 to monthly-only.
-15. W1 / SHIFT-UI / SHIFT-HIST — ✅ implemented 2026-09-27: per-cashier concurrency, branch ownership, direct Home/POS controls, complete paginated history, and all-open-shift admin views (§1.6).
-16. W2 + E5 / §2.2 / §2.9 — internal POS sales. Largest item.
+12. §2.12 — ✅ owner accepted browser Print / Save as PDF, 2026-09-27.
+13. B7 — daily/hourly payroll, or amend spec §9 to monthly-only.
+14. W1 / SHIFT-UI / SHIFT-HIST — ✅ implemented 2026-09-27: per-cashier concurrency, branch ownership, direct Home/POS controls, complete paginated history, and all-open-shift admin views (§1.6).
+15. W2 + E5 / §2.2 / §2.9 — internal POS sales. Largest item.
 
-**Open older decisions:** §2.12 (PDF strategy) and the W2 direction, which B6 and the dead refund branches depend on. W1 is implemented (§1.6).
+**Open older decision:** W2 direction, which B6 and the dead refund branches depend on. W1 is implemented (§1.6); browser Print / Save as PDF is accepted (§1.7).
 
 **2026-09-27 additions — dependency order:**
 
-1. Fix REPORT-2/3/5 in the existing flows; these findings can be addressed without the new branch/online features. REPORT-4 was fixed during the CodeRabbit follow-up.
+1. REPORT-2/3/5 and current local flow reports are implemented (§1.7). REPORT-4 was fixed during the CodeRabbit follow-up.
 2. Branch ownership/assignment throughout model, API, worker, UI, and existing reports (BRANCH-1) is implemented. Branch specification/rollout docs are updated. Complete AUTH-1 and the remaining capability/CRUD documentation against this ownership.
 3. Implement retained transaction corrections (CRUD-1), reusable recipe links/snapshots (RECIPE-1), and immediate versioned branch online processing (ONLINE-1/2/3). The upstream event/line-data contract must be verified before claiming immediate deduction works end-to-end.
 4. Complete REPORT-1 for every implemented flow, including backend online revenue counted once and separate branch stock/correction effects. Verify these dependencies together with the acceptance cases in §7.
@@ -377,7 +379,7 @@ This dependency order supplements the existing money/concurrency fixes; it does 
 - No SQLi: Drizzle params; raw `sql` columns only.
 - `api build` builds `@cashier/shared` first (`api/package.json`) — keep.
 - `changePassword` bumps `tokenVersion` + re-issues (`auth.repository.ts:26-34`, `auth.service.ts:48-66`); admin resets also bump (`users.repository.ts:51-60`).
-- Frontend API shapes match backend for the older implemented flows (Appendix B); cookie-first + Tauri fallback and 401 clearing remain. Route gating exists, but the actual allowed pages/actions need AUTH-1; report range printing needs REPORT-2. Existing layout/cart/refund/receipt helpers do not establish the new branch/online/CRUD requirements.
+- Frontend API shapes match backend for the implemented flows (Appendix B); cookie-first + Tauri fallback and 401 clearing remain. Route gating exists, but the actual allowed pages/actions need AUTH-1. Report range printing and current-flow reporting are fixed (§1.7); online/CRUD reporting still depends on those unfinished features.
 - Docker: five services, healthchecks via `scripts/process-liveness.cjs` (probe ignores itself), `docs/docker.md` matches Compose. `docs/tmp-xx.md` reticked 2026-09-24.
 
 ---

@@ -1,7 +1,7 @@
 import { api } from "@/lib/api";
 export type ReportRow = Record<string, string | number | null>;
 export type ReportsData = {
-  range: { from: string; to: string; branchId?: number };
+  range: { from: string; to: string; branchId: number; generatedAt: string };
   sales: Record<
     "byDay" | "byProduct" | "byCategory" | "byShift" | "byCashier",
     ReportRow[]
@@ -15,9 +15,22 @@ export type ReportsData = {
   money: {
     cashFlow: ReportRow[];
     expenseBreakdown: ReportRow[];
+    expenses: ReportRow[];
     shiftOverShort: ReportRow[];
   };
-  employees: { activity: ReportRow[]; salaryHistory: ReportRow[] };
+  employees: {
+    activity: ReportRow[];
+    salaryHistory: ReportRow[];
+    shiftHistory: ReportRow[];
+  };
+  operations: {
+    transfers: ReportRow[];
+    transferLines: ReportRow[];
+    requests: ReportRow[];
+    requestLines: ReportRow[];
+    preparations: ReportRow[];
+    ingredients: ReportRow[];
+  };
   wasteAndRefunds: {
     waste: ReportRow[];
     wasteSummary: ReportRow[];
@@ -28,6 +41,7 @@ export type ReportsData = {
     summary: ReportRow[];
     purchases: ReportRow[];
     payments: ReportRow[];
+    purchaseLines: ReportRow[];
   };
 };
 export type DashboardData = {

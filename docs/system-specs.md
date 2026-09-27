@@ -28,7 +28,7 @@ A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inv
 - **Backend:** Express.js REST API (TypeScript), JWT-based auth with role checks on every endpoint.
 - **Database:** MySQL (InnoDB, utf8mb4) accessed via Drizzle ORM (drizzle-kit migrations). All money stored as `DECIMAL`, all quantities as `DECIMAL` (fractional units supported).
 - **Printing:** 80mm thermal receipts rendered as an Arabic print view; browser print to the printer attached to the cashier PC. Auto-print after each sale.
-- **PDF export:** server- or client-rendered Arabic-friendly PDF for every report.
+- **PDF export:** browser Print / Save as PDF with Arabic report labels for every report (owner-confirmed 2026-09-27).
 
 ### Roles & permissions
 
@@ -261,6 +261,11 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 4. **Employees & worked time:** cashier shift hours and actions by employee; salary history with advances/bonuses/deductions for all employees.
 5. **Waste & refunds:** totals and detail by item/product, reason, warehouse, period, recorded-by.
 6. **Suppliers:** account statements, purchases by supplier, balances summary.
+7. **Transfers & preparation:** executed main-to-cafe transfers, request status/review, recipe preparation output and consumed ingredients, quantities, FIFO costs, and responsible staff.
+
+Date semantics: transaction totals use inclusive Cairo calendar dates, with correct daylight-saving boundaries. Stock/value/alerts and supplier balances are current snapshots, not historical closing balances. Transfer requests and stocktakes are selected by creation date and show their current state. Shift-period sales use transaction dates; lifetime shift cash reconciliation and dated closure/correction snapshots are separately labelled. Worked-shift counts exclude closed gaps between reopening segments. Gross profit excludes expenses, payroll and waste. All sections of a report read one consistent database snapshot; display/print uses the loaded range, not unapplied date controls.
+
+Current implementation covers the existing branch operations above. Global completed online revenue counted once, per-branch online stock costs, and transaction edit/delete history depend on the unfinished online/correction features and remain pending. See `reports.md` for contracts, coverage and print limitations.
 
 ---
 

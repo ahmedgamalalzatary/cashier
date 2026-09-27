@@ -15,18 +15,17 @@ function nextDate(value: string) {
   return date.toISOString().slice(0, 10);
 }
 export function cairoMidnight(value: string) {
-  const guess = new Date(`${value}T00:00:00Z`);
-  const zone = new Intl.DateTimeFormat("en", {
-    timeZone: "Africa/Cairo",
-    timeZoneName: "longOffset",
-  })
-    .formatToParts(guess)
-    .find((part) => part.type === "timeZoneName")?.value;
-  const match = zone?.match(/GMT([+-])(\d{2}):(\d{2})/);
-  if (!match) throw new Error("تعذر تحديد توقيت القاهرة");
-  const offset =
-    (Number(match[2]) * 60 + Number(match[3])) * (match[1] === "+" ? 1 : -1);
-  return new Date(guess.getTime() - offset * 60_000);
+  const guess = new Date(`${value}T00:00:00Z`).getTime();
+  // Find the first instant of this calendar day. Cairo can skip midnight
+  // when DST starts, so subtracting the offset at UTC midnight is insufficient.
+  let low = guess - 86_400_000,
+    high = guess + 86_400_000;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (dayFormat.format(new Date(middle)) < value) low = middle + 1;
+    else high = middle;
+  }
+  return new Date(low);
 }
 const dayFormat = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Africa/Cairo",
@@ -81,7 +80,12 @@ export class ReportsService {
       stock: stock.filter(isLowStock),
     };
   }
-  async report({ from, to }: ReportRange) {
+  report(range: ReportRange) {
+    return this.repo.snapshot((repo) =>
+      new ReportsService(repo).buildReport(range),
+    );
+  }
+  private async buildReport({ from, to }: ReportRange) {
     const start = cairoMidnight(from),
       end = cairoMidnight(nextDate(to));
     const [
@@ -104,6 +108,15 @@ export class ReportsService {
       suppliers,
       supplierPurchases,
       supplierPayments,
+      shiftHistory,
+      expenses,
+      transfers,
+      transferLines,
+      requests,
+      requestLines,
+      preparations,
+      ingredients,
+      purchaseLines,
     ] = await Promise.all([
       this.repo.salesByDay(start, end),
       this.repo.salesByProduct(start, end),
@@ -124,10 +137,24 @@ export class ReportsService {
       this.repo.suppliers(),
       this.repo.supplierPurchases(from, to),
       this.repo.supplierPayments(from, to),
+      this.repo.shiftHistory(start, end),
+      this.repo.expenses(from, to),
+      this.repo.transfers(start, end),
+      this.repo.transferLines(start, end),
+      this.repo.transferRequests(start, end),
+      this.repo.transferRequestLines(start, end),
+      this.repo.preparations(start, end),
+      this.repo.preparationIngredients(start, end),
+      this.repo.purchaseLines(from, to),
     ]);
     const lowStock = stock.filter(isLowStock);
     return {
-      range: { from, to, branchId: currentBranchId() },
+      range: {
+        from,
+        to,
+        branchId: currentBranchId(),
+        generatedAt: new Date().toISOString(),
+      },
       sales: {
         byDay: aggregateSalesDays(byDay),
         byProduct,
@@ -136,13 +163,29 @@ export class ReportsService {
         byCashier,
       },
       stock: { current: stock, lowStock, ledger, stocktakes },
-      money: { cashFlow, expenseBreakdown, shiftOverShort: byShift },
-      employees: { activity: employees, salaryHistory },
+      money: {
+        cashFlow,
+        expenses,
+        expenseBreakdown,
+        shiftOverShort: shiftHistory.filter((row) =>
+          ["close", "admin_close", "correction"].includes(String(row.action)),
+        ),
+      },
+      employees: { activity: employees, salaryHistory, shiftHistory },
+      operations: {
+        transfers,
+        transferLines,
+        requests,
+        requestLines,
+        preparations,
+        ingredients,
+      },
       wasteAndRefunds: { waste, wasteSummary, refunds, refundSummary },
       suppliers: {
         summary: suppliers,
         purchases: supplierPurchases,
         payments: supplierPayments,
+        purchaseLines,
       },
     };
   }

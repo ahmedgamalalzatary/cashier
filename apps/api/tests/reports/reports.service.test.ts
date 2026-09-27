@@ -16,6 +16,15 @@ describe("report Cairo calendar boundaries", () => {
     );
   });
 
+  it("starts the report at the first instant of a Cairo day when DST skips midnight", () => {
+    expect(cairoMidnight("2026-04-24").toISOString()).toBe(
+      "2026-04-23T22:00:00.000Z",
+    );
+    expect(cairoMidnight("2026-10-30").toISOString()).toBe(
+      "2026-10-29T22:00:00.000Z",
+    );
+  });
+
   it("groups UTC timestamps by the Cairo business day", () => {
     expect(
       aggregateSalesDays([
