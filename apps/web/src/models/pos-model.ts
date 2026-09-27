@@ -211,7 +211,7 @@ export function isOwnOpenShift(
   user: { id: number; role: string } | null | undefined,
 ): boolean {
   if (!user || user.role !== "cashier") return false;
-  if (shift === null || "occupied" in shift) return false;
+  if (shift === null) return false;
   return shift.cashierUserId === user.id;
 }
 

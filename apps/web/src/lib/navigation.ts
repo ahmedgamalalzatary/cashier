@@ -9,7 +9,7 @@ export const NAV_ITEMS = [
   { href: "/suppliers", label: "الموردين", adminOnly: true },
   { href: "/purchases", label: "المشتريات", adminOnly: true },
   { href: "/users", label: "مستخدمو النظام", adminOnly: true },
-  { href: "/shifts", label: "الورديات" },
+  { href: "/shifts", label: "الورديات", adminOnly: true },
   { href: "/employees", label: "الموظفين", adminOnly: true },
   { href: "/salaries", label: "المرتبات", adminOnly: true },
   { href: "/expenses", label: "المصروفات" },

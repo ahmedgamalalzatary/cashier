@@ -44,6 +44,16 @@ export const correctShiftInput = z
 
 export const shiftIdParam = z.coerce.number().int().positive();
 
+export const shiftListQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(100),
+  offset: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(Number.MAX_SAFE_INTEGER)
+    .default(0),
+});
+
 export type OpenShiftInput = z.infer<typeof openShiftInput>;
 export type CloseShiftInput = z.infer<typeof closeShiftInput>;
 export type AdminCloseShiftInput = z.infer<typeof adminCloseShiftInput>;

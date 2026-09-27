@@ -73,14 +73,9 @@ export function greetingFor(hour: number) {
   return "مساء الخير";
 }
 
-/** The drawer the signed-in user may look inside, if any. */
+/** Current shift is scoped to the signed-in cashier by the server. */
 export function openShiftOf(current: CurrentShift | null) {
-  return current && !("occupied" in current) ? current : null;
-}
-
-/** True when another cashier holds the drawer and its figures stay hidden. */
-export function drawerIsBusy(current: CurrentShift | null) {
-  return Boolean(current && "occupied" in current);
+  return current;
 }
 
 export function workedLabel(minutes: number) {

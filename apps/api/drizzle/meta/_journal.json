@@ -288,6 +288,13 @@
       "when": 1790506045505,
       "tag": "0040_branch_owned_data",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "5",
+      "when": 1790525178748,
+      "tag": "0041_cashier_concurrent_shifts",
+      "breakpoints": true
     }
   ]
 }

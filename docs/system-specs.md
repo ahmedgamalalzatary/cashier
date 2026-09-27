@@ -160,16 +160,17 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 
 ## 8. Shifts
 
-- **Owner-confirmed target:** one open shift per cashier account, with multiple cashiers able to work simultaneously within/across branches. Branch isolation currently separates drawer slots across branches; the within-branch concurrency change remains W1 in the audit. Orders, refunds, and shift expenses require and attach to the owning cashier's open shift.
-- **Open:** cashier logs in and enters the counted **starting float**.
+- **Concurrency:** one open shift per cashier account, with multiple cashiers able to work simultaneously within/across branches. The database enforces the cashier account limit. Orders, refunds, expenses, waste, and cashier transfer requests require and attach to the owning cashier's branch-scoped open shift.
+- **Open:** cashier logs in and enters the counted **starting float** directly on Home or POS. Both pages also offer counted-cash closing and the cashier's own paginated history. The separate Shifts page is admin-only.
 - Each shift records the authenticated cashier user and, through that user's required employee link, the employee who operated it.
-- A cashier's worked time is the shift duration from open to close. Non-cashier employees have no attendance or worked-hours tracking.
+- A cashier's worked time sums open/reopened work segments, excluding closed gaps. Non-cashier employees have no attendance or worked-hours tracking.
 - **During:** shift screen shows running totals (orders count, sales, discounts, transfer requests, refunds, expenses, and waste actions).
 - **Close:** cashier counts the drawer and enters **actual cash**. System computes:
   - `expected = float + cash sales − cash refunds − shift expenses`
   - `over/short = actual − expected`
 - Over/short is stored against the shift and cashier, with full history in reports.
 - Admin can view shifts, force-close a shift left open, and reopen/correct a closed shift with an audit note. Admin cannot open a shift.
+- Admin Home and Shifts show every open shift in the selected branch. Reopening conflicts only when that cashier already has an open shift. History pages retain access beyond 100 records and expose audit events and cash snapshots. See [shift rollout and API contract](shifts.md).
 
 ---
 

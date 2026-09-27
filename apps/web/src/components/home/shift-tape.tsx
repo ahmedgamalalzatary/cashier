@@ -1,14 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { CashierShiftControls } from "../shifts/cashier-shift-controls";
 import Link from "next/link";
-import { LockKeyhole, UnlockKeyhole } from "lucide-react";
+import { LockKeyhole } from "lucide-react";
 import type { CurrentShift, Role, Shift } from "@cashier/shared";
 import { cairoClock } from "@/lib/cairo-date";
 import {
   countPhrase,
   dayTape,
-  drawerIsBusy,
   openShiftOf,
   SHIFT_COUNT,
   shiftTapeLines,
@@ -20,15 +20,15 @@ type Props = {
   role: Role;
   current: CurrentShift | null;
   shifts: Shift[];
+  onChanged?: (current: Shift | null) => void;
 };
 
 /**
  * The day printed the way the shop already reads it — as a receipt. The lines
  * feed in on load like paper leaving the printer.
  */
-export function ShiftTape({ role, current, shifts }: Props) {
+export function ShiftTape({ role, current, shifts, onChanged }: Props) {
   const shift = openShiftOf(current);
-  const busy = drawerIsBusy(current);
   const day = dayTape(shifts);
   let step = 0;
 
@@ -58,17 +58,15 @@ export function ShiftTape({ role, current, shifts }: Props) {
             <>
               <span className="inline-flex items-center gap-2 text-xs font-medium text-muted">
                 <LockKeyhole className="size-3.5" />
-                الدرج مقفول
+                {role === "cashier" ? "الدرج مقفول" : "سجل الورديات"}
               </span>
               <h2 id="tape-heading" className="mt-2 text-xl font-bold">
-                {busy ? "الدرج مع كاشير آخر" : "لا توجد وردية مفتوحة"}
+                {role === "cashier" ? "لا توجد وردية مفتوحة" : "ورديات الفرع"}
               </h2>
               <p className="mt-1 text-xs leading-5 text-muted">
-                {busy
-                  ? "تفاصيل النقدية تظهر لصاحب الوردية فقط، ولا يمكن فتح وردية جديدة حتى تُغلق."
-                  : role === "cashier"
-                    ? "افتح ورديتك وأدخل العهدة المعدودة قبل أول طلب."
-                    : "الكاشير يفتح الوردية من صفحة الورديات."}
+                {role === "cashier"
+                  ? "افتح ورديتك وأدخل العهدة المعدودة قبل أول طلب."
+                  : "تابع كل الورديات المفتوحة من ملخص الإدارة وصفحة الورديات."}
               </p>
             </>
           )}
@@ -110,30 +108,20 @@ export function ShiftTape({ role, current, shifts }: Props) {
           </dl>
         )}
 
-        {!busy && (
-          <Feed step={step++}>
-            <Link
-              href="/shifts"
-              className={`mt-6 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
-                shift
-                  ? "border border-line text-ink hover:bg-line/50"
-                  : "bg-primary text-white hover:bg-primary-strong"
-              }`}
-            >
-              {shift ? (
-                <>
-                  <LockKeyhole className="size-4" />
-                  {role === "cashier" ? "إغلاق وعدّ الدرج" : "متابعة الوردية"}
-                </>
-              ) : (
-                <>
-                  <UnlockKeyhole className="size-4" />
-                  {role === "cashier" ? "فتح وردية" : "سجل الورديات"}
-                </>
-              )}
-            </Link>
-          </Feed>
-        )}
+        <Feed step={step++}>
+          <div className="mt-6">
+            {role === "cashier" ? (
+              <CashierShiftControls
+                current={shift}
+                onChanged={onChanged ?? (() => undefined)}
+              />
+            ) : (
+              <Link href="/shifts" className="text-sm font-medium text-primary">
+                سجل الورديات وإدارتها
+              </Link>
+            )}
+          </div>
+        </Feed>
       </div>
       <div className="tape-bottom" aria-hidden="true" />
     </section>

@@ -10,7 +10,6 @@ import {
   attentionItems,
   countPhrase,
   dayTape,
-  drawerIsBusy,
   greetingFor,
   ITEM_COUNT,
   openShiftOf,
@@ -108,12 +107,8 @@ describe("home view model", () => {
 
   it("only exposes a drawer the signed-in user may look inside", () => {
     expect(openShiftOf(null)).toBeNull();
-    expect(openShiftOf({ occupied: true })).toBeNull();
-    expect(drawerIsBusy({ occupied: true })).toBe(true);
-    expect(drawerIsBusy(null)).toBe(false);
     const open = shift({ id: 4, status: "open" });
     expect(openShiftOf(open)).toBe(open);
-    expect(drawerIsBusy(open)).toBe(false);
   });
 
   it("prints the open shift as receipt lines", () => {
@@ -227,7 +222,16 @@ describe("home view model", () => {
       mainStock: [stockRow({ itemId: 3, isLowStock: true })],
       requests: [request("pending"), request("rejected")],
       suppliers: [
-        { id: 1, name: "مورد", phone: null, address: null, notes: null, openingBalance: "0", isActive: true, balance: "1200.00" },
+        {
+          id: 1,
+          name: "مورد",
+          phone: null,
+          address: null,
+          notes: null,
+          openingBalance: "0",
+          isActive: true,
+          balance: "1200.00",
+        },
       ],
     });
     expect(items.map((item) => item.id)).toEqual([

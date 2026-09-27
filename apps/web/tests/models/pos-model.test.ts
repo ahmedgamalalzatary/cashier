@@ -281,7 +281,6 @@ describe("POS model", () => {
     expect(isOwnOpenShift(shift, cashier)).toBe(true);
     expect(isOwnOpenShift(shift, { id: 6, role: "cashier" })).toBe(false);
     expect(isOwnOpenShift(shift, { id: 5, role: "admin" })).toBe(false);
-    expect(isOwnOpenShift({ occupied: true }, cashier)).toBe(false);
     expect(isOwnOpenShift(null, cashier)).toBe(false);
     expect(isOwnOpenShift(shift, null)).toBe(false);
   });

@@ -162,6 +162,12 @@ describe("tokenless persisted session", () => {
 });
 
 describe("login redirects", () => {
+  it("keeps shift administration restricted to admins while cashiers can open Home and POS", () => {
+    expect(canOpenPath("cashier", "/shifts")).toBe(false);
+    expect(canOpenPath("cashier", "/")).toBe(true);
+    expect(canOpenPath("cashier", "/pos")).toBe(true);
+    expect(canOpenPath("admin", "/shifts")).toBe(true);
+  });
   it("reserves branch management and its deep links for admins", () => {
     expect(canOpenPath("cashier", "/branches")).toBe(false);
     expect(canOpenPath("cashier", "/branches/edit")).toBe(false);

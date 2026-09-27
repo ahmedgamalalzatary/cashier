@@ -33,6 +33,8 @@ function stubController(
   return {
     open: vi.fn(ok),
     current: vi.fn(ok),
+    active: vi.fn(ok),
+    today: vi.fn(ok),
     list: vi.fn(ok),
     close: vi.fn(ok),
     adminClose: vi.fn(ok),

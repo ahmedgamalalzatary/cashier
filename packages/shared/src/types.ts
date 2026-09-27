@@ -140,7 +140,7 @@ export type Shift = {
   events: ShiftEvent[];
 };
 
-export type CurrentShift = Shift | { occupied: true };
+export type CurrentShift = Shift;
 
 export type Supplier = {
   id: number;

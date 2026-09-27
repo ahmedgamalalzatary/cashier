@@ -74,12 +74,15 @@ export function AdminMetrics() {
           </p>
         </div>
       </div>
-      {data.openShift && (
-        <p className="rounded-xl border border-line bg-surface p-3 text-sm">
-          الوردية المفتوحة: <b>{String(data.openShift.cashierName)}</b> —
-          المبيعات {formatMoney(data.openShift.sales ?? 0)}
+      {data.openShifts.map((shift) => (
+        <p
+          key={shift.id}
+          className="rounded-xl border border-line bg-surface p-3 text-sm"
+        >
+          الوردية #{shift.id}: <b>{String(shift.cashierName)}</b> — المبيعات{" "}
+          {formatMoney(shift.sales ?? 0)}
         </p>
-      )}
+      ))}
     </section>
   );
 }

@@ -24,13 +24,13 @@ export class ReportsRepository {
     `);
   }
 
-  openShift() {
+  openShifts() {
     return this.rows<Record<string, unknown>>(sql`
       SELECT s.id, e.name AS cashierName, s.opening_float AS openingFloat, s.opened_at AS openedAt,
         COALESCE((SELECT SUM(o.total) FROM ${branchTable("orders")} o WHERE o.shift_id=s.id),0) AS sales,
         COALESCE((SELECT SUM(r.amount) FROM ${branchTable("refunds")} r WHERE r.shift_id=s.id),0) AS refunds,
         COALESCE((SELECT SUM(x.amount) FROM ${branchTable("expenses")} x WHERE x.shift_id=s.id),0) AS expenses
-      FROM ${branchTable("shifts")} s JOIN ${branchTable("employees")} e ON e.id=s.employee_id WHERE s.open_slot=1 LIMIT 1
+      FROM ${branchTable("shifts")} s JOIN ${branchTable("employees")} e ON e.id=s.employee_id WHERE s.open_slot=1 ORDER BY s.opened_at DESC,s.id DESC
     `);
   }
 

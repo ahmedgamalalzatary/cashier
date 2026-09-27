@@ -1,7 +1,14 @@
 import type { CurrentShift, Shift } from "@cashier/shared";
 import { api } from "../lib/api";
 
-export const listShifts = () => api<Shift[]>("/api/shifts");
+export const listShifts = (pagination?: { limit: number; offset: number }) =>
+  api<Shift[]>(
+    pagination
+      ? `/api/shifts?limit=${pagination.limit}&offset=${pagination.offset}`
+      : "/api/shifts",
+  );
+export const listActiveShifts = () => api<Shift[]>("/api/shifts/active");
+export const listTodayShifts = () => api<Shift[]>("/api/shifts/today");
 export const getCurrentShift = () =>
   api<CurrentShift | null>("/api/shifts/current");
 

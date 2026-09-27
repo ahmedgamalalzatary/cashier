@@ -8,6 +8,7 @@ import type {
   ShiftAuditNoteInput,
 } from "./shifts.schemas.js";
 import type { ShiftsRepository } from "./shifts.repository.js";
+import { cairoMidnight } from "../reports/reports.service.js";
 
 function isDuplicateEntry(error: unknown) {
   return (
@@ -92,17 +93,38 @@ export class ShiftsService {
   }
 
   async current(actor: AuthUser) {
-    const current = await this.repo.findCurrent();
+    if (actor.role !== "cashier") return null;
+    const current = await this.repo.findCurrent(actor.id);
     if (!current) return null;
-    if (actor.role === "cashier" && current.cashierUserId !== actor.id) {
-      return { occupied: true as const };
-    }
     return this.get(current.id);
   }
 
-  async list(actor: AuthUser) {
+  async active() {
+    const rows = await this.repo.activeIds();
+    return Promise.all(rows.map((row) => this.get(row.id)));
+  }
+
+  async today(actor: AuthUser) {
+    const day = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Africa/Cairo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    const next = new Date(`${day}T12:00:00Z`);
+    next.setUTCDate(next.getUTCDate() + 1);
+    const rows = await this.repo.dayIds(
+      cairoMidnight(day),
+      cairoMidnight(next.toISOString().slice(0, 10)),
+      actor.role === "cashier" ? actor.id : undefined,
+    );
+    return Promise.all(rows.map((row) => this.get(row.id)));
+  }
+
+  async list(actor: AuthUser, pagination = { limit: 100, offset: 0 }) {
     const rows = await this.repo.listIds(
       actor.role === "cashier" ? actor.id : undefined,
+      pagination,
     );
     return Promise.all(rows.map((row) => this.get(row.id)));
   }

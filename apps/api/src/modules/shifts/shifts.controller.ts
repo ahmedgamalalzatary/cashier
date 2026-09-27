@@ -7,6 +7,7 @@ import {
   openShiftInput,
   shiftAuditNoteInput,
   shiftIdParam,
+  shiftListQuery,
 } from "./shifts.schemas.js";
 
 export class ShiftsController {
@@ -25,7 +26,17 @@ export class ShiftsController {
   };
 
   list = async (req: Request, res: Response) => {
-    res.json(await this.service.list(req.user!));
+    res.json(
+      await this.service.list(req.user!, shiftListQuery.parse(req.query)),
+    );
+  };
+
+  active = async (_req: Request, res: Response) => {
+    res.json(await this.service.active());
+  };
+
+  today = async (req: Request, res: Response) => {
+    res.json(await this.service.today(req.user!));
   };
 
   close = async (req: Request, res: Response) => {

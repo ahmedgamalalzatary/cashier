@@ -25,21 +25,75 @@ type Action = {
 
 /** Ordered by how often the job actually comes up, not by the sidebar order. */
 const cashierActions: Action[] = [
-  { href: "/pos", label: "نقطة البيع", hint: "افتح طلباً جديداً", icon: ShoppingBag },
-  { href: "/refunds", label: "المرتجع", hint: "أرجع صنفاً من طلب", icon: RotateCcw },
-  { href: "/expenses", label: "مصروفات الدرج", hint: "اصرف من النقدية", icon: Receipt },
-  { href: "/waste", label: "الهالك", hint: "سجّل تالفاً أو مسكوباً", icon: Trash2 },
-  { href: "/cafe", label: "مخزن الكافيه", hint: "اطلب تحويلاً من المخزن", icon: CupSoda },
-  { href: "/shifts", label: "الورديات", hint: "افتح أو أغلق وردية", icon: Clock },
+  {
+    href: "/pos",
+    label: "نقطة البيع",
+    hint: "افتح طلباً جديداً",
+    icon: ShoppingBag,
+  },
+  {
+    href: "/refunds",
+    label: "المرتجع",
+    hint: "أرجع صنفاً من طلب",
+    icon: RotateCcw,
+  },
+  {
+    href: "/expenses",
+    label: "مصروفات الدرج",
+    hint: "اصرف من النقدية",
+    icon: Receipt,
+  },
+  {
+    href: "/waste",
+    label: "الهالك",
+    hint: "سجّل تالفاً أو مسكوباً",
+    icon: Trash2,
+  },
+  {
+    href: "/cafe",
+    label: "مخزن الكافيه",
+    hint: "اطلب تحويلاً من المخزن",
+    icon: CupSoda,
+  },
 ];
 
 const adminActions: Action[] = [
-  { href: "/purchases", label: "المشتريات", hint: "سجّل فاتورة مورد", icon: ShoppingCart },
-  { href: "/cafe", label: "مخزن الكافيه", hint: "راجع طلبات التحويل", icon: CupSoda },
-  { href: "/warehouse", label: "المخزن الرئيسي", hint: "الأصناف والأرصدة", icon: Warehouse },
-  { href: "/suppliers", label: "الموردين", hint: "الأرصدة والمدفوعات", icon: Truck },
-  { href: "/recipes", label: "الوصفات", hint: "التكلفة وهامش الربح", icon: BookOpen },
-  { href: "/shifts", label: "الورديات", hint: "متابعة الكاشير والدرج", icon: Clock },
+  {
+    href: "/purchases",
+    label: "المشتريات",
+    hint: "سجّل فاتورة مورد",
+    icon: ShoppingCart,
+  },
+  {
+    href: "/cafe",
+    label: "مخزن الكافيه",
+    hint: "راجع طلبات التحويل",
+    icon: CupSoda,
+  },
+  {
+    href: "/warehouse",
+    label: "المخزن الرئيسي",
+    hint: "الأصناف والأرصدة",
+    icon: Warehouse,
+  },
+  {
+    href: "/suppliers",
+    label: "الموردين",
+    hint: "الأرصدة والمدفوعات",
+    icon: Truck,
+  },
+  {
+    href: "/recipes",
+    label: "الوصفات",
+    hint: "التكلفة وهامش الربح",
+    icon: BookOpen,
+  },
+  {
+    href: "/shifts",
+    label: "الورديات",
+    hint: "متابعة الكاشير والدرج",
+    icon: Clock,
+  },
 ];
 
 export function QuickActions({ role }: { role: Role }) {

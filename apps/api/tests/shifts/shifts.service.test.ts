@@ -249,9 +249,11 @@ describe("ShiftsService.correct guards", () => {
     ).rejects.toMatchObject({ status: 409 });
 
     const uncounted = repoWithTx({
-      findByIdForUpdate: vi.fn().mockResolvedValue(
-        openShiftRow({ status: "closed", actualCash: null }),
-      ),
+      findByIdForUpdate: vi
+        .fn()
+        .mockResolvedValue(
+          openShiftRow({ status: "closed", actualCash: null }),
+        ),
     });
     await expect(
       new ShiftsService(uncounted).correct(1, correction, 1),
@@ -269,16 +271,14 @@ describe("ShiftsService visibility", () => {
     });
   });
 
-  it("reports occupied to a different cashier and null when none open", async () => {
-    const occupiedRepo = {
-      findCurrent: vi
-        .fn()
-        .mockResolvedValue({ id: 1, cashierUserId: otherCashier.id }),
-    } as unknown as ShiftsRepository;
+  it("returns no personal shift for an admin", async () => {
+    const repo = repoWithTx({});
     await expect(
-      new ShiftsService(occupiedRepo).current(cashier),
-    ).resolves.toEqual({ occupied: true });
+      new ShiftsService(repo).current({ id: 1, role: "admin" } as AuthUser),
+    ).resolves.toBeNull();
+  });
 
+  it("returns null when the cashier has no open shift", async () => {
     const emptyRepo = {
       findCurrent: vi.fn().mockResolvedValue(undefined),
     } as unknown as ShiftsRepository;

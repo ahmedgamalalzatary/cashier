@@ -32,7 +32,7 @@ export type ReportsData = {
 };
 export type DashboardData = {
   summary: ReportRow | null;
-  openShift: ReportRow | null;
+  openShifts: ReportRow[];
   stock: ReportRow[];
 };
 export const getReports = (from: string, to: string) =>

@@ -3,7 +3,7 @@ import {
   branchValues,
   branchTransaction,
 } from "../../db/branch-context.js";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import {
   employees,
@@ -143,15 +143,47 @@ export class ShiftsRepository {
       .where(branchCondition(shifts, eq(shifts.id, id)));
   }
 
-  async findCurrent() {
+  async findCurrent(cashierUserId: number) {
     const [row] = await this.db
       .select({ id: shifts.id, cashierUserId: shifts.cashierUserId })
       .from(shifts)
-      .where(branchCondition(shifts, eq(shifts.openSlot, 1)));
+      .where(
+        branchCondition(
+          shifts,
+          and(eq(shifts.openSlot, 1), eq(shifts.cashierUserId, cashierUserId)),
+        ),
+      );
     return row;
   }
 
-  listIds(cashierUserId?: number) {
+  activeIds() {
+    return this.db
+      .select({ id: shifts.id })
+      .from(shifts)
+      .where(branchCondition(shifts, eq(shifts.openSlot, 1)))
+      .orderBy(desc(shifts.openedAt), desc(shifts.id));
+  }
+
+  dayIds(start: Date, end: Date, cashierUserId?: number) {
+    return this.db
+      .select({ id: shifts.id })
+      .from(shifts)
+      .where(
+        branchCondition(
+          shifts,
+          and(
+            gte(shifts.openedAt, start),
+            lt(shifts.openedAt, end),
+            cashierUserId === undefined
+              ? undefined
+              : eq(shifts.cashierUserId, cashierUserId),
+          ),
+        ),
+      )
+      .orderBy(desc(shifts.openedAt), desc(shifts.id));
+  }
+
+  listIds(cashierUserId?: number, pagination = { limit: 100, offset: 0 }) {
     const query = this.db
       .select({ id: shifts.id })
       .from(shifts)
@@ -165,7 +197,8 @@ export class ShiftsRepository {
           )
     )
       .orderBy(desc(shifts.openedAt), desc(shifts.id))
-      .limit(100);
+      .limit(pagination.limit)
+      .offset(pagination.offset);
   }
 
   async totals(id: number) {

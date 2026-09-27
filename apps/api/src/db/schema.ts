@@ -1291,7 +1291,10 @@ export const shifts = mysqlTable(
       (): AnyMySqlColumn => employees.branchId,
       (): AnyMySqlColumn => employees.id,
     ),
-    uniqueIndex("shifts_open_slot_uidx").on(table.branchId, table.openSlot),
+    uniqueIndex("shifts_open_slot_uidx").on(
+      table.cashierUserId,
+      table.openSlot,
+    ),
     index("shifts_cashier_opened_idx").on(table.cashierUserId, table.openedAt),
     index("shifts_employee_opened_idx").on(table.employeeId, table.openedAt),
   ],

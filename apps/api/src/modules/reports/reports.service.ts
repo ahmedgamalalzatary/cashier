@@ -70,14 +70,14 @@ export class ReportsService {
     const day = cairoDate(),
       start = cairoMidnight(day),
       end = cairoMidnight(nextDate(day));
-    const [summary, openShift, stock] = await Promise.all([
+    const [summary, openShifts, stock] = await Promise.all([
       this.repo.dashboard(start, end),
-      this.repo.openShift(),
+      this.repo.openShifts(),
       this.repo.stock(),
     ]);
     return {
       summary: summary[0],
-      openShift: openShift[0] ?? null,
+      openShifts,
       stock: stock.filter(isLowStock),
     };
   }

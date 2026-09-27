@@ -79,7 +79,10 @@ Reticked 2026-09-24 against the running code. Remaining gaps are tracked in [aud
 
 ## 8. Shifts
 
-- [x] `shifts` table (one open at a time)
+- [x] `shifts` table (one open per cashier account; concurrent cashiers within/across branches)
+- [x] Home and POS: direct open/close and cashier's own paginated history
+- [x] Admin-only Shifts page and dashboard show every open shift in the selected branch
+- [x] History beyond 100 records with audit events; Home today totals include all today's shifts
 - [x] Each shift records the authenticated cashier user and linked employee
 - [x] Cashier-only open with counted float; admin cannot open
 - [x] Shift screen: worked duration and running order, sales, discount, and transfer-request totals

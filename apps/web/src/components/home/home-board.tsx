@@ -19,7 +19,7 @@ import {
   getCafeWarehouseStock,
   getMainWarehouseStock,
 } from "@/services/inventory-service";
-import { getCurrentShift, listShifts } from "@/services/shifts-service";
+import { getCurrentShift, listTodayShifts } from "@/services/shifts-service";
 import { listSuppliers } from "@/services/suppliers-service";
 import { listTransferRequests } from "@/services/transfers-service";
 
@@ -54,7 +54,7 @@ export function HomeBoard() {
       const [current, shifts, cafeStock, requests, mainStock, suppliers] =
         await Promise.all([
           getCurrentShift(),
-          listShifts(),
+          listTodayShifts(),
           getCafeWarehouseStock(),
           listTransferRequests(),
           isAdmin ? getMainWarehouseStock() : Promise.resolve([]),
@@ -117,6 +117,10 @@ export function HomeBoard() {
             role={user.role}
             current={board.current}
             shifts={board.shifts}
+            onChanged={(current) => {
+              setBoard((previous) => ({ ...previous, current }));
+              void load();
+            }}
           />
 
           <div className="space-y-8">

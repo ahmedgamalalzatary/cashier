@@ -39,4 +39,4 @@ Browser preference is stored per account. Server authorization always reads the 
 
 Database tests exercise lifecycle, assignment, cross-branch reads/writes/references, independent item numbering, inventory/transfers/preparation, catalog setup, archive access, and active-branch worker state/leases. Client tests cover admin/cashier request scope, direct management-page access, and stale responses after switching.
 
-This module isolates the existing flows. Full cashier CRUD/permission changes (AUTH-1/CRUD-1), immediate online stock deduction (ONLINE-1/2/3), reusable live recipe links (RECIPE-1), and multiple concurrent cashiers in the same branch (W1) remain separate audit items. Each branch currently has its own single open drawer slot.
+This module isolates the existing flows. Full cashier CRUD/permission changes (AUTH-1/CRUD-1), immediate online stock deduction (ONLINE-1/2/3), and reusable live recipe links (RECIPE-1) remain separate audit items. Concurrent shifts now allow multiple cashiers in each branch, with one open shift per account; see [shifts](shifts.md) for migration `0041` and the updated controls/history.

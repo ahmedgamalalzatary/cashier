@@ -5,6 +5,8 @@ import type { ShiftsController } from "./shifts.controller.js";
 export function shiftsRouter(controller: ShiftsController) {
   const router = Router();
   router.get("/current", controller.current);
+  router.get("/today", controller.today);
+  router.get("/active", requireRole("admin"), controller.active);
   router.get("/", controller.list);
   router.post("/open", requireRole("cashier"), controller.open);
   router.post("/:id/close", requireRole("cashier"), controller.close);

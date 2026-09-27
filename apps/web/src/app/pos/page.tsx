@@ -21,6 +21,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
+import { CashierShiftControls } from "@/components/shifts/cashier-shift-controls";
 import type {
   CurrentShift,
   ExternalProduct,
@@ -290,7 +291,14 @@ export default function PosPage() {
           </p>
           <h1 className="text-3xl font-bold tracking-tight">نقطة البيع</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {user?.role === "cashier" && (
+            <CashierShiftControls
+              current={currentShift}
+              onChanged={setCurrentShift}
+              disabled={loading || saving}
+            />
+          )}
           {user?.role === "admin" && (
             <Button
               variant="ghost"
@@ -333,12 +341,14 @@ export default function PosPage() {
               ? "يجب فتح وردية تخص هذا الكاشير قبل تسجيل البيع."
               : "المدير لا يسجل مبيعات؛ استخدم حساب كاشير."}
           </span>
-          <Link
-            className="rounded-lg bg-sidebar px-3 py-2 text-white"
-            href="/shifts"
-          >
-            الذهاب إلى الورديات
-          </Link>
+          {user?.role === "admin" && (
+            <Link
+              className="rounded-lg bg-sidebar px-3 py-2 text-white"
+              href="/shifts"
+            >
+              إدارة الورديات
+            </Link>
+          )}
         </div>
       )}
 
@@ -711,9 +721,7 @@ function CartRow({
               .join(" · ")}
           </p>
         </div>
-        <span className="font-bold">
-          {formatMoney(cartLineTotal(line))}
-        </span>
+        <span className="font-bold">{formatMoney(cartLineTotal(line))}</span>
       </div>
       <div className="mt-2 flex items-center gap-2">
         <button
