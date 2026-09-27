@@ -176,8 +176,12 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
     );
   }
   async currentFifoCost(itemId: number, warehouse: Warehouse) {
+    // Surplus found on an empty shelf has no batch with stock left, so fall back
+    // to the newest batch of any remaining quantity. Valuing found stock at zero
+    // would hide its cost from every later sale's COGS. Rows with stock still
+    // come first and stay in FIFO order, so the stocked case is unchanged.
     const [row] = await this.db.execute(
-      sql`SELECT unit_cost unitCost FROM stock_batches WHERE item_id=${itemId} AND warehouse=${warehouse} AND remaining_quantity>0 ORDER BY received_at,id LIMIT 1`,
+      sql`SELECT unit_cost unitCost FROM stock_batches WHERE item_id=${itemId} AND warehouse=${warehouse} ORDER BY (remaining_quantity>0) DESC, received_at ASC, id ASC LIMIT 1`,
     );
     return String(
       (row as unknown as Array<{ unitCost: string }>)[0]?.unitCost ??

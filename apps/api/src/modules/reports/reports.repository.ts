@@ -91,6 +91,19 @@ export class ReportsRepository {
         LEFT JOIN recipes rp ON rp.id=ol.recipe_id LEFT JOIN items i ON i.id=ol.item_id
         JOIN categories c ON c.id=COALESCE(rp.category_id,i.category_id) LEFT JOIN categories pc ON pc.id=c.parent_id
         WHERE r.created_at >= ${from} AND r.created_at < ${to} GROUP BY COALESCE(pc.name,c.name),c.name
+        UNION ALL
+        SELECT ec.name_ar mainCategory,ec.name_ar category,
+          SUM(COALESCE(ol.line_subtotal * o.total / NULLIF(o.subtotal,0),0)) sales,0 refunds,SUM(ol.total_cost) cost,0 returnedCost
+        FROM order_lines ol JOIN orders o ON o.id=ol.order_id
+        JOIN external_products ep ON ep.external_id=ol.external_product_id
+        JOIN external_categories ec ON ec.external_id=ep.external_category_id
+        WHERE o.created_at >= ${from} AND o.created_at < ${to} GROUP BY ec.name_ar
+        UNION ALL
+        SELECT ec.name_ar,ec.name_ar,0,SUM(rl.refund_amount),0,SUM(rl.returned_cost)
+        FROM refund_lines rl JOIN refunds r ON r.id=rl.refund_id JOIN order_lines ol ON ol.id=rl.order_line_id
+        JOIN external_products ep ON ep.external_id=ol.external_product_id
+        JOIN external_categories ec ON ec.external_id=ep.external_category_id
+        WHERE r.created_at >= ${from} AND r.created_at < ${to} GROUP BY ec.name_ar
       ) x GROUP BY mainCategory,category ORDER BY sales DESC
     `);
   }
@@ -163,16 +176,32 @@ export class ReportsRepository {
 
   employees(from: Date, to: Date, fromDate: string, toDate: string) {
     return this.rows<Record<string, unknown>>(sql`
+    WITH open_segments AS (
+      SELECT s.employee_id,e.shift_id,e.occurred_at startedAt,s.closed_at,
+        (SELECT MIN(c.occurred_at) FROM shift_events c
+          WHERE c.shift_id=e.shift_id AND c.occurred_at > e.occurred_at
+            AND c.action IN ('close','admin_close')) endedAt
+      FROM shift_events e JOIN shifts s ON s.id=e.shift_id
+      WHERE e.action IN ('open','reopen')
+    ),
+    worked AS (
+      SELECT employee_id,
+        SUM(GREATEST(0,TIMESTAMPDIFF(MINUTE,GREATEST(startedAt,${from}),
+          LEAST(COALESCE(endedAt,closed_at,CURRENT_TIMESTAMP),${to})))) workedMinutes
+      FROM open_segments GROUP BY employee_id
+    )
     SELECT e.id,e.name,COUNT(DISTINCT s.id) shiftsCount,
-      COALESCE(SUM(TIMESTAMPDIFF(MINUTE,GREATEST(s.opened_at,${from}),LEAST(COALESCE(s.closed_at,CURRENT_TIMESTAMP),${to}))),0) workedMinutes,
+      COALESCE(w.workedMinutes,0) workedMinutes,
       COALESCE((SELECT COUNT(*) FROM orders o JOIN users u ON u.id=o.cashier_id WHERE u.employee_id=e.id AND o.created_at >= ${from} AND o.created_at < ${to}),0) ordersCount,
       COALESCE((SELECT COUNT(*) FROM refunds r JOIN users u ON u.id=r.cashier_id WHERE u.employee_id=e.id AND r.created_at >= ${from} AND r.created_at < ${to}),0) refundsCount,
       COALESCE((SELECT SUM(o.discount_amount) FROM orders o JOIN users u ON u.id=o.cashier_id WHERE u.employee_id=e.id AND o.created_at >= ${from} AND o.created_at < ${to}),0) discounts,
       COALESCE((SELECT COUNT(*) FROM waste_entries w JOIN users u ON u.id=w.recorded_by WHERE u.employee_id=e.id AND w.occurred_at >= ${from} AND w.occurred_at < ${to}),0) wasteCount,
       COALESCE((SELECT COUNT(*) FROM expenses x JOIN users u ON u.id=x.recorded_by WHERE u.employee_id=e.id AND x.expense_date BETWEEN ${fromDate} AND ${toDate}),0) expensesCount,
       COALESCE((SELECT COUNT(*) FROM transfer_requests tr JOIN users u ON u.id=tr.requested_by WHERE u.employee_id=e.id AND tr.created_at >= ${from} AND tr.created_at < ${to}),0) transferRequestsCount
-    FROM employees e LEFT JOIN shifts s ON s.employee_id=e.id AND s.opened_at < ${to} AND COALESCE(s.closed_at,CURRENT_TIMESTAMP) >= ${from}
-    GROUP BY e.id,e.name ORDER BY e.name
+    FROM employees e
+    LEFT JOIN shifts s ON s.employee_id=e.id AND s.opened_at < ${to} AND COALESCE(s.closed_at,CURRENT_TIMESTAMP) >= ${from}
+    LEFT JOIN worked w ON w.employee_id=e.id
+    GROUP BY e.id,e.name,w.workedMinutes ORDER BY e.name
   `);
   }
 

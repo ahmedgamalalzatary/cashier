@@ -1,3 +1,12 @@
+// The confirm reason is a separate field from the optional start note, so a
+// start note can never stand in for why the session was confirmed.
+export function confirmReasonFor(
+  confirmReason: string,
+): { ok: true; reason: string } | { ok: false } {
+  if (confirmReason.trim() === "") return { ok: false };
+  return { ok: true, reason: confirmReason.trim() };
+}
+
 export function countedLinesFromDraft(
   lines: Array<{ itemId: number; countedQuantity: unknown }>,
 ):

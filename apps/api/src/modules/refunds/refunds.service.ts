@@ -234,8 +234,8 @@ export class RefundsService {
             "قيمة المرتجع تتجاوز الرصيد النقدي المتبقي للطلب",
           );
         }
-        if (refundAmount <= 0n) {
-          throw new HttpError(409, "قيمة المرتجع تساوي صفراً");
+        if (refundAmount < 0n) {
+          throw new HttpError(409, "قيمة المرتجع غير صحيحة");
         }
 
         const occurredAt = new Date();

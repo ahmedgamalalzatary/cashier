@@ -119,4 +119,19 @@ describe("ReportsService.dashboard", () => {
     expect(dashboard.openShift).toBeNull();
     expect(dashboard.stock.map((row) => row.id)).toEqual([1, 4]);
   });
+
+  it("does not flag an item that has no minimum level set", async () => {
+    const repo = {
+      dashboard: vi.fn(async () => []),
+      openShift: vi.fn(async () => []),
+      stock: vi.fn(async () => [
+        { id: 1, isActive: true, quantity: "0.000", minimumLevel: "0.000" },
+        { id: 2, isActive: true, quantity: "0.000", minimumLevel: "5.000" },
+      ]),
+    } as unknown as ReportsRepository;
+
+    const dashboard = await new ReportsService(repo).dashboard();
+
+    expect(dashboard.stock.map((row) => row.id)).toEqual([2]);
+  });
 });

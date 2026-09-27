@@ -1034,7 +1034,7 @@ export const refunds = mysqlTable(
     index("refunds_order_id_idx").on(table.orderId),
     index("refunds_shift_id_idx").on(table.shiftId),
     index("refunds_cashier_created_idx").on(table.cashierId, table.createdAt),
-    check("refunds_amount_positive_chk", sql`${table.amount} > 0`),
+    check("refunds_amount_positive_chk", sql`${table.amount} >= 0`),
     check(
       "refunds_reason_nonblank_chk",
       sql`CHAR_LENGTH(TRIM(${table.reason})) > 0`,

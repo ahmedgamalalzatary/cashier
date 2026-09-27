@@ -1,6 +1,6 @@
-import { Table } from "@/components/ui/table";
-import { formatMoney } from "@/lib/format";
-import type { ReportTable as ReportTableData } from "@/models/reports-model";
+import { formatMoney } from "../../lib/format";
+import type { ReportTable as ReportTableData } from "../../models/reports-model";
+import { Table } from "../ui/table";
 const arabicNumber = new Intl.NumberFormat("ar-EG", {
   maximumFractionDigits: 3,
 });
@@ -17,14 +17,59 @@ const eventLabels: Record<string, string> = {
   preparation_out: "استهلاك تحضير",
   preparation_in: "إنتاج تحضير",
   refund_return: "إرجاع للمخزون",
+  adjustment: "تسوية جرد",
+  stocktake_shortage: "عجز جرد",
+  stocktake_surplus: "زيادة جرد",
+  salary_payment: "صرف راتب",
+  salary_advance: "سلفة موظف",
+  purchase_invoice: "فاتورة شراء",
+  preparation: "تحضير",
+  transfer: "تحويل",
+  stocktake: "جرد مخزون",
 };
-function valueOf(value: string | number | null, kind?: string) {
+// The stocktake document kind shares its vocabulary with nothing else, so it
+// gets its own map rather than borrowing the movement/reference labels.
+const stocktakeKindLabels: Record<string, string> = {
+  stocktake: "جرد مخزون",
+  manual: "تسوية يدوية",
+};
+const salaryHistoryLabels: Record<string, string> = {
+  payment: "صرف راتب",
+  advance: "سلفة",
+  bonus: "مكافأة",
+  deduction: "خصم",
+};
+// Waste stores an enum code in `reason`; a refund stores free-typed text, so
+// the same map must never rewrite a refund reason the cashier actually wrote.
+const wasteReasonLabels: Record<string, string> = {
+  expired: "منتهي الصلاحية",
+  damaged: "تالف",
+  preparation_mistake: "خطأ تحضير",
+  spill: "انسكاب",
+  other: "سبب آخر",
+};
+const labelSets: Record<string, Record<string, string>> = {
+  movement: eventLabels,
+  reference: eventLabels,
+  cashFlow: eventLabels,
+  stocktakeKind: stocktakeKindLabels,
+  salaryHistory: salaryHistoryLabels,
+  wasteReason: wasteReasonLabels,
+};
+function valueOf(
+  value: string | number | null,
+  kind?: string,
+  labelSet?: string,
+) {
   if (value == null || value === "") return "—";
   if (kind === "money") return formatMoney(value);
   if (kind === "number") return arabicNumber.format(Number(value));
   if (kind === "date") return new Date(value).toLocaleString("ar-EG");
   if (kind === "warehouse") return value === "main" ? "الرئيسي" : "الكافيه";
-  if (kind === "event") return eventLabels[String(value)] ?? String(value);
+  if (kind === "event") {
+    const set = labelSet ? labelSets[labelSet] : eventLabels;
+    return set?.[String(value)] ?? String(value);
+  }
   return String(value);
 }
 export function ReportTable({ title, rows, columns }: ReportTableData) {
@@ -47,7 +92,7 @@ export function ReportTable({ title, rows, columns }: ReportTableData) {
                       : ""
                   }
                 >
-                  {valueOf(row[column.key], column.kind)}
+                  {valueOf(row[column.key], column.kind, column.labelSet)}
                 </td>
               ))}
             </tr>

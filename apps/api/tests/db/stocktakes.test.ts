@@ -105,6 +105,95 @@ describe("stocktake API", () => {
       .send({ note: "جرد" });
     expect(response.status).toBe(409);
   });
+
+  it("values surplus found on an empty shelf at the last known batch cost", async () => {
+    const app = createApp(db, appOptions);
+    const authorization = await loginAs(app, "admin");
+    const [category] = await db.insert(categories).values({ name: "خامات" });
+    const [item] = await db.insert(items).values({
+      code: nextTestItemCode(),
+      name: "سكر",
+      categoryId: category.insertId,
+      type: "raw",
+      stockUnit: "كجم",
+    });
+    const inventory = new InventoryService(new InventoryRepository(db));
+    await inventory.receive({
+      itemId: item.insertId,
+      warehouse: "main",
+      quantity: 2,
+      unitCost: "12.50",
+      movementType: "purchase",
+    });
+    // Empty the shelf, so the only batch left has zero remaining quantity.
+    await inventory.consume({
+      itemId: item.insertId,
+      warehouse: "main",
+      quantity: 2,
+      movementType: "waste",
+    });
+
+    await request(app)
+      .post("/api/stocktakes/manual-adjustments")
+      .set(authorization)
+      .send({
+        warehouse: "main",
+        itemId: item.insertId,
+        countedQuantity: 3,
+        note: "جرد اكتشاف زيادة",
+      })
+      .expect(201);
+
+    const movements = await db.select().from(stockMovements);
+    const surplus = movements.at(-1);
+    expect(surplus?.movementType).toBe("stocktake_surplus");
+    expect(surplus?.unitCost).toBe("12.500000");
+  });
+
+  it("still values surplus from a stocked shelf at the oldest batch cost", async () => {
+    const app = createApp(db, appOptions);
+    const authorization = await loginAs(app, "admin");
+    const [category] = await db.insert(categories).values({ name: "خامات" });
+    const [item] = await db.insert(items).values({
+      code: nextTestItemCode(),
+      name: "شاي",
+      categoryId: category.insertId,
+      type: "raw",
+      stockUnit: "كجم",
+    });
+    const inventory = new InventoryService(new InventoryRepository(db));
+    await inventory.receive({
+      itemId: item.insertId,
+      warehouse: "main",
+      quantity: 5,
+      unitCost: "20",
+      movementType: "purchase",
+    });
+    await inventory.receive({
+      itemId: item.insertId,
+      warehouse: "main",
+      quantity: 5,
+      unitCost: "30",
+      movementType: "purchase",
+    });
+
+    await request(app)
+      .post("/api/stocktakes/manual-adjustments")
+      .set(authorization)
+      .send({
+        warehouse: "main",
+        itemId: item.insertId,
+        countedQuantity: 11,
+        note: "جرد زيادة",
+      })
+      .expect(201);
+
+    const movements = await db.select().from(stockMovements);
+    const surplus = movements.at(-1);
+    expect(surplus?.movementType).toBe("stocktake_surplus");
+    // FIFO means the oldest batch still holding stock values the surplus.
+    expect(surplus?.unitCost).toBe("20.000000");
+  });
 });
 
 describe("stocktake snapshot", () => {

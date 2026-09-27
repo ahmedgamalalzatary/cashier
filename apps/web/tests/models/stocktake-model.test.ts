@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { countedLinesFromDraft } from "../../src/models/stocktake-model";
+import {
+  confirmReasonFor,
+  countedLinesFromDraft,
+} from "../../src/models/stocktake-model";
 
 describe("stocktake counted lines", () => {
   it("treats a blank count as missing instead of zero", () => {
@@ -33,5 +36,22 @@ describe("stocktake counted lines", () => {
     expect(
       countedLinesFromDraft([{ itemId: 1, countedQuantity: "abc" }]),
     ).toEqual({ ok: false });
+  });
+});
+
+describe("stocktake confirm reason", () => {
+  it("refuses to confirm when no reason was typed", () => {
+    expect(confirmReasonFor("")).toEqual({ ok: false });
+  });
+
+  it("refuses a whitespace-only confirm reason", () => {
+    expect(confirmReasonFor("   ")).toEqual({ ok: false });
+  });
+
+  it("confirms with the trimmed reason", () => {
+    expect(confirmReasonFor("  عجز في المخزون  ")).toEqual({
+      ok: true,
+      reason: "عجز في المخزون",
+    });
   });
 });

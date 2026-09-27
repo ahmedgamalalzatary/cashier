@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Field, TextAreaField } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table } from "@/components/ui/table";
-import { countedLinesFromDraft } from "@/models/stocktake-model";
+import { confirmReasonFor, countedLinesFromDraft } from "@/models/stocktake-model";
 import { listCategories } from "@/services/categories-service";
 import {
   getCafeWarehouseStock,
@@ -34,7 +34,8 @@ export default function StocktakesPage() {
   const [active, setActive] = useState<StocktakeDetail | null>(null),
     [warehouse, setWarehouse] = useState<Warehouse>("main"),
     [categoryId, setCategoryId] = useState(""),
-    [note, setNote] = useState("");
+    [note, setNote] = useState(""),
+    [confirmReason, setConfirmReason] = useState("");
   const [manualItem, setManualItem] = useState(""),
     [manualCount, setManualCount] = useState(""),
     [manualNote, setManualNote] = useState("");
@@ -100,12 +101,15 @@ export default function StocktakesPage() {
     });
   const confirm = () =>
     run(async () => {
-      if (!active || !note.trim()) throw new Error("اكتب سبب اعتماد الجرد");
+      if (!active) return;
+      const reason = confirmReasonFor(confirmReason);
+      if (!reason.ok) throw new Error("اكتب سبب اعتماد الجرد");
       const counted = countedLinesFromDraft(active.lines);
       if (!counted.ok) throw new Error("أدخل الكمية الفعلية لكل صنف");
       await updateStocktakeCounts(active.id, counted.lines);
-      const confirmed = await confirmStocktake(active.id, note.trim());
+      const confirmed = await confirmStocktake(active.id, reason.reason);
       setActive(confirmed);
+      setConfirmReason("");
       await load();
     });
   const manual = () =>
@@ -259,6 +263,12 @@ export default function StocktakesPage() {
               </tr>
             ))}
           </Table>
+          <TextAreaField
+            label="سبب اعتماد الجرد"
+            required
+            value={confirmReason}
+            onChange={(e) => setConfirmReason(e.target.value)}
+          />
           <div className="flex gap-2">
             <Button variant="ghost" onClick={saveCounts} disabled={busy}>
               حفظ العد

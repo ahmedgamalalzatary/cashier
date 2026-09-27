@@ -11,6 +11,7 @@ import {
   orderLines,
   orders,
   refundLineAllocations,
+  refunds,
   stockBatches,
   stockMovements,
   users,
@@ -255,6 +256,61 @@ describe("refunds", () => {
     ]);
   });
 
+  it("restocks a fully discounted sale with a zero-cash refund", async () => {
+    const fixture = await soldResaleOrder();
+    // 100% discount: the customer paid nothing, so the cash refund is zero
+    await db
+      .update(orders)
+      .set({ subtotal: "20.00", discountAmount: "20.00", total: "0.00", cashReceived: "0.00", changeAmount: "0.00" })
+      .where(eq(orders.id, fixture.orderId));
+
+    const response = await request(app())
+      .post("/api/refunds")
+      .set(authorization)
+      .send({
+        clientRequestId: crypto.randomUUID(),
+        orderId: fixture.orderId,
+        reason: "طلب العميل",
+        lines: [
+          {
+            orderLineId: fixture.lineId,
+            quantity: 1,
+            stockAction: "return_to_stock",
+          },
+        ],
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({
+      orderId: fixture.orderId,
+      amount: "0.00",
+      totalCostReturned: "3.00",
+      lines: [
+        {
+          orderLineId: fixture.lineId,
+          quantity: "1.000",
+          refundAmount: "0.00",
+          stockAction: "return_to_stock",
+          returnedCost: "3.00",
+        },
+      ],
+    });
+    // the goods actually came back, as a refund return and not as waste
+    const returns = await db
+      .select()
+      .from(stockMovements)
+      .where(eq(stockMovements.movementType, "refund_return"));
+    expect(returns).toHaveLength(1);
+    expect(returns[0].quantity).toBe("1.000");
+    expect(await db.select().from(wasteEntries)).toHaveLength(0);
+    const refundable = await request(app())
+      .get(`/api/refunds/order/${fixture.orderId}/quantities`)
+      .set(authorization);
+    expect(refundable.body).toEqual([
+      { orderLineId: fixture.lineId, refundedQuantity: "1.000" },
+    ]);
+  });
+
   it("rejects cumulative quantities above the sold amount", async () => {
     const fixture = await soldResaleOrder();
     const body = {
@@ -278,6 +334,45 @@ describe("refunds", () => {
       (await request(app()).post("/api/refunds").set(authorization).send(body))
         .status,
     ).toBe(409);
+  });
+
+  it("replays a concurrent double-submit of the same clientRequestId as one refund", async () => {
+    const fixture = await soldResaleOrder();
+    const body = {
+      clientRequestId: crypto.randomUUID(),
+      orderId: fixture.orderId,
+      reason: "طلب العميل",
+      lines: [
+        {
+          orderLineId: fixture.lineId,
+          quantity: 1,
+          stockAction: "return_to_stock",
+        },
+      ],
+    };
+
+    // a double-tapped save sends the same key twice at the same moment
+    const responses = await Promise.all([
+      request(app()).post("/api/refunds").set(authorization).send(body),
+      request(app()).post("/api/refunds").set(authorization).send(body),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      201, 201,
+    ]);
+    expect(responses[1].body.id).toBe(responses[0].body.id);
+    // one refund document and one stock return — cash and stock move once
+    expect(await db.select().from(refunds)).toHaveLength(1);
+    const returns = await db
+      .select()
+      .from(stockMovements)
+      .where(eq(stockMovements.movementType, "refund_return"));
+    expect(returns).toHaveLength(1);
+    expect(returns[0].quantity).toBe("1.000");
+    const shift = (
+      await request(app()).get("/api/shifts/current").set(authorization)
+    ).body;
+    expect(shift.totals.refunds).toBe("9.00");
   });
 
   it("never over-refunds discounted thirds and replays the same client request", async () => {

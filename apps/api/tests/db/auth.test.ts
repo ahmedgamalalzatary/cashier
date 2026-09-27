@@ -229,4 +229,39 @@ describe("role protection", () => {
         .status,
     ).toBe(403);
   });
+
+  it("forbids cashiers from reading and creating purchases", async () => {
+    const authorization = await loginAs(app(), "cashier");
+
+    expect(
+      (await request(app()).get("/api/purchases").set(authorization)).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(app())
+          .post("/api/purchases")
+          .set(authorization)
+          .send({})
+      ).status,
+    ).toBe(403);
+  });
+
+  it("forbids cashiers from reading suppliers", async () => {
+    const authorization = await loginAs(app(), "cashier");
+
+    expect(
+      (await request(app()).get("/api/suppliers").set(authorization)).status,
+    ).toBe(403);
+  });
+
+  it("still lets admins read purchases and suppliers", async () => {
+    const authorization = await loginAs(app(), "admin");
+
+    expect(
+      (await request(app()).get("/api/purchases").set(authorization)).status,
+    ).toBe(200);
+    expect(
+      (await request(app()).get("/api/suppliers").set(authorization)).status,
+    ).toBe(200);
+  });
 });

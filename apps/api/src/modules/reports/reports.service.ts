@@ -56,6 +56,13 @@ export function aggregateSalesDays(rows: Record<string, unknown>[]) {
   }));
 }
 
+// A minimum level of 0 is the "not configured" default, so such an item must
+// not be raised as low stock. Matches the rule the items list already uses.
+const isLowStock = (row: Record<string, unknown>) =>
+  Boolean(row.isActive) &&
+  Number(row.minimumLevel) > 0 &&
+  Number(row.quantity) <= Number(row.minimumLevel);
+
 export class ReportsService {
   constructor(private repo: ReportsRepository) {}
   async dashboard() {
@@ -70,11 +77,7 @@ export class ReportsService {
     return {
       summary: summary[0],
       openShift: openShift[0] ?? null,
-      stock: stock.filter(
-        (row) =>
-          Boolean(row.isActive) &&
-          Number(row.quantity) <= Number(row.minimumLevel),
-      ),
+      stock: stock.filter(isLowStock),
     };
   }
   async report({ from, to }: ReportRange) {
@@ -121,11 +124,7 @@ export class ReportsService {
       this.repo.supplierPurchases(from, to),
       this.repo.supplierPayments(from, to),
     ]);
-    const lowStock = stock.filter(
-      (row) =>
-        Boolean(row.isActive) &&
-        Number(row.quantity) <= Number(row.minimumLevel),
-    );
+    const lowStock = stock.filter(isLowStock);
     return {
       range: { from, to },
       sales: {

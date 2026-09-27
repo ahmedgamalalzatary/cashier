@@ -115,7 +115,7 @@ describe("RefundsService.create discount-share math", () => {
     expect(tx.createRefund).not.toHaveBeenCalled();
   });
 
-  it("409s a zero-value refund", async () => {
+  it("allows a zero-cash refund for a fully discounted order", async () => {
     const tx = txForCreate({
       lockOrder: vi.fn(async () => ({
         id: 10,
@@ -128,9 +128,16 @@ describe("RefundsService.create discount-share math", () => {
     });
     const repo = repoForCreate(tx);
 
-    await expect(
-      new RefundsService(repo).create(refundInput, cashierId),
-    ).rejects.toMatchObject({ status: 409 });
+    const refund = await new RefundsService(repo).create(
+      refundInput,
+      cashierId,
+    );
+
+    // the goods still come back; only the cash leg is zero
+    expect(refund).toEqual({ id: 55, lines: [] });
+    expect(tx.createRefund).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: "0.00" }),
+    );
   });
 });
 

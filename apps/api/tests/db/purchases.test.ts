@@ -327,6 +327,39 @@ describe("purchase invoices", () => {
     expect(suppliersList.body[0].balance).toBe("0.00");
   });
 
+  it("replays a concurrent double-submit of the same clientRequestId as one invoice", async () => {
+    const fixture = await createPurchaseFixture();
+    const body = {
+      clientRequestId: crypto.randomUUID(),
+      supplierId: fixture.supplierId,
+      purchasedAt: "2026-07-20",
+      paidAmount: 0,
+      lines: [
+        {
+          itemId: fixture.itemId,
+          quantity: 1,
+          unitMode: "stock",
+          unitPrice: 10,
+        },
+      ],
+    };
+
+    // a double-tapped save sends the same key twice at the same moment
+    const responses = await Promise.all([
+      request(app()).post("/api/purchases").set(authorization).send(body),
+      request(app()).post("/api/purchases").set(authorization).send(body),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      201, 201,
+    ]);
+    expect(responses[1].body.id).toBe(responses[0].body.id);
+    // one invoice, one receipt, one stock movement — no double stock
+    expect(await db.select().from(purchaseInvoices)).toHaveLength(1);
+    expect(await db.select().from(stockBatches)).toHaveLength(1);
+    expect(await db.select().from(stockMovements)).toHaveLength(1);
+  });
+
   it("serializes concurrent duplicate invoice numbers for one supplier", async () => {
     const fixture = await createPurchaseFixture();
     const body = {

@@ -134,10 +134,15 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
           number("code", "الكود"),
           { key: "itemName", label: "الصنف" },
           { key: "warehouse", label: "المخزن", kind: "warehouse" },
-          { key: "movementType", label: "الحركة", kind: "event" },
+          { key: "movementType", label: "الحركة", kind: "event", labelSet: "movement" },
           number("quantity", "الكمية"),
           money("totalCost", "التكلفة"),
-          { key: "referenceType", label: "المرجع", kind: "event" },
+          {
+            key: "referenceType",
+            label: "المرجع",
+            kind: "event",
+            labelSet: "reference",
+          },
         ],
       },
       {
@@ -146,7 +151,7 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
         columns: [
           number("id", "المستند"),
           date("createdAt", "التاريخ"),
-          { key: "kind", label: "النوع", kind: "event" },
+          { key: "kind", label: "النوع", kind: "event", labelSet: "stocktakeKind" },
           { key: "warehouse", label: "المخزن", kind: "warehouse" },
           number("lineCount", "الأصناف"),
           number("shortageQuantity", "العجز"),
@@ -162,7 +167,7 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
         rows: d.money.cashFlow,
         columns: [
           date("occurredAt", "التاريخ"),
-          { key: "type", label: "النوع", kind: "event" },
+          { key: "type", label: "النوع", kind: "event", labelSet: "cashFlow" },
           { key: "reference", label: "المرجع" },
           money("amount", "المبلغ"),
         ],
@@ -210,7 +215,7 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
         columns: [
           date("occurredAt", "التاريخ"),
           { key: "employeeName", label: "الموظف" },
-          { key: "type", label: "النوع" },
+          { key: "type", label: "النوع", kind: "event", labelSet: "salaryHistory" },
           money("amount", "المبلغ"),
           { key: "periodMonth", label: "شهر الاستحقاق" },
           { key: "note", label: "ملاحظات" },
@@ -225,7 +230,12 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
         columns: [
           { key: "targetName", label: "الصنف / المنتج" },
           { key: "warehouse", label: "المخزن", kind: "warehouse" },
-          { key: "reason", label: "السبب" },
+          {
+            key: "reason",
+            label: "السبب",
+            kind: "event",
+            labelSet: "wasteReason",
+          },
           { key: "recordedByName", label: "المسجل" },
           number("entriesCount", "العدد"),
           number("quantity", "الكمية"),
@@ -240,7 +250,12 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
           { key: "targetName", label: "الصنف / المنتج" },
           { key: "warehouse", label: "المخزن", kind: "warehouse" },
           number("quantity", "الكمية"),
-          { key: "reason", label: "السبب" },
+          {
+            key: "reason",
+            label: "السبب",
+            kind: "event",
+            labelSet: "wasteReason",
+          },
           money("totalCost", "التكلفة"),
           { key: "recordedByName", label: "المسجل" },
         ],
