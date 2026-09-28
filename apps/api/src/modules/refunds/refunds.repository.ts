@@ -120,7 +120,8 @@ export class RefundsRepository {
       .where(
         branchCondition(refundLines, inArray(refundLines.orderLineId, lineIds)),
       )
-      .groupBy(refundLines.orderLineId);
+      .groupBy(refundLines.orderLineId)
+      .for("update");
   }
 
   refundedQuantitiesForOrder(orderId: number) {

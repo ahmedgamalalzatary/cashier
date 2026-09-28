@@ -6,6 +6,7 @@ import {
   categories,
   externalCategories,
   externalProducts,
+  externalProductIngredients,
   externalProductSizes,
   externalSizeIngredients,
   items,
@@ -323,5 +324,154 @@ describe("waste", () => {
       .where(eq(wasteEntries.targetType, "recipe"));
     expect(stored.recipeId).toBe(recipe.insertId);
     expect(stored.recipeSizeId).toBe(size.insertId);
+  });
+
+  // Two recipes over the same stock items, inserted in opposite orders.
+  async function opposingIngredientRecipes() {
+    const itemIds: number[] = [];
+    for (let index = 0; index < 15; index += 1) {
+      itemIds.push(await stockItem("cafe", ["10.000"]));
+    }
+    const [category] = await db.insert(categories).values({ name: "مشروبات" });
+    const makeRecipe = async (name: string, ingredientItemIds: number[]) => {
+      const [recipe] = await db.insert(recipes).values({
+        name,
+        type: "product",
+        categoryId: category.insertId,
+        outputItemId: null,
+      });
+      const [size] = await db.insert(recipeSizes).values({
+        recipeId: recipe.insertId,
+        name: "وسط",
+        sellingPrice: "25.00",
+        outputQuantity: null,
+        sortOrder: 0,
+      });
+      for (const itemId of ingredientItemIds) {
+        await db.insert(recipeIngredients).values({
+          recipeSizeId: size.insertId,
+          itemId,
+          quantity: "0.100",
+        });
+      }
+      return { recipeId: recipe.insertId, recipeSizeId: size.insertId };
+    };
+    const reverse = await makeRecipe("هالك أ", [...itemIds].reverse());
+    const forward = await makeRecipe("هالك ب", itemIds);
+    return { itemIds, reverse, forward };
+  }
+
+  it("preserves stock after concurrent multi-item recipe wastes", async () => {
+    const adminAuth = await loginAs(app(), "admin");
+    const { itemIds, reverse, forward } = await opposingIngredientRecipes();
+
+    const waste = (target: { recipeId: number; recipeSizeId: number }) =>
+      request(app())
+        .post("/api/waste")
+        .set(adminAuth)
+        .send({
+          clientRequestId: crypto.randomUUID(),
+          warehouse: "cafe",
+          target: { type: "recipe", ...target },
+          quantity: 1,
+          reason: "spill",
+          note: null,
+        });
+
+    const responses = await Promise.all([waste(reverse), waste(forward)]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      201, 201,
+    ]);
+    expect(await db.select().from(wasteEntries)).toHaveLength(2);
+    const [batch] = await db
+      .select()
+      .from(stockBatches)
+      .where(eq(stockBatches.itemId, itemIds[0]));
+    expect(batch.remainingQuantity).toBe("9.800");
+  });
+
+  it("preserves stock after concurrent recipe waste and sale", async () => {
+    const adminAuth = await loginAs(app(), "admin");
+    const { itemIds, reverse } = await opposingIngredientRecipes();
+    const syncedAt = new Date();
+    await db.insert(externalCategories).values({
+      externalId: 3,
+      nameAr: "مشروبات",
+      nameEn: "Drinks",
+      descriptionAr: null,
+      descriptionEn: null,
+      isActive: true,
+      isVisible: true,
+      displayOrder: 1,
+      isCurrent: true,
+      syncedAt,
+    });
+    await db.insert(externalProducts).values({
+      externalId: 10,
+      externalCategoryId: 3,
+      nameAr: "لاتيه",
+      nameEn: "Latte",
+      descriptionAr: null,
+      descriptionEn: null,
+      imageUrl: null,
+      price: "30.00",
+      discountPercentage: null,
+      discountStart: null,
+      discountEnd: null,
+      calories: 100,
+      pointsReward: 3,
+      isAvailable: true,
+      isVisible: true,
+      isCurrent: true,
+      syncedAt,
+    });
+    for (const itemId of itemIds) {
+      await db.insert(externalProductIngredients).values({
+        externalProductId: 10,
+        itemId,
+        quantity: "0.100",
+      });
+    }
+
+    const responses = await Promise.all([
+      request(app())
+        .post("/api/orders")
+        .set(cashierAuth)
+        .send({
+          clientRequestId: crypto.randomUUID(),
+          lines: [
+            {
+              type: "external_product",
+              externalProductId: 10,
+              externalSizeId: null,
+              quantity: 1,
+              modifiers: [],
+            },
+          ],
+          discount: null,
+          cashReceived: 100,
+        }),
+      request(app())
+        .post("/api/waste")
+        .set(adminAuth)
+        .send({
+          clientRequestId: crypto.randomUUID(),
+          warehouse: "cafe",
+          target: { type: "recipe", ...reverse },
+          quantity: 1,
+          reason: "spill",
+          note: null,
+        }),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      201, 201,
+    ]);
+    const [batch] = await db
+      .select()
+      .from(stockBatches)
+      .where(eq(stockBatches.itemId, itemIds[0]));
+    expect(batch.remainingQuantity).toBe("9.800");
   });
 });

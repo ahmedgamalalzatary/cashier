@@ -375,6 +375,57 @@ describe("refunds", () => {
     expect(shift.totals.refunds).toBe("9.00");
   });
 
+  it("rejects a concurrent refund of the same remaining unit from a different request", async () => {
+    const fixture = await soldResaleOrder();
+    await db
+      .update(orderLines)
+      .set({ quantity: "1.000", lineSubtotal: "10.00" })
+      .where(eq(orderLines.id, fixture.lineId));
+    await db
+      .update(orderLineAllocations)
+      .set({ quantity: "1.000" })
+      .where(eq(orderLineAllocations.orderLineId, fixture.lineId));
+    await db
+      .update(orders)
+      .set({ subtotal: "10.00", discountAmount: "0.00", total: "10.00" })
+      .where(eq(orders.id, fixture.orderId));
+
+    const send = () =>
+      request(app())
+        .post("/api/refunds")
+        .set(authorization)
+        .send({
+          clientRequestId: crypto.randomUUID(),
+          orderId: fixture.orderId,
+          reason: "طلب العميل",
+          lines: [
+            {
+              orderLineId: fixture.lineId,
+              quantity: 1,
+              stockAction: "return_to_stock",
+            },
+          ],
+        });
+
+    // two distinct requests racing for the single remaining unit
+    const responses = await Promise.all([send(), send()]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      201, 409,
+    ]);
+    expect(await db.select().from(refunds)).toHaveLength(1);
+    const returns = await db
+      .select()
+      .from(stockMovements)
+      .where(eq(stockMovements.movementType, "refund_return"));
+    expect(returns).toHaveLength(1);
+    expect(returns[0].quantity).toBe("1.000");
+    const shift = (
+      await request(app()).get("/api/shifts/current").set(authorization)
+    ).body;
+    expect(shift.totals.refunds).toBe("10.00");
+  });
+
   it("never over-refunds discounted thirds and replays the same client request", async () => {
     const fixture = await soldResaleOrder();
     await db

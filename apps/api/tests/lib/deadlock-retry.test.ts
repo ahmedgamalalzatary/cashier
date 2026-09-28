@@ -10,6 +10,8 @@ import type { RefundsRepository } from "../../src/modules/refunds/refunds.reposi
 import { RefundsService } from "../../src/modules/refunds/refunds.service.js";
 import type { TransfersRepository } from "../../src/modules/transfers/transfers.repository.js";
 import { TransfersService } from "../../src/modules/transfers/transfers.service.js";
+import type { WasteRepository } from "../../src/modules/waste/waste.repository.js";
+import { WasteService } from "../../src/modules/waste/waste.service.js";
 import { transactionWithDeadlockRetry } from "../../src/lib/deadlock-retry.js";
 
 const deadlock = Object.assign(new Error("deadlock"), {
@@ -315,6 +317,52 @@ describe("transfers.createRequest retries after a deadlock", () => {
     );
 
     expect(id).toBe(31);
+    expect(repo.transaction).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("waste.create retries after a deadlock", () => {
+  it("retries the create transaction once", async () => {
+    const tx = {
+      findByClientRequestId: vi.fn().mockResolvedValue(undefined),
+      findOpenShiftForCashier: vi.fn().mockResolvedValue({ id: 1 }),
+      findItem: vi.fn().mockResolvedValue({
+        id: 1,
+        name: "بن",
+        stockUnit: "كجم",
+        isActive: true,
+      }),
+      create: vi.fn().mockResolvedValue(12),
+      updateCost: vi.fn(),
+    };
+    const repo = {
+      transaction: vi
+        .fn()
+        .mockRejectedValueOnce(deadlock)
+        .mockImplementationOnce(
+          async (run: (r: typeof tx, inv: object) => Promise<number>) =>
+            run(tx, {
+              consume: vi.fn().mockResolvedValue({ allocations: [] }),
+            }),
+        ),
+      findByClientRequestId: vi.fn().mockResolvedValue(undefined),
+      find: vi.fn().mockResolvedValue({ id: 12 }),
+      allocations: vi.fn().mockResolvedValue([]),
+    } as unknown as WasteRepository & { transaction: ReturnType<typeof vi.fn> };
+
+    const entry = await new WasteService(repo).create(
+      {
+        clientRequestId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        warehouse: "cafe",
+        target: { type: "item", itemId: 1 },
+        quantity: 1,
+        reason: "spill",
+        note: null,
+      } as never,
+      { id: 7, name: "كاشير", role: "cashier" } as AuthUser,
+    );
+
+    expect(entry.id).toBe(12);
     expect(repo.transaction).toHaveBeenCalledTimes(2);
   });
 });

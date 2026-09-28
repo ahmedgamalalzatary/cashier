@@ -105,6 +105,10 @@ describe("WasteService recipe target", () => {
           { itemId: 22, itemName: "قهوة", quantity: "0.050" },
         ],
       }),
+      lockStockItems: vi.fn().mockResolvedValue([
+        { id: 21, name: "حليب", isActive: true },
+        { id: 22, name: "قهوة", isActive: true },
+      ]),
       create: vi.fn(async (row: Record<string, unknown>) => {
         createdRow = row;
         return 9;
@@ -155,6 +159,58 @@ describe("WasteService recipe target", () => {
     expect(consume).toHaveBeenCalledWith(
       expect.objectContaining({ itemId: 22, quantity: 0.1 }),
     );
+  });
+
+  it("locks all recipe stock items in id order before consuming them", async () => {
+    const events: string[] = [];
+    const tx = {
+      findByClientRequestId: vi.fn(async () => undefined),
+      loadRecipeProduct: vi.fn(async () => ({
+        recipeId: 3,
+        recipeName: "Coffee",
+        isActive: true,
+        sizeId: 7,
+        sizeName: "Large",
+        ingredients: [
+          { itemId: 22, itemName: "Milk", quantity: "0.100" },
+          { itemId: 21, itemName: "Beans", quantity: "0.100" },
+        ],
+      })),
+      lockStockItems: vi.fn(async (ids: number[]) => {
+        events.push(`lock:${ids.join(",")}`);
+        return ids.map((id) => ({ id, name: `Item ${id}`, isActive: true }));
+      }),
+      create: vi.fn(async () => 9),
+      createAllocation: vi.fn(),
+      updateCost: vi.fn(),
+    };
+    const repo = {
+      transaction: vi.fn(
+        async (run: (r: typeof tx, inv: object) => Promise<number>) =>
+          run(tx, {
+            consume: vi.fn(async ({ itemId }: { itemId: number }) => {
+              events.push(`consume:${itemId}`);
+              return { allocations: [] };
+            }),
+          }),
+      ),
+      find: vi.fn(async () => ({ id: 9, warehouse: "cafe" })),
+      allocations: vi.fn(async () => []),
+    } as unknown as WasteRepository;
+
+    await new WasteService(repo).create(
+      {
+        clientRequestId: "dddddddd-dddd-4ddd-8ddd-dddddddddd01",
+        warehouse: "cafe",
+        target: { type: "recipe", recipeId: 3, recipeSizeId: 7 },
+        quantity: 1,
+        reason: "spill",
+        note: null,
+      },
+      actor,
+    );
+
+    expect(events).toEqual(["lock:21,22", "consume:21", "consume:22"]);
   });
 
   it("rejects recipe waste outside cafe with 400", async () => {

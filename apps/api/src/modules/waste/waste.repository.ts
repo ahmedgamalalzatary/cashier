@@ -112,6 +112,10 @@ export class WasteRepository {
     return product;
   }
 
+  lockStockItems(ids: number[]) {
+    return new OrdersRepository(this.db).lockStockItems(ids);
+  }
+
   async loadRecipeProduct(recipeId: number, recipeSizeId: number) {
     const [recipe] = await this.db
       .select({
@@ -137,17 +141,12 @@ export class WasteRepository {
       )
       .for("update");
     if (!size) throw new Error("RECIPE_SIZE_MISMATCH");
-    const ingredients = await this.db
+    const ingredientRows = await this.db
       .select({
         itemId: recipeIngredients.itemId,
-        itemName: items.name,
         quantity: recipeIngredients.quantity,
       })
       .from(recipeIngredients)
-      .innerJoin(
-        items,
-        branchCondition(items, eq(items.id, recipeIngredients.itemId)),
-      )
       .where(
         branchCondition(
           recipeIngredients,
@@ -156,6 +155,14 @@ export class WasteRepository {
       )
       .orderBy(asc(recipeIngredients.id))
       .for("update");
+    const stockItems = await this.lockStockItems(
+      ingredientRows.map((row) => row.itemId),
+    );
+    const itemsById = new Map(stockItems.map((item) => [item.id, item]));
+    const ingredients = ingredientRows.flatMap((row) => {
+      const item = itemsById.get(row.itemId);
+      return item ? [{ ...row, itemName: item.name }] : [];
+    });
     return { ...recipe, ...size, ingredients };
   }
 

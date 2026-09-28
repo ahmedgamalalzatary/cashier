@@ -1,5 +1,6 @@
 import type { AuthUser } from "@cashier/shared";
 import { requestFingerprint as hashRequest } from "../../lib/request-fingerprint.js";
+import { transactionWithDeadlockRetry } from "../../lib/deadlock-retry.js";
 import { HttpError } from "../../middleware/error.js";
 import type { WasteInput } from "./waste.schemas.js";
 import type { WasteRepository } from "./waste.repository.js";
@@ -41,9 +42,8 @@ export class WasteService {
 
   async create(input: WasteInput, actor: AuthUser) {
     const requestFingerprint = fingerprint(input);
-    let id: number;
-    try {
-      id = await this.repo.transaction(async (repo, inventory) => {
+    const transaction = () =>
+      this.repo.transaction(async (repo, inventory) => {
         const prior = await repo.findByClientRequestId(input.clientRequestId);
         if (prior) {
           if (
@@ -170,6 +170,11 @@ export class WasteService {
           }));
         }
 
+        consumptions.sort((left, right) => left.itemId - right.itemId);
+        if (consumptions.length > 1) {
+          await repo.lockStockItems(consumptions.map((row) => row.itemId));
+        }
+
         const id = await repo.create({
           clientRequestId: input.clientRequestId,
           requestFingerprint,
@@ -229,6 +234,9 @@ export class WasteService {
         );
         return id;
       });
+    let id: number;
+    try {
+      id = await transactionWithDeadlockRetry(transaction);
     } catch (error) {
       if (!isDuplicate(error)) throw error;
       const prior = await this.repo.findByClientRequestId(
