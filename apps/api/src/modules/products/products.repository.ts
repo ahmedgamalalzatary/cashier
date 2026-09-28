@@ -15,6 +15,7 @@ import {
   externalProducts,
   externalProductSizes,
   externalSizeIngredients,
+  categories,
   items,
 } from "../../db/schema.js";
 import type { ExternalCatalog } from "../external/external-catalog.client.js";
@@ -36,6 +37,41 @@ export class ProductsRepository implements ProductsRepositoryContract {
     private readonly db: Db,
     private readonly recordCatalogSuccess = true,
   ) {}
+
+  async getLocalCatalog() {
+    const [categoryRows, products] = await Promise.all([
+      this.db
+        .select({
+          id: categories.id,
+          name: categories.name,
+          parentId: categories.parentId,
+        })
+        .from(categories)
+        .where(branchCondition(categories, eq(categories.isActive, true)))
+        .orderBy(asc(categories.id)),
+      this.db
+        .select({
+          id: items.id,
+          name: items.name,
+          categoryId: items.categoryId,
+          sellingPrice: items.sellingPrice,
+          stockUnit: items.stockUnit,
+        })
+        .from(items)
+        .where(
+          branchCondition(
+            items,
+            and(
+              eq(items.isActive, true),
+              eq(items.type, "resale"),
+              sql`${items.sellingPrice} IS NOT NULL`,
+            ),
+          ),
+        )
+        .orderBy(asc(items.id)),
+    ]);
+    return { categories: categoryRows, products };
+  }
 
   applyCatalog(catalog: ExternalCatalog): Promise<void> {
     return branchTransaction(this.db, async (tx) => {

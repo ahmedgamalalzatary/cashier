@@ -53,7 +53,21 @@ const discount = z.discriminatedUnion("type", [
 
 export const orderInput = z.object({
   clientRequestId: z.string().uuid(),
-  lines: z.array(externalProductLine).min(1).max(100),
+  lines: z
+    .array(
+      z.union([
+        externalProductLine,
+        z
+          .object({
+            type: z.literal("item"),
+            itemId: z.coerce.number().int().positive(),
+            quantity: z.coerce.number().int().positive().max(999),
+          })
+          .strict(),
+      ]),
+    )
+    .min(1)
+    .max(100),
   discount: discount.nullish().transform((value) => value ?? null),
   cashReceived: money,
 });

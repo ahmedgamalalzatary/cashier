@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CurrentShift, ExternalProduct } from "@cashier/shared";
+import * as posModel from "../../src/models/pos-model";
 import {
   addCatalogSelection,
   cartLineTotal,
@@ -69,6 +70,120 @@ const product: ExternalProduct = {
 const nowMs = Date.parse("2026-08-18T09:00:00Z");
 
 describe("POS model", () => {
+  it("adds a local product independently of an imported product with the same id", () => {
+    const item = {
+      id: 9,
+      name: "تركي سنجل",
+      categoryId: 2,
+      sellingPrice: "35.00",
+      stockUnit: "فنجان",
+    };
+    const imported = addCatalogSelection(
+      [],
+      product,
+      91,
+      [],
+      new Date("2026-09-28").getTime(),
+    );
+    const once = posModel.addLocalSelection(imported, item);
+    const twice = posModel.addLocalSelection(once, item);
+    expect(
+      twice.map((line) => [line.type, line.quantity, line.unitPrice]),
+    ).toEqual([
+      ["external_product", 1, "100.00"],
+      ["item", 2, "35.00"],
+    ]);
+    expect(orderPayload(twice, { type: null, value: 0 }, 200).lines).toEqual([
+      {
+        type: "external_product",
+        externalProductId: 9,
+        externalSizeId: 91,
+        quantity: 1,
+        modifiers: [],
+      },
+      { type: "item", itemId: 9, quantity: 2 },
+    ]);
+  });
+
+  it("browses main-category descendants and a selected subcategory, with search", () => {
+    const categories = [
+      { id: 1, name: "مشروبات", parentId: null },
+      { id: 2, name: "قهوة", parentId: 1 },
+      { id: 3, name: "حلويات", parentId: null },
+    ];
+    const items = [
+      {
+        id: 10,
+        name: "تركي",
+        categoryId: 2,
+        sellingPrice: "35.00",
+        stockUnit: "فنجان",
+      },
+      {
+        id: 11,
+        name: "شاي",
+        categoryId: 1,
+        sellingPrice: "30.00",
+        stockUnit: "كوب",
+      },
+      {
+        id: 12,
+        name: "كيك",
+        categoryId: 3,
+        sellingPrice: "80.00",
+        stockUnit: "قطعة",
+      },
+    ];
+    expect(
+      posModel
+        .filterLocalCatalog(items, categories, {
+          mainCategoryId: 1,
+          subCategoryId: null,
+          query: "",
+        })
+        .map((item) => item.id),
+    ).toEqual([10, 11]);
+    expect(
+      posModel
+        .filterLocalCatalog(items, categories, {
+          mainCategoryId: 1,
+          subCategoryId: 2,
+          query: "",
+        })
+        .map((item) => item.id),
+    ).toEqual([10]);
+    expect(
+      posModel
+        .filterLocalCatalog(items, categories, {
+          mainCategoryId: null,
+          subCategoryId: null,
+          query: " كيك ",
+        })
+        .map((item) => item.id),
+    ).toEqual([12]);
+  });
+  it("sends local resale lines with their identity and charges their selling price", () => {
+    const cart = [
+      {
+        key: "item:9",
+        type: "item" as const,
+        itemId: 9,
+        productName: "تركي سنجل",
+        sizeName: null,
+        quantity: 2,
+        unitPrice: "35.00",
+        modifiers: [],
+      },
+    ];
+    expect(orderPayload(cart as never, { type: null, value: 0 }, 100)).toEqual({
+      lines: [{ type: "item", itemId: 9, quantity: 2 }],
+      discount: null,
+      cashReceived: 100,
+    });
+    expect(
+      cartTotals(cart as never, { type: null, value: 0 }, 100),
+    ).toMatchObject({ subtotal: 70, total: 70, change: 30 });
+  });
   it("adds size/modifier selections and combines identical configurations", () => {
     let cart = addCatalogSelection(
       [],

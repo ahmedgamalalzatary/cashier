@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inventory management. Goods are purchased from suppliers into the **main warehouse**, transferred on request to the **cafe**, and sold there either as **recipe products** (deducting ingredients) or **as-is items**. The system also manages shifts, employee records, salaries, expenses, waste, refunds, and full reporting.
+A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inventory management. Goods are purchased from suppliers into the **main warehouse**, transferred on request to the **cafe**, and sold as stock items. Preparation consumes ingredients before sale and receives a finished stock item; sale consumes that finished item or an as-is item. The system also manages shifts, employee records, salaries, expenses, waste, refunds, and full reporting.
 
 | Decision   | Locked choice                                                |
 | ---------- | ------------------------------------------------------------ |
@@ -78,7 +78,7 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 - **Main category** (e.g. مشروبات ساخنة) contains **sub-categories** (e.g. قهوة، شاي).
 - An item/product attaches to a sub-category, or directly to a main category that has no subs.
 - POS: main categories as tabs, sub-categories as a filter row for **internal** products; external catalog renders as a separate flat group alongside (see §7). Both navigations coexist.
-- Decision (amended 2026-09-19 — internal sales restored): POS sells **both** internal products (recipe products + as-is resale items, navigated by main/sub tabs) **and** the flat external catalog (single flat external category row). The local main/sub tree remains the source of truth for warehouse items and reports grouping; external sales group by external category.
+- Decision (amended 2026-09-28): POS sells local as-is resale items under main/sub tabs alongside a separate flat external catalog. Local prepared-result sales remain a separate implementation gap (audit §1.8). Categories do not determine whether a stock item is sold or used as an ingredient.
 - Reports can group by main or sub level.
 - Admin manages the tree (add/rename/deactivate).
 
@@ -145,11 +145,11 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 ## 7. POS (Sales)
 
 - **Order type:** takeaway only.
-- Flow: product grid (internal main/sub tabs + flat external group) → cart with quantities/sizes → cash received → change computed → order saved → receipt auto-prints. An order may mix all three line types below.
-- **Products (three line types, stored in `order_lines.type`):**
+- Flow: product grid (local main/sub tabs + separate flat external group) → cart with quantities/sizes → cash received → change computed → order saved → receipt auto-prints. An order may mix local and imported products.
+- **Current sale line types, stored in `order_lines.type`:**
   1. `external_product` — flat external catalog item (existing flow). Price from catalog (minus catalog discount) + modifier extras. Deducts mapped ingredients (`external_*_ingredients`) from **cafe stock** (FIFO).
-  2. `recipe` — internal **recipe product** with size variants (`recipes.type='product'`, `recipe_sizes.sellingPrice`, ingredients in `recipe_ingredients`). Deducts each ingredient quantity (FIFO) for the chosen size from **cafe stock**.
-  3. `item` — internal as-is **resale item** (`items.type='resale'`, `items.sellingPrice`). Deducts the item itself (FIFO) from **cafe stock**.
+  2. `item` — local as-is **resale item** (`items.type='resale'`, `items.sellingPrice`). The server reads its stored price and deducts the item itself (FIFO) from **cafe stock**, with no recipe required. Each imported menu flavor/size can be a separate local item.
+- `recipe` lines are legacy records; new checkout does not accept them. The owner-confirmed prepared-result model consumes a prepared output stock item at sale, not recipe ingredients. Local prepared pricing/sales and explicit imported recipe/output links remain unimplemented; see audit §1.8.
 - Sales are allowed even if computed stock would go negative (the shop can't stop selling because of a data entry gap); negative stock is flagged on the dashboard for correction.
 - **Payments:** cash only. Received amount + change recorded.
 - **Discounts:** percentage or fixed amount per order; cashier applies freely; every discount is stored with order, cashier, and shift, and is visible in reports.
@@ -198,13 +198,10 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 
 ## 10. Recipes
 
-- A **recipe product** (`recipes.type='product'`) defines an internal menu item sold directly at the POS:
-  - **Size variants** (e.g. S/M/L): each size has its own ingredient quantities (`recipe_ingredients`) and its own selling price (`recipe_sizes.sellingPrice`). Single-size products are just one variant.
-  - **Ingredients:** cafe-stock items (raw, resale, or prepared) with quantities in stock units.
-  - Active + sellable recipe products appear in POS under their category main/sub tabs.
-- **Sub-recipes / prepared items** (`recipes.type='prepared'`): a recipe that produces a stock item instead of a menu product (e.g. 1L sugar syrup from sugar + water). Admin runs **“prepare batch”** with a produced quantity → raw ingredients are deducted (FIFO) from cafe stock and a new batch of the prepared item is added at the computed ingredient cost. Prepared items are then used as ingredients in menu recipes (internal or external).
+- **Preparation recipes** (`recipes.type='prepared'`) consume cafe-stock ingredients (raw, resale, or prepared) and produce a finished stock item (e.g. 1L sugar syrup). Admin runs **“prepare batch”** with a produced quantity → ingredients are deducted (FIFO) from cafe stock and a new batch of the prepared item is added at the computed ingredient cost.
+- A prepared output may be an ingredient or a finished result for sale. The confirmed sale model deducts its prepared stock, without consuming ingredients again. Local prepared-result pricing/sales and explicit imported recipe/output links remain separate open work; the current POS local catalog contains resale items only.
 - **Live costing:** each recipe/size shows its current FIFO ingredient cost next to its selling price (cost %, margin) to guide pricing.
-- Recipes are created and edited by Admin only; changes affect future sales only (past orders keep their historical cost).
+- Recipes are created and edited by Admin only; changes affect future preparations only (past preparations and orders keep their historical cost).
 - A prepared recipe declares a base yield. Any requested preparation quantity scales every ingredient proportionally to that yield, rounded to the stock ledger's three-decimal quantity precision.
 - Preparation never permits negative ingredient stock. The recipe, all cafe FIFO deductions, allocation snapshots, and the costed prepared-item output batch commit atomically; insufficient stock returns a conflict and changes nothing.
 - Every preparation is immutable and retains recipe/output names, the administrator, time, notes, source FIFO batches, exact carried costs, and the resulting cafe batch. Recipe edits affect only later preparations.
@@ -217,7 +214,7 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 - Waste entry: warehouse (main or cafe), what was wasted, quantity, **reason** (expired, damaged, preparation mistake, spill, other + note), date, who recorded it.
 - Can target:
   - a **stock item** (raw/resale/prepared) → deducts that item (FIFO), or
-  - a **finished recipe product** (e.g. a dropped drink) → deducts its ingredients per the recipe/size.
+  - a **finished prepared result** (e.g. a dropped drink) → deducts its finished stock item, not ingredients again. The legacy recipe waste path still consumes ingredients and remains audit finding B6.
 - FIFO cost of every waste entry is stored and totalled in reports.
 - Permissions: cashier records **cafe** waste only; admin records waste anywhere.
 
@@ -227,9 +224,9 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 
 - Cashier selects the **original order** (by number or from recent orders) and refunds the **whole order or specific lines/quantities**, with a reason.
 - Cash is returned to the customer; the refund **reduces the current shift's expected drawer** and is attached to the current shift.
-- Stock handling per line type (all reachable — POS sells all three):
+- Stock handling per line type:
   - **As-is items (`item` resale + `external_product` not-returnable path):** cashier chooses “return to stock” (unopened, sellable → back into cafe stock at its original cost) or “not returnable” (recorded as waste).
-  - **Recipe products (`recipe`):** ingredients remain consumed; optionally the refunded drink is also logged as waste for visibility.
+  - **Legacy recipe records (`recipe`):** ingredients remain consumed. New checkout rejects recipe lines; future prepared-result sales must use finished item allocations rather than restoring ingredients.
   - **External products (`external_product`):** `return_to_stock` restocks each mapped ingredient; `not_returnable` writes a waste entry linked to the refund line.
 - Refunds appear in reports (by shift, cashier, product, reason) and reduce net sales and profit.
 

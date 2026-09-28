@@ -505,6 +505,19 @@ export type ExternalProductCatalog = {
   syncError: string | null;
 };
 
+export type LocalSaleProduct = {
+  id: number;
+  name: string;
+  categoryId: number;
+  sellingPrice: string;
+  stockUnit: string;
+};
+
+export type PosCatalog = ExternalProductCatalog & {
+  localCategories: Array<Pick<Category, "id" | "name" | "parentId">>;
+  localProducts: LocalSaleProduct[];
+};
+
 export type ExternalCacheRefreshStatus = {
   lastAttemptAt: string | null;
   lastSuccessfulSyncAt: string | null;

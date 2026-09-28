@@ -38,7 +38,7 @@ const isDuplicateEntry = (error: unknown) =>
   "code" in error &&
   (error as { code?: unknown }).code === "ER_DUP_ENTRY";
 
-function canonicalModifiers(modifiers: OrderLineInput["modifiers"]) {
+function canonicalModifiers(modifiers: Extract<OrderLineInput, { type: "external_product" }>["modifiers"]) {
   return [...modifiers].sort(
     (left, right) =>
       left.externalModifierOptionId - right.externalModifierOptionId,
@@ -46,6 +46,7 @@ function canonicalModifiers(modifiers: OrderLineInput["modifiers"]) {
 }
 
 function lineKey(line: OrderLineInput) {
+  if (line.type === "item") return JSON.stringify({ type: "item", item: line.itemId });
   return JSON.stringify({
     product: line.externalProductId,
     size: line.externalSizeId,
@@ -56,11 +57,11 @@ function lineKey(line: OrderLineInput) {
 function normalizeLines(lines: OrderLineInput[]) {
   const combined = new Map<string, OrderLineInput>();
   for (const line of lines) {
-    const modifiers = canonicalModifiers(line.modifiers);
-    const key = lineKey({ ...line, modifiers });
+    const normalized = line.type === "item" ? { ...line } : { ...line, modifiers: canonicalModifiers(line.modifiers) };
+    const key = lineKey(normalized);
     const existing = combined.get(key);
     if (existing) existing.quantity += line.quantity;
-    else combined.set(key, { ...line, modifiers });
+    else combined.set(key, normalized);
   }
   return [...combined.values()];
 }
@@ -73,8 +74,10 @@ function orderNumber(now: Date) {
 function requestFingerprint(data: OrderInput) {
   const lines = [...normalizeLines(data.lines)].sort(
     (left, right) =>
-      left.externalProductId - right.externalProductId ||
-      (left.externalSizeId ?? 0) - (right.externalSizeId ?? 0) ||
+      (left.type === "item" ? left.itemId : left.externalProductId) -
+      (right.type === "item" ? right.itemId : right.externalProductId) ||
+      (left.type === "item" ? 0 : left.externalSizeId ?? 0) -
+      (right.type === "item" ? 0 : right.externalSizeId ?? 0) ||
       lineKey(left).localeCompare(lineKey(right)),
   );
   return hashRequest({
@@ -108,24 +111,50 @@ export class OrdersService {
           throw new HttpError(400, "كمية المنتج خارج النطاق المسموح");
         }
         const products = await repo.loadExternalProducts(
-          normalized.map((line) => line.externalProductId),
+          normalized.flatMap((line) => line.type === "external_product" ? [line.externalProductId] : []),
         );
         const productsById = new Map(
           products.map((product) => [product.externalId, product]),
         );
         const now = new Date();
+        const localIds = normalized.flatMap(line => line.type === "item" ? [line.itemId] : []);
+        // Lock all stock items in one consistent order, including imported mappings,
+        // before reading local prices. The item lock also serializes item edits.
+        const candidateStockIds = [...localIds, ...products.flatMap(product => [
+          ...product.ingredients,
+          ...product.sizes.flatMap(size => size.ingredients),
+          ...product.modifierGroups.flatMap(group => group.options.flatMap(option => option.ingredients)),
+        ].map(ingredient => ingredient.itemId))];
+        const lockedItems = localIds.length > 0 ? await repo.lockStockItems(candidateStockIds) : null;
+        const localById = new Map((lockedItems ?? []).map(item => [item.id, item]));
         const calculated = normalized.map((line) => {
+          if (line.type === "item") {
+            const item = localById.get(line.itemId);
+            if (!item) throw new HttpError(404, "الصنف غير موجود");
+            if (!item.isActive || item.type !== "resale" || item.sellingPrice === null) {
+              throw new HttpError(409, "الصنف غير متاح للبيع المباشر");
+            }
+            return {
+              type: "item" as const, itemId: item.id,
+              externalProductId: null, externalSizeId: null,
+              productName: item.name, sizeName: null,
+              quantityText: line.quantity.toFixed(3), unitPrice: item.sellingPrice,
+              lineSubtotal: formatScaled(stringToScaled(item.sellingPrice, 2) * BigInt(line.quantity), 2),
+              modifiers: [], consumptions: [{ itemId: item.id, itemName: item.name, quantity: line.quantity.toFixed(3) }],
+            };
+          }
           const product = productsById.get(line.externalProductId);
           if (!product) {
             throw new HttpError(404, "المنتج الخارجي غير موجود");
           }
-          return calculateExternalOrderLine(product, line, now.getTime());
+          return { ...calculateExternalOrderLine(product, line, now.getTime()), type: "external_product" as const, itemId: null };
         });
 
         const stockItemIds = calculated.flatMap((line) =>
           line.consumptions.map((consumption) => consumption.itemId),
         );
-        const stockRows = await repo.lockStockItems(stockItemIds);
+        const requiredIds = new Set(stockItemIds);
+        const stockRows = lockedItems ? lockedItems.filter(item => requiredIds.has(item.id)) : await repo.lockStockItems(stockItemIds);
         if (stockRows.length !== new Set(stockItemIds).size) {
           throw new HttpError(409, "أحد أصناف المخزون غير موجود");
         }
@@ -182,10 +211,10 @@ export class OrdersService {
         for (const line of calculated) {
           const lineId = await repo.createLine({
             orderId: id,
-            type: "external_product",
+            type: line.type,
             recipeId: null,
             recipeSizeId: null,
-            itemId: null,
+            itemId: line.itemId,
             externalProductId: line.externalProductId,
             externalSizeId: line.externalSizeId,
             productName: line.productName,

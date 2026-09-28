@@ -14,6 +14,7 @@ describe("productsRouter", () => {
     const router = productsRouter(
       {
         list: vi.fn(),
+        local: vi.fn(),
         refresh,
         refreshStatus: vi.fn(),
         configureStock: vi.fn(),
@@ -34,6 +35,7 @@ describe("productsRouter", () => {
   it("exposes catalog, manual refresh, and stock setup routes", async () => {
     const controller = {
       list: vi.fn((_req, res) => res.json({ products: [] })),
+      local: vi.fn((_req, res) => res.json({ categories: [], products: [] })),
       refresh: vi.fn((_req, res) => res.json({ products: [] })),
       refreshStatus: vi.fn((_req, res) => res.json({ refreshing: false })),
       configureStock: vi.fn((_req, res) => res.json({ ok: true })),

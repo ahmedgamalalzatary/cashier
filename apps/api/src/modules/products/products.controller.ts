@@ -3,18 +3,37 @@ import { idParam } from "../../middleware/validation.js";
 import type { ProductsService } from "./products.service.js";
 import { productStockSetupInput } from "./products.schemas.js";
 import type { CacheRefreshRepository } from "../external/cache-refresh.repository.js";
+import type { ProductsRepository } from "./products.repository.js";
+import { HttpError } from "../../middleware/error.js";
 
 export class ProductsController {
   constructor(
     private readonly service: ProductsService,
     private readonly refreshStore: CacheRefreshRepository,
+    private readonly localCatalog: Pick<ProductsRepository, "getLocalCatalog">,
   ) {}
 
+  local = async (_req: Request, res: Response) => {
+    res.json(await this.localCatalog.getLocalCatalog());
+  };
+
   list = async (req: Request, res: Response) => {
+    const forPos = req.query.pos === "true";
     const [catalog, refreshStatus] = await Promise.all([
-      this.service.list(),
+      this.service.list().catch((error) => {
+        if (!forPos || !(error instanceof HttpError) || error.status !== 503)
+          throw error;
+        return {
+          categories: [],
+          products: [],
+          lastSuccessfulSyncAt: null,
+          stale: true,
+          syncError: error.message,
+        };
+      }),
       this.refreshStore.getStatus(),
     ]);
+    const local = forPos ? await this.localCatalog.getLocalCatalog() : null;
     const search =
       typeof req.query.search === "string"
         ? req.query.search.trim().toLocaleLowerCase()
@@ -41,11 +60,15 @@ export class ProductsController {
     const page = unpaginated ? 1 : Math.min(requestedPage, totalPages);
     res.json({
       ...catalog,
+      ...(local
+        ? { localCategories: local.categories, localProducts: local.products }
+        : {}),
       stale:
-        !!refreshStatus.lastFailedAt &&
-        (!refreshStatus.lastSuccessfulSyncAt ||
-          refreshStatus.lastFailedAt > refreshStatus.lastSuccessfulSyncAt),
-      syncError: refreshStatus.lastError,
+        catalog.stale ||
+        (!!refreshStatus.lastFailedAt &&
+          (!refreshStatus.lastSuccessfulSyncAt ||
+            refreshStatus.lastFailedAt > refreshStatus.lastSuccessfulSyncAt)),
+      syncError: refreshStatus.lastError ?? catalog.syncError,
       products: unpaginated
         ? products
         : products.slice((page - 1) * pageSize, page * pageSize),

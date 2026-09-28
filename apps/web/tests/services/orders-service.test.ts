@@ -14,6 +14,29 @@ const mockedApi = vi.mocked(api);
 describe("orders service", () => {
   beforeEach(() => mockedApi.mockReset());
 
+  it("loads the local resale catalog together with the imported catalog for POS", async () => {
+    mockedApi.mockResolvedValue({
+      products: [],
+      categories: [],
+      pagination: { currentPage: 1, totalPages: 1 },
+      localCategories: [{ id: 1, name: "مشروبات", parentId: null }],
+      localProducts: [
+        {
+          id: 9,
+          name: "تركي سنجل",
+          categoryId: 1,
+          sellingPrice: "35.00",
+          stockUnit: "فنجان",
+        },
+      ],
+    } as never);
+    const catalog = await listCatalog();
+    expect(mockedApi).toHaveBeenCalledWith("/api/products?all=true&pos=true");
+    expect(catalog).toMatchObject({
+      localProducts: [{ sellingPrice: "35.00" }],
+    });
+  });
+
   it("uses catalog, recent-order, detail, and creation endpoints", async () => {
     mockedApi.mockResolvedValue({
       products: [],
@@ -41,7 +64,7 @@ describe("orders service", () => {
     await createOrder(body);
 
     expect(mockedApi.mock.calls).toEqual([
-      ["/api/products?page=1&pageSize=50"],
+      ["/api/products?all=true&pos=true"],
       ["/api/orders"],
       ["/api/orders/external"],
       ["/api/orders/7"],

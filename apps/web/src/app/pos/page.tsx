@@ -25,7 +25,7 @@ import { CashierShiftControls } from "@/components/shifts/cashier-shift-controls
 import type {
   CurrentShift,
   ExternalProduct,
-  ExternalProductCatalog,
+  PosCatalog,
   OrderDetail,
   OrderDiscountType,
   OrderSummary,
@@ -38,12 +38,14 @@ import { formatMoney } from "@/lib/format";
 import { catalogRefreshOutcome } from "@/models/catalog-refresh";
 import {
   addCatalogSelection,
+  addLocalSelection,
   cartLineTotal,
   catalogSizePrice,
   catalogTilePrice,
   cartTotals,
   defaultExternalSize,
   filterCatalog,
+  filterLocalCatalog,
   isOwnOpenShift,
   orderPayload,
   setCartLineQuantity,
@@ -63,11 +65,16 @@ import {
 
 export default function PosPage() {
   const { user } = useAuth();
-  const [catalog, setCatalog] = useState<ExternalProductCatalog | null>(null);
+  const [catalog, setCatalog] = useState<PosCatalog | null>(null);
   const [recentOrders, setRecentOrders] = useState<OrderSummary[]>([]);
   const [currentShift, setCurrentShift] = useState<CurrentShift | null>(null);
   const [cart, setCart] = useState<PosCartLine[]>([]);
   const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [catalogSource, setCatalogSource] = useState<"local" | "external">(
+    "local",
+  );
+  const [mainCategoryId, setMainCategoryId] = useState<number | null>(null);
+  const [subCategoryId, setSubCategoryId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [selecting, setSelecting] = useState<ExternalProduct | null>(null);
   const [discountType, setDiscountType] = useState<OrderDiscountType | null>(
@@ -200,6 +207,11 @@ export default function PosPage() {
     cart,
     { type: discountType, value: discountValue },
     cashReceived,
+  );
+  const visibleLocalProducts = filterLocalCatalog(
+    catalog?.localProducts ?? [],
+    catalog?.localCategories ?? [],
+    { mainCategoryId, subCategoryId, query },
   );
   const hasOwnOpenShift = isOwnOpenShift(currentShift, user);
   const canComplete =
@@ -365,32 +377,110 @@ export default function PosPage() {
                 className="h-12 w-full rounded-xl border border-line bg-paper pe-4 ps-12 text-sm outline-none focus:border-primary"
               />
             </label>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div
+              className="mt-3 flex flex-wrap gap-2"
+              aria-label="مصدر المنتجات"
+            >
               <CategoryButton
-                active={categoryId === null}
-                onClick={() => setCategoryId(null)}
+                active={catalogSource === "local"}
+                onClick={() => setCatalogSource("local")}
               >
-                الكل
+                المنتجات المحلية
               </CategoryButton>
-              {(catalog?.categories ?? [])
-                .filter((category) => category.isActive && category.isVisible)
-                .map((category) => (
-                  <CategoryButton
-                    key={category.externalId}
-                    active={categoryId === category.externalId}
-                    onClick={() => setCategoryId(category.externalId)}
-                  >
-                    {category.nameAr}
-                  </CategoryButton>
-                ))}
+              <CategoryButton
+                active={catalogSource === "external"}
+                onClick={() => setCatalogSource("external")}
+              >
+                المنتجات الخارجية
+              </CategoryButton>
             </div>
+            {catalogSource === "local" ? (
+              <>
+                <div
+                  className="mt-3 flex flex-wrap gap-2"
+                  aria-label="الأقسام الرئيسية"
+                >
+                  <CategoryButton
+                    active={mainCategoryId === null}
+                    onClick={() => {
+                      setMainCategoryId(null);
+                      setSubCategoryId(null);
+                    }}
+                  >
+                    الكل
+                  </CategoryButton>
+                  {(catalog?.localCategories ?? [])
+                    .filter((category) => category.parentId === null)
+                    .map((category) => (
+                      <CategoryButton
+                        key={category.id}
+                        active={mainCategoryId === category.id}
+                        onClick={() => {
+                          setMainCategoryId(category.id);
+                          setSubCategoryId(null);
+                        }}
+                      >
+                        {category.name}
+                      </CategoryButton>
+                    ))}
+                </div>
+                {mainCategoryId !== null && (
+                  <div
+                    className="mt-3 flex flex-wrap gap-2"
+                    aria-label="الأقسام الفرعية"
+                  >
+                    <CategoryButton
+                      active={subCategoryId === null}
+                      onClick={() => setSubCategoryId(null)}
+                    >
+                      كل القسم
+                    </CategoryButton>
+                    {(catalog?.localCategories ?? [])
+                      .filter(
+                        (category) => category.parentId === mainCategoryId,
+                      )
+                      .map((category) => (
+                        <CategoryButton
+                          key={category.id}
+                          active={subCategoryId === category.id}
+                          onClick={() => setSubCategoryId(category.id)}
+                        >
+                          {category.name}
+                        </CategoryButton>
+                      ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <CategoryButton
+                  active={categoryId === null}
+                  onClick={() => setCategoryId(null)}
+                >
+                  الكل
+                </CategoryButton>
+                {(catalog?.categories ?? [])
+                  .filter((category) => category.isActive && category.isVisible)
+                  .map((category) => (
+                    <CategoryButton
+                      key={category.externalId}
+                      active={categoryId === category.externalId}
+                      onClick={() => setCategoryId(category.externalId)}
+                    >
+                      {category.nameAr}
+                    </CategoryButton>
+                  ))}
+              </div>
+            )}
           </div>
 
           {loading ? (
             <div className="rounded-2xl border border-line bg-surface p-12 text-center text-muted">
               جارِ تحميل قائمة البيع…
             </div>
-          ) : visibleProducts.length === 0 ? (
+          ) : (catalogSource === "local"
+              ? visibleLocalProducts.length
+              : visibleProducts.length) === 0 ? (
             <div className="rounded-2xl border border-dashed border-line bg-surface/60 p-12 text-center">
               <ReceiptText className="mx-auto mb-3 size-8 text-muted" />
               <p className="font-medium">لا توجد منتجات جاهزة للبيع</p>
@@ -400,22 +490,42 @@ export default function PosPage() {
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
-              {visibleProducts.map((product) => (
-                <button
-                  type="button"
-                  key={product.externalId}
-                  onClick={() => setSelecting(product)}
-                  className="rounded-2xl border border-line bg-surface p-4 text-start shadow-sm transition hover:-translate-y-0.5 hover:border-primary"
-                >
-                  <p className="font-bold">{product.nameAr}</p>
-                  <p className="text-xs text-muted" dir="ltr">
-                    {product.nameEn}
-                  </p>
-                  <p className="mt-4 font-bold text-primary">
-                    {formatMoney(catalogTilePrice(product, nowMs))}
-                  </p>
-                </button>
-              ))}
+              {catalogSource === "local"
+                ? visibleLocalProducts.map((product) => (
+                    <button
+                      type="button"
+                      key={`item:${product.id}`}
+                      onClick={() => {
+                        setCart((current) =>
+                          addLocalSelection(current, product),
+                        );
+                        setError("");
+                      }}
+                      className="rounded-2xl border border-line bg-surface p-4 text-start shadow-sm transition hover:-translate-y-0.5 hover:border-primary"
+                    >
+                      <p className="font-bold">{product.name}</p>
+                      <p className="text-xs text-muted">{product.stockUnit}</p>
+                      <p className="mt-4 font-bold text-primary">
+                        {formatMoney(product.sellingPrice)}
+                      </p>
+                    </button>
+                  ))
+                : visibleProducts.map((product) => (
+                    <button
+                      type="button"
+                      key={product.externalId}
+                      onClick={() => setSelecting(product)}
+                      className="rounded-2xl border border-line bg-surface p-4 text-start shadow-sm transition hover:-translate-y-0.5 hover:border-primary"
+                    >
+                      <p className="font-bold">{product.nameAr}</p>
+                      <p className="text-xs text-muted" dir="ltr">
+                        {product.nameEn}
+                      </p>
+                      <p className="mt-4 font-bold text-primary">
+                        {formatMoney(catalogTilePrice(product, nowMs))}
+                      </p>
+                    </button>
+                  ))}
             </div>
           )}
         </section>

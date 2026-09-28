@@ -48,6 +48,8 @@ export class OrdersRepository {
         id: items.id,
         name: items.name,
         isActive: items.isActive,
+        type: items.type,
+        sellingPrice: items.sellingPrice,
       })
       .from(items)
       .where(

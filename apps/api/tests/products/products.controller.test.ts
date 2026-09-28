@@ -38,7 +38,9 @@ function controllerWith(
     getStatus: vi.fn(async () => status),
     request: vi.fn(async () => undefined),
   } as unknown as CacheRefreshRepository;
-  return new ProductsController(service, refreshStore);
+  return new ProductsController(service, refreshStore, {
+    getLocalCatalog: async () => ({ categories: [], products: [] }),
+  });
 }
 
 function appWith(controller: ProductsController, role = "cashier") {
@@ -55,7 +57,10 @@ function appWith(controller: ProductsController, role = "cashier") {
 describe("products catalog listing", () => {
   it("filters by bilingual search and paginates", async () => {
     const app = appWith(
-      controllerWith([product(), product({ externalId: 10, nameAr: "شاي", nameEn: "Tea" })]),
+      controllerWith([
+        product(),
+        product({ externalId: 10, nameAr: "شاي", nameEn: "Tea" }),
+      ]),
     );
 
     const search = await request(app).get("/?search=lat");
@@ -80,14 +85,11 @@ describe("products catalog listing", () => {
 
   it("marks the catalog stale after a failed sync", async () => {
     const app = appWith(
-      controllerWith(
-        [product()],
-        {
-          lastFailedAt: new Date("2026-08-19T10:00:00Z"),
-          lastSuccessfulSyncAt: new Date("2026-08-18T10:00:00Z"),
-          lastError: "boom",
-        },
-      ),
+      controllerWith([product()], {
+        lastFailedAt: new Date("2026-08-19T10:00:00Z"),
+        lastSuccessfulSyncAt: new Date("2026-08-18T10:00:00Z"),
+        lastError: "boom",
+      }),
     );
 
     const response = await request(app).get("/");
@@ -102,6 +104,7 @@ describe("products route authorization", () => {
       res.json({ ok: true });
     const controller = {
       list: vi.fn(done),
+      local: vi.fn(done),
       refresh: vi.fn(done),
       refreshStatus: vi.fn(done),
       configureStock: vi.fn(done),

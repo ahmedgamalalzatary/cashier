@@ -11,6 +11,7 @@ export function createProductsModule(db: Db, adminOnly: RequestHandler) {
   const controller = new ProductsController(
     service,
     new CacheRefreshRepository(db),
+    new ProductsRepository(db),
   );
   return productsRouter(controller, adminOnly);
 }

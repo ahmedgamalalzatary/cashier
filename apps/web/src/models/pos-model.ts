@@ -3,6 +3,8 @@ import type {
   CurrentShift,
   ExternalProduct,
   OrderDiscountType,
+  LocalSaleProduct,
+  PosCatalog,
 } from "@cashier/shared";
 
 export type PosModifierSelection = {
@@ -13,15 +15,19 @@ export type PosModifierSelection = {
 
 export type PosCartLine = {
   key: string;
-  type: "external_product";
-  externalProductId: number;
-  externalSizeId: number | null;
   productName: string;
   sizeName: string | null;
   quantity: number;
   unitPrice: string;
   modifiers: PosModifierSelection[];
-};
+} & (
+  | { type: "item"; itemId: number }
+  | {
+      type: "external_product";
+      externalProductId: number;
+      externalSizeId: number | null;
+    }
+);
 
 export type DiscountSelection = {
   type: OrderDiscountType | null;
@@ -29,6 +35,63 @@ export type DiscountSelection = {
 };
 
 const MAX_MONEY = 9_999_999_999.99;
+
+export function addLocalSelection(
+  cart: PosCartLine[],
+  product: LocalSaleProduct,
+): PosCartLine[] {
+  const key = `item:${product.id}`;
+  const existing = cart.find((line) => line.key === key);
+  if (existing)
+    return cart.map((line) =>
+      line.key === key
+        ? { ...line, quantity: Math.min(999, line.quantity + 1) }
+        : line,
+    );
+  return [
+    ...cart,
+    {
+      key,
+      type: "item",
+      itemId: product.id,
+      productName: product.name,
+      sizeName: null,
+      quantity: 1,
+      unitPrice: product.sellingPrice,
+      modifiers: [],
+    },
+  ];
+}
+
+export function filterLocalCatalog(
+  products: LocalSaleProduct[],
+  categories: PosCatalog["localCategories"],
+  filters: {
+    mainCategoryId: number | null;
+    subCategoryId: number | null;
+    query: string;
+  },
+) {
+  const categoryIds =
+    filters.subCategoryId !== null
+      ? [filters.subCategoryId]
+      : filters.mainCategoryId !== null
+        ? [
+            filters.mainCategoryId,
+            ...categories
+              .filter(
+                (category) => category.parentId === filters.mainCategoryId,
+              )
+              .map((category) => category.id),
+          ]
+        : null;
+  const query = filters.query.trim().toLocaleLowerCase("ar");
+  return products.filter(
+    (product) =>
+      (!categoryIds || categoryIds.includes(product.categoryId)) &&
+      (!query || product.name.toLocaleLowerCase("ar").includes(query)),
+  );
+}
 
 const stringToScaled = (value: string, scale: number) => {
   const negative = value.startsWith("-");
@@ -285,16 +348,24 @@ export function orderPayload(
   cashReceived: number,
 ) {
   return {
-    lines: cart.map((line) => ({
-      type: "external_product" as const,
-      externalProductId: line.externalProductId,
-      externalSizeId: line.externalSizeId,
-      quantity: line.quantity,
-      modifiers: line.modifiers.map((modifier) => ({
-        externalModifierOptionId: modifier.externalModifierOptionId,
-        quantity: modifier.quantity,
-      })),
-    })),
+    lines: cart.map((line) =>
+      line.type === "item"
+        ? {
+            type: "item" as const,
+            itemId: line.itemId,
+            quantity: line.quantity,
+          }
+        : {
+            type: "external_product" as const,
+            externalProductId: line.externalProductId,
+            externalSizeId: line.externalSizeId,
+            quantity: line.quantity,
+            modifiers: line.modifiers.map((modifier) => ({
+              externalModifierOptionId: modifier.externalModifierOptionId,
+              quantity: modifier.quantity,
+            })),
+          },
+    ),
     discount:
       discount.type === null
         ? null
