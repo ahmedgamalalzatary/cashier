@@ -94,7 +94,7 @@ function InventoryView() {
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [state, setState] = useState<StockFilter>(() =>
-    requestedState === "low" || requestedState === "inactive"
+    requestedState === "low" || (isAdmin && requestedState === "inactive")
       ? requestedState
       : "all",
   );
@@ -102,8 +102,8 @@ function InventoryView() {
 
   useEffect(() => {
     let cancelled = false;
-    // Cashiers must never call the admin-only APIs (T1): one failing call in
-    // the batch would break the whole page for them.
+    // Items, categories and main stock are admin-only APIs: one failing call
+    // in the batch would break the whole page, so cashiers load cafe stock only.
     type Loaded = [Item[], Category[], InventoryStockRow[], InventoryStockRow[]];
     const load: Promise<Loaded> = isAdmin
       ? Promise.all([
@@ -112,9 +112,7 @@ function InventoryView() {
           getMainWarehouseStock(),
           getCafeWarehouseStock(),
         ])
-      : Promise.all([listCategories(), getCafeWarehouseStock()]).then(
-          ([categoryRows, cafeRows]): Loaded => [[], categoryRows, [], cafeRows],
-        );
+      : getCafeWarehouseStock().then((cafeRows): Loaded => [[], [], [], cafeRows]);
     load
       .then(([itemRows, categoryRows, mainRows, cafeRows]) => {
         if (cancelled) return;

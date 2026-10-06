@@ -375,6 +375,11 @@ export default function RecipesPage() {
           editing={form}
           categories={categories}
           items={items}
+          onItemsChanged={async () => {
+            const rows = await listItems();
+            setItems(rows);
+            return rows;
+          }}
           onClose={() => setForm(undefined)}
           onSaved={saved}
         />
@@ -383,6 +388,11 @@ export default function RecipesPage() {
         <ProductStockSetupModal
           product={stockProduct}
           items={items}
+          onItemsChanged={async () => {
+            const rows = await listItems();
+            setItems(rows);
+            return rows;
+          }}
           onClose={() => setStockProduct(null)}
           onSaved={saved}
         />

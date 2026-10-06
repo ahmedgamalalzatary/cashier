@@ -10,10 +10,16 @@ import type {
 } from "@cashier/shared";
 import { itemLabel } from "../../lib/format";
 import { configureProductStock } from "../../services/products-service";
+import { listItems } from "../../services/items-service";
 import { Button } from "../ui/button";
+import { EntityPicker } from "../ui/entity-picker";
 import { Field } from "../ui/field";
 import { Modal } from "../ui/modal";
-import { SearchSelect } from "../ui/search-select";
+import { ItemFormModal } from "../warehouse/item-form-modal";
+
+async function defaultItemsChanged() {
+  return listItems();
+}
 
 type IngredientRow = { key: string; itemId: string; quantity: string };
 type ModifierForm = {
@@ -38,16 +44,23 @@ const rowsFromMappings = (
 export function ProductStockSetupModal({
   product,
   items,
+  onItemsChanged = defaultItemsChanged,
   onClose,
   onSaved,
 }: {
   product: ExternalProduct;
   items: Item[];
+  onItemsChanged?: () => Promise<Item[]>;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const keyRef = useRef(1);
   const nextKey = () => `new:${keyRef.current++}`;
+  const [itemList, setItemList] = useState<Item[]>(items);
+  const [creatingRowKey, setCreatingRowKey] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ key: string; text: string } | null>(
+    null,
+  );
   const [baseIngredients, setBaseIngredients] = useState<IngredientRow[]>(() =>
     rowsFromMappings(product.ingredients, "base"),
   );
@@ -96,9 +109,51 @@ export function ProductStockSetupModal({
       ),
     ),
   ]);
-  const activeItems = items.filter(
+  const activeItems = itemList.filter(
     (item) => item.isActive || referencedItemIds.has(item.id),
   );
+
+  function setRowItemId(rowKey: string, itemId: string) {
+    const patch = (rows: IngredientRow[]) =>
+      rows.map((row) => (row.key === rowKey ? { ...row, itemId } : row));
+    setBaseIngredients(patch);
+    setSizeIngredients((current) =>
+      Object.fromEntries(
+        Object.entries(current).map(([id, rows]) => [id, patch(rows)]),
+      ),
+    );
+    setModifiers((current) =>
+      current.map((modifier) => ({
+        ...modifier,
+        ingredients: patch(modifier.ingredients),
+      })),
+    );
+  }
+
+  async function selectCreatedItem(rowKey: string, savedId: number) {
+    let rows: Item[];
+    try {
+      rows = await onItemsChanged();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "تعذر تحميل الأصناف",
+      );
+      return;
+    }
+    setItemList(rows);
+    const allowed = rows.filter(
+      (item) => item.isActive || referencedItemIds.has(item.id),
+    );
+    if (!allowed.some((item) => item.id === savedId)) {
+      setNotice({
+        key: rowKey,
+        text: "تم إنشاء الصنف لكنه غير مناسب لهذا الحقل.",
+      });
+      return;
+    }
+    setRowItemId(rowKey, String(savedId));
+    setNotice(null);
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -154,7 +209,12 @@ export function ProductStockSetupModal({
             rows={baseIngredients}
             items={activeItems}
             nextKey={nextKey}
+            notice={notice}
             onChange={setBaseIngredients}
+            onCreate={(rowKey) => {
+              setNotice(null);
+              setCreatingRowKey(rowKey);
+            }}
           />
         ) : (
           product.sizes.map((size) => (
@@ -164,12 +224,17 @@ export function ProductStockSetupModal({
               rows={sizeIngredients[size.externalId] ?? []}
               items={activeItems}
               nextKey={nextKey}
+              notice={notice}
               onChange={(rows) =>
                 setSizeIngredients((current) => ({
                   ...current,
                   [size.externalId]: rows,
                 }))
               }
+              onCreate={(rowKey) => {
+                setNotice(null);
+                setCreatingRowKey(rowKey);
+              }}
             />
           ))
         )}
@@ -230,6 +295,11 @@ export function ProductStockSetupModal({
                     rows={modifier.ingredients}
                     items={activeItems}
                     nextKey={nextKey}
+                    notice={notice}
+                    onCreate={(rowKey) => {
+                      setNotice(null);
+                      setCreatingRowKey(rowKey);
+                    }}
                     onChange={(ingredients) =>
                       setModifiers((current) =>
                         current.map((row) =>
@@ -261,6 +331,17 @@ export function ProductStockSetupModal({
           </Button>
         </div>
       </form>
+      {creatingRowKey !== null && (
+        <ItemFormModal
+          item={null}
+          onClose={() => setCreatingRowKey(null)}
+          onSaved={(savedId) => {
+            const rowKey = creatingRowKey;
+            setCreatingRowKey(null);
+            void selectCreatedItem(rowKey, savedId);
+          }}
+        />
+      )}
     </Modal>
   );
 }
@@ -270,13 +351,17 @@ function TargetEditor({
   rows,
   items,
   nextKey,
+  notice,
   onChange,
+  onCreate,
 }: {
   title: string;
   rows: IngredientRow[];
   items: Item[];
   nextKey: () => string;
+  notice: { key: string; text: string } | null;
   onChange: (rows: IngredientRow[]) => void;
+  onCreate: (rowKey: string) => void;
 }) {
   return (
     <section className="space-y-3 rounded-xl border border-line p-4">
@@ -285,7 +370,9 @@ function TargetEditor({
         rows={rows}
         items={items}
         nextKey={nextKey}
+        notice={notice}
         onChange={onChange}
+        onCreate={onCreate}
       />
     </section>
   );
@@ -295,42 +382,44 @@ function IngredientRows({
   rows,
   items,
   nextKey,
+  notice,
   onChange,
+  onCreate,
 }: {
   rows: IngredientRow[];
   items: Item[];
   nextKey: () => string;
+  notice: { key: string; text: string } | null;
   onChange: (rows: IngredientRow[]) => void;
+  onCreate: (rowKey: string) => void;
 }) {
   return (
     <div className="space-y-3">
       {rows.map((row, index) => {
         const selected = items.find((item) => String(item.id) === row.itemId);
         return (
-          <div
-            key={row.key}
-            className="grid items-end gap-3 sm:grid-cols-[1fr_12rem_auto]"
-          >
-            <SearchSelect
-              label={`المكوّن ${index + 1}`}
-              value={row.itemId}
-              onChange={(itemId) =>
-                onChange(
-                  rows.map((current) =>
-                    current.key === row.key
-                      ? { ...current, itemId }
-                      : current,
-                  ),
-                )
-              }
-              options={items.map((item) => ({
-                value: item.id,
-                label: itemLabel(item.code, item.name),
-                hint: item.stockUnit,
-              }))}
-              placeholder="اختر الصنف"
-              required
-            />
+          <div key={row.key}>
+            <div className="grid items-start gap-3 sm:grid-cols-[1fr_12rem_auto]">
+              <EntityPicker
+                label={`المكوّن ${index + 1}`}
+                value={row.itemId}
+                onChange={(itemId) =>
+                  onChange(
+                    rows.map((current) =>
+                      current.key === row.key ? { ...current, itemId } : current,
+                    ),
+                  )
+                }
+                options={items.map((item) => ({
+                  value: item.id,
+                  label: itemLabel(item.code, item.name),
+                  hint: item.stockUnit,
+                }))}
+                placeholder="اختر الصنف"
+                createLabel="إضافة صنف جديد"
+                onCreate={() => onCreate(row.key)}
+                required
+              />
             <Field
               label={`الكمية${selected ? ` (${selected.stockUnit})` : ""}`}
               type="number"
@@ -352,7 +441,7 @@ function IngredientRows({
             <button
               type="button"
               aria-label={`حذف المكوّن ${index + 1}`}
-              className="rounded-lg p-2 text-muted hover:bg-danger/10 hover:text-danger disabled:opacity-40"
+              className="rounded-lg p-2 text-muted hover:bg-danger/10 hover:text-danger disabled:opacity-40 sm:mt-7"
               disabled={rows.length === 1}
               onClick={() =>
                 onChange(rows.filter((current) => current.key !== row.key))
@@ -360,6 +449,10 @@ function IngredientRows({
             >
               <Trash2 className="size-4" />
             </button>
+            </div>
+            {notice?.key === row.key && (
+              <p className="mt-1.5 text-xs text-danger">{notice.text}</p>
+            )}
           </div>
         );
       })}

@@ -38,11 +38,20 @@ export default function BranchesPage() {
     setArchivingError("");
     try {
       await archiveBranch(target.id);
-      setArchiving(null);
-      await refresh();
     } catch (cause) {
       setArchivingError(
         cause instanceof Error ? cause.message : "تعذر أرشفة الفرع",
+      );
+      setBusy(false);
+      return;
+    }
+    // archived: the dialog closes, so a failed refresh is a page-level error
+    setArchiving(null);
+    try {
+      await refresh();
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "تمت الأرشفة، لكن تعذر تحديث الفروع",
       );
     } finally {
       setBusy(false);

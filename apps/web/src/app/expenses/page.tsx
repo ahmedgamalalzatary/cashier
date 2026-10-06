@@ -1,19 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ExpenseCategory, ExpenseSummary } from "@cashier/shared";
 import { Plus, Receipt } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
+import { ExpenseEntryForm } from "@/components/expenses/expense-entry-form";
 import { Button } from "@/components/ui/button";
 import { DataTable, type DataColumn } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { Section } from "@/components/ui/section";
-import { SelectField } from "@/components/ui/select-field";
 import { EmptyState, ErrorBanner } from "@/components/ui/states";
-import { cairoCalendarDate } from "@/lib/cairo-date";
 import { formatMoney } from "@/lib/format";
 import {
-  createExpense,
   createExpenseCategory,
   listExpenseCategories,
   listExpenses,
@@ -24,13 +22,7 @@ export default function ExpensesPage() {
   const { user } = useAuth();
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [entries, setEntries] = useState<ExpenseSummary[]>([]);
-  const [categoryId, setCategoryId] = useState("");
-  const [amount, setAmount] = useState("");
-  const [expenseDate, setExpenseDate] = useState(cairoCalendarDate);
-  const [note, setNote] = useState("");
   const [newCategory, setNewCategory] = useState("");
-  const [requestId, setRequestId] = useState(() => crypto.randomUUID());
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   async function load() {
@@ -57,33 +49,6 @@ export default function ExpensesPage() {
       cancelled = true;
     };
   }, []);
-
-  const activeCategories = useMemo(
-    () => categories.filter((category) => category.isActive),
-    [categories],
-  );
-
-  async function submit() {
-    setSaving(true);
-    setError("");
-    try {
-      await createExpense({
-        clientRequestId: requestId,
-        categoryId: Number(categoryId),
-        amount: Number(amount),
-        expenseDate: user?.role === "admin" ? expenseDate : undefined,
-        note: note.trim() || null,
-      });
-      await load();
-      setAmount("");
-      setNote("");
-      setRequestId(crypto.randomUUID());
-    } catch (cause) {
-      setError((cause as Error).message);
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function addCategory() {
     if (!newCategory.trim()) return;
@@ -142,76 +107,10 @@ export default function ExpensesPage() {
           user?.role === "admin" ? "تسجيل مصروف عام" : "مصروف من درج الوردية"
         }
       >
-        <div className="grid gap-4 md:grid-cols-2">
-          <SelectField
-            label="تصنيف المصروف"
-            value={categoryId}
-            onChange={(event) => {
-              setCategoryId(event.target.value);
-              setRequestId(crypto.randomUUID());
-            }}
-          >
-            <option value="">اختر التصنيف</option>
-            {activeCategories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </SelectField>
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium">المبلغ</span>
-            <input
-              aria-label="المبلغ"
-              type="number"
-              min="0.01"
-              step="0.01"
-              value={amount}
-              onChange={(event) => {
-                setAmount(event.target.value);
-                setRequestId(crypto.randomUUID());
-              }}
-              placeholder="المبلغ"
-              className="input tnum"
-            />
-          </label>
-          {user?.role === "admin" && (
-            <label className="block space-y-1.5">
-              <span className="text-sm font-medium">تاريخ المصروف</span>
-              <input
-                aria-label="تاريخ المصروف"
-                type="date"
-                value={expenseDate}
-                onChange={(event) => {
-                  setExpenseDate(event.target.value);
-                  setRequestId(crypto.randomUUID());
-                }}
-                className="input"
-              />
-            </label>
-          )}
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium">ملاحظات</span>
-            <input
-              aria-label="ملاحظات"
-              value={note}
-              maxLength={500}
-              onChange={(event) => {
-                setNote(event.target.value);
-                setRequestId(crypto.randomUUID());
-              }}
-              placeholder="ملاحظات اختيارية"
-              className="input"
-            />
-          </label>
-        </div>
-        <Button
-          onClick={submit}
-          disabled={saving || !categoryId || Number(amount) <= 0}
-          className="mt-4"
-        >
-          <Receipt className="size-4" />
-          {saving ? "جارِ التسجيل…" : "تسجيل المصروف"}
-        </Button>
+        <ExpenseEntryForm
+          categories={categories}
+          onSaved={() => void load().catch(() => undefined)}
+        />
       </Section>
 
       {user?.role === "admin" && (

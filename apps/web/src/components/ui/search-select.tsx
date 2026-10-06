@@ -93,11 +93,10 @@ export function SearchSelect({
       return;
     }
     if (event.key === "Enter") {
+      // an open list owns Enter, even with no match: never submit the form
+      event.preventDefault();
       const option = visible[highlight];
-      if (option) {
-        event.preventDefault();
-        choose(option);
-      }
+      if (option) choose(option);
     }
   }
 

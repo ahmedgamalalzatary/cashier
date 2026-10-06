@@ -9,8 +9,10 @@ import {
   Printer,
   ReceiptText,
   RefreshCw,
+  RotateCcw,
   Search,
   ShoppingBasket,
+  Trash2,
 } from "lucide-react";
 import {
   useCallback,
@@ -22,9 +24,14 @@ import {
 } from "react";
 import Link from "next/link";
 import { CashierShiftControls } from "@/components/shifts/cashier-shift-controls";
+import { ExpenseEntryForm } from "@/components/expenses/expense-entry-form";
+import { OrderPicker } from "@/components/refunds/order-picker";
+import { RefundOrderModal } from "@/components/refunds/refund-order-modal";
+import { WasteEntryForm } from "@/components/waste/waste-entry-form";
 import type {
   CurrentShift,
   ExternalProduct,
+  InventoryStockRow,
   PosCatalog,
   OrderDetail,
   OrderDiscountType,
@@ -33,6 +40,7 @@ import type {
 import { useAuth } from "@/components/auth/auth-provider";
 import { OrderReceipt } from "@/components/pos/order-receipt";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { Tabs } from "@/components/ui/tabs";
 import { formatMoney } from "@/lib/format";
@@ -59,6 +67,7 @@ import {
   listOrders,
 } from "@/services/orders-service";
 import { getCurrentShift } from "@/services/shifts-service";
+import { getCafeWarehouseStock } from "@/services/inventory-service";
 import {
   getProductRefreshStatus,
   refreshProducts,
@@ -91,7 +100,15 @@ export default function PosPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [refreshingCatalog, setRefreshingCatalog] = useState(false);
+  const [refundPicking, setRefundPicking] = useState(false);
+  const [refundingOrderId, setRefundingOrderId] = useState<number | null>(null);
+  const [wasting, setWasting] = useState(false);
+  const [expensing, setExpensing] = useState(false);
   const [error, setError] = useState("");
+  // Cafe stock is information only on POS (T4): it never blocks a sale.
+  const [cafeStock, setCafeStock] = useState<Map<number, InventoryStockRow>>(
+    () => new Map(),
+  );
   const checkoutAttempt = useRef<{
     fingerprint: string;
     clientRequestId: string;
@@ -99,6 +116,17 @@ export default function PosPage() {
 
   const refreshOrders = useCallback(async () => {
     setRecentOrders(await listOrders());
+  }, []);
+
+  const refreshCafeStock = useCallback(async () => {
+    // Stock badges are informational only (T4), so failures stay silent.
+    const rows = await getCafeWarehouseStock().catch(() => null);
+    if (rows) setCafeStock(new Map(rows.map((row) => [row.itemId, row])));
+  }, []);
+
+  const refreshShiftTotals = useCallback(async () => {
+    const shift = await getCurrentShift().catch(() => null);
+    if (shift) setCurrentShift(shift);
   }, []);
 
   useEffect(() => {
@@ -178,7 +206,14 @@ export default function PosPage() {
       getCurrentShift()
         .then(setCurrentShift)
         .catch(() => undefined);
+      // Stock badges are informational (T4), so a failure is silent.
+      getCafeWarehouseStock()
+        .then((rows) =>
+          setCafeStock(new Map(rows.map((row) => [row.itemId, row]))),
+        )
+        .catch(() => undefined);
     };
+    refreshShift();
     const interval = window.setInterval(refreshShift, 30_000);
     window.addEventListener("focus", refreshShift);
     return () => {
@@ -215,6 +250,7 @@ export default function PosPage() {
     { mainCategoryId, subCategoryId, query },
   );
   const hasOwnOpenShift = isOwnOpenShift(currentShift, user);
+  const quickCash = useMemo(() => quickCashOptions(totals.total), [totals.total]);
   const canComplete =
     hasOwnOpenShift &&
     cart.length > 0 &&
@@ -280,6 +316,7 @@ export default function PosPage() {
       void refreshOrders().catch(() => {
         setError("تم حفظ الطلب، لكن تعذر تحديث قائمة الطلبات");
       });
+      void refreshCafeStock();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "تعذر حفظ الطلب");
     } finally {
@@ -310,19 +347,36 @@ export default function PosPage() {
               disabled={loading || saving}
             />
           )}
-          {user?.role === "admin" && (
+          {hasOwnOpenShift && (
             <>
               <Button
-                variant="ghost"
-                disabled={refreshingCatalog}
-                onClick={() => void requestCatalogRefresh()}
+                variant="secondary"
+                onClick={() => {
+                  setRefundPicking(true);
+                  setError("");
+                }}
               >
-                <RefreshCw
-                  className={`size-4 ${refreshingCatalog ? "animate-spin" : ""}`}
-                />
-                تحديث الكتالوج
+                <RotateCcw className="size-4" /> مرتجع
+              </Button>
+              <Button variant="secondary" onClick={() => setWasting(true)}>
+                <Trash2 className="size-4" /> هالك
+              </Button>
+              <Button variant="secondary" onClick={() => setExpensing(true)}>
+                <ReceiptText className="size-4" /> مصروف درج
               </Button>
             </>
+          )}
+          {user?.role === "admin" && (
+            <Button
+              variant="ghost"
+              disabled={refreshingCatalog}
+              onClick={() => void requestCatalogRefresh()}
+            >
+              <RefreshCw
+                className={`size-4 ${refreshingCatalog ? "animate-spin" : ""}`}
+              />
+              تحديث الكتالوج
+            </Button>
           )}
           <div className="flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-sm text-muted">
             <Clock3 className="size-4 text-primary" />
@@ -482,6 +536,8 @@ export default function PosPage() {
                     <button
                       type="button"
                       key={`item:${product.id}`}
+                      // Stock badges are informational only (T4): the tile
+                      // stays clickable whatever the balance is.
                       onClick={() => {
                         setCart((current) =>
                           addLocalSelection(current, product),
@@ -493,6 +549,27 @@ export default function PosPage() {
                       <div>
                         <p className="font-bold">{product.name}</p>
                         <p className="text-xs text-muted">{product.stockUnit}</p>
+                        {(() => {
+                          const stock = cafeStock.get(product.id);
+                          if (!stock) return null;
+                          const qty = Number(stock.quantity);
+                          return (
+                            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+                              <span className="tnum">
+                                المتاح:{" "}
+                                {qty.toLocaleString("ar-EG", {
+                                  maximumFractionDigits: 3,
+                                })}{" "}
+                                {stock.stockUnit}
+                              </span>
+                              {qty <= 0 ? (
+                                <Badge tone="danger">نفد من الكافيه</Badge>
+                              ) : stock.isLowStock ? (
+                                <Badge tone="danger">منخفض</Badge>
+                              ) : null}
+                            </p>
+                          );
+                        })()}
                       </div>
                       <p className="mt-3 inline-flex w-fit rounded-lg bg-primary/10 px-2.5 py-1 font-bold text-primary">
                         {formatMoney(product.sellingPrice)}
@@ -542,6 +619,11 @@ export default function PosPage() {
                         setCartLineQuantity(current, line.key, quantity),
                       )
                     }
+                    onRemove={() =>
+                      setCart((current) =>
+                        setCartLineQuantity(current, line.key, 0),
+                      )
+                    }
                   />
                 ))}
               </div>
@@ -550,43 +632,73 @@ export default function PosPage() {
 
           <div className="space-y-3 border-t border-line p-4">
             <div className="grid grid-cols-2 gap-2">
-              <select
-                aria-label="نوع الخصم"
-                value={discountType ?? ""}
-                onChange={(event) =>
-                  setDiscountType(
-                    (event.target.value || null) as OrderDiscountType | null,
-                  )
-                }
-                className="input"
-              >
-                <option value="">بدون خصم</option>
-                <option value="percent">خصم نسبة</option>
-                <option value="fixed">خصم ثابت</option>
-              </select>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-medium">الخصم</span>
+                <select
+                  aria-label="نوع الخصم"
+                  value={discountType ?? ""}
+                  onChange={(event) =>
+                    setDiscountType(
+                      (event.target.value || null) as OrderDiscountType | null,
+                    )
+                  }
+                  className="input"
+                >
+                  <option value="">بدون خصم</option>
+                  <option value="percent">خصم نسبة</option>
+                  <option value="fixed">خصم ثابت</option>
+                </select>
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-medium">قيمة الخصم</span>
+                <input
+                  aria-label="قيمة الخصم"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  disabled={discountType === null}
+                  value={discountValue || ""}
+                  onChange={(event) =>
+                    setDiscountValue(Number(event.target.value))
+                  }
+                  className="input tnum"
+                />
+              </label>
+            </div>
+            <label className="block space-y-1.5">
+              <span className="text-xs font-medium">النقد المستلم</span>
               <input
-                aria-label="قيمة الخصم"
+                aria-label="النقد المستلم"
                 type="number"
                 min="0"
                 step="0.01"
-                disabled={discountType === null}
-                value={discountValue || ""}
-                onChange={(event) =>
-                  setDiscountValue(Number(event.target.value))
-                }
+                value={cashReceived || ""}
+                onChange={(event) => setCashReceived(Number(event.target.value))}
+                placeholder="النقد المستلم"
                 className="input tnum"
               />
-            </div>
-            <input
-              aria-label="النقد المستلم"
-              type="number"
-              min="0"
-              step="0.01"
-              value={cashReceived || ""}
-              onChange={(event) => setCashReceived(Number(event.target.value))}
-              placeholder="النقد المستلم"
-              className="input tnum"
-            />
+            </label>
+            {totals.total > 0 && (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setCashReceived(totals.total)}
+                >
+                  بالضبط
+                </Button>
+                {quickCash.map((amount) => (
+                  <Button
+                    key={amount}
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setCashReceived(amount)}
+                  >
+                    {formatMoney(amount)}
+                  </Button>
+                ))}
+              </div>
+            )}
             <div className="space-y-1 text-sm">
               <Total label="الإجمالي الفرعي" value={totals.subtotal} />
               <Total label="الخصم" value={totals.discountAmount} />
@@ -644,15 +756,78 @@ export default function PosPage() {
         {receipt && (
           <>
             <OrderReceipt order={receipt} />
-            <Button
-              className="mt-4 w-full justify-center"
-              onClick={() => window.print()}
-            >
-              <Printer className="size-4" /> طباعة
-            </Button>
+            <div className="mt-4 flex flex-col gap-2">
+              {hasOwnOpenShift && (
+                <Button
+                  variant="secondary"
+                  className="w-full justify-center"
+                  onClick={() => setRefundingOrderId(receipt.id)}
+                >
+                  <RotateCcw className="size-4" /> مرتجع لهذا الطلب
+                </Button>
+              )}
+              <Button
+                className="w-full justify-center"
+                onClick={() => window.print()}
+              >
+                <Printer className="size-4" /> طباعة
+              </Button>
+            </div>
           </>
         )}
       </Modal>
+
+      {refundPicking && (
+        <Modal open title="اختر الطلب" onClose={() => setRefundPicking(false)}>
+          <OrderPicker
+            orders={recentOrders}
+            onPick={(orderId) => {
+              setRefundPicking(false);
+              setRefundingOrderId(orderId);
+            }}
+          />
+        </Modal>
+      )}
+      {refundingOrderId !== null && (
+        <RefundOrderModal
+          orderId={refundingOrderId}
+          onClose={() => setRefundingOrderId(null)}
+          onSaved={() => {
+            setRefundingOrderId(null);
+            setReceipt(null);
+            void refreshOrders().catch(() =>
+              setError("تم تسجيل المرتجع، لكن تعذر تحديث الطلبات"),
+            );
+            void refreshShiftTotals();
+            void refreshCafeStock();
+          }}
+        />
+      )}
+      {wasting && (
+        <Modal open title="تسجيل هالك" onClose={() => setWasting(false)}>
+          <WasteEntryForm
+            onSaved={() => {
+              setWasting(false);
+              void refreshShiftTotals();
+              void refreshCafeStock();
+            }}
+          />
+        </Modal>
+      )}
+      {expensing && (
+        <Modal
+          open
+          title="مصروف من درج الوردية"
+          onClose={() => setExpensing(false)}
+        >
+          <ExpenseEntryForm
+            onSaved={() => {
+              setExpensing(false);
+              void refreshShiftTotals();
+            }}
+          />
+        </Modal>
+      )}
     </div>
   );
 }
@@ -805,9 +980,11 @@ function ProductSelectionModal({
 function CartRow({
   line,
   onQuantity,
+  onRemove,
 }: {
   line: PosCartLine;
   onQuantity: (quantity: number) => void;
+  onRemove: () => void;
 }) {
   return (
     <div className="p-3">
@@ -825,7 +1002,18 @@ function CartRow({
               .join(" · ")}
           </p>
         </div>
-        <span className="tnum font-bold">{formatMoney(cartLineTotal(line))}</span>
+        <span className="flex items-start gap-1">
+          <span className="tnum font-bold">{formatMoney(cartLineTotal(line))}</span>
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label={`حذف ${line.productName}`}
+            title="حذف الصنف"
+            className="rounded-md p-1 text-muted transition-colors hover:bg-danger/10 hover:text-danger"
+          >
+            <Trash2 className="size-4" />
+          </button>
+        </span>
       </div>
       <div className="mt-2 flex items-center gap-2">
         <button
@@ -867,6 +1055,23 @@ function CategoryButton({
       {children}
     </button>
   );
+}
+
+const CASH_BILLS = [50, 100, 200, 500];
+
+/**
+ * "بالضبط" plus the next three round notes above the total, so the cashier
+ * rarely touches the keypad.
+ */
+function quickCashOptions(total: number) {
+  if (total <= 0) return [];
+  const rounded = [
+    ...new Set(CASH_BILLS.map((bill) => Math.ceil(total / bill) * bill)),
+  ]
+    .filter((amount) => amount > total)
+    .sort((a, b) => a - b)
+    .slice(0, 3);
+  return rounded;
 }
 
 function Total({

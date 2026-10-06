@@ -23,6 +23,13 @@ export function Modal({
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // Callers pass inline handlers, so onClose changes on every parent render.
+  // Reading it through a ref keeps the focus setup below from re-running (and
+  // yanking focus back to the first control) whenever the page re-renders.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -37,7 +44,7 @@ export function Modal({
       if (dialogs.length > 0 && dialogs[dialogs.length - 1] !== panel) return;
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab") return;
@@ -59,7 +66,7 @@ export function Modal({
       document.removeEventListener("keydown", onKeyDown);
       previous?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
   return (

@@ -1,18 +1,20 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { OrderDetail } from "@cashier/shared";
 import {
   Banknote,
   Coins,
   Printer,
+  RotateCcw,
   Scissors,
   TriangleAlert,
   User,
 } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { OrderReceipt } from "@/components/pos/order-receipt";
+import { RefundOrderModal } from "@/components/refunds/refund-order-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -45,14 +47,22 @@ function OrderDetailView() {
   const isAdmin = user?.role === "admin";
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [error, setError] = useState("");
+  const [refunding, setRefunding] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      setOrder(await getOrder(Number(id)));
+      setError("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "تعذر تحميل الطلب");
+    }
+  }, [id]);
 
   useEffect(() => {
-    getOrder(Number(id))
-      .then(setOrder)
-      .catch((caught) =>
-        setError(caught instanceof Error ? caught.message : "تعذر تحميل الطلب"),
-      );
-  }, [id]);
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   if (error) return <ErrorBanner>{error}</ErrorBanner>;
   if (!order) return <LoadingState label="جارِ تحميل الطلب…" />;
@@ -70,6 +80,12 @@ function OrderDetailView() {
             <span className="rounded-lg border border-line bg-surface px-2.5 py-1 text-sm font-bold tnum">
               {order.orderNumber}
             </span>
+            {!isAdmin && (
+              <Button variant="secondary" onClick={() => setRefunding(true)}>
+                <RotateCcw className="size-4" />
+                مرتجع
+              </Button>
+            )}
             <Button onClick={() => window.print()}>
               <Printer className="size-4" />
               طباعة الإيصال
@@ -77,6 +93,27 @@ function OrderDetailView() {
           </>
         }
       />
+
+      {notice && (
+        <p
+          role="status"
+          className="mb-4 rounded-lg border border-success/30 bg-success/5 p-3 text-sm text-success"
+        >
+          {notice}
+        </p>
+      )}
+
+      {refunding && (
+        <RefundOrderModal
+          orderId={order.id}
+          onClose={() => setRefunding(false)}
+          onSaved={(refund) => {
+            setRefunding(false);
+            setNotice(`تم تسجيل المرتجع بقيمة ${formatMoney(refund.amount)}`);
+            void load();
+          }}
+        />
+      )}
 
       <StatStrip className="mb-6">
         <Stat

@@ -134,6 +134,8 @@ export function ItemFormModal({
 
   async function save(event: FormEvent) {
     event.preventDefault();
+    // this modal opens from inside other forms; keep its submit from reaching theirs
+    event.stopPropagation();
     setSaving(true);
     setError("");
     const purchaseUnit = form.purchaseUnit.trim() || null;

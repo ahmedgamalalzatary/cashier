@@ -310,7 +310,8 @@ function TransfersView() {
         />
       )}
 
-      {formMode && (
+      {/* wait for stock: an invoice opened from the URL computes availability once */}
+      {formMode && !loading && (
         <TransferFormModal
           mode={formMode}
           items={stock}
