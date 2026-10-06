@@ -45,6 +45,10 @@ const runtimeEnvSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
+  EXTERNAL_CATALOG_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
   EXTERNAL_ORDERS_BASE_URL: z
     .string({ required_error: 'EXTERNAL_ORDERS_BASE_URL is required' })
     .url('EXTERNAL_ORDERS_BASE_URL must be a valid URL')

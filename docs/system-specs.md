@@ -1,6 +1,6 @@
 # Cashier + Warehouse System — Specification
 
-**Date:** 2026-07-19 (amended 2026-09-19 — internal POS sales restored; 2026-09-27 — independent branch workspaces)
+**Date:** 2026-07-19 (amended 2026-09-19 — internal POS sales restored; 2026-09-27 — independent branch workspaces; 2026-10-06 — branch, shift, and report details merged in from their separate docs)
 **Status:** Approved by owner
 **Scope:** Multiple independent branches — each has one main warehouse + one cafe (sub-warehouse)
 
@@ -32,7 +32,7 @@ A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inv
 
 ### Roles & permissions
 
-Branch access is enforced independently of the capability matrix below. Admins manage/select all branches; each cashier belongs to one branch and cannot change it. The revised capability/CRUD requirements remain tracked as AUTH-1/CRUD-1 in `docs/audit-report.md`; branch isolation does not mark those separate changes implemented.
+Branch access is enforced independently of the capability matrix below. Admins manage/select all branches; each cashier belongs to one branch and cannot change it. Revised cashier capabilities and transaction correction (edit/delete with reversal and retained history) remain open; branch isolation does not implement them.
 
 Only admins and cashiers can sign in. An employee record is a staff/HR record and has no system access by default.
 
@@ -52,7 +52,29 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 - Admin identities are global and may act within any selected workspace. Application requests carry `X-Branch-Id`; the server validates the selection against the current account. Cashiers default to their assigned branch and cannot override it.
 - Archive preserves history, blocks cashier login and operational writes, and skips worker refreshes. Admin can read archived records and restore the branch. A branch with an open shift, or the last active branch, cannot be archived.
 - Background catalog/order caching runs separately in each active branch with independent refresh state and leases. Online order stock deduction is a separate pending feature.
-- See `docs/branches.md` for API and rollout details.
+- **Using branches:** open **الفروع** (admin) to add, rename, archive, or restore. Select **الفرع الحالي** in the header (or **فتح الفرع** in the list); the workspace opens on Home and forms/carts/page state reset on a switch. To staff a branch, create the employee inside that workspace and grant cashier access; the account inherits the employee's branch.
+- New workspaces copy only cached catalog data. Ingredient mappings, modifier stock effects, stock, staff, and transactions are not copied; each branch configures its catalog stock setup independently.
+- Internal IDs stay globally unique; local item codes, request keys, and external catalog/order IDs may repeat across branches. Composite foreign keys protect owned-record references. The browser remembers the selected branch per account, but authorization always reads the account's real assignment, and responses that arrive after a branch/account switch are discarded.
+
+#### Branch API
+
+| Request                                        | Behavior                                           |
+| ---------------------------------------------- | -------------------------------------------------- |
+| `GET /api/branches`                            | Admin: every branch; cashier: assigned branch only |
+| `POST /api/branches` `{ "name": "…" }`         | Admin creates an active workspace                  |
+| `PUT /api/branches/:id` `{ "name": "…" }`      | Admin renames it                                   |
+| `DELETE /api/branches/:id`                     | Admin archives it and revokes its cashier sessions |
+| `PUT /api/branches/:id` `{ "isActive": true }` | Admin restores it                                  |
+
+Business endpoints select the workspace with `X-Branch-Id`. Admin defaults to Main Branch when no header is sent; a cashier defaults to its assigned branch and gets 403 for any other. Invalid IDs return 400, missing branches 404, and writes into an archived workspace 409. Auth and branch-management endpoints do not depend on the selection.
+
+#### Branch rollout
+
+- `0039_branch_workspaces` creates **الفرع الرئيسي** and preserves existing cashier assignment; `0040_branch_owned_data` assigns all existing operational rows to branch 1 without changing IDs, quantities, amounts, or history, and adds scoped uniqueness, cache keys, and owned-record references.
+- Back up the database and stop the old API/worker first: older versions run unscoped queries and must not serve the multi-branch schema. Apply migrations, then start API, worker, and web together (see `docker.md`).
+- MySQL DDL is not transactional. On failure, inspect the failing statement and partial schema before retrying; never blindly rerun completed DDL or remove the production volume.
+
+### Capability matrix
 
 | Capability                              | Admin | Cashier            |
 | --------------------------------------- | ----- | ------------------ |
@@ -78,7 +100,7 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 - **Main category** (e.g. مشروبات ساخنة) contains **sub-categories** (e.g. قهوة، شاي).
 - An item/product attaches to a sub-category, or directly to a main category that has no subs.
 - POS: main categories as tabs, sub-categories as a filter row for **internal** products; external catalog renders as a separate flat group alongside (see §7). Both navigations coexist.
-- Decision (amended 2026-09-28): POS sells local as-is resale items under main/sub tabs alongside a separate flat external catalog. Local prepared-result sales remain a separate implementation gap (audit §1.8). Categories do not determine whether a stock item is sold or used as an ingredient.
+- Decision (amended 2026-09-28): POS sells local as-is resale items under main/sub tabs alongside a separate flat external catalog. Local prepared-result sales remain a separate implementation gap. Categories do not determine whether a stock item is sold or used as an ingredient.
 - Reports can group by main or sub level.
 - Admin manages the tree (add/rename/deactivate).
 
@@ -149,7 +171,7 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 - **Current sale line types, stored in `order_lines.type`:**
   1. `external_product` — flat external catalog item (existing flow). Price from catalog (minus catalog discount) + modifier extras. Deducts mapped ingredients (`external_*_ingredients`) from **cafe stock** (FIFO).
   2. `item` — local as-is **resale item** (`items.type='resale'`, `items.sellingPrice`). The server reads its stored price and deducts the item itself (FIFO) from **cafe stock**, with no recipe required. Each imported menu flavor/size can be a separate local item.
-- `recipe` lines are legacy records; new checkout does not accept them. The owner-confirmed prepared-result model consumes a prepared output stock item at sale, not recipe ingredients. Local prepared pricing/sales and explicit imported recipe/output links remain unimplemented; see audit §1.8.
+- `recipe` lines are legacy records; new checkout does not accept them. The owner-confirmed prepared-result model consumes a prepared output stock item at sale, not recipe ingredients. Local prepared pricing/sales and explicit imported recipe/output links remain unimplemented.
 - Sales are allowed even if computed stock would go negative (the shop can't stop selling because of a data entry gap); negative stock is flagged on the dashboard for correction.
 - **Payments:** cash only. Received amount + change recorded.
 - **Discounts:** percentage or fixed amount per order; cashier applies freely; every discount is stored with order, cashier, and shift, and is visible in reports.
@@ -170,7 +192,26 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
   - `over/short = actual − expected`
 - Over/short is stored against the shift and cashier, with full history in reports.
 - Admin can view shifts, force-close a shift left open, and reopen/correct a closed shift with an audit note. Admin cannot open a shift.
-- Admin Home and Shifts show every open shift in the selected branch. Reopening conflicts only when that cashier already has an open shift. History pages retain access beyond 100 records and expose audit events and cash snapshots. See [shift rollout and API contract](shifts.md).
+- Admin Home and Shifts show every open shift in the selected branch. Reopening conflicts only when that cashier already has an open shift. History pages retain access beyond 100 records and expose audit events and cash snapshots.
+- **Controls:** cashiers use **فتح وردية** / **إغلاق وعدّ الدرج** on Home or POS, and **سجل وردياتي** for their own paginated history (**تفاصيل الوردية** shows totals, closing time, and audit events). Admin uses the **الورديات** page to force-close with a note, reopen, or correct float/actual cash with a note.
+
+#### Shift API
+
+All requests use the authenticated branch selection.
+
+| Request                              | Result                                                                                        |
+| ------------------------------------ | --------------------------------------------------------------------------------------------- |
+| `GET /api/shifts/current`            | Cashier: own open shift or `null`; admin: `null` (no personal cashier shift)                  |
+| `GET /api/shifts/active`             | Admin: all open shifts in the selected branch                                                 |
+| `GET /api/shifts/today`              | All shifts opened on today's Cairo calendar date; cashier: own shifts, admin: selected branch |
+| `GET /api/shifts?limit=100&offset=0` | Paginated history; limit 1–100, offset nonnegative; same ownership rules                      |
+| `GET /api/reports/dashboard`         | `openShifts`: every open shift in the selected branch                                         |
+
+Open, close, admin-close, reopen, and correction routes keep their payloads. A duplicate open/reopen for one cashier returns 409; a cashier cannot close another cashier's shift, and admin actions are limited to the selected branch.
+
+#### Shift rollout
+
+`0041_cashier_concurrent_shifts` replaces the unique `(branch_id, open_slot)` index with `(cashier_user_id, open_slot)` (open shifts use slot 1, closed use NULL), preserving every record, ID, total, and event. Stop the old API/worker before migrating: the old app assumes one shift per branch. Start the updated API, web, and worker together.
 
 ---
 
@@ -214,7 +255,7 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 - Waste entry: warehouse (main or cafe), what was wasted, quantity, **reason** (expired, damaged, preparation mistake, spill, other + note), date, who recorded it.
 - Can target:
   - a **stock item** (raw/resale/prepared) → deducts that item (FIFO), or
-  - a **finished prepared result** (e.g. a dropped drink) → deducts its finished stock item, not ingredients again. The legacy recipe waste path still consumes ingredients and remains audit finding B6.
+  - a **finished prepared result** (e.g. a dropped drink) → deducts its finished stock item, not ingredients again. The legacy recipe waste path still consumes ingredients and remains an open issue.
 - FIFO cost of every waste entry is stored and totalled in reports.
 - Permissions: cashier records **cafe** waste only; admin records waste anywhere.
 
@@ -260,9 +301,31 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 6. **Suppliers:** account statements, purchases by supplier, balances summary.
 7. **Transfers & preparation:** executed main-to-cafe transfers, request status/review, recipe preparation output and consumed ingredients, quantities, FIFO costs, and responsible staff.
 
-Date semantics: transaction totals use inclusive Cairo calendar dates, with correct daylight-saving boundaries. Stock/value/alerts and supplier balances are current snapshots, not historical closing balances. Transfer requests and stocktakes are selected by creation date and show their current state. Shift-period sales use transaction dates; lifetime shift cash reconciliation and dated closure/correction snapshots are separately labelled. Worked-shift counts exclude closed gaps between reopening segments. Gross profit excludes expenses, payroll and waste. All sections of a report read one consistent database snapshot; display/print uses the loaded range, not unapplied date controls.
+The Reports page is admin-only and reads the selected branch. Supplier reports complement the full statements on the Suppliers page.
 
-Current implementation covers the existing branch operations above. Global completed online revenue counted once, per-branch online stock costs, and transaction edit/delete history depend on the unfinished online/correction features and remain pending. See `reports.md` for contracts, coverage and print limitations.
+#### Dates and amounts
+
+- `from` and `to` are inclusive Cairo calendar dates. Timestamp queries use `[first instant of from, first instant of the day after to)`, including days where daylight saving skips midnight.
+- Timestamps are stored and sent as UTC and displayed in Cairo time. Expense, purchase/payment, and salary advance/adjustment dates stay calendar dates; no time is invented. The database pool uses UTC so the host timezone cannot shift report boundaries.
+- All sections read one read-only REPEATABLE READ transaction, so concurrent writes cannot make sections describe different states.
+- The response `range` carries `from`, `to`, `branchId`, and `generatedAt`. Editing the date controls does not relabel loaded figures; refresh clears the old report, and a pending or failed refresh cannot be printed. Late responses, including ones from a previous branch, are ignored.
+- Stock quantities/value/alerts and supplier balances are **current snapshots** at generation, not historical closing balances. Transfer-request status and stocktakes show their current state but are selected by creation date.
+- **Gross profit** = `sales − refunds − sales cost + returned cost`. Expenses, salaries, and waste are not deducted. Discounts are already inside the stored sale total and are not subtracted again.
+- Sales by shift counts only orders/refunds timestamped inside the period, including shifts opened earlier or reopened. Lifetime shift totals and the latest cash reconciliation appear separately.
+- Shift over/short lists close, admin-close, and correction events **dated within the period**; each row is a whole-shift snapshot at that event. Repeated snapshots of one shift are history, not additive gains/losses.
+- A closed gap between shift segments adds no worked minutes and no worked-shift count. Sub-minute segments are summed before rounding down to whole minutes.
+
+#### Print / Save as PDF
+
+Select a report group, load its dates, then choose **طباعة / PDF** and use the browser's Save as PDF destination (owner-accepted; there is no separate PDF service). Printed output shows the branch, loaded date range, Cairo timezone, generation time, scope notes, and the selected group's tables.
+
+#### Report API
+
+`GET /api/reports?from=YYYY-MM-DD&to=YYYY-MM-DD` returns every group, including `operations` (`transfers`, `transferLines`, `requests`, `requestLines`, `preparations`, `ingredients`), `money.expenses`, `employees.shiftHistory`, `suppliers.purchaseLines`, `sales.byShift` with period and lifetime figures, and `money.shiftOverShort` as dated event snapshots. Deploy matching API and web versions together.
+
+#### Pending
+
+Online revenue counted once for completed orders, per-branch online stock costs, and transaction edit/delete history depend on the unfinished online-order and correction features. Cached online summaries are not counted as POS revenue or cash flow.
 
 ---
 

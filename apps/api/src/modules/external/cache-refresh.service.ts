@@ -37,7 +37,11 @@ export class CacheRefreshService {
     private readonly catalogStore: CatalogStore,
     private readonly ordersSource: OrdersSource,
     private readonly ordersStore: OrdersStore,
-    private readonly runtime: { now: () => Date; owner: string },
+    private readonly runtime: {
+      now: () => Date;
+      owner: string;
+      syncCatalog?: boolean;
+    },
   ) {}
 
   requestRefresh() {
@@ -97,13 +101,15 @@ export class CacheRefreshService {
         void renewLease().catch(() => undefined);
       }, 60_000);
       const [catalog, orders] = await Promise.all([
-        this.catalogSource.load(),
+        this.runtime.syncCatalog === false
+          ? Promise.resolve(null)
+          : this.catalogSource.load(),
         this.ordersSource.listAll(),
       ]);
       signal?.throwIfAborted();
       await renewLease();
       signal?.throwIfAborted();
-      await this.catalogStore.applyCatalog(catalog);
+      if (catalog !== null) await this.catalogStore.applyCatalog(catalog);
       signal?.throwIfAborted();
       await renewLease();
       signal?.throwIfAborted();

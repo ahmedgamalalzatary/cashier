@@ -19,14 +19,14 @@ declare global {
 type AuthToken = AuthUser & { tokenVersion: number };
 
 export const AUTH_COOKIE_NAME = "cashier.token";
-const AUTH_COOKIE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const AUTH_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 export function signToken(
   user: AuthUser,
   tokenVersion: number,
   jwtSecret: string,
 ) {
-  return jwt.sign({ ...user, tokenVersion }, jwtSecret, { expiresIn: "12h" });
+  return jwt.sign({ ...user, tokenVersion }, jwtSecret, { expiresIn: "30d" });
 }
 
 function readCookie(header: string | undefined, name: string) {

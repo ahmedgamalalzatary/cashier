@@ -17,6 +17,7 @@ const refresh = createCacheRefreshService(
     password: environment.EXTERNAL_ORDERS_PASSWORD,
   },
   `${hostname()}:${process.pid}:${randomUUID()}`,
+  environment.EXTERNAL_CATALOG_ENABLED,
 );
 
 const shutdown = new AbortController();

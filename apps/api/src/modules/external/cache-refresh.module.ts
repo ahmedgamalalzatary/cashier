@@ -17,6 +17,7 @@ export function createCacheRefreshService(
   db: Db,
   config: ExternalOrdersConfig,
   owner: string,
+  syncCatalog = true,
 ) {
   const backend = new ExternalBackendClient(config);
   return new CacheRefreshService(
@@ -25,7 +26,7 @@ export function createCacheRefreshService(
     new ProductsRepository(db, false),
     new ExternalOrdersClient(backend),
     new ExternalOrdersRepository(db),
-    { now: () => new Date(), owner },
+    { now: () => new Date(), owner, syncCatalog },
   );
 }
 

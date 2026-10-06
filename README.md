@@ -2,7 +2,6 @@
 
 POS + inventory system with independent branch workspaces, each with a main warehouse and a cafe sub-warehouse.
 Full specification: [docs/system-specs.md](docs/system-specs.md).
-Branch management, access, and migration details: [docs/branches.md](docs/branches.md).
 
 ## Structure
 

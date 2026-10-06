@@ -36,6 +36,8 @@ The API response should be `{"ok":true}`; `/health` is intentionally unauthentic
 
 ## Deploy an update
 
+For a local menu that must retain archived external products/categories, set `EXTERNAL_CATALOG_ENABLED=false` in `.env.production`. The cache worker then skips loading and writing the upstream product catalog while continuing the existing online-order refresh schedule and manual refresh requests. Archived products/categories and historical sales remain stored; enabling the flag again allows upstream catalog refresh. Recreate `cache-worker` after changing this value. The default is `true`.
+
 ```bash
 git pull
 sudo docker compose --env-file .env.production config --quiet
@@ -69,7 +71,7 @@ After successful migration, start the updated stack:
 sudo docker compose --env-file .env.production up -d --force-recreate api cache-worker web
 ```
 
-Existing records remain in **الفرع الرئيسي**. MySQL DDL does not roll back on failure; inspect logs and the partial schema before retrying a failed migration. Branch ownership is implemented throughout the API, worker, and web client, so deploy those versions together. Further API/usage details are in `branches.md`.
+Existing records remain in **الفرع الرئيسي**. MySQL DDL does not roll back on failure; inspect logs and the partial schema before retrying a failed migration. Branch ownership is implemented throughout the API, worker, and web client, so deploy those versions together.
 
 ## Admin account
 

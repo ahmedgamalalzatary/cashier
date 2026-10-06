@@ -15,6 +15,11 @@ const valid = {
 };
 
 describe('runtime environment', () => {
+  it('keeps catalog refresh enabled by default and accepts explicitly disabling it', () => {
+    expect(parseRuntimeEnv(valid).EXTERNAL_CATALOG_ENABLED).toBe(true);
+    expect(parseRuntimeEnv({ ...valid, EXTERNAL_CATALOG_ENABLED: 'false' }).EXTERNAL_CATALOG_ENABLED).toBe(false);
+    expect(() => parseRuntimeEnv({ ...valid, EXTERNAL_CATALOG_ENABLED: 'no' })).toThrow('EXTERNAL_CATALOG_ENABLED');
+  });
   it('loads injected environment variables when the env file is absent', () => {
     expect(
       loadRuntimeEnv({

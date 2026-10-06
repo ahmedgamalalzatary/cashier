@@ -1,9 +1,66 @@
 import { describe, expect, it, vi } from "vitest";
 import { CacheRefreshService } from "../../src/modules/external/cache-refresh.service.js";
+import type { ExternalOrderSummary } from "@cashier/shared";
 
 const now = new Date("2026-08-21T12:00:00.000Z");
 
 describe("CacheRefreshService", () => {
+  it("continues importing online orders when catalog synchronization is disabled and the catalog is unavailable", async () => {
+    const saved: ExternalOrderSummary[] = [];
+    const onlineOrder: ExternalOrderSummary = {
+      id: 17,
+      customerName: "Customer",
+      customerPhone: "01000000000",
+      subtotal: "100.00",
+      discountAmount: "0.00",
+      totalAmount: "100.00",
+      deliveryFee: "0.00",
+      createdAt: "2026-08-21T10:00:00",
+      orderStatus: "pending",
+      paymentStatus: "unpaid",
+      paymentMethod: "cash_on_delivery",
+      orderType: "delivery",
+      itemCount: 1,
+    };
+    const service = new CacheRefreshService(
+      {
+        getState: async () => ({
+          lastSuccessfulSyncAt: null,
+          lastFailedAt: null,
+          refreshRequestedAt: null,
+          refreshRequestVersion: 0,
+        }),
+        tryAcquire: async () => true,
+        renew: async () => true,
+        markAttempt: async () => {},
+        markSuccess: async () => {},
+        markFailure: async () => {},
+        release: async () => {},
+        request: async () => {},
+      },
+      {
+        load: async () => {
+          throw new Error("Catalog must not be requested");
+        },
+      },
+      {
+        applyCatalog: async () => {
+          throw new Error("Archived catalog must not be overwritten");
+        },
+      },
+      { listAll: async () => [onlineOrder] },
+      {
+        insertUnseen: async (rows) => {
+          saved.push(...rows);
+        },
+      },
+      { now: () => now, owner: "worker-1", syncCatalog: false },
+    );
+    await expect(service.runForced()).resolves.toBe(true);
+    expect(saved).toEqual([
+      expect.objectContaining({ id: 17, totalAmount: "100.00" }),
+    ]);
+  });
   it("uses one durable lock and refreshes catalog plus append-only orders", async () => {
     const state = {
       getState: vi.fn().mockResolvedValue({
