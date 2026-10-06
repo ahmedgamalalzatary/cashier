@@ -122,7 +122,7 @@ export function ReportTable({ title, rows, columns, note }: ReportTableData) {
           ))}
         </Table>
       ) : (
-        <p className="rounded-xl border border-dashed border-line p-5 text-center text-sm text-muted">
+        <p className="empty-state text-sm text-muted">
           لا توجد بيانات
         </p>
       )}

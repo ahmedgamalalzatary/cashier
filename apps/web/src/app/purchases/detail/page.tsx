@@ -3,17 +3,18 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowRight } from "lucide-react";
 import type { PurchaseInvoiceDetail } from "@cashier/shared";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
+import { Stat, StatStrip } from "@/components/ui/stat";
 import { Table } from "@/components/ui/table";
+import { ErrorBanner, LoadingState } from "@/components/ui/states";
 import { formatMoney, itemLabel } from "@/lib/format";
 import { getPurchase } from "@/services/purchases-service";
 
 export default function PurchaseDetailPage() {
   return (
-    <Suspense fallback={<p className="text-muted">جارِ تحميل الفاتورة…</p>}>
+    <Suspense fallback={<LoadingState label="جارِ تحميل الفاتورة…" />}>
       <PurchaseDetailView />
     </Suspense>
   );
@@ -34,52 +35,37 @@ function PurchaseDetailView() {
       );
   }, [id]);
 
-  if (error)
-    return (
-      <p className="rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>
-    );
-  if (!invoice) return <p className="text-muted">جارِ تحميل الفاتورة…</p>;
+  if (error) return <ErrorBanner>{error}</ErrorBanner>;
+  if (!invoice) return <LoadingState label="جارِ تحميل الفاتورة…" />;
 
   const due = Number(invoice.dueAmount);
+  const paid = Number(invoice.paidAmount);
+
   return (
     <div>
-      <Link
-        href="/purchases"
-        className="mb-4 inline-flex items-center gap-1 text-sm text-muted hover:text-ink"
-      >
-        <ArrowRight className="size-4" /> رجوع إلى المشتريات
-      </Link>
       <PageHeader
+        back={{ href: "/purchases", label: "رجوع إلى المشتريات" }}
         title={`فاتورة شراء ${invoice.invoiceNumber || `#${invoice.id}`}`}
+        actions={
+          <Badge tone={due === 0 ? "success" : paid > 0 ? "neutral" : "danger"}>
+            {due === 0
+              ? "مدفوع بالكامل"
+              : paid > 0
+                ? "دفعة جزئية"
+                : "آجل بالكامل"}
+          </Badge>
+        }
       />
 
-      <section className="mb-5 overflow-hidden rounded-2xl border border-line bg-surface">
-        <div className="grid gap-px bg-line sm:grid-cols-2 lg:grid-cols-4">
-          <Info label="المورد" value={invoice.supplierName} />
-          <Info label="تاريخ الشراء" value={invoice.purchasedAt} numeric />
-          <Info label="سجلها" value={invoice.createdByName} />
-          <div className="bg-surface p-4">
-            <p className="text-xs text-muted">السداد عند التسجيل</p>
-            <div className="mt-2">
-              <Badge
-                tone={
-                  due === 0
-                    ? "success"
-                    : Number(invoice.paidAmount) > 0
-                      ? "neutral"
-                      : "danger"
-                }
-              >
-                {due === 0
-                  ? "مدفوع بالكامل"
-                  : Number(invoice.paidAmount) > 0
-                    ? "دفعة جزئية"
-                    : "آجل بالكامل"}
-              </Badge>
-            </div>
-          </div>
-        </div>
-      </section>
+      <StatStrip className="mb-5">
+        <Stat label="المورد" value={invoice.supplierName} />
+        <Stat label="تاريخ الشراء" value={invoice.purchasedAt} />
+        <Stat label="سجلها" value={invoice.createdByName} />
+        <Stat
+          label="الإجمالي"
+          value={formatMoney(invoice.totalAmount)}
+        />
+      </StatStrip>
 
       <Table
         headers={[
@@ -93,24 +79,26 @@ function PurchaseDetailView() {
       >
         {invoice.lines.map((line) => (
           <tr key={line.id}>
-            <td className="px-4 py-3 font-medium">{itemLabel(line.itemCode, line.itemName)}</td>
-            <td className="px-4 py-3 tnum">
+            <td className="px-4 py-3 font-medium">
+              {itemLabel(line.itemCode, line.itemName)}
+            </td>
+            <td className="tnum px-4 py-3">
               {Number(line.quantity).toLocaleString("ar-EG", {
                 maximumFractionDigits: 3,
               })}{" "}
               {line.unitName}
             </td>
-            <td className="px-4 py-3 tnum">{formatMoney(line.unitPrice)}</td>
-            <td className="px-4 py-3 tnum">
+            <td className="tnum px-4 py-3">{formatMoney(line.unitPrice)}</td>
+            <td className="tnum px-4 py-3">
               {Number(line.stockQuantity).toLocaleString("ar-EG", {
                 maximumFractionDigits: 3,
               })}{" "}
               {line.stockUnit}
             </td>
-            <td className="px-4 py-3 tnum text-muted">
+            <td className="tnum px-4 py-3 text-muted">
               {formatMoney(line.unitCost)}
             </td>
-            <td className="px-4 py-3 tnum font-medium">
+            <td className="tnum px-4 py-3 font-medium">
               {formatMoney(line.lineTotal)}
             </td>
           </tr>
@@ -118,7 +106,7 @@ function PurchaseDetailView() {
       </Table>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_20rem]">
-        <div className="rounded-xl border border-line bg-surface p-4">
+        <div className="sheet p-4">
           <p className="text-xs text-muted">ملاحظات</p>
           <p className="mt-1 text-sm">{invoice.notes || "لا توجد ملاحظات"}</p>
         </div>
@@ -143,23 +131,14 @@ function PurchaseDetailView() {
           </div>
         </dl>
       </div>
-    </div>
-  );
-}
 
-function Info({
-  label,
-  value,
-  numeric = false,
-}: {
-  label: string;
-  value: string;
-  numeric?: boolean;
-}) {
-  return (
-    <div className="bg-surface p-4">
-      <p className="text-xs text-muted">{label}</p>
-      <p className={`mt-1 font-medium ${numeric ? "tnum" : ""}`}>{value}</p>
+      <p className="mt-4 text-sm text-muted">
+        لإضافة هذه الكميات إلى مخزن الكافيه،{" "}
+        <Link href="/transfers" className="font-medium text-primary hover:underline">
+          أنشئ طلب تحويل
+        </Link>
+        .
+      </p>
     </div>
   );
 }

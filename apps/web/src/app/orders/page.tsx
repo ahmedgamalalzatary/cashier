@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { OrderSummary } from "@cashier/shared";
 import {
@@ -12,10 +12,12 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { ExternalOrdersPanel } from "@/components/orders/external-orders-panel";
-import { OrdersTabs, type OrdersTab } from "@/components/orders/orders-tabs";
 import { Badge } from "@/components/ui/badge";
+import { DataTable, type DataColumn } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
-import { Table } from "@/components/ui/table";
+import { Stat, StatStrip } from "@/components/ui/stat";
+import { Tabs } from "@/components/ui/tabs";
+import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
 import { cairoCalendarDate } from "@/lib/cairo-date";
 import { formatMoney } from "@/lib/format";
 import {
@@ -26,6 +28,8 @@ import {
   splitOrderNumber,
 } from "@/models/orders-model";
 import { listOrders } from "@/services/orders-service";
+
+type OrdersTab = "cashier" | "online";
 
 const dayFormat = new Intl.DateTimeFormat("ar-EG", { dateStyle: "medium" });
 const timeFormat = new Intl.DateTimeFormat("ar-EG", {
@@ -80,78 +84,164 @@ export default function OrdersPage() {
   const totals = useMemo(() => ordersTotals(visibleRows), [visibleRows]);
   const flagged = visibleRows.filter((row) => row.isNegativeStock).length;
 
+  const columns: DataColumn<OrderSummary>[] = [
+    {
+      key: "orderNumber",
+      header: "رقم الطلب",
+      mobile: "primary",
+      cell: (row) => {
+        const { prefix, code } = splitOrderNumber(row.orderNumber);
+        return (
+          <Link
+            href={`/orders/detail?id=${row.id}`}
+            className="block hover:text-primary"
+          >
+            <span className="tnum block font-bold">{code}</span>
+            {prefix && (
+              <span className="tnum block truncate text-xs text-muted">
+                {prefix}
+              </span>
+            )}
+          </Link>
+        );
+      },
+    },
+    {
+      key: "createdAt",
+      header: "الوقت",
+      cell: (row) => {
+        const createdAt = new Date(row.createdAt);
+        return (
+          <>
+            <span className="tnum block">{timeFormat.format(createdAt)}</span>
+            <span className="tnum block text-xs text-muted">
+              {dayFormat.format(createdAt)}
+            </span>
+          </>
+        );
+      },
+    },
+    { key: "cashier", header: "الكاشير", cell: (row) => row.cashierName },
+    {
+      key: "discount",
+      header: "الخصم",
+      numeric: true,
+      cell: (row) =>
+        Number(row.discountAmount) > 0 ? (
+          formatMoney(row.discountAmount)
+        ) : (
+          <span className="text-muted">—</span>
+        ),
+    },
+    {
+      key: "total",
+      header: "الإجمالي",
+      numeric: true,
+      cell: (row) => (
+        <span className="font-bold">{formatMoney(row.total)}</span>
+      ),
+    },
+    ...(isAdmin
+      ? ([
+          {
+            key: "cost",
+            header: "التكلفة",
+            numeric: true,
+            cell: (row) => orderMargin(row).cost,
+          },
+          {
+            key: "profit",
+            header: "الربح",
+            numeric: true,
+            cell: (row) => {
+              const margin = orderMargin(row);
+              const loss = Number(row.total) < Number(row.totalCost);
+              return (
+                <span className={loss ? "text-danger" : "text-success"}>
+                  {margin.profit}
+                </span>
+              );
+            },
+          },
+        ] satisfies DataColumn<OrderSummary>[])
+      : []),
+    {
+      key: "status",
+      header: "الحالة",
+      cell: (row) =>
+        row.isNegativeStock ? (
+          <Badge tone="danger">رصيد سالب</Badge>
+        ) : (
+          <Badge tone="success">مكتمل</Badge>
+        ),
+    },
+  ];
+
   return (
     <div>
       <PageHeader
         title="الطلبات"
-        actions={
-          <span className="text-sm text-muted">
-            {activeTab === "cashier"
-              ? "آخر ما سُجّل على الكاونتر، الأحدث أولاً"
-              : "طلبات الأونلاين من نظام الطلبات، الأحدث أولاً"}
-          </span>
+        description={
+          activeTab === "cashier"
+            ? "آخر ما سُجّل على الكاونتر، الأحدث أولاً"
+            : "طلبات الأونلاين من نظام الطلبات، الأحدث أولاً"
         }
       />
 
-      <OrdersTabs active={activeTab} onChange={setActiveTab} />
+      <Tabs
+        items={[
+          { id: "cashier", label: "طلبات الكاشير" },
+          { id: "online", label: "طلبات الأونلاين" },
+        ]}
+        active={activeTab}
+        onChange={setActiveTab}
+        ariaLabel="مصدر الطلبات"
+        className="mb-5"
+      />
 
-      <section
-        id="orders-cashier-panel"
-        role="tabpanel"
-        aria-labelledby="orders-cashier-tab"
-        hidden={activeTab !== "cashier"}
-      >
-        <section className="mb-6 overflow-hidden rounded-2xl border border-line bg-sidebar text-white shadow-[0_16px_45px_rgb(43_33_24/0.10)]">
-          <div className="grid grid-cols-2 divide-x divide-y divide-white/10 divide-x-reverse lg:grid-cols-4 lg:divide-y-0">
-            <Summary
-              icon={<ReceiptText className="size-5 text-accent" />}
-              label="عدد الطلبات المعروضة"
-              value={totals.countLabel}
-            />
-            <Summary
-              icon={<Coins className="size-5 text-accent" />}
-              label="إجمالي المبيعات"
-              value={totals.sales}
-            />
-            <Summary
-              icon={<Scissors className="size-5 text-accent" />}
-              label="إجمالي الخصومات"
-              value={totals.discounts}
-            />
-            <Summary
-              icon={<TriangleAlert className="size-5 text-danger" />}
-              label="طلبات برصيد سالب"
-              value={String(flagged)}
-              danger={flagged > 0}
-            />
-          </div>
-        </section>
+      <section hidden={activeTab !== "cashier"}>
+        <StatStrip className="mb-5">
+          <Stat
+            icon={<ReceiptText className="size-4" />}
+            label="عدد الطلبات المعروضة"
+            value={totals.countLabel}
+          />
+          <Stat
+            icon={<Coins className="size-4" />}
+            label="إجمالي المبيعات"
+            value={totals.sales}
+          />
+          <Stat
+            icon={<Scissors className="size-4" />}
+            label="إجمالي الخصومات"
+            value={totals.discounts}
+          />
+          <Stat
+            icon={<TriangleAlert className="size-4" />}
+            label="طلبات برصيد سالب"
+            value={String(flagged)}
+            tone={flagged > 0 ? "danger" : "default"}
+          />
+        </StatStrip>
 
-        {error && (
-          <p
-            role="alert"
-            className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger"
-          >
-            {error}
-          </p>
-        )}
+        {error && <ErrorBanner className="mb-4">{error}</ErrorBanner>}
 
-        <div className="mb-4 grid gap-3 rounded-xl border border-line bg-surface p-3 md:grid-cols-[minmax(14rem,1fr)_13rem_12rem]">
-          <label className="relative block">
-            <Search className="pointer-events-none absolute right-3 top-2.5 size-4 text-muted" />
+        <div className="toolbar mb-4">
+          <label className="relative min-w-[14rem] flex-1">
+            <Search className="pointer-events-none absolute inset-y-0 start-3 my-auto size-4 text-muted" />
             <input
               aria-label="البحث عن طلب"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="ابحث برقم الطلب أو اسم الكاشير"
-              className="w-full rounded-lg border border-line bg-paper/40 py-2 pe-3 ps-9 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              className="input ps-9"
             />
           </label>
           <select
             aria-label="تصفية حسب الكاشير"
             value={cashierId}
             onChange={(event) => setCashierId(event.target.value)}
-            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+            className="input w-auto"
           >
             <option value="">كل الكاشيرية</option>
             {cashiers.map((cashier) => (
@@ -166,12 +256,12 @@ export default function OrdersPage() {
               type="date"
               value={day}
               onChange={(event) => setDay(event.target.value)}
-              className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+              className="input w-auto"
             />
             <button
               type="button"
               onClick={() => setDay(day ? "" : cairoCalendarDate())}
-              className="shrink-0 rounded-lg border border-line px-3 py-2 text-sm text-muted hover:border-primary hover:text-primary"
+              className="shrink-0 rounded-lg border border-line px-3 text-sm text-muted transition-colors hover:border-primary hover:text-primary"
             >
               {day ? "كل الأيام" : "اليوم"}
             </button>
@@ -179,211 +269,33 @@ export default function OrdersPage() {
         </div>
 
         {loading ? (
-          <p className="text-muted">جارِ تحميل سجل الطلبات…</p>
-        ) : orders.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-line bg-surface p-10 text-center">
-            <ReceiptText className="mx-auto mb-3 size-8 text-muted" />
-            <p className="font-medium">لم يُسجَّل أي طلب بعد</p>
-            <p className="mt-1 text-sm text-muted">
-              أول عملية بيع من نقطة البيع تظهر هنا فوراً.
-            </p>
-          </div>
-        ) : visibleRows.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-line bg-surface p-8 text-center text-muted">
-            لا توجد طلبات تطابق عوامل التصفية الحالية.
-          </p>
+          <LoadingState label="جارِ تحميل سجل الطلبات…" />
         ) : (
-          <>
-            <ul className="grid gap-3 md:hidden">
-              {visibleRows.map((row) => {
-                const { prefix, code } = splitOrderNumber(row.orderNumber);
-                const margin = orderMargin(row);
-                const createdAt = new Date(row.createdAt);
-                return (
-                  <li
-                    key={row.id}
-                    className="rounded-xl border border-line bg-surface p-3"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <Link
-                        href={`/orders/detail?id=${row.id}`}
-                        className="min-w-0 hover:text-primary"
-                      >
-                        <span className="tnum block font-bold">{code}</span>
-                        {prefix && (
-                          <span className="block truncate text-xs tnum text-muted">
-                            {prefix}
-                          </span>
-                        )}
-                      </Link>
-                      <div className="flex shrink-0 flex-col items-end gap-1">
-                        {row.isNegativeStock ? (
-                          <Badge tone="danger">رصيد سالب</Badge>
-                        ) : (
-                          <Badge tone="success">مكتمل</Badge>
-                        )}
-                        <span className="tnum text-base font-bold">
-                          {formatMoney(row.total)}
-                        </span>
-                      </div>
-                    </div>
-                    <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-line pt-3 text-xs">
-                      <div>
-                        <dt className="text-muted">الوقت</dt>
-                        <dd className="tnum">
-                          {timeFormat.format(createdAt)} ·{" "}
-                          {dayFormat.format(createdAt)}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-muted">الكاشير</dt>
-                        <dd className="truncate">{row.cashierName}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-muted">الخصم</dt>
-                        <dd className="tnum">
-                          {Number(row.discountAmount) > 0
-                            ? formatMoney(row.discountAmount)
-                            : "—"}
-                        </dd>
-                      </div>
-                      {isAdmin && (
-                        <div>
-                          <dt className="text-muted">التكلفة / الربح</dt>
-                          <dd className="tnum">
-                            {margin.cost}
-                            {" · "}
-                            <span
-                              className={
-                                Number(row.total) < Number(row.totalCost)
-                                  ? "text-danger"
-                                  : "text-success"
-                              }
-                            >
-                              {margin.profit}
-                            </span>
-                          </dd>
-                        </div>
-                      )}
-                    </dl>
-                  </li>
-                );
-              })}
-            </ul>
-            <div className="hidden md:block">
-              <Table
-                headers={[
-                  "رقم الطلب",
-                  "الوقت",
-                  "الكاشير",
-                  "الخصم",
-                  "الإجمالي",
-                  ...(isAdmin ? ["التكلفة", "الربح"] : []),
-                  "الحالة",
-                ]}
-              >
-                {visibleRows.map((row) => {
-                  const { prefix, code } = splitOrderNumber(row.orderNumber);
-                  const margin = orderMargin(row);
-                  const createdAt = new Date(row.createdAt);
-                  return (
-                    <tr key={row.id} className="hover:bg-paper/50">
-                      <td className="px-4 py-3">
-                        <Link
-                          href={`/orders/detail?id=${row.id}`}
-                          className="block hover:text-primary"
-                        >
-                          <span className="block font-bold tnum">{code}</span>
-                          {prefix && (
-                            <span className="block text-xs tnum text-muted">
-                              {prefix}
-                            </span>
-                          )}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="block tnum">
-                          {timeFormat.format(createdAt)}
-                        </span>
-                        <span className="block text-xs tnum text-muted">
-                          {dayFormat.format(createdAt)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">{row.cashierName}</td>
-                      <td className="px-4 py-3 tnum text-muted">
-                        {Number(row.discountAmount) > 0
-                          ? formatMoney(row.discountAmount)
-                          : "—"}
-                      </td>
-                      <td className="px-4 py-3 tnum font-bold">
-                        {formatMoney(row.total)}
-                      </td>
-                      {isAdmin && (
-                        <td className="px-4 py-3 tnum text-muted">
-                          {margin.cost}
-                        </td>
-                      )}
-                      {isAdmin && (
-                        <td
-                          className={`px-4 py-3 tnum font-medium ${
-                            Number(row.total) < Number(row.totalCost)
-                              ? "text-danger"
-                              : "text-success"
-                          }`}
-                        >
-                          {margin.profit}
-                        </td>
-                      )}
-                      <td className="px-4 py-3">
-                        {row.isNegativeStock ? (
-                          <Badge tone="danger">رصيد سالب</Badge>
-                        ) : (
-                          <Badge tone="success">مكتمل</Badge>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </Table>
-            </div>
-          </>
+          <DataTable
+            caption="سجل طلبات الكاشير"
+            rows={visibleRows}
+            rowKey={(row) => row.id}
+            columns={columns}
+            empty={
+              orders.length === 0 ? (
+                <EmptyState
+                  icon={<ReceiptText className="size-8" />}
+                  title="لم يُسجَّل أي طلب بعد"
+                  description="أول عملية بيع من نقطة البيع تظهر هنا فوراً."
+                />
+              ) : (
+                <p className="empty-state text-sm text-muted">
+                  لا توجد طلبات تطابق عوامل التصفية الحالية.
+                </p>
+              )
+            }
+          />
         )}
       </section>
 
-      <section
-        id="orders-online-panel"
-        role="tabpanel"
-        aria-labelledby="orders-online-tab"
-        hidden={activeTab !== "online"}
-      >
+      <section hidden={activeTab !== "online"}>
         <ExternalOrdersPanel />
       </section>
-    </div>
-  );
-}
-
-function Summary({
-  icon,
-  label,
-  value,
-  danger = false,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  danger?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-2 px-3 py-3 sm:gap-3 sm:px-5 sm:py-4">
-      <div className="shrink-0 rounded-lg bg-white/8 p-2">{icon}</div>
-      <div className="min-w-0">
-        <p className="text-[11px] text-sidebar-ink sm:text-xs">{label}</p>
-        <p
-          className={`tnum mt-0.5 truncate text-base font-bold sm:text-xl ${danger ? "text-accent" : ""}`}
-        >
-          {value}
-        </p>
-      </div>
     </div>
   );
 }

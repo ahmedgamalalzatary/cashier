@@ -24,7 +24,7 @@ export function SupplierFormModal({
 }: {
   supplier: Supplier | null;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (savedId: number) => void;
 }) {
   const [form, setForm] = useState(
     supplier
@@ -51,9 +51,13 @@ export function SupplierFormModal({
     setError("");
     try {
       const body = supplierRequestBody(form, supplier);
-      if (supplier) await updateSupplier(supplier.id, body);
-      else await createSupplier(body);
-      onSaved();
+      if (supplier) {
+        await updateSupplier(supplier.id, body);
+        onSaved(supplier.id);
+      } else {
+        const created = await createSupplier(body);
+        onSaved(created.id);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "تعذر الحفظ");
     } finally {

@@ -13,10 +13,12 @@ import type { Branch } from "@cashier/shared";
 import { useBranch } from "@/components/branches/branch-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DataTable, type DataColumn } from "@/components/ui/data-table";
 import { Field } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
-import { Table } from "@/components/ui/table";
+import { ErrorBanner } from "@/components/ui/states";
 import {
   archiveBranch,
   createBranch,
@@ -28,6 +30,24 @@ export default function BranchesPage() {
   const [form, setForm] = useState<{ id?: number; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [archiving, setArchiving] = useState<Branch | null>(null);
+  const [archivingError, setArchivingError] = useState("");
+
+  async function archive(target: Branch) {
+    setBusy(true);
+    setArchivingError("");
+    try {
+      await archiveBranch(target.id);
+      setArchiving(null);
+      await refresh();
+    } catch (cause) {
+      setArchivingError(
+        cause instanceof Error ? cause.message : "تعذر أرشفة الفرع",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
@@ -54,16 +74,38 @@ export default function BranchesPage() {
       setForm(null);
     });
   }
-  function archive(row: Branch) {
-    if (window.confirm(`أرشفة «${row.name}»؟ ستظل سجلاته محفوظة.`))
-      void run(() => archiveBranch(row.id));
-  }
+
+  const columns: DataColumn<Branch>[] = [
+    {
+      key: "name",
+      header: "الفرع",
+      mobile: "primary",
+      cell: (row) => (
+        <div className="flex items-center gap-3">
+          <Building2 className="size-5 text-primary" />
+          <span className="font-semibold">{row.name}</span>
+          {row.id === branch.id && <Badge tone="neutral">الفرع الحالي</Badge>}
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: "الحالة",
+      cell: (row) => (
+        <Badge tone={row.isActive ? "success" : "neutral"}>
+          {row.isActive ? "نشط" : "مؤرشف"}
+        </Badge>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-5">
       <PageHeader
         title="الفروع"
+        description="لكل فرع مخزونه وموظفوه وسجلاته الخاصة. افتح الفرع الذي تريد العمل فيه، وأنشئ حسابات الكاشير من سجل الموظفين داخله."
         actions={
-          <div className="flex gap-2">
+          <>
             <Button
               variant="ghost"
               disabled={busy}
@@ -82,84 +124,66 @@ export default function BranchesPage() {
               <Plus className="size-4" />
               إضافة فرع
             </Button>
-          </div>
+          </>
         }
       />
-      <p className="max-w-2xl text-sm leading-7 text-muted">
-        لكل فرع مخزونه وموظفوه وسجلاته الخاصة. افتح الفرع الذي تريد العمل فيه،
-        وأنشئ حسابات الكاشير من سجل الموظفين داخله.
-      </p>
-      {error && !form && (
-        <p
-          role="alert"
-          className="rounded-lg bg-danger/10 p-3 text-sm text-danger"
-        >
-          {error}
-        </p>
-      )}
-      <Table headers={["الفرع", "الحالة", "الإجراءات"]}>
-        {branches.map((row) => (
-          <tr key={row.id}>
-            <td className="px-4 py-4">
-              <div className="flex items-center gap-3">
-                <Building2 className="size-5 text-primary" />
-                <span className="font-semibold">{row.name}</span>
-                {row.id === branch.id && (
-                  <Badge tone="neutral">الفرع الحالي</Badge>
-                )}
-              </div>
-            </td>
-            <td className="px-4 py-4">
-              <Badge tone={row.isActive ? "success" : "neutral"}>
-                {row.isActive ? "نشط" : "مؤرشف"}
-              </Badge>
-            </td>
-            <td className="px-4 py-4">
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="ghost"
-                  disabled={busy || row.id === branch.id}
-                  onClick={() => selectBranch(row.id)}
-                >
-                  فتح الفرع
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => {
-                    setError("");
-                    setForm({ id: row.id, name: row.name });
-                  }}
-                >
-                  <Pencil className="size-4" />
-                  تعديل
-                </Button>
-                {row.isActive ? (
-                  <Button
-                    variant="danger"
-                    disabled={busy}
-                    onClick={() => archive(row)}
-                  >
-                    <Archive className="size-4" />
-                    أرشفة
-                  </Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() =>
-                      void run(() => updateBranch(row.id, { isActive: true }))
-                    }
-                  >
-                    <RotateCcw className="size-4" />
-                    إعادة تفعيل
-                  </Button>
-                )}
-              </div>
-            </td>
-          </tr>
-        ))}
-      </Table>
+      {error && !form && <ErrorBanner>{error}</ErrorBanner>}
+      <DataTable
+        caption="قائمة الفروع"
+        rows={branches}
+        rowKey={(row) => row.id}
+        columns={columns}
+        actions={(row) => (
+          <div className="flex flex-wrap justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy || row.id === branch.id}
+              onClick={() => selectBranch(row.id)}
+            >
+              فتح الفرع
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => {
+                setError("");
+                setForm({ id: row.id, name: row.name });
+              }}
+            >
+              <Pencil className="size-4" />
+              تعديل
+            </Button>
+            {row.isActive ? (
+              <Button
+                variant="danger"
+                size="sm"
+                disabled={busy}
+                onClick={() => {
+                  setArchivingError("");
+                  setArchiving(row);
+                }}
+              >
+                <Archive className="size-4" />
+                أرشفة
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={busy}
+                onClick={() =>
+                  void run(() => updateBranch(row.id, { isActive: true }))
+                }
+              >
+                <RotateCcw className="size-4" />
+                إعادة تفعيل
+              </Button>
+            )}
+          </div>
+        )}
+      />
       {form && (
         <Modal
           open
@@ -200,6 +224,26 @@ export default function BranchesPage() {
           </form>
         </Modal>
       )}
+      <ConfirmDialog
+        open={archiving !== null}
+        title="أرشفة الفرع"
+        description={
+          archiving
+            ? `ستُؤرشف «${archiving.name}» مع بقاء سجلاته محفوظة.`
+            : undefined
+        }
+        tone="danger"
+        confirmLabel="أرشفة"
+        busy={busy}
+        error={archivingError}
+        onConfirm={() => {
+          if (archiving) void archive(archiving);
+        }}
+        onCancel={() => {
+          setArchiving(null);
+          setArchivingError("");
+        }}
+      />
     </div>
   );
 }

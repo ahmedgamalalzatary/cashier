@@ -33,6 +33,8 @@ export function Modal({
     (focusables()[0] ?? panel)?.focus();
 
     function onKeyDown(e: KeyboardEvent) {
+      const dialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
+      if (dialogs.length > 0 && dialogs[dialogs.length - 1] !== panel) return;
       if (e.key === "Escape") {
         e.stopPropagation();
         onClose();

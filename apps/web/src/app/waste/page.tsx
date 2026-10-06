@@ -10,9 +10,12 @@ import type {
 import { Trash2 } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
+import { DataTable, type DataColumn } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
-import { Table } from "@/components/ui/table";
+import { Section } from "@/components/ui/section";
+import { SelectField } from "@/components/ui/select-field";
+import { EmptyState, ErrorBanner } from "@/components/ui/states";
 import { formatMoney } from "@/lib/format";
 import { warehouseForWasteTarget } from "@/lib/waste-target";
 import {
@@ -107,11 +110,11 @@ export default function WastePage() {
           }
         : type === "product"
           ? {
-            type: "external_product",
-            externalProductId: Number(idText),
-            externalSizeId: Number(sizeText) || null,
-          }
-        : { type: "item", itemId: Number(idText) };
+              type: "external_product",
+              externalProductId: Number(idText),
+              externalSizeId: Number(sizeText) || null,
+            }
+          : { type: "item", itemId: Number(idText) };
     setSaving(true);
     setError("");
     try {
@@ -149,24 +152,76 @@ export default function WastePage() {
     (!selectedUnit || Number.isInteger(Number(quantity))) &&
     (reason !== "other" || note.trim().length > 0);
 
-  return (
-    <div className="space-y-6">
-      <PageHeader title="الهالك" />
-      {error && (
-        <p
-          role="alert"
-          className="rounded-xl border border-danger/30 bg-danger/5 p-3 text-sm text-danger"
+  const columns: DataColumn<WasteSummary>[] = [
+    {
+      key: "target",
+      header: "الصنف / المنتج",
+      mobile: "primary",
+      cell: (entry) => (
+        <button
+          type="button"
+          onClick={() =>
+            getWaste(entry.id)
+              .then(setDetail)
+              .catch((cause: Error) => setError(cause.message))
+          }
+          className="text-start font-medium transition-colors hover:text-primary"
         >
-          {error}
-        </p>
-      )}
+          {entry.targetName}
+          {entry.sizeName ? ` — ${entry.sizeName}` : ""}
+        </button>
+      ),
+    },
+    {
+      key: "warehouse",
+      header: "المخزن",
+      cell: (entry) => (entry.warehouse === "cafe" ? "الكافيه" : "الرئيسي"),
+    },
+    {
+      key: "quantity",
+      header: "الكمية",
+      numeric: true,
+      cell: (entry) =>
+        Number(entry.quantity).toLocaleString("ar-EG", {
+          maximumFractionDigits: 3,
+        }),
+    },
+    {
+      key: "reason",
+      header: "السبب",
+      cell: (entry) => reasonLabels[entry.reason] ?? entry.note,
+    },
+    {
+      key: "cost",
+      header: "تكلفة FIFO",
+      numeric: true,
+      cell: (entry) => formatMoney(entry.totalCost),
+    },
+    { key: "by", header: "المسجل", cell: (entry) => entry.recordedByName },
+    {
+      key: "at",
+      header: "التاريخ",
+      cell: (entry) => (
+        <span className="text-muted">
+          {new Date(entry.occurredAt).toLocaleString("ar-EG")}
+        </span>
+      ),
+    },
+  ];
 
-      <section className="rounded-2xl border border-line bg-surface p-4">
-        <h2 className="mb-4 font-bold">تسجيل هالك جديد</h2>
-        <div className="grid gap-3 md:grid-cols-2">
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title="الهالك"
+        description="تسجيل التالف والمنتهي والمسكوب، وتكلفته FIFO من المخزون."
+      />
+      {error && <ErrorBanner>{error}</ErrorBanner>}
+
+      <Section title="تسجيل هالك جديد">
+        <div className="grid gap-4 md:grid-cols-2">
           {user?.role === "admin" && (
-            <select
-              aria-label="المخزن"
+            <SelectField
+              label="المخزن"
               disabled={saving}
               value={warehouse}
               onChange={(event) => {
@@ -178,14 +233,13 @@ export default function WastePage() {
                 setCafeForcedNotice(next.cafeForced);
                 setClientRequestId(crypto.randomUUID());
               }}
-              className="h-11 rounded-xl border border-line bg-paper px-3"
             >
               <option value="cafe">مخزن الكافيه</option>
               <option value="main">المخزن الرئيسي</option>
-            </select>
+            </SelectField>
           )}
-          <select
-            aria-label="الصنف أو المنتج"
+          <SelectField
+            label="الصنف أو المنتج"
             disabled={saving}
             value={targetKey}
             onChange={(event) => {
@@ -198,7 +252,6 @@ export default function WastePage() {
               setWarehouse(next.warehouse);
               setCafeForcedNotice(next.cafeForced);
             }}
-            className="h-11 rounded-xl border border-line bg-paper px-3"
           >
             <option value="">اختر الصنف أو منتج الوصفة</option>
             {targets.map((target) => (
@@ -206,7 +259,7 @@ export default function WastePage() {
                 {target.label}
               </option>
             ))}
-          </select>
+          </SelectField>
           {(selectedProduct || selectedRecipe) && (
             <p
               className="text-xs text-muted md:col-span-2"
@@ -217,99 +270,79 @@ export default function WastePage() {
                 : "الوصفة أو منتج الوصفة يُسجل في مخزن الكافيه فقط."}
             </p>
           )}
-          <input
-            aria-label="الكمية"
-            disabled={saving}
-            type="number"
-            min="0"
-            step={selectedUnit ? 1 : 0.001}
-            value={quantity}
-            onChange={(event) => {
-              setQuantity(event.target.value);
-              setClientRequestId(crypto.randomUUID());
-            }}
-            placeholder="الكمية"
-            className="h-11 rounded-xl border border-line bg-paper px-3 tnum"
-          />
-          <select
-            aria-label="سبب الهالك"
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium">الكمية</span>
+            <input
+              aria-label="الكمية"
+              disabled={saving}
+              type="number"
+              min="0"
+              step={selectedUnit ? 1 : 0.001}
+              value={quantity}
+              onChange={(event) => {
+                setQuantity(event.target.value);
+                setClientRequestId(crypto.randomUUID());
+              }}
+              placeholder="الكمية"
+              className="input tnum"
+            />
+          </label>
+          <SelectField
+            label="سبب الهالك"
             disabled={saving}
             value={reason}
             onChange={(event) => {
               setReason(event.target.value as WasteReason);
               setClientRequestId(crypto.randomUUID());
             }}
-            className="h-11 rounded-xl border border-line bg-paper px-3"
           >
             {Object.entries(reasonLabels).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
             ))}
-          </select>
-          <textarea
-            aria-label="ملاحظات الهالك"
-            disabled={saving}
-            value={note}
-            onChange={(event) => {
-              setNote(event.target.value);
-              setClientRequestId(crypto.randomUUID());
-            }}
-            placeholder={
-              reason === "other" ? "اكتب السبب (مطلوب)" : "ملاحظات اختيارية"
-            }
-            maxLength={500}
-            className="min-h-24 rounded-xl border border-line bg-paper p-3 md:col-span-2"
-          />
+          </SelectField>
+          <label className="block space-y-1.5 md:col-span-2">
+            <span className="text-sm font-medium">ملاحظات</span>
+            <textarea
+              aria-label="ملاحظات الهالك"
+              disabled={saving}
+              value={note}
+              onChange={(event) => {
+                setNote(event.target.value);
+                setClientRequestId(crypto.randomUUID());
+              }}
+              placeholder={
+                reason === "other"
+                  ? "اكتب السبب (مطلوب)"
+                  : "ملاحظات اختيارية"
+              }
+              maxLength={500}
+              className="input min-h-24"
+            />
+          </label>
         </div>
-        <Button
-          onClick={submit}
-          disabled={saving || !valid}
-          className="mt-4 justify-center"
-        >
+        <Button onClick={submit} disabled={saving || !valid} className="mt-4">
           <Trash2 className="size-4" />
           {saving ? "جارِ التسجيل…" : "تسجيل الهالك"}
         </Button>
-      </section>
+      </Section>
 
-      <section className="rounded-2xl border border-line bg-surface">
-        <h2 className="border-b border-line p-4 font-bold">سجل الهالك</h2>
-        <Table
-          headers={[
-            "الصنف / المنتج",
-            "المخزن",
-            "الكمية",
-            "السبب",
-            "تكلفة FIFO",
-            "المسجل",
-            "التاريخ",
-          ]}
-        >
-          {entries.map((entry) => (
-            <tr key={entry.id}>
-              <td>
-                <button
-                  type="button"
-                  onClick={() =>
-                    getWaste(entry.id)
-                      .then(setDetail)
-                      .catch((cause: Error) => setError(cause.message))
-                  }
-                  className="font-medium hover:text-primary"
-                >
-                  {entry.targetName}{" "}
-                  {entry.sizeName ? `— ${entry.sizeName}` : ""}
-                </button>
-              </td>
-              <td>{entry.warehouse === "cafe" ? "الكافيه" : "الرئيسي"}</td>
-              <td className="tnum">{entry.quantity}</td>
-              <td>{reasonLabels[entry.reason] ?? entry.note}</td>
-              <td className="tnum">{formatMoney(entry.totalCost)}</td>
-              <td>{entry.recordedByName}</td>
-              <td>{new Date(entry.occurredAt).toLocaleString("ar-EG")}</td>
-            </tr>
-          ))}
-        </Table>
+      <section className="space-y-3">
+        <h2 className="font-bold">سجل الهالك</h2>
+        <DataTable
+          caption="سجل الهالك"
+          rows={entries}
+          rowKey={(entry) => entry.id}
+          columns={columns}
+          empty={
+            <EmptyState
+              icon={<Trash2 className="size-8" />}
+              title="لم يُسجَّل هالك بعد"
+              description="سجّل أول تالف أو منتهي الصلاحية أعلاه."
+            />
+          }
+        />
       </section>
 
       {detail && (

@@ -4,6 +4,8 @@ import { Printer, RefreshCw } from "lucide-react";
 import { ReportTable } from "@/components/reports/report-table";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import { Tabs } from "@/components/ui/tabs";
+import { ErrorBanner, LoadingState } from "@/components/ui/states";
 import { cairoCalendarDate } from "@/lib/cairo-date";
 import { formatMoney } from "@/lib/format";
 import type { ReportTable as TableData } from "@/models/reports-model";
@@ -595,20 +597,20 @@ export default function ReportsPage() {
           </div>
         }
       />
-      <div className="print-controls grid gap-3 rounded-xl border border-line bg-surface p-4 sm:grid-cols-2">
-        <label className="text-sm">
-          من
+      <div className="print-controls toolbar">
+        <label className="block space-y-1.5 text-sm">
+          <span className="font-medium">من</span>
           <input
             aria-label="من"
             type="date"
             value={from}
             max={to}
             onChange={(e) => setFrom(e.target.value)}
-            className="mt-1 block h-11 w-full rounded-lg border border-line bg-paper px-3"
+            className="input"
           />
         </label>
-        <label className="text-sm">
-          إلى
+        <label className="block space-y-1.5 text-sm">
+          <span className="font-medium">إلى</span>
           <input
             aria-label="إلى"
             type="date"
@@ -616,21 +618,18 @@ export default function ReportsPage() {
             min={from}
             max={today}
             onChange={(e) => setTo(e.target.value)}
-            className="mt-1 block h-11 w-full rounded-lg border border-line bg-paper px-3"
+            className="input"
           />
         </label>
       </div>
-      <nav className="print-controls flex gap-2 overflow-x-auto pb-1">
-        {tabs.map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`shrink-0 rounded-lg px-3 py-2 text-sm ${tab === key ? "bg-primary text-white" : "border border-line bg-surface"}`}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
+      <div className="print-controls">
+        <Tabs
+          items={tabs.map(([id, label]) => ({ id, label }))}
+          active={tab}
+          onChange={setTab}
+          ariaLabel="أقسام التقارير"
+        />
+      </div>
       {data && (
         <div className="space-y-2 rounded-xl border border-line bg-surface p-4 print:border-0">
           <p>{branch.name}</p>
@@ -686,13 +685,9 @@ export default function ReportsPage() {
           )}
         </div>
       )}
-      {error && (
-        <p role="alert" className="rounded-xl bg-danger/10 p-3 text-danger">
-          {error}
-        </p>
-      )}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
       {loading ? (
-        <p className="text-muted">جارِ تحميل التقرير…</p>
+        <LoadingState label="جارِ تحميل التقرير…" />
       ) : (
         <div className="space-y-8">
           {visible.map((table) => (

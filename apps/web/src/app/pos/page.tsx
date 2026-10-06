@@ -34,6 +34,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { OrderReceipt } from "@/components/pos/order-receipt";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { Tabs } from "@/components/ui/tabs";
 import { formatMoney } from "@/lib/format";
 import { catalogRefreshOutcome } from "@/models/catalog-refresh";
 import {
@@ -295,13 +296,11 @@ export default function PosPage() {
   }
 
   return (
-    <div className="pos-workspace -m-2 lg:-m-4">
-      <header className="mb-5 flex flex-wrap items-end justify-between gap-3 px-2 lg:px-4">
+    <div className="pos-workspace">
+      <header className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="mb-1 text-xs font-bold tracking-[0.18em] text-primary">
-            الكاونتر · تيك أواي
-          </p>
-          <h1 className="text-3xl font-bold tracking-tight">نقطة البيع</h1>
+          <h1 className="text-3xl font-bold tracking-[-0.01em]">نقطة البيع</h1>
+          <p className="mt-1 text-sm text-muted">الكاونتر · تيك أواي</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {user?.role === "cashier" && (
@@ -312,34 +311,35 @@ export default function PosPage() {
             />
           )}
           {user?.role === "admin" && (
-            <Button
-              variant="ghost"
-              disabled={refreshingCatalog}
-              onClick={() => void requestCatalogRefresh()}
-            >
-              <RefreshCw
-                className={`size-4 ${refreshingCatalog ? "animate-spin" : ""}`}
-              />
-              تحديث الكتالوج
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                disabled={refreshingCatalog}
+                onClick={() => void requestCatalogRefresh()}
+              >
+                <RefreshCw
+                  className={`size-4 ${refreshingCatalog ? "animate-spin" : ""}`}
+                />
+                تحديث الكتالوج
+              </Button>
+            </>
           )}
-          <div className="flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-sm text-muted shadow-sm">
+          <div className="flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-sm text-muted">
             <Clock3 className="size-4 text-primary" />
-            <span>{recentOrders.length} طلب محفوظ حديثاً</span>
+            <span className="tnum">
+              {recentOrders.length} طلب محفوظ حديثاً
+            </span>
           </div>
         </div>
       </header>
 
       {error && (
-        <div
-          role="alert"
-          className="mx-2 mb-4 flex items-start gap-2 rounded-xl border border-danger/25 bg-danger/5 px-4 py-3 text-sm text-danger lg:mx-4"
-        >
+        <div role="alert" className="error-banner mb-4 flex items-start gap-2">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" /> {error}
         </div>
       )}
       {catalog?.stale && (
-        <div className="mx-2 mb-4 rounded-xl bg-accent/10 px-4 py-3 text-sm lg:mx-4">
+        <div className="mb-4 rounded-xl bg-accent/10 px-4 py-3 text-sm">
           الكتالوج الخارجي قديم؛ آخر تحديث ناجح:{" "}
           {catalog.lastSuccessfulSyncAt
             ? new Date(catalog.lastSuccessfulSyncAt).toLocaleString("ar-EG")
@@ -347,7 +347,7 @@ export default function PosPage() {
         </div>
       )}
       {!loading && !hasOwnOpenShift && (
-        <div className="mx-2 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/35 bg-accent/10 px-4 py-3 text-sm lg:mx-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/35 bg-accent/10 px-4 py-3 text-sm">
           <span>
             {user?.role === "cashier"
               ? "يجب فتح وردية تخص هذا الكاشير قبل تسجيل البيع."
@@ -366,40 +366,30 @@ export default function PosPage() {
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_25rem]">
         <section className="min-w-0 space-y-4">
-          <div className="rounded-2xl border border-line bg-surface p-3 shadow-sm">
+          <div className="sheet p-3">
             <label className="relative block">
-              <Search className="pointer-events-none absolute inset-y-0 right-4 my-auto size-5 text-muted" />
+              <Search className="pointer-events-none absolute inset-y-0 start-4 my-auto size-5 text-muted" />
               <input
                 aria-label="ابحث باسم المنتج"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="ابحث باسم المنتج"
-                className="h-12 w-full rounded-xl border border-line bg-paper pe-4 ps-12 text-sm outline-none focus:border-primary"
+                className="input h-12 rounded-xl bg-paper ps-12 text-base"
               />
             </label>
-            <div
-              className="mt-3 flex flex-wrap gap-2"
-              aria-label="مصدر المنتجات"
-            >
-              <CategoryButton
-                active={catalogSource === "local"}
-                onClick={() => setCatalogSource("local")}
-              >
-                المنتجات المحلية
-              </CategoryButton>
-              <CategoryButton
-                active={catalogSource === "external"}
-                onClick={() => setCatalogSource("external")}
-              >
-                المنتجات الخارجية
-              </CategoryButton>
-            </div>
+            <Tabs
+              items={[
+                { id: "local", label: "المنتجات المحلية" },
+                { id: "external", label: "المنتجات الخارجية" },
+              ]}
+              active={catalogSource}
+              onChange={setCatalogSource}
+              ariaLabel="مصدر المنتجات"
+              className="mt-3 border-0 bg-transparent p-0"
+            />
             {catalogSource === "local" ? (
               <>
-                <div
-                  className="mt-3 flex flex-wrap gap-2"
-                  aria-label="الأقسام الرئيسية"
-                >
+                <div className="flex flex-wrap gap-2 mt-3" aria-label="الأقسام الرئيسية">
                   <CategoryButton
                     active={mainCategoryId === null}
                     onClick={() => {
@@ -425,10 +415,7 @@ export default function PosPage() {
                     ))}
                 </div>
                 {mainCategoryId !== null && (
-                  <div
-                    className="mt-3 flex flex-wrap gap-2"
-                    aria-label="الأقسام الفرعية"
-                  >
+                  <div className="flex flex-wrap gap-2 mt-3" aria-label="الأقسام الفرعية">
                     <CategoryButton
                       active={subCategoryId === null}
                       onClick={() => setSubCategoryId(null)}
@@ -452,7 +439,7 @@ export default function PosPage() {
                 )}
               </>
             ) : (
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 mt-3">
                 <CategoryButton
                   active={categoryId === null}
                   onClick={() => setCategoryId(null)}
@@ -475,13 +462,13 @@ export default function PosPage() {
           </div>
 
           {loading ? (
-            <div className="rounded-2xl border border-line bg-surface p-12 text-center text-muted">
+            <div className="sheet p-12 text-center text-sm text-muted">
               جارِ تحميل قائمة البيع…
             </div>
           ) : (catalogSource === "local"
               ? visibleLocalProducts.length
               : visibleProducts.length) === 0 ? (
-            <div className="rounded-2xl border border-dashed border-line bg-surface/60 p-12 text-center">
+            <div className="empty-state">
               <ReceiptText className="mx-auto mb-3 size-8 text-muted" />
               <p className="font-medium">لا توجد منتجات جاهزة للبيع</p>
               <p className="mt-1 text-sm text-muted">
@@ -501,11 +488,13 @@ export default function PosPage() {
                         );
                         setError("");
                       }}
-                      className="rounded-2xl border border-line bg-surface p-4 text-start shadow-sm transition hover:-translate-y-0.5 hover:border-primary"
+                      className="flex min-h-[6.5rem] flex-col justify-between rounded-2xl border border-line bg-surface p-4 text-start transition hover:border-primary hover:shadow-md"
                     >
-                      <p className="font-bold">{product.name}</p>
-                      <p className="text-xs text-muted">{product.stockUnit}</p>
-                      <p className="mt-4 font-bold text-primary">
+                      <div>
+                        <p className="font-bold">{product.name}</p>
+                        <p className="text-xs text-muted">{product.stockUnit}</p>
+                      </div>
+                      <p className="mt-3 inline-flex w-fit rounded-lg bg-primary/10 px-2.5 py-1 font-bold text-primary">
                         {formatMoney(product.sellingPrice)}
                       </p>
                     </button>
@@ -515,13 +504,15 @@ export default function PosPage() {
                       type="button"
                       key={product.externalId}
                       onClick={() => setSelecting(product)}
-                      className="rounded-2xl border border-line bg-surface p-4 text-start shadow-sm transition hover:-translate-y-0.5 hover:border-primary"
+                      className="flex min-h-[6.5rem] flex-col justify-between rounded-2xl border border-line bg-surface p-4 text-start transition hover:border-primary hover:shadow-md"
                     >
-                      <p className="font-bold">{product.nameAr}</p>
-                      <p className="text-xs text-muted" dir="ltr">
-                        {product.nameEn}
-                      </p>
-                      <p className="mt-4 font-bold text-primary">
+                      <div>
+                        <p className="font-bold">{product.nameAr}</p>
+                        <p className="text-xs text-muted" dir="ltr">
+                          {product.nameEn}
+                        </p>
+                      </div>
+                      <p className="mt-3 inline-flex w-fit rounded-lg bg-primary/10 px-2.5 py-1 font-bold text-primary">
                         {formatMoney(catalogTilePrice(product, nowMs))}
                       </p>
                     </button>
@@ -530,28 +521,30 @@ export default function PosPage() {
           )}
         </section>
 
-        <aside className="pos-ticket overflow-hidden rounded-2xl border border-line bg-surface shadow-sm xl:sticky xl:top-6">
+        <aside className="pos-ticket overflow-hidden rounded-2xl border border-line bg-surface xl:sticky xl:top-6">
           <div className="flex items-center gap-2 bg-sidebar px-4 py-3 text-white">
             <ShoppingBasket className="size-4" /> تذكرة الطلب
           </div>
-          <div className="max-h-[42vh] min-h-40 space-y-2 overflow-y-auto p-4">
+          <div className="max-h-[42vh] min-h-40 overflow-y-auto">
             {cart.length === 0 ? (
               <div className="flex min-h-32 flex-col items-center justify-center text-center text-muted">
                 <ShoppingBasket className="mb-2 size-8 opacity-40" />
                 <p>الطلب فارغ</p>
               </div>
             ) : (
-              cart.map((line) => (
-                <CartRow
-                  key={line.key}
-                  line={line}
-                  onQuantity={(quantity) =>
-                    setCart((current) =>
-                      setCartLineQuantity(current, line.key, quantity),
-                    )
-                  }
-                />
-              ))
+              <div className="ledger">
+                {cart.map((line) => (
+                  <CartRow
+                    key={line.key}
+                    line={line}
+                    onQuantity={(quantity) =>
+                      setCart((current) =>
+                        setCartLineQuantity(current, line.key, quantity),
+                      )
+                    }
+                  />
+                ))}
+              </div>
             )}
           </div>
 
@@ -565,7 +558,7 @@ export default function PosPage() {
                     (event.target.value || null) as OrderDiscountType | null,
                   )
                 }
-                className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+                className="input"
               >
                 <option value="">بدون خصم</option>
                 <option value="percent">خصم نسبة</option>
@@ -581,7 +574,7 @@ export default function PosPage() {
                 onChange={(event) =>
                   setDiscountValue(Number(event.target.value))
                 }
-                className="rounded-lg border border-line px-3 py-2 text-sm"
+                className="input tnum"
               />
             </div>
             <input
@@ -591,7 +584,8 @@ export default function PosPage() {
               step="0.01"
               value={cashReceived || ""}
               onChange={(event) => setCashReceived(Number(event.target.value))}
-              className="w-full rounded-lg border border-line px-3 py-2 text-sm"
+              placeholder="النقد المستلم"
+              className="input tnum"
             />
             <div className="space-y-1 text-sm">
               <Total label="الإجمالي الفرعي" value={totals.subtotal} />
@@ -600,7 +594,7 @@ export default function PosPage() {
               <Total label="الباقي" value={totals.change} />
             </div>
             <Button
-              className="w-full justify-center"
+              className="h-11 w-full justify-center"
               disabled={!canComplete}
               onClick={() => void completeOrder()}
             >
@@ -611,7 +605,7 @@ export default function PosPage() {
         </aside>
       </div>
 
-      <section className="mx-2 mt-5 rounded-2xl border border-line bg-surface p-4 lg:mx-4">
+      <section className="mt-5 sheet p-4">
         <h2 className="mb-3 font-bold">آخر الطلبات</h2>
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {recentOrders.slice(0, 9).map((order) => (
@@ -619,13 +613,13 @@ export default function PosPage() {
               type="button"
               key={order.id}
               onClick={() => void openReceipt(order.id)}
-              className="flex items-center justify-between rounded-xl border border-line p-3 text-start hover:border-primary"
+              className="flex items-center justify-between rounded-xl border border-line p-3 text-start transition-colors hover:border-primary"
             >
               <span>
                 <span className="block font-medium">{order.orderNumber}</span>
                 <span className="text-xs text-muted">{order.cashierName}</span>
               </span>
-              <span className="font-bold">{formatMoney(order.total)}</span>
+              <span className="tnum font-bold">{formatMoney(order.total)}</span>
             </button>
           ))}
         </div>
@@ -704,7 +698,7 @@ function ProductSelectionModal({
                   type="button"
                   key={size.externalId}
                   onClick={() => setSizeId(size.externalId)}
-                  className={`rounded-lg border px-3 py-2 text-sm ${sizeId === size.externalId ? "border-primary bg-primary text-white" : "border-line"}`}
+                  className={`min-h-11 rounded-lg border px-3 py-2 text-sm ${sizeId === size.externalId ? "border-primary bg-primary text-white" : "border-line"}`}
                 >
                   {size.nameAr} ·{" "}
                   {formatMoney(catalogSizePrice(product, size, nowMs))}
@@ -752,7 +746,7 @@ function ProductSelectionModal({
                           ),
                         }))
                       }
-                      className="rounded-md border border-line p-1"
+                      className="rounded-md border border-line p-1.5"
                     >
                       <Minus className="size-4" />
                     </button>
@@ -770,7 +764,7 @@ function ProductSelectionModal({
                             (current[option.externalId] ?? 0) + 1,
                         }))
                       }
-                      className="rounded-md border border-line p-1 disabled:opacity-40"
+                      className="rounded-md border border-line p-1.5 disabled:opacity-40"
                     >
                       <Plus className="size-4" />
                     </button>
@@ -816,7 +810,7 @@ function CartRow({
   onQuantity: (quantity: number) => void;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-paper/60 p-3">
+    <div className="p-3">
       <div className="flex justify-between gap-3">
         <div>
           <p className="font-medium">{line.productName}</p>
@@ -831,21 +825,21 @@ function CartRow({
               .join(" · ")}
           </p>
         </div>
-        <span className="font-bold">{formatMoney(cartLineTotal(line))}</span>
+        <span className="tnum font-bold">{formatMoney(cartLineTotal(line))}</span>
       </div>
       <div className="mt-2 flex items-center gap-2">
         <button
           type="button"
           onClick={() => onQuantity(line.quantity - 1)}
-          className="rounded-md border border-line p-1"
+          className="rounded-md border border-line p-1.5"
         >
           <Minus className="size-4" />
         </button>
-        <span>{line.quantity}</span>
+        <span className="tnum">{line.quantity}</span>
         <button
           type="button"
           onClick={() => onQuantity(line.quantity + 1)}
-          className="rounded-md border border-line p-1"
+          className="rounded-md border border-line p-1.5"
         >
           <Plus className="size-4" />
         </button>
@@ -867,7 +861,8 @@ function CategoryButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full px-4 py-2 text-sm ${active ? "bg-sidebar text-white" : "bg-paper text-muted hover:text-ink"}`}
+      data-active={active}
+      className="chip"
     >
       {children}
     </button>
@@ -888,7 +883,7 @@ function Total({
       className={`flex justify-between ${strong ? "text-base font-bold" : ""}`}
     >
       <span>{label}</span>
-      <span>{formatMoney(value)}</span>
+      <span className="tnum">{formatMoney(value)}</span>
     </div>
   );
 }

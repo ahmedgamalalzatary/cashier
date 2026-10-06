@@ -6,8 +6,10 @@ import type { ManagedUser } from "@cashier/shared";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DataTable, type DataColumn } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
-import { Table } from "@/components/ui/table";
+import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
 import { IconButton } from "@/components/ui/icon-button";
 import { UserModal } from "@/components/users/user-modal";
 import { listUsers, setUserActive } from "@/services/users-service";
@@ -20,6 +22,9 @@ export default function UsersPage() {
   const [editing, setEditing] = useState<ManagedUser | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [confirming, setConfirming] = useState<ManagedUser | null>(null);
+  const [confirmingBusy, setConfirmingBusy] = useState(false);
+  const [confirmingError, setConfirmingError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -43,23 +48,67 @@ export default function UsersPage() {
     };
   }, [reloadKey]);
 
-  async function setActive(user: ManagedUser, isActive: boolean) {
-    const action = isActive ? "إعادة تفعيل" : "إيقاف";
-    if (!confirm(`${action} حساب "${user.name}"؟`)) return;
+  async function toggleActive(user: ManagedUser) {
+    const action = user.isActive ? "إيقاف" : "إعادة تفعيل";
+    setConfirmingBusy(true);
+    setConfirmingError("");
     try {
-      await setUserActive(user.id, isActive);
+      await setUserActive(user.id, !user.isActive);
+      setConfirming(null);
       setReloadKey((current) => current + 1);
     } catch (cause) {
-      setError(
+      setConfirmingError(
         cause instanceof Error ? cause.message : `تعذر ${action} الحساب`,
       );
+    } finally {
+      setConfirmingBusy(false);
     }
   }
+
+  const columns: DataColumn<ManagedUser>[] = [
+    {
+      key: "name",
+      header: "المستخدم",
+      mobile: "primary",
+      cell: (user) => (
+        <span className="font-medium">
+          {user.name}
+          {user.id === currentUser?.id && (
+            <span className="ms-2 text-xs font-normal text-muted">حسابك</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: "username",
+      header: "اسم الدخول",
+      cell: (user) => (
+        <span className="tnum" dir="ltr">
+          {user.username}
+        </span>
+      ),
+    },
+    {
+      key: "role",
+      header: "الصلاحية",
+      cell: (user) => (user.role === "admin" ? "مدير نظام" : "كاشير"),
+    },
+    {
+      key: "status",
+      header: "الحالة",
+      cell: (user) => (
+        <Badge tone={user.isActive ? "success" : "neutral"}>
+          {user.isActive ? "نشط" : "موقوف"}
+        </Badge>
+      ),
+    },
+  ];
 
   return (
     <div>
       <PageHeader
         title="مستخدمو النظام"
+        description="إدارة حسابات النظام. أنشئ المديرين هنا، وامنح دخول الكاشير من شاشة الموظفين حتى تظل ووردياته وساعات عمله مرتبطة بسجله."
         actions={
           <Button
             onClick={() => {
@@ -72,83 +121,58 @@ export default function UsersPage() {
         }
       />
 
-      <p className="mb-5 max-w-2xl text-sm leading-6 text-muted">
-        إدارة حسابات النظام. أنشئ المديرين هنا، وامنح دخول الكاشير من شاشة
-        الموظفين حتى تظل وردياته وساعات عمله مرتبطة بسجله.
-      </p>
-
-      {error && (
-        <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">
-          {error}
-        </p>
-      )}
+      {error && <ErrorBanner className="mb-4">{error}</ErrorBanner>}
 
       {loading ? (
-        <p className="text-muted">جارِ تحميل المستخدمين…</p>
-      ) : users.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-line bg-surface p-8 text-center text-muted">
-          لا توجد حسابات بعد — أنشئ أول حساب مستخدم.
-        </p>
+        <LoadingState label="جارِ تحميل المستخدمين…" />
       ) : (
-        <Table
-          headers={["المستخدم", "اسم الدخول", "الصلاحية", "الحالة", "إجراءات"]}
-        >
-          {users.map((user) => (
-            <tr key={user.id} className={user.isActive ? "" : "opacity-50"}>
-              <td className="px-4 py-3 font-medium">
-                {user.name}
-                {user.id === currentUser?.id && (
-                  <span className="ms-2 text-xs font-normal text-muted">
-                    حسابك
-                  </span>
-                )}
-              </td>
-              <td className="px-4 py-3 tnum" dir="ltr">
-                {user.username}
-              </td>
-              <td className="px-4 py-3">
-                {user.role === "admin" ? "مدير نظام" : "كاشير"}
-              </td>
-              <td className="px-4 py-3">
-                <Badge tone={user.isActive ? "success" : "neutral"}>
-                  {user.isActive ? "نشط" : "موقوف"}
-                </Badge>
-              </td>
-              <td className="px-4 py-3">
-                {user.role === "admin" ? (
-                  <div className="flex items-center gap-1">
-                    <IconButton
-                      title="تعديل الحساب أو كلمة المرور"
-                      onClick={() => {
-                        setEditing(user);
-                        setFormOpen(true);
-                      }}
-                    >
-                      <Pencil className="size-4" />
-                    </IconButton>
-                    {user.id !== currentUser?.id && (
-                      <IconButton
-                        title={user.isActive ? "إيقاف الحساب" : "تفعيل الحساب"}
-                        danger={user.isActive}
-                        onClick={() => setActive(user, !user.isActive)}
-                      >
-                        {user.isActive ? (
-                          <Ban className="size-4" />
-                        ) : (
-                          <Power className="size-4" />
-                        )}
-                      </IconButton>
+        <DataTable
+          caption="مستخدمو النظام"
+          rows={users}
+          rowKey={(user) => user.id}
+          rowClassName={(user) => (user.isActive ? undefined : "opacity-55")}
+          columns={columns}
+          empty={
+            <EmptyState
+              icon={<Power className="size-8" />}
+              title="لا توجد حسابات بعد"
+              description="أنشئ أول حساب مستخدم."
+            />
+          }
+          actions={(user) =>
+            user.role === "admin" ? (
+              <div className="flex items-center gap-1">
+                <IconButton
+                  title="تعديل الحساب أو كلمة المرور"
+                  onClick={() => {
+                    setEditing(user);
+                    setFormOpen(true);
+                  }}
+                >
+                  <Pencil className="size-4" />
+                </IconButton>
+                {user.id !== currentUser?.id && (
+                  <IconButton
+                    title={user.isActive ? "إيقاف الحساب" : "تفعيل الحساب"}
+                    danger={user.isActive}
+                    onClick={() => {
+                      setConfirmingError("");
+                      setConfirming(user);
+                    }}
+                  >
+                    {user.isActive ? (
+                      <Ban className="size-4" />
+                    ) : (
+                      <Power className="size-4" />
                     )}
-                  </div>
-                ) : (
-                  <span className="text-xs text-muted">
-                    يُدار من سجل الموظف
-                  </span>
+                  </IconButton>
                 )}
-              </td>
-            </tr>
-          ))}
-        </Table>
+              </div>
+            ) : (
+              <span className="text-xs text-muted">يُدار من سجل الموظف</span>
+            )
+          }
+        />
       )}
 
       {formOpen && (
@@ -162,6 +186,24 @@ export default function UsersPage() {
           }}
         />
       )}
+      <ConfirmDialog
+        open={confirming !== null}
+        title={confirming?.isActive ? "إيقاف الحساب" : "إعادة تفعيل الحساب"}
+        description={
+          confirming
+            ? `${confirming.isActive ? "سيُوقف" : "سيُعاد تفعيل"} حساب "${confirming.name}".`
+            : undefined
+        }
+        tone={confirming?.isActive ? "danger" : "primary"}
+        confirmLabel={confirming?.isActive ? "إيقاف" : "تفعيل"}
+        busy={confirmingBusy}
+        error={confirmingError}
+        onConfirm={() => confirming && void toggleActive(confirming)}
+        onCancel={() => {
+          setConfirming(null);
+          setConfirmingError("");
+        }}
+      />
     </div>
   );
 }

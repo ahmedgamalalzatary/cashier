@@ -42,12 +42,12 @@ export function stockMeaningFieldsLocked(item: { hasStockHistory: boolean }) {
 
 export function filterStockRows(
   rows: InventoryStockRow[],
-  filters: { query: string; categoryId: number | null; state: StockFilter },
+  filters: { query: string; categoryId?: number | null; state: StockFilter },
   categories: Category[],
 ) {
   const query = filters.query.trim().toLocaleLowerCase("ar");
   const categoryIds =
-    filters.categoryId === null
+    filters.categoryId === null || filters.categoryId === undefined
       ? null
       : new Set([
           filters.categoryId,

@@ -15,7 +15,7 @@ export function ExternalProductCard({
   onStockSetup: () => void;
 }) {
   return (
-    <article className="overflow-hidden rounded-2xl border border-line bg-surface">
+    <article className="sheet overflow-hidden">
       <div className="flex gap-4 border-b border-line bg-paper/45 p-4">
         {product.imageUrl ? (
           <Image

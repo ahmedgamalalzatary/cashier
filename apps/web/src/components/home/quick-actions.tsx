@@ -50,30 +50,30 @@ const cashierActions: Action[] = [
     icon: Trash2,
   },
   {
-    href: "/cafe",
-    label: "مخزن الكافيه",
-    hint: "اطلب تحويلاً من المخزن",
+    href: "/transfers?new=request",
+    label: "طلب تحويل",
+    hint: "اطلب من المخزن الرئيسي",
     icon: CupSoda,
   },
 ];
 
 const adminActions: Action[] = [
   {
-    href: "/purchases",
-    label: "المشتريات",
-    hint: "سجّل فاتورة مورد",
+    href: "/purchases/new",
+    label: "فاتورة شراء",
+    hint: "سجّل مورداً وصنفاً واستلاماً",
     icon: ShoppingCart,
   },
   {
-    href: "/cafe",
-    label: "مخزن الكافيه",
-    hint: "راجع طلبات التحويل",
+    href: "/transfers",
+    label: "طلبات التحويل",
+    hint: "راجع واعتمد طلبات الكافيه",
     icon: CupSoda,
   },
   {
-    href: "/warehouse",
-    label: "المخزن الرئيسي",
-    hint: "الأصناف والأرصدة",
+    href: "/inventory",
+    label: "المخزون",
+    hint: "الأرصدة والأصناف",
     icon: Warehouse,
   },
   {
@@ -97,44 +97,56 @@ const adminActions: Action[] = [
 ];
 
 export function QuickActions({ role }: { role: Role }) {
+  // POS is what a cashier opens dozens of times a day, so it leads as the
+  // highlighted action; the admin board keeps every row equal.
   const actions = role === "admin" ? adminActions : cashierActions;
   return (
-    <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <ul className="ledger">
       {actions.map((action, index) => (
-        <li key={action.href}>
-          <ActionTile action={action} lead={index === 0} />
-        </li>
+        <ActionRow
+          key={action.href}
+          action={action}
+          featured={role !== "admin" && index === 0}
+        />
       ))}
     </ul>
   );
 }
 
-function ActionTile({ action, lead }: { action: Action; lead: boolean }) {
+function ActionRow({ action, featured }: { action: Action; featured: boolean }) {
   const Icon = action.icon;
   return (
-    <Link
-      href={action.href}
-      className={`flex h-full items-start gap-3 rounded-xl border p-4 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
-        lead
-          ? "border-transparent bg-primary text-white hover:bg-primary-strong"
-          : "border-line bg-surface hover:border-primary/35 hover:bg-primary/5"
-      }`}
-    >
-      <span
-        className={`grid size-9 shrink-0 place-items-center rounded-lg ${
-          lead ? "bg-white/15 text-white" : "bg-primary/10 text-primary"
-        }`}
+    <li>
+      <Link
+        href={action.href}
+        className={
+          featured
+            ? "group flex h-full items-center gap-3 bg-primary px-4 py-3 text-white transition-colors hover:bg-primary-strong focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+            : "group flex h-full items-center gap-3 px-4 py-3 transition-colors hover:bg-paper focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+        }
       >
-        <Icon className="size-4.5" />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-sm font-medium">{action.label}</span>
         <span
-          className={`mt-0.5 block text-xs ${lead ? "text-white/75" : "text-muted"}`}
+          className={
+            featured
+              ? "grid size-9 shrink-0 place-items-center rounded-lg bg-white/15 text-white"
+              : "grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"
+          }
         >
-          {action.hint}
+          <Icon className="size-4.5" />
         </span>
-      </span>
-    </Link>
+        <span className="min-w-0">
+          <span className="block text-sm font-medium">{action.label}</span>
+          <span
+            className={
+              featured
+                ? "mt-0.5 block text-xs text-white/75"
+                : "mt-0.5 block text-xs text-muted"
+            }
+          >
+            {action.hint}
+          </span>
+        </span>
+      </Link>
+    </li>
   );
 }

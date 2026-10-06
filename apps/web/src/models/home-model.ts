@@ -182,14 +182,14 @@ export function attentionItems({
       id: "cafe-negative",
       count: negativeStockCount(cafeStock),
       label: `${countPhrase(negativeStockCount(cafeStock), ITEM_COUNT)} برصيد سالب في الكافيه`,
-      href: "/cafe",
+      href: "/inventory?warehouse=cafe",
       tone: "danger",
     },
     {
       id: "main-negative",
       count: negativeStockCount(mainStock),
       label: `${countPhrase(negativeStockCount(mainStock), ITEM_COUNT)} برصيد سالب في المخزن الرئيسي`,
-      href: "/warehouse",
+      href: "/inventory",
       tone: "danger",
     },
     {
@@ -198,21 +198,21 @@ export function attentionItems({
       label: `${countPhrase(pending, REQUEST_COUNT)} ${
         role === "admin" ? "بانتظار موافقتك" : "بانتظار موافقة المدير"
       }`,
-      href: "/cafe",
+      href: "/transfers",
       tone: role === "admin" ? "warn" : "info",
     },
     {
       id: "cafe-low",
       count: lowStockCount(cafeStock),
       label: `${countPhrase(lowStockCount(cafeStock), ITEM_COUNT)} تحت حد التنبيه في الكافيه`,
-      href: "/cafe",
+      href: "/inventory?warehouse=cafe",
       tone: "warn",
     },
     {
       id: "main-low",
       count: lowStockCount(mainStock),
       label: `${countPhrase(lowStockCount(mainStock), ITEM_COUNT)} تحت حد التنبيه في المخزن الرئيسي`,
-      href: "/warehouse",
+      href: "/inventory",
       tone: "warn",
     },
     {

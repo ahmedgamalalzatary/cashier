@@ -1,26 +1,33 @@
 import { useId } from "react";
-import type { InputHTMLAttributes, TextareaHTMLAttributes } from "react";
-
-const inputCls =
-  "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
+import type {
+  InputHTMLAttributes,
+  ReactNode,
+  TextareaHTMLAttributes,
+} from "react";
 
 export function Field({
   label,
   error,
+  hint,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string }) {
+}: InputHTMLAttributes<HTMLInputElement> & {
+  label: string;
+  error?: string;
+  hint?: ReactNode;
+}) {
   const errorId = useId();
   return (
     <label className="block space-y-1.5">
       <span className="text-sm font-medium">{label}</span>
       <input
-        className={inputCls}
+        className="input"
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
         {...props}
       />
+      {hint && <span className="block text-xs text-muted">{hint}</span>}
       {error && (
-        <span id={errorId} className="text-xs text-danger">
+        <span id={errorId} className="block text-xs text-danger">
           {error}
         </span>
       )}
@@ -35,7 +42,7 @@ export function TextAreaField({
   return (
     <label className="block space-y-1.5">
       <span className="text-sm font-medium">{label}</span>
-      <textarea className={inputCls} rows={2} {...props} />
+      <textarea className="input" rows={2} {...props} />
     </label>
   );
 }

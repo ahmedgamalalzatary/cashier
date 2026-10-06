@@ -26,6 +26,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { PageHeader } from "@/components/ui/page-header";
+import { Section } from "@/components/ui/section";
+import { Stat, StatStrip } from "@/components/ui/stat";
+import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
 import { ShiftHistory } from "@/components/shifts/shift-history";
 import { formatMoney } from "@/lib/format";
 import {
@@ -102,112 +105,96 @@ export default function ShiftsPage() {
 
   return (
     <div>
-      <PageHeader title="الورديات" />
-      <p className="mb-5 max-w-3xl text-sm leading-6 text-muted">
-        الوردية هي وقت عمل الكاشير وجلسة درج النقدية معاً. كل المبيعات
-        والإجراءات ترتبط بالوردية المفتوحة، وتُحسب مدة العمل من الفتح حتى
-        الإغلاق.
-      </p>
+      <PageHeader
+        title="الورديات"
+        description="الوردية هي وقت عمل الكاشير وجلسة درج النقدية معاً. كل المبيعات والإجراءات ترتبط بالوردية المفتوحة، وتُحسب مدة العمل من الفتح حتى الإغلاق."
+      />
 
-      {error && (
-        <p
-          role="alert"
-          className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger"
-        >
-          {error}
-        </p>
-      )}
+      {error && <ErrorBanner className="mb-4">{error}</ErrorBanner>}
       {loading ? (
-        <p className="text-muted">جارِ تحميل الورديات…</p>
+        <LoadingState label="جارِ تحميل الورديات…" />
       ) : (
         <>
           {active.length > 0 ? (
             active.map((activeShift) => (
-              <section
+              <Section
                 key={activeShift.id}
-                className="mb-7 overflow-hidden rounded-2xl border border-primary/25 bg-surface shadow-sm"
+                className="mb-7"
+                bodyClassName="p-0"
+                title={
+                  <span className="flex items-center gap-2">
+                    <Badge tone="success">وردية مفتوحة</Badge>
+                    {activeShift.cashierName}
+                    <span className="tnum text-xs font-normal text-muted">
+                      #{activeShift.id}
+                    </span>
+                  </span>
+                }
+                description={`بدأت ${dateTime.format(new Date(activeShift.openedAt))} · ${duration(activeShift.workedMinutes)}`}
+                action={
+                  user?.role === "admin" ? (
+                    <Button
+                      variant="danger"
+                      onClick={() =>
+                        setAction({ mode: "admin-close", shift: activeShift })
+                      }
+                    >
+                      <TriangleAlert className="size-4" /> إغلاق إداري
+                    </Button>
+                  ) : undefined
+                }
               >
-                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line bg-primary/5 p-5">
-                  <div>
-                    <div className="mb-1 flex items-center gap-2">
-                      <Badge tone="success">وردية مفتوحة</Badge>
-                      <span className="text-xs text-muted tnum">
-                        #{activeShift.id}
-                      </span>
-                    </div>
-                    <h2 className="text-xl font-bold">
-                      {activeShift.cashierName}
-                    </h2>
-                    <p className="mt-1 text-sm text-muted">
-                      بدأت {dateTime.format(new Date(activeShift.openedAt))} ·{" "}
-                      {duration(activeShift.workedMinutes)}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    {user?.role === "admin" && (
-                      <Button
-                        variant="danger"
-                        onClick={() =>
-                          setAction({ mode: "admin-close", shift: activeShift })
-                        }
-                      >
-                        <TriangleAlert className="size-4" /> إغلاق إداري
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                <div className="grid gap-px bg-line sm:grid-cols-2 xl:grid-cols-4">
-                  <Metric
-                    icon={Banknote}
+                <StatStrip className="statline-flush">
+                  <Stat
+                    icon={<Banknote className="size-4" />}
                     label="العهدة الافتتاحية"
                     value={formatMoney(activeShift.openingFloat)}
                   />
-                  <Metric
-                    icon={ShoppingBag}
+                  <Stat
+                    icon={<ShoppingBag className="size-4" />}
                     label={`المبيعات · ${activeShift.totals.ordersCount} طلب`}
                     value={formatMoney(activeShift.totals.sales)}
                   />
-                  <Metric
-                    icon={Tag}
+                  <Stat
+                    icon={<Tag className="size-4" />}
                     label="الخصومات"
                     value={formatMoney(activeShift.totals.discounts)}
                   />
-                  <Metric
-                    icon={ArrowLeftRight}
+                  <Stat
+                    icon={<ArrowLeftRight className="size-4" />}
                     label="طلبات التحويل"
                     value={String(activeShift.totals.transferRequests)}
                   />
-                  <Metric
-                    icon={ReceiptText}
+                  <Stat
+                    icon={<ReceiptText className="size-4" />}
                     label="المرتجعات"
                     value={formatMoney(activeShift.totals.refunds)}
                   />
-                  <Metric
-                    icon={WalletCards}
+                  <Stat
+                    icon={<WalletCards className="size-4" />}
                     label="مصروفات الدرج"
                     value={formatMoney(activeShift.totals.expenses)}
                   />
-                  <Metric
-                    icon={Trash2}
+                  <Stat
+                    icon={<Trash2 className="size-4" />}
                     label="عمليات الهالك"
                     value={String(activeShift.totals.wasteEntries)}
                   />
-                  <Metric
-                    icon={Clock3}
+                  <Stat
+                    icon={<Clock3 className="size-4" />}
                     label="وقت العمل"
                     value={duration(activeShift.workedMinutes)}
                   />
-                </div>
-              </section>
+                </StatStrip>
+              </Section>
             ))
           ) : (
-            <section className="mb-7 rounded-2xl border border-dashed border-line bg-surface p-8 text-center">
-              <LockKeyhole className="mx-auto mb-3 size-8 text-muted" />
-              <h2 className="font-bold">لا توجد وردية مفتوحة</h2>
-              <p className="mt-1 text-sm text-muted">
-                يفتح الكاشير ورديته من الرئيسية أو نقطة البيع.
-              </p>
-            </section>
+            <EmptyState
+              className="mb-7"
+              icon={<LockKeyhole className="size-8" />}
+              title="لا توجد وردية مفتوحة"
+              description="يفتح الكاشير ورديته من الرئيسية أو نقطة البيع."
+            />
           )}
 
           <section>
@@ -251,24 +238,6 @@ export default function ShiftsPage() {
           onSubmit={submit}
         />
       )}
-    </div>
-  );
-}
-
-function Metric({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof Banknote;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="bg-surface p-5">
-      <Icon className="mb-3 size-5 text-primary" />
-      <div className="text-xs text-muted">{label}</div>
-      <div className="mt-1 text-xl font-bold tnum">{value}</div>
     </div>
   );
 }

@@ -8,7 +8,7 @@ import {
   Building2,
   LayoutDashboard,
   Warehouse,
-  CupSoda,
+  ArrowLeftRight,
   Truck,
   Clock,
   Users,
@@ -30,7 +30,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
-import { NAV_ITEMS } from "@/lib/navigation";
+import { NAV_GROUPS, NAV_ITEMS } from "@/lib/navigation";
 import { normalizePath } from "@/lib/auth";
 import { ChangePasswordModal } from "@/components/auth/change-password-modal";
 
@@ -40,10 +40,10 @@ const navIcons: Record<NavHref, LucideIcon> = {
   "/": LayoutDashboard,
   "/pos": ShoppingBag,
   "/orders": ReceiptText,
-  "/categories": Tags,
-  "/warehouse": Warehouse,
+  "/inventory": Warehouse,
+  "/transfers": ArrowLeftRight,
   "/stocktakes": ClipboardCheck,
-  "/cafe": CupSoda,
+  "/categories": Tags,
   "/suppliers": Truck,
   "/purchases": ShoppingCart,
   "/users": UserCog,
@@ -72,10 +72,6 @@ export function Sidebar({
   const pathname = normalizePath(usePathname());
   const { user, logout } = useAuth();
   const [passwordOpen, setPasswordOpen] = useState(false);
-  const visibleNav = NAV_ITEMS.filter(
-    (item) =>
-      !("adminOnly" in item && item.adminOnly) || user?.role === "admin",
-  );
   return (
     <>
       {open && (
@@ -106,26 +102,45 @@ export function Sidebar({
             <X className="size-5" />
           </button>
         </div>
-        <nav className="flex-1 space-y-0.5 px-3 pb-6">
-          {visibleNav.map(({ href, label }) => {
-            const Icon = navIcons[href];
-            const active =
-              href === "/" ? pathname === "/" : pathname.startsWith(href);
+        <nav className="flex-1 space-y-5 px-3 pb-6 pt-1">
+          {NAV_GROUPS.map((group) => {
+            const items = group.items.filter(
+              (item) =>
+                !("adminOnly" in item && item.adminOnly) ||
+                user?.role === "admin",
+            );
+            if (items.length === 0) return null;
             return (
-              <Link
-                key={href}
-                href={href}
-                onClick={onClose}
-                aria-current={active ? "page" : undefined}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-                  active
-                    ? "bg-white/10 text-white border-e-2 border-accent"
-                    : "hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                <Icon className="size-4.5" />
-                {label}
-              </Link>
+              <div key={group.label}>
+                <p className="mb-1 px-3 text-[11px] font-semibold tracking-wide text-sidebar-ink/70">
+                  {group.label}
+                </p>
+                <div className="space-y-0.5">
+                  {items.map(({ href, label }) => {
+                    const Icon = navIcons[href];
+                    const active =
+                      href === "/"
+                        ? pathname === "/"
+                        : pathname.startsWith(href);
+                    return (
+                      <Link
+                        key={href}
+                        href={href}
+                        onClick={onClose}
+                        aria-current={active ? "page" : undefined}
+                        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          active
+                            ? "bg-white/10 text-white border-e-2 border-accent"
+                            : "hover:bg-white/5 hover:text-white"
+                        }`}
+                      >
+                        <Icon className="size-4.5" />
+                        {label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
         </nav>

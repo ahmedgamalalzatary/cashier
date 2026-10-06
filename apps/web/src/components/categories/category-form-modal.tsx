@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
+import { SelectField } from "@/components/ui/select-field";
 import { categoryParentOptions, categoryUpdateBody } from "@/models/category-model";
 import { createCategory, updateCategory } from "@/services/categories-service";
 
@@ -72,25 +73,20 @@ export function CategoryFormModal({
           required
         />
         {editing && (
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium">التصنيف الرئيسي</span>
-            <select
-              value={parentId}
-              onChange={(event) => setParentId(event.target.value)}
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-            >
-              <option value="">بدون — تصنيف رئيسي</option>
-              {categoryParentOptions(
-                categories,
-                editing.id,
-                editing.parentId,
-              ).map((category) => (
+          <SelectField
+            label="التصنيف الرئيسي"
+            value={parentId}
+            onChange={(event) => setParentId(event.target.value)}
+          >
+            <option value="">بدون — تصنيف رئيسي</option>
+            {categoryParentOptions(categories, editing.id, editing.parentId).map(
+              (category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
                 </option>
-              ))}
-            </select>
-          </label>
+              ),
+            )}
+          </SelectField>
         )}
         {error && <p className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end gap-2 pt-1">

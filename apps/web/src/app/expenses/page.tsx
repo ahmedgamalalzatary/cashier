@@ -5,8 +5,11 @@ import type { ExpenseCategory, ExpenseSummary } from "@cashier/shared";
 import { Plus, Receipt } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
+import { DataTable, type DataColumn } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
-import { Table } from "@/components/ui/table";
+import { Section } from "@/components/ui/section";
+import { SelectField } from "@/components/ui/select-field";
+import { EmptyState, ErrorBanner } from "@/components/ui/states";
 import { cairoCalendarDate } from "@/lib/cairo-date";
 import { formatMoney } from "@/lib/format";
 import {
@@ -93,54 +96,142 @@ export default function ExpensesPage() {
     }
   }
 
+  const columns: DataColumn<ExpenseSummary>[] = [
+    {
+      key: "date",
+      header: "التاريخ",
+      mobile: "primary",
+      cell: (entry) => (
+        <span className="tnum">
+          {new Date(`${entry.expenseDate}T00:00:00`).toLocaleDateString("ar-EG")}
+        </span>
+      ),
+    },
+    {
+      key: "type",
+      header: "النوع",
+      cell: (entry) => (entry.type === "shift" ? "وردية" : "عام"),
+    },
+    { key: "category", header: "التصنيف", cell: (entry) => entry.categoryName },
+    {
+      key: "amount",
+      header: "المبلغ",
+      numeric: true,
+      cell: (entry) => (
+        <span className="font-bold">{formatMoney(entry.amount)}</span>
+      ),
+    },
+    { key: "by", header: "المسجل", cell: (entry) => entry.recordedByName },
+    { key: "note", header: "ملاحظات", cell: (entry) => entry.note ?? "—" },
+  ];
+
   return (
-    <div className="space-y-6">
-      <PageHeader title="المصروفات" />
-      {error && (
-        <p role="alert" className="rounded-xl border border-danger/30 bg-danger/5 p-3 text-sm text-danger">{error}</p>
-      )}
-      <section className="rounded-2xl border border-line bg-surface p-4">
-        <h2 className="mb-4 font-bold">
-          {user?.role === "admin" ? "تسجيل مصروف عام" : "مصروف من درج الوردية"}
-        </h2>
-        <div className="grid gap-3 md:grid-cols-2">
-          <select aria-label="تصنيف المصروف" value={categoryId}
-            onChange={(event) => { setCategoryId(event.target.value); setRequestId(crypto.randomUUID()); }}
-            className="h-11 rounded-xl border border-line bg-paper px-3">
+    <div className="space-y-5">
+      <PageHeader
+        title="المصروفات"
+        description={
+          user?.role === "admin"
+            ? "تسجيل المصروفات العامة وتصنيفاتها."
+            : "تسجيل المصروفات المدفوعة من درج الوردية."
+        }
+      />
+      {error && <ErrorBanner>{error}</ErrorBanner>}
+
+      <Section
+        title={
+          user?.role === "admin" ? "تسجيل مصروف عام" : "مصروف من درج الوردية"
+        }
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <SelectField
+            label="تصنيف المصروف"
+            value={categoryId}
+            onChange={(event) => {
+              setCategoryId(event.target.value);
+              setRequestId(crypto.randomUUID());
+            }}
+          >
             <option value="">اختر التصنيف</option>
             {activeCategories.map((category) => (
-              <option key={category.id} value={category.id}>{category.name}</option>
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
             ))}
-          </select>
-          <input aria-label="المبلغ" type="number" min="0.01" step="0.01"
-            value={amount} onChange={(event) => { setAmount(event.target.value); setRequestId(crypto.randomUUID()); }}
-            placeholder="المبلغ" className="h-11 rounded-xl border border-line bg-paper px-3 tnum" />
+          </SelectField>
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium">المبلغ</span>
+            <input
+              aria-label="المبلغ"
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={amount}
+              onChange={(event) => {
+                setAmount(event.target.value);
+                setRequestId(crypto.randomUUID());
+              }}
+              placeholder="المبلغ"
+              className="input tnum"
+            />
+          </label>
           {user?.role === "admin" && (
-            <input aria-label="تاريخ المصروف" type="date" value={expenseDate}
-              onChange={(event) => { setExpenseDate(event.target.value); setRequestId(crypto.randomUUID()); }}
-              className="h-11 rounded-xl border border-line bg-paper px-3" />
+            <label className="block space-y-1.5">
+              <span className="text-sm font-medium">تاريخ المصروف</span>
+              <input
+                aria-label="تاريخ المصروف"
+                type="date"
+                value={expenseDate}
+                onChange={(event) => {
+                  setExpenseDate(event.target.value);
+                  setRequestId(crypto.randomUUID());
+                }}
+                className="input"
+              />
+            </label>
           )}
-          <input aria-label="ملاحظات" value={note} maxLength={500}
-            onChange={(event) => { setNote(event.target.value); setRequestId(crypto.randomUUID()); }}
-            placeholder="ملاحظات اختيارية" className="h-11 rounded-xl border border-line bg-paper px-3" />
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium">ملاحظات</span>
+            <input
+              aria-label="ملاحظات"
+              value={note}
+              maxLength={500}
+              onChange={(event) => {
+                setNote(event.target.value);
+                setRequestId(crypto.randomUUID());
+              }}
+              placeholder="ملاحظات اختيارية"
+              className="input"
+            />
+          </label>
         </div>
-        <Button onClick={submit} disabled={saving || !categoryId || Number(amount) <= 0} className="mt-4 justify-center">
-          <Receipt className="size-4" />{saving ? "جارِ التسجيل…" : "تسجيل المصروف"}
+        <Button
+          onClick={submit}
+          disabled={saving || !categoryId || Number(amount) <= 0}
+          className="mt-4"
+        >
+          <Receipt className="size-4" />
+          {saving ? "جارِ التسجيل…" : "تسجيل المصروف"}
         </Button>
-      </section>
+      </Section>
 
       {user?.role === "admin" && (
-        <section className="rounded-2xl border border-line bg-surface p-4">
-          <h2 className="mb-4 font-bold">تصنيفات المصروفات</h2>
-          <div className="mb-4 flex gap-2">
-            <input aria-label="اسم التصنيف الجديد" value={newCategory}
+        <Section title="تصنيفات المصروفات" bodyClassName="p-0">
+          <div className="flex gap-2 p-4">
+            <input
+              aria-label="اسم التصنيف الجديد"
+              value={newCategory}
               onChange={(event) => setNewCategory(event.target.value)}
-              className="h-10 min-w-0 flex-1 rounded-xl border border-line bg-paper px-3" placeholder="مثال: صيانة" />
-            <Button onClick={addCategory} disabled={!newCategory.trim()}><Plus className="size-4" />إضافة</Button>
+              className="input min-w-0 flex-1"
+              placeholder="مثال: صيانة"
+            />
+            <Button onClick={addCategory} disabled={!newCategory.trim()}>
+              <Plus className="size-4" />
+              إضافة
+            </Button>
           </div>
-          <div className="space-y-2">
+          <ul className="ledger border-t border-line">
             {categories.map((category) => (
-              <div key={category.id} className="flex gap-2">
+              <li key={category.id} className="flex gap-2 px-4 py-2">
                 <input
                   aria-label={`اسم تصنيف ${category.name}`}
                   defaultValue={category.name}
@@ -152,12 +243,13 @@ export default function ExpensesPage() {
                         .then(load)
                         .catch((cause: Error) => setError(cause.message));
                   }}
-                  className={`h-9 min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 text-sm ${
+                  className={`input min-w-0 flex-1 ${
                     category.isActive ? "" : "text-muted line-through"
                   }`}
                 />
                 <Button
                   variant="ghost"
+                  size="sm"
                   onClick={() =>
                     updateExpenseCategory(category.id, {
                       isActive: !category.isActive,
@@ -168,26 +260,27 @@ export default function ExpensesPage() {
                 >
                   {category.isActive ? "إيقاف" : "تفعيل"}
                 </Button>
-              </div>
+              </li>
             ))}
-          </div>
-        </section>
+          </ul>
+        </Section>
       )}
 
-      <section>
-        <h2 className="mb-3 font-bold">سجل المصروفات</h2>
-        <Table headers={["التاريخ", "النوع", "التصنيف", "المبلغ", "المسجل", "ملاحظات"]}>
-          {entries.map((entry) => (
-            <tr key={entry.id}>
-              <td>{new Date(`${entry.expenseDate}T00:00:00`).toLocaleDateString("ar-EG")}</td>
-              <td>{entry.type === "shift" ? "وردية" : "عام"}</td>
-              <td>{entry.categoryName}</td>
-              <td className="tnum font-bold">{formatMoney(entry.amount)}</td>
-              <td>{entry.recordedByName}</td>
-              <td>{entry.note ?? "—"}</td>
-            </tr>
-          ))}
-        </Table>
+      <section className="space-y-3">
+        <h2 className="font-bold">سجل المصروفات</h2>
+        <DataTable
+          caption="سجل المصروفات"
+          rows={entries}
+          rowKey={(entry) => entry.id}
+          columns={columns}
+          empty={
+            <EmptyState
+              icon={<Receipt className="size-8" />}
+              title="لا توجد مصروفات بعد"
+              description="سجّل أول مصروف أعلاه."
+            />
+          }
+        />
       </section>
     </div>
   );

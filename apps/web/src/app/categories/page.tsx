@@ -1,12 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus, Pencil, Ban, CornerDownLeft, RotateCcw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Plus,
+  Pencil,
+  Ban,
+  CornerDownLeft,
+  RotateCcw,
+  Tags,
+} from "lucide-react";
 import type { Category } from "@cashier/shared";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { IconButton as IconBtn } from "@/components/ui/icon-button";
 import { PageHeader } from "@/components/ui/page-header";
+import { Section } from "@/components/ui/section";
+import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
 import { CategoryFormModal } from "@/components/categories/category-form-modal";
 import {
   deactivateCategory,
@@ -22,6 +32,9 @@ export default function CategoriesPage() {
     editing: Category | null;
     parent: Category | null;
   } | null>(null);
+  const [confirming, setConfirming] = useState<Category | null>(null);
+  const [confirmingBusy, setConfirmingBusy] = useState(false);
+  const [confirmingError, setConfirmingError] = useState("");
 
   const [reloadKey, setReloadKey] = useState(0);
   const reload = () => setReloadKey((k) => k + 1);
@@ -46,15 +59,18 @@ export default function CategoriesPage() {
   }, [reloadKey]);
 
   async function deactivate(c: Category) {
-    const warning = c.parentId
-      ? `إيقاف التصنيف "${c.name}"؟`
-      : `إيقاف التصنيف "${c.name}" وجميع فروعه؟`;
-    if (!confirm(warning)) return;
+    setConfirmingBusy(true);
+    setConfirmingError("");
     try {
       await deactivateCategory(c.id);
+      setConfirming(null);
       reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "تعذر إيقاف التصنيف");
+      setConfirmingError(
+        e instanceof Error ? e.message : "تعذر إيقاف التصنيف",
+      );
+    } finally {
+      setConfirmingBusy(false);
     }
   }
 
@@ -67,13 +83,17 @@ export default function CategoriesPage() {
     }
   }
 
-  const mains = categories.filter((c) => c.parentId === null);
+  const mains = useMemo(
+    () => categories.filter((c) => c.parentId === null),
+    [categories],
+  );
   const subsOf = (id: number) => categories.filter((c) => c.parentId === id);
 
   return (
     <div>
       <PageHeader
-        title="التصنيفات"
+        title="تصنيفات الأصناف"
+        description="تصنيفات المخزن التي تُبنى عليها الأصناف وتقارير المبيعات."
         actions={
           <Button onClick={() => setModal({ editing: null, parent: null })}>
             <Plus className="size-4" /> تصنيف رئيسي جديد
@@ -81,107 +101,120 @@ export default function CategoriesPage() {
         }
       />
 
-      {error && (
-        <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">
-          {error}
-        </p>
-      )}
+      {error && <ErrorBanner className="mb-4">{error}</ErrorBanner>}
 
       {loading ? (
-        <p className="text-muted">جارِ التحميل…</p>
+        <LoadingState />
       ) : mains.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-line bg-surface p-8 text-center text-muted">
-          لا توجد تصنيفات بعد — أضف أول تصنيف بزر «تصنيف رئيسي جديد».
-        </p>
+        <EmptyState
+          icon={<Tags className="size-8" />}
+          title="لا توجد تصنيفات بعد"
+          description="أضف أول تصنيف رئيسي، ثم أضف التصنيفات الفرعية تحته."
+        />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {mains.map((main) => (
-            <section
-              key={main.id}
-              className={`rounded-xl border border-line bg-surface ${main.isActive ? "" : "opacity-50"}`}
-            >
-              <div className="flex items-center justify-between border-b border-line px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <h2 className="font-bold">{main.name}</h2>
-                  {!main.isActive && <Badge tone="neutral">موقوف</Badge>}
-                </div>
-                <div className="flex items-center gap-1">
-                  <IconBtn
-                    title="إضافة فرعي"
-                    onClick={() => setModal({ editing: null, parent: main })}
+        <Section bodyClassName="p-0">
+          <div className="ledger">
+            {mains.map((main) => {
+              const subs = subsOf(main.id);
+              return (
+                <div key={main.id}>
+                  <div
+                    className={`flex items-center justify-between gap-3 px-4 py-3 ${main.isActive ? "" : "opacity-55"}`}
                   >
-                    <Plus className="size-4" />
-                  </IconBtn>
-                  <IconBtn
-                    title="تعديل"
-                    onClick={() => setModal({ editing: main, parent: null })}
-                  >
-                    <Pencil className="size-4" />
-                  </IconBtn>
-                  {main.isActive ? (
-                    <IconBtn
-                      title="إيقاف"
-                      onClick={() => deactivate(main)}
-                      danger
-                    >
-                      <Ban className="size-4" />
-                    </IconBtn>
-                  ) : (
-                    <IconBtn
-                      title="إعادة التفعيل"
-                      onClick={() => reactivate(main)}
-                    >
-                      <RotateCcw className="size-4" />
-                    </IconBtn>
-                  )}
-                </div>
-              </div>
-              <ul className="px-4 py-2">
-                {subsOf(main.id).length === 0 && (
-                  <li className="py-2 text-sm text-muted">
-                    لا توجد تصنيفات فرعية
-                  </li>
-                )}
-                {subsOf(main.id).map((sub) => (
-                  <li
-                    key={sub.id}
-                    className={`flex items-center justify-between py-1.5 ${sub.isActive ? "" : "opacity-50"}`}
-                  >
-                    <span className="flex items-center gap-2 text-sm">
-                      <CornerDownLeft className="size-3.5 text-muted" />
-                      {sub.name}
-                      {!sub.isActive && <Badge tone="neutral">موقوف</Badge>}
-                    </span>
-                    <span className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
+                      <h2 className="font-bold">{main.name}</h2>
+                      {!main.isActive && <Badge tone="neutral">موقوف</Badge>}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <IconBtn
+                        title="إضافة فرعي"
+                        onClick={() => setModal({ editing: null, parent: main })}
+                      >
+                        <Plus className="size-4" />
+                      </IconBtn>
                       <IconBtn
                         title="تعديل"
-                        onClick={() => setModal({ editing: sub, parent: main })}
+                        onClick={() => setModal({ editing: main, parent: null })}
                       >
                         <Pencil className="size-4" />
                       </IconBtn>
-                      {sub.isActive ? (
+                      {main.isActive ? (
                         <IconBtn
                           title="إيقاف"
-                          onClick={() => deactivate(sub)}
                           danger
+                          onClick={() => {
+                            setConfirmingError("");
+                            setConfirming(main);
+                          }}
                         >
                           <Ban className="size-4" />
                         </IconBtn>
                       ) : (
                         <IconBtn
                           title="إعادة التفعيل"
-                          onClick={() => reactivate(sub)}
+                          onClick={() => reactivate(main)}
                         >
                           <RotateCcw className="size-4" />
                         </IconBtn>
                       )}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
-        </div>
+                    </div>
+                  </div>
+                  {subs.length === 0 ? (
+                    <p className="px-4 pb-3 ps-10 text-xs text-muted">
+                      لا توجد تصنيفات فرعية — أضف واحداً بزر «+».
+                    </p>
+                  ) : (
+                    <ul className="border-t border-line bg-paper/30">
+                      {subs.map((sub) => (
+                        <li
+                          key={sub.id}
+                          className={`flex items-center justify-between gap-3 px-4 py-2 ps-10 ${sub.isActive ? "" : "opacity-55"}`}
+                        >
+                          <span className="flex items-center gap-2 text-sm">
+                            <CornerDownLeft className="size-3.5 text-muted" />
+                            {sub.name}
+                            {!sub.isActive && (
+                              <Badge tone="neutral">موقوف</Badge>
+                            )}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <IconBtn
+                              title="تعديل"
+                              onClick={() =>
+                                setModal({ editing: sub, parent: main })
+                              }
+                            >
+                              <Pencil className="size-4" />
+                            </IconBtn>
+                            {sub.isActive ? (
+                              <IconBtn
+                                title="إيقاف"
+                                danger
+                                onClick={() => {
+                                  setConfirmingError("");
+                                  setConfirming(sub);
+                                }}
+                              >
+                                <Ban className="size-4" />
+                              </IconBtn>
+                            ) : (
+                              <IconBtn
+                                title="إعادة التفعيل"
+                                onClick={() => reactivate(sub)}
+                              >
+                                <RotateCcw className="size-4" />
+                              </IconBtn>
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Section>
       )}
 
       {modal && (
@@ -197,6 +230,26 @@ export default function CategoriesPage() {
           }}
         />
       )}
+      <ConfirmDialog
+        open={confirming !== null}
+        title="إيقاف التصنيف"
+        description={
+          confirming
+            ? confirming.parentId
+              ? `سيُوقف التصنيف "${confirming.name}".`
+              : `سيُوقف التصنيف "${confirming.name}" وجميع فروعه.`
+            : undefined
+        }
+        tone="danger"
+        confirmLabel="إيقاف التصنيف"
+        busy={confirmingBusy}
+        error={confirmingError}
+        onConfirm={() => confirming && void deactivate(confirming)}
+        onCancel={() => {
+          setConfirming(null);
+          setConfirmingError("");
+        }}
+      />
     </div>
   );
 }

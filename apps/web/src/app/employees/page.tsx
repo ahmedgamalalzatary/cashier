@@ -7,9 +7,11 @@ import { CashierAccessModal } from "@/components/employees/cashier-access-modal"
 import { EmployeeModal } from "@/components/employees/employee-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DataTable, type DataColumn } from "@/components/ui/data-table";
 import { IconButton } from "@/components/ui/icon-button";
 import { PageHeader } from "@/components/ui/page-header";
-import { Table } from "@/components/ui/table";
+import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
 import { formatMoney } from "@/lib/format";
 import {
   deactivateEmployee,
@@ -24,12 +26,17 @@ const payTypeLabel = {
   hourly: "بالساعة",
 } as const;
 
+type ConfirmAction = { kind: "deactivate" | "revoke"; employee: Employee };
+
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<Employee | null | undefined>();
   const [accessEmployee, setAccessEmployee] = useState<Employee | null>(null);
+  const [confirming, setConfirming] = useState<ConfirmAction | null>(null);
+  const [confirmingBusy, setConfirmingBusy] = useState(false);
+  const [confirmingError, setConfirmingError] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -47,13 +54,22 @@ export default function EmployeesPage() {
     return () => window.clearTimeout(initialLoad);
   }, [load]);
 
-  async function deactivate(employee: Employee) {
-    if (!confirm(`إيقاف سجل الموظف "${employee.name}"؟`)) return;
+  async function runConfirm() {
+    if (!confirming) return;
+    setConfirmingBusy(true);
+    setConfirmingError("");
     try {
-      await deactivateEmployee(employee.id);
+      if (confirming.kind === "deactivate")
+        await deactivateEmployee(confirming.employee.id);
+      else await revokeCashierAccess(confirming.employee.id);
+      setConfirming(null);
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "تعذر إيقاف الموظف");
+      setConfirmingError(
+        cause instanceof Error ? cause.message : "تعذر تنفيذ الإجراء",
+      );
+    } finally {
+      setConfirmingBusy(false);
     }
   }
 
@@ -66,148 +82,147 @@ export default function EmployeesPage() {
     }
   }
 
-  async function revoke(employee: Employee) {
-    if (!confirm(`إلغاء دخول الكاشير للموظف "${employee.name}"؟`)) return;
-    try {
-      await revokeCashierAccess(employee.id);
-      await load();
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "تعذر إلغاء صلاحية الكاشير",
-      );
-    }
-  }
+  const columns: DataColumn<Employee>[] = [
+    {
+      key: "name",
+      header: "الموظف",
+      mobile: "primary",
+      cell: (employee) => (
+        <div>
+          <div className="font-medium">{employee.name}</div>
+          <div className="tnum text-xs text-muted">
+            {employee.phone || "—"}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "job",
+      header: "الوظيفة",
+      cell: (employee) => employee.jobTitle || "—",
+    },
+    {
+      key: "pay",
+      header: "الأجر",
+      cell: (employee) =>
+        employee.payType && employee.payRate
+          ? `${formatMoney(employee.payRate)} · ${payTypeLabel[employee.payType]}`
+          : "—",
+    },
+    {
+      key: "access",
+      header: "دخول الكاشير",
+      cell: (employee) =>
+        employee.cashierAccess ? (
+          <div>
+            <Badge
+              tone={employee.cashierAccess.isActive ? "success" : "neutral"}
+            >
+              {employee.cashierAccess.isActive ? "مفعّل" : "موقوف"}
+            </Badge>
+            <div className="tnum mt-1 text-xs" dir="ltr">
+              {employee.cashierAccess.username}
+            </div>
+          </div>
+        ) : (
+          <Badge tone="neutral">بدون دخول</Badge>
+        ),
+    },
+    {
+      key: "status",
+      header: "الحالة",
+      cell: (employee) => (
+        <Badge tone={employee.isActive ? "success" : "neutral"}>
+          {employee.isActive ? "نشط" : "موقوف"}
+        </Badge>
+      ),
+    },
+  ];
 
   return (
     <div>
       <PageHeader
         title="الموظفون"
+        description="سجلات الموظفين مستقلة عن الدخول للنظام. يمكن منح الموظف صلاحية كاشير واحدة، وتُحسب ساعات عمل الكاشير من ووردياته."
         actions={
           <Button onClick={() => setEditing(null)}>
             <Plus className="size-4" /> موظف جديد
           </Button>
         }
       />
-      <p className="mb-5 max-w-3xl text-sm leading-6 text-muted">
-        سجلات الموظفين مستقلة عن الدخول للنظام. يمكن منح الموظف صلاحية كاشير
-        واحدة، وتُحسب ساعات عمل الكاشير من وردياته.
-      </p>
-      {error && (
-        <p
-          role="alert"
-          className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger"
-        >
-          {error}
-        </p>
-      )}
+      {error && <ErrorBanner className="mb-4">{error}</ErrorBanner>}
       {loading ? (
-        <p className="text-muted">جارِ تحميل الموظفين…</p>
-      ) : employees.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-line bg-surface p-8 text-center text-muted">
-          لا توجد سجلات موظفين بعد.
-        </p>
+        <LoadingState label="جارِ تحميل الموظفين…" />
       ) : (
-        <Table
-          headers={[
-            "الموظف",
-            "الوظيفة",
-            "الأجر",
-            "دخول الكاشير",
-            "الحالة",
-            "إجراءات",
-          ]}
-        >
-          {employees.map((employee) => (
-            <tr
-              key={employee.id}
-              className={employee.isActive ? "" : "opacity-55"}
-            >
-              <td className="px-4 py-3">
-                <div className="font-medium">{employee.name}</div>
-                <div className="text-xs text-muted">
-                  {employee.phone || "—"}
-                </div>
-              </td>
-              <td className="px-4 py-3">{employee.jobTitle || "—"}</td>
-              <td className="px-4 py-3">
-                {employee.payType && employee.payRate
-                  ? `${formatMoney(employee.payRate)} · ${payTypeLabel[employee.payType]}`
-                  : "—"}
-              </td>
-              <td className="px-4 py-3">
-                {employee.cashierAccess ? (
-                  <div>
-                    <Badge
-                      tone={
-                        employee.cashierAccess.isActive ? "success" : "neutral"
-                      }
-                    >
-                      {employee.cashierAccess.isActive ? "مفعّل" : "موقوف"}
-                    </Badge>
-                    <div className="mt-1 text-xs tnum" dir="ltr">
-                      {employee.cashierAccess.username}
-                    </div>
-                  </div>
-                ) : (
-                  <Badge tone="neutral">بدون دخول</Badge>
-                )}
-              </td>
-              <td className="px-4 py-3">
-                <Badge tone={employee.isActive ? "success" : "neutral"}>
-                  {employee.isActive ? "نشط" : "موقوف"}
-                </Badge>
-              </td>
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-1">
+        <DataTable
+          caption="قائمة الموظفين"
+          rows={employees}
+          rowKey={(employee) => employee.id}
+          rowClassName={(employee) =>
+            employee.isActive ? undefined : "opacity-55"
+          }
+          columns={columns}
+          empty={
+            <EmptyState
+              icon={<Power className="size-8" />}
+              title="لا توجد سجلات موظفين بعد"
+              description="أضف أول موظف لربط وورديات الكاشير وساعات العمل."
+            />
+          }
+          actions={(employee) => (
+            <div className="flex items-center gap-1">
+              <IconButton
+                title="تعديل الموظف"
+                onClick={() => setEditing(employee)}
+              >
+                <Pencil className="size-4" />
+              </IconButton>
+              {employee.isActive &&
+                (!employee.cashierAccess || !employee.cashierAccess.isActive ? (
                   <IconButton
-                    title="تعديل الموظف"
-                    onClick={() => setEditing(employee)}
+                    title={
+                      employee.cashierAccess
+                        ? "إعادة تفعيل حساب الكاشير"
+                        : "منح صلاحية كاشير"
+                    }
+                    onClick={() => setAccessEmployee(employee)}
                   >
-                    <Pencil className="size-4" />
+                    <KeyRound className="size-4" />
                   </IconButton>
-                  {employee.isActive &&
-                    (!employee.cashierAccess ||
-                    !employee.cashierAccess.isActive ? (
-                      <IconButton
-                        title={
-                          employee.cashierAccess
-                            ? "إعادة تفعيل حساب الكاشير"
-                            : "منح صلاحية كاشير"
-                        }
-                        onClick={() => setAccessEmployee(employee)}
-                      >
-                        <KeyRound className="size-4" />
-                      </IconButton>
-                    ) : (
-                      <IconButton
-                        title="إلغاء صلاحية الكاشير"
-                        danger
-                        onClick={() => revoke(employee)}
-                      >
-                        <UserMinus className="size-4" />
-                      </IconButton>
-                    ))}
-                  {employee.isActive ? (
-                    <IconButton
-                      title="إيقاف الموظف"
-                      danger
-                      onClick={() => deactivate(employee)}
-                    >
-                      <Ban className="size-4" />
-                    </IconButton>
-                  ) : (
-                    <IconButton
-                      title="إعادة تفعيل الموظف"
-                      onClick={() => reactivate(employee)}
-                    >
-                      <Power className="size-4" />
-                    </IconButton>
-                  )}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </Table>
+                ) : (
+                  <IconButton
+                    title="إلغاء صلاحية الكاشير"
+                    danger
+                    onClick={() => {
+                      setConfirmingError("");
+                      setConfirming({ kind: "revoke", employee });
+                    }}
+                  >
+                    <UserMinus className="size-4" />
+                  </IconButton>
+                ))}
+              {employee.isActive ? (
+                <IconButton
+                  title="إيقاف الموظف"
+                  danger
+                  onClick={() => {
+                    setConfirmingError("");
+                    setConfirming({ kind: "deactivate", employee });
+                  }}
+                >
+                  <Ban className="size-4" />
+                </IconButton>
+              ) : (
+                <IconButton
+                  title="إعادة تفعيل الموظف"
+                  onClick={() => reactivate(employee)}
+                >
+                  <Power className="size-4" />
+                </IconButton>
+              )}
+            </div>
+          )}
+        />
       )}
       {editing !== undefined && (
         <EmployeeModal
@@ -229,6 +244,30 @@ export default function EmployeesPage() {
           }}
         />
       )}
+      <ConfirmDialog
+        open={confirming !== null}
+        title={
+          confirming?.kind === "revoke"
+            ? "إلغاء صلاحية الكاشير"
+            : "إيقاف الموظف"
+        }
+        description={
+          confirming
+            ? confirming.kind === "revoke"
+              ? `سيُلغى دخول الكاشير للموظف "${confirming.employee.name}".`
+              : `سيُوقف سجل الموظف "${confirming.employee.name}" مع بقاء سجلاته.`
+            : undefined
+        }
+        tone="danger"
+        confirmLabel={confirming?.kind === "revoke" ? "إلغاء الصلاحية" : "إيقاف"}
+        busy={confirmingBusy}
+        error={confirmingError}
+        onConfirm={() => void runConfirm()}
+        onCancel={() => {
+          setConfirming(null);
+          setConfirmingError("");
+        }}
+      />
     </div>
   );
 }

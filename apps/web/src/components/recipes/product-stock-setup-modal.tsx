@@ -247,7 +247,7 @@ export function ProductStockSetupModal({
         )}
 
         {error && (
-          <p className="rounded-lg bg-danger/10 p-3 text-sm text-danger">
+          <p className="error-banner">
             {error}
           </p>
         )}

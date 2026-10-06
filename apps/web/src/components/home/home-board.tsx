@@ -13,6 +13,8 @@ import { AttentionQueue } from "@/components/home/attention-queue";
 import { AdminMetrics } from "@/components/home/admin-metrics";
 import { QuickActions } from "@/components/home/quick-actions";
 import { ShiftTape } from "@/components/home/shift-tape";
+import { Section } from "@/components/ui/section";
+import { ErrorBanner, LoadingState } from "@/components/ui/states";
 import { cairoClock, cairoDayLabel, cairoHour } from "@/lib/cairo-date";
 import { attentionItems, greetingFor } from "@/models/home-model";
 import {
@@ -87,30 +89,31 @@ export function HomeBoard() {
 
   if (!user) return null;
 
+  const attention = attentionItems({
+    role: user.role,
+    mainStock: board.mainStock,
+    cafeStock: board.cafeStock,
+    requests: board.requests,
+    suppliers: board.suppliers,
+  });
+
   return (
     <div>
       <header className="mb-7">
-        <p className="text-sm text-muted">
+        <p className="tnum text-sm text-muted">
           {cairoDayLabel(now)} · {cairoClock(now)}
         </p>
-        <h1 className="mt-1.5 text-3xl font-bold">
+        <h1 className="mt-1.5 text-3xl font-bold tracking-[-0.01em]">
           {greetingFor(cairoHour(now))}، {user.name}
         </h1>
       </header>
 
-      {error && (
-        <p
-          role="alert"
-          className="mb-5 rounded-lg bg-danger/10 p-3 text-sm text-danger"
-        >
-          {error}
-        </p>
-      )}
+      {error && <ErrorBanner className="mb-5">{error}</ErrorBanner>}
 
       {isAdmin && <AdminMetrics />}
 
       {loading ? (
-        <p className="text-muted">جارِ تحميل حالة اليوم…</p>
+        <LoadingState label="جارِ تحميل حالة اليوم…" />
       ) : (
         <div className="grid items-start gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] xl:gap-8">
           <ShiftTape
@@ -123,24 +126,14 @@ export function HomeBoard() {
             }}
           />
 
-          <div className="space-y-8">
-            <section>
-              <h2 className="mb-3 text-base font-bold">ابدأ من هنا</h2>
+          <div className="space-y-6">
+            <Section title="ابدأ من هنا" bodyClassName="p-0">
               <QuickActions role={user.role} />
-            </section>
+            </Section>
 
-            <section>
-              <h2 className="mb-3 text-base font-bold">يحتاج انتباهك</h2>
-              <AttentionQueue
-                items={attentionItems({
-                  role: user.role,
-                  mainStock: board.mainStock,
-                  cafeStock: board.cafeStock,
-                  requests: board.requests,
-                  suppliers: board.suppliers,
-                })}
-              />
-            </section>
+            <Section title="يحتاج انتباهك" bodyClassName="p-0">
+              <AttentionQueue items={attention} />
+            </Section>
           </div>
         </div>
       )}

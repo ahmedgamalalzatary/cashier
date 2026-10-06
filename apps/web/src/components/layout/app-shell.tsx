@@ -47,8 +47,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
       <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
       <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
-        <WorkspaceBar />
-        {children}
+        <div className="mx-auto w-full max-w-[96rem]">
+          <WorkspaceBar />
+          {children}
+        </div>
       </main>
     </div>
   );

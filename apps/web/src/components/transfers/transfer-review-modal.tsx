@@ -159,7 +159,7 @@ export function TransferReviewModal({
           </div>
 
           {request.status === "rejected" && (
-            <p className="rounded-lg bg-danger/10 p-3 text-sm text-danger">
+            <p className="error-banner">
               سبب الرفض: {request.rejectionReason}
             </p>
           )}

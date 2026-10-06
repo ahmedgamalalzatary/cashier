@@ -1,11 +1,9 @@
 "use client";
 
-import { Suspense, useEffect, useState, type ReactNode } from "react";
-import Link from "next/link";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { OrderDetail } from "@cashier/shared";
 import {
-  ArrowRight,
   Banknote,
   Coins,
   Printer,
@@ -16,7 +14,11 @@ import {
 import { useAuth } from "@/components/auth/auth-provider";
 import { OrderReceipt } from "@/components/pos/order-receipt";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
+import { Stat, StatStrip } from "@/components/ui/stat";
 import { Table } from "@/components/ui/table";
+import { ErrorBanner, LoadingState } from "@/components/ui/states";
 import { formatMoney, itemLabel } from "@/lib/format";
 import { orderMargin } from "@/models/orders-model";
 import { getOrder } from "@/services/orders-service";
@@ -31,7 +33,7 @@ const quantity = (value: string | number) =>
 
 export default function OrderDetailPage() {
   return (
-    <Suspense fallback={<p className="text-muted">جارِ تحميل الطلب…</p>}>
+    <Suspense fallback={<LoadingState label="جارِ تحميل الطلب…" />}>
       <OrderDetailView />
     </Suspense>
   );
@@ -52,74 +54,56 @@ function OrderDetailView() {
       );
   }, [id]);
 
-  if (error)
-    return (
-      <p
-        role="alert"
-        className="rounded-lg bg-danger/10 p-3 text-sm text-danger"
-      >
-        {error}
-      </p>
-    );
-  if (!order) return <p className="text-muted">جارِ تحميل الطلب…</p>;
+  if (error) return <ErrorBanner>{error}</ErrorBanner>;
+  if (!order) return <LoadingState label="جارِ تحميل الطلب…" />;
 
   const margin = orderMargin(order);
   const atLoss = Number(order.total) < Number(order.totalCost);
 
   return (
     <div>
-      <Link
-        href="/orders"
-        className="mb-4 inline-flex items-center gap-1 text-sm text-muted hover:text-ink"
-      >
-        <ArrowRight className="size-4" /> رجوع إلى الطلبات
-      </Link>
+      <PageHeader
+        back={{ href: "/orders", label: "رجوع إلى الطلبات" }}
+        title="الطلب"
+        actions={
+          <>
+            <span className="rounded-lg border border-line bg-surface px-2.5 py-1 text-sm font-bold tnum">
+              {order.orderNumber}
+            </span>
+            <Button onClick={() => window.print()}>
+              <Printer className="size-4" />
+              طباعة الإيصال
+            </Button>
+          </>
+        }
+      />
 
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-bold">الطلب</h1>
-          <span className="rounded-lg border border-line bg-surface px-2.5 py-1 text-sm font-bold tnum">
-            {order.orderNumber}
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-strong"
-        >
-          <Printer className="size-4" />
-          طباعة الإيصال
-        </button>
-      </div>
-
-      <section className="mb-6 overflow-hidden rounded-2xl border border-line bg-sidebar text-white shadow-[0_16px_45px_rgb(43_33_24/0.10)]">
-        <div className="grid divide-y divide-white/10 sm:grid-cols-2 sm:divide-x sm:divide-x-reverse sm:divide-y-0 lg:grid-cols-4">
-          <Summary
-            icon={<Coins className="size-5 text-accent" />}
-            label="المطلوب"
-            value={formatMoney(order.total)}
-          />
-          <Summary
-            icon={<Scissors className="size-5 text-accent" />}
-            label="الخصم"
-            value={
-              Number(order.discountAmount) > 0
-                ? formatMoney(order.discountAmount)
-                : "—"
-            }
-          />
-          <Summary
-            icon={<Banknote className="size-5 text-accent" />}
-            label="المستلم / الباقي"
-            value={`${formatMoney(order.cashReceived)} · ${formatMoney(order.changeAmount)}`}
-          />
-          <Summary
-            icon={<User className="size-5 text-accent" />}
-            label="الكاشير"
-            value={order.cashierName}
-          />
-        </div>
-      </section>
+      <StatStrip className="mb-6">
+        <Stat
+          icon={<Coins className="size-4" />}
+          label="المطلوب"
+          value={formatMoney(order.total)}
+        />
+        <Stat
+          icon={<Scissors className="size-4" />}
+          label="الخصم"
+          value={
+            Number(order.discountAmount) > 0
+              ? formatMoney(order.discountAmount)
+              : "—"
+          }
+        />
+        <Stat
+          icon={<Banknote className="size-4" />}
+          label="المستلم / الباقي"
+          value={`${formatMoney(order.cashReceived)} · ${formatMoney(order.changeAmount)}`}
+        />
+        <Stat
+          icon={<User className="size-4" />}
+          label="الكاشير"
+          value={order.cashierName}
+        />
+      </StatStrip>
 
       {order.isNegativeStock && (
         <p className="mb-4 flex items-center gap-2 rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm text-danger">
@@ -128,7 +112,7 @@ function OrderDetailView() {
         </p>
       )}
 
-      <section className="mb-6 grid gap-3 rounded-xl border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="mb-6 grid gap-4 rounded-xl border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-4">
         <Fact
           label="وقت البيع"
           value={dateTime.format(new Date(order.createdAt))}
@@ -179,15 +163,15 @@ function OrderDetailView() {
                   </span>
                 ))}
               </td>
-              <td className="px-4 py-3 tnum">{quantity(line.quantity)}</td>
-              <td className="px-4 py-3 tnum text-muted">
+              <td className="tnum px-4 py-3">{quantity(line.quantity)}</td>
+              <td className="tnum px-4 py-3 text-muted">
                 {formatMoney(line.unitPrice)}
               </td>
-              <td className="px-4 py-3 tnum font-bold">
+              <td className="tnum px-4 py-3 font-bold">
                 {formatMoney(line.lineSubtotal)}
               </td>
               {isAdmin && (
-                <td className="px-4 py-3 tnum text-muted">
+                <td className="tnum px-4 py-3 text-muted">
                   {formatMoney(line.totalCost)}
                 </td>
               )}
@@ -209,13 +193,13 @@ function OrderDetailView() {
                     <td className="px-4 py-3">
                       {itemLabel(allocation.itemCode, allocation.itemName)}
                     </td>
-                    <td className="px-4 py-3 tnum">
+                    <td className="tnum px-4 py-3">
                       {quantity(allocation.quantity)}
                     </td>
-                    <td className="px-4 py-3 tnum text-muted">
+                    <td className="tnum px-4 py-3 text-muted">
                       {formatMoney(allocation.unitCost)}
                     </td>
-                    <td className="px-4 py-3 tnum">
+                    <td className="tnum px-4 py-3">
                       {formatMoney(allocation.lineCost)}
                     </td>
                   </tr>
@@ -223,7 +207,7 @@ function OrderDetailView() {
               )}
             </Table>
           ) : (
-            <p className="rounded-xl border border-dashed border-line bg-surface p-8 text-center text-muted">
+            <p className="empty-state text-sm text-muted">
               لم تُسحب أي كمية من المخزون لهذا الطلب.
             </p>
           )}
@@ -234,26 +218,6 @@ function OrderDetailView() {
           say the same thing with room to read */}
       <div className="hidden print:block">
         <OrderReceipt order={order} />
-      </div>
-    </div>
-  );
-}
-
-function Summary({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 px-5 py-4">
-      <div className="rounded-lg bg-white/8 p-2">{icon}</div>
-      <div className="min-w-0">
-        <p className="text-xs text-sidebar-ink">{label}</p>
-        <p className="tnum mt-0.5 truncate text-xl font-bold">{value}</p>
       </div>
     </div>
   );

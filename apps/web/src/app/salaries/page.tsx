@@ -3,7 +3,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Banknote, Plus } from "lucide-react";
 import type { SalaryMonth } from "@cashier/shared";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DataTable, type DataColumn } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
+import { Section } from "@/components/ui/section";
+import { SelectField } from "@/components/ui/select-field";
+import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
 import { Table } from "@/components/ui/table";
 import { cairoCalendarDate } from "@/lib/cairo-date";
 import { formatMoney } from "@/lib/format";
@@ -13,6 +18,8 @@ import {
   getSalaryMonth,
   paySalary,
 } from "@/services/salaries-service";
+
+type Row = NonNullable<SalaryMonth["employees"]>[number];
 
 const initialMonth = cairoCalendarDate().slice(0, 7);
 export default function SalariesPage() {
@@ -26,6 +33,10 @@ export default function SalariesPage() {
   const [loading, setLoading] = useState(true),
     [saving, setSaving] = useState(false),
     [error, setError] = useState("");
+  const [paying, setPaying] = useState<{ id: number; name: string } | null>(
+    null,
+  );
+  const [payingError, setPayingError] = useState("");
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -62,25 +73,83 @@ export default function SalariesPage() {
       setSaving(false);
     }
   }
-  async function pay(id: number, name: string) {
-    if (
-      !confirm(
-        `تأكيد صرف راتب ${name} عن ${month}؟ لا يمكن تعديل الدفعة بعد ذلك.`,
-      )
-    )
-      return;
+  async function pay() {
+    if (!paying) return;
     setSaving(true);
+    setPayingError("");
     try {
-      await paySalary(id, month);
+      await paySalary(paying.id, month);
+      setPaying(null);
       await load();
     } catch (cause) {
-      setError((cause as Error).message);
+      setPayingError((cause as Error).message);
     } finally {
       setSaving(false);
     }
   }
+
+  const columns: DataColumn<Row>[] = [
+    {
+      key: "employee",
+      header: "الموظف",
+      mobile: "primary",
+      cell: (e) => e.employeeName,
+    },
+    {
+      key: "base",
+      header: "الراتب",
+      numeric: true,
+      cell: (e) => (e.basePay === null ? "يلزم راتب شهري" : formatMoney(e.basePay)),
+    },
+    {
+      key: "bonuses",
+      header: "المكافآت",
+      numeric: true,
+      cell: (e) => formatMoney(e.bonuses),
+    },
+    {
+      key: "deductions",
+      header: "الخصومات",
+      numeric: true,
+      cell: (e) => formatMoney(e.deductions),
+    },
+    {
+      key: "advances",
+      header: "السلف",
+      numeric: true,
+      cell: (e) => formatMoney(e.advances),
+    },
+    {
+      key: "net",
+      header: "الصافي",
+      numeric: true,
+      cell: (e) => (
+        <span className="font-bold">
+          {e.netPay === null ? "—" : formatMoney(e.netPay)}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "الحالة",
+      cell: (e) =>
+        e.payment ? (
+          <span className="text-success">تم الصرف</span>
+        ) : (
+          <Button
+            size="sm"
+            onClick={() => setPaying({ id: e.employeeId, name: e.employeeName })}
+            disabled={saving || e.netPay === null}
+          >
+            <Banknote className="size-4" />
+            صرف
+          </Button>
+        ),
+    },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title="المرتبات والسلف"
         actions={
@@ -94,24 +163,19 @@ export default function SalariesPage() {
                 setMonth(e.target.value);
                 setEntryDate(`${e.target.value}-01`);
               }}
-              className="h-10 rounded-xl border border-line bg-paper px-3"
+              className="input w-auto"
             />
           </label>
         }
       />
-      {error && (
-        <p role="alert" className="rounded-xl bg-danger/10 p-3 text-danger">
-          {error}
-        </p>
-      )}
-      <section className="rounded-2xl border border-line bg-surface p-4">
-        <h2 className="mb-4 font-bold">تسجيل سلفة أو تسوية</h2>
-        <div className="grid gap-3 md:grid-cols-5">
-          <select
-            aria-label="الموظف"
+      {error && <ErrorBanner>{error}</ErrorBanner>}
+
+      <Section title="تسجيل سلفة أو تسوية">
+        <div className="grid gap-4 md:grid-cols-5">
+          <SelectField
+            label="الموظف"
             value={employeeId}
             onChange={(e) => setEmployeeId(e.target.value)}
-            className="h-11 rounded-xl border border-line bg-paper px-3"
           >
             <option value="">اختر الموظف</option>
             {data?.employees.map((e) => (
@@ -119,42 +183,50 @@ export default function SalariesPage() {
                 {e.employeeName}
               </option>
             ))}
-          </select>
-          <select
-            aria-label="النوع"
+          </SelectField>
+          <SelectField
+            label="النوع"
             value={kind}
             onChange={(e) => setKind(e.target.value as typeof kind)}
-            className="h-11 rounded-xl border border-line bg-paper px-3"
           >
             <option value="advance">سلفة</option>
             <option value="bonus">مكافأة</option>
             <option value="deduction">خصم</option>
-          </select>
-          <input
-            aria-label="المبلغ"
-            type="number"
-            min="0.01"
-            step="0.01"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="المبلغ"
-            className="h-11 rounded-xl border border-line bg-paper px-3 tnum"
-          />
-          <input
-            aria-label="التاريخ"
-            type="date"
-            value={entryDate}
-            onChange={(e) => setEntryDate(e.target.value)}
-            className="h-11 rounded-xl border border-line bg-paper px-3"
-          />
-          <input
-            aria-label="ملاحظات"
-            value={note}
-            maxLength={500}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="ملاحظات"
-            className="h-11 rounded-xl border border-line bg-paper px-3"
-          />
+          </SelectField>
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium">المبلغ</span>
+            <input
+              aria-label="المبلغ"
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="المبلغ"
+              className="input tnum"
+            />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium">التاريخ</span>
+            <input
+              aria-label="التاريخ"
+              type="date"
+              value={entryDate}
+              onChange={(e) => setEntryDate(e.target.value)}
+              className="input"
+            />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium">ملاحظات</span>
+            <input
+              aria-label="ملاحظات"
+              value={note}
+              maxLength={500}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="ملاحظات"
+              className="input"
+            />
+          </label>
         </div>
         <Button
           className="mt-4"
@@ -164,57 +236,32 @@ export default function SalariesPage() {
           <Plus className="size-4" />
           تسجيل
         </Button>
-      </section>
-      <section>
-        <h2 className="mb-3 font-bold">كشف رواتب الشهر</h2>
+      </Section>
+
+      <section className="space-y-3">
+        <h2 className="font-bold">كشف رواتب الشهر</h2>
         {loading ? (
-          <p className="text-muted">جارِ التحميل…</p>
+          <LoadingState />
         ) : (
-          <Table
-            headers={[
-              "الموظف",
-              "الراتب",
-              "المكافآت",
-              "الخصومات",
-              "السلف",
-              "الصافي",
-              "الحالة",
-            ]}
-          >
-            {data?.employees.map((e) => (
-              <tr key={e.employeeId} className={e.isActive ? "" : "opacity-60"}>
-                <td>{e.employeeName}</td>
-                <td className="tnum">
-                  {e.basePay === null
-                    ? "يلزم راتب شهري"
-                    : formatMoney(e.basePay)}
-                </td>
-                <td className="tnum">{formatMoney(e.bonuses)}</td>
-                <td className="tnum">{formatMoney(e.deductions)}</td>
-                <td className="tnum">{formatMoney(e.advances)}</td>
-                <td className="tnum font-bold">
-                  {e.netPay === null ? "—" : formatMoney(e.netPay)}
-                </td>
-                <td>
-                  {e.payment ? (
-                    <span className="text-success">تم الصرف</span>
-                  ) : (
-                    <Button
-                      onClick={() => pay(e.employeeId, e.employeeName)}
-                      disabled={saving || e.netPay === null}
-                    >
-                      <Banknote className="size-4" />
-                      صرف
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </Table>
+          <DataTable
+            caption="كشف رواتب الشهر"
+            rows={data?.employees ?? []}
+            rowKey={(e) => e.employeeId}
+            rowClassName={(e) => (e.isActive ? undefined : "opacity-60")}
+            columns={columns}
+            empty={
+              <EmptyState
+                icon={<Banknote className="size-8" />}
+                title="لا توجد رواتب لهذا الشهر"
+                description="أضف موظفين براتب شهري لعرض الكشف."
+              />
+            }
+          />
         )}
       </section>
-      <section>
-        <h2 className="mb-3 font-bold">حركات الشهر</h2>
+
+      <section className="space-y-3">
+        <h2 className="font-bold">حركات الشهر</h2>
         <Table
           headers={[
             "التاريخ",
@@ -227,26 +274,46 @@ export default function SalariesPage() {
         >
           {data?.advances.map((x) => (
             <tr key={`a-${x.id}`}>
-              <td>{x.entryDate}</td>
-              <td>{x.employeeName}</td>
-              <td>سلفة</td>
-              <td className="tnum">{formatMoney(x.amount)}</td>
-              <td>{x.recordedByName}</td>
-              <td>{x.note ?? "—"}</td>
+              <td className="px-4 py-3">{x.entryDate}</td>
+              <td className="px-4 py-3">{x.employeeName}</td>
+              <td className="px-4 py-3">سلفة</td>
+              <td className="tnum px-4 py-3">{formatMoney(x.amount)}</td>
+              <td className="px-4 py-3">{x.recordedByName}</td>
+              <td className="px-4 py-3">{x.note ?? "—"}</td>
             </tr>
           ))}
           {data?.adjustments.map((x) => (
             <tr key={`j-${x.id}`}>
-              <td>{x.entryDate}</td>
-              <td>{x.employeeName}</td>
-              <td>{x.type === "bonus" ? "مكافأة" : "خصم"}</td>
-              <td className="tnum">{formatMoney(x.amount)}</td>
-              <td>{x.recordedByName}</td>
-              <td>{x.note ?? "—"}</td>
+              <td className="px-4 py-3">{x.entryDate}</td>
+              <td className="px-4 py-3">{x.employeeName}</td>
+              <td className="px-4 py-3">
+                {x.type === "bonus" ? "مكافأة" : "خصم"}
+              </td>
+              <td className="tnum px-4 py-3">{formatMoney(x.amount)}</td>
+              <td className="px-4 py-3">{x.recordedByName}</td>
+              <td className="px-4 py-3">{x.note ?? "—"}</td>
             </tr>
           ))}
         </Table>
       </section>
+
+      <ConfirmDialog
+        open={paying !== null}
+        title="صرف الراتب"
+        description={
+          paying
+            ? `تأكيد صرف راتب ${paying.name} عن ${month}؟ لا يمكن تعديل الدفعة بعد ذلك.`
+            : undefined
+        }
+        confirmLabel="صرف الراتب"
+        busy={saving}
+        error={payingError}
+        onConfirm={() => void pay()}
+        onCancel={() => {
+          setPaying(null);
+          setPayingError("");
+        }}
+      />
     </div>
   );
 }

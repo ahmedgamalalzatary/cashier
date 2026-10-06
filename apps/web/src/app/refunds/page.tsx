@@ -11,8 +11,10 @@ import type {
 import { RotateCcw, Search } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
+import { DataTable, type DataColumn } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/modal";
-import { Table } from "@/components/ui/table";
+import { Section } from "@/components/ui/section";
+import { EmptyState, ErrorBanner } from "@/components/ui/states";
 import { useAuth } from "@/components/auth/auth-provider";
 import { formatMoney } from "@/lib/format";
 import {
@@ -155,94 +157,161 @@ export default function RefundsPage() {
     (line) => line.quantity > 0,
   ).length;
 
+  const orderColumns: DataColumn<OrderSummary>[] = [
+    {
+      key: "orderNumber",
+      header: "رقم الطلب",
+      mobile: "primary",
+      cell: (row) => (
+        <span className="tnum font-medium" dir="ltr">
+          {row.orderNumber}
+        </span>
+      ),
+    },
+    { key: "cashier", header: "الكاشير", cell: (row) => row.cashierName },
+    {
+      key: "total",
+      header: "الإجمالي",
+      numeric: true,
+      cell: (row) => (
+        <span className="font-bold">{formatMoney(row.total)}</span>
+      ),
+    },
+  ];
+
+  const refundColumns: DataColumn<RefundSummary>[] = [
+    {
+      key: "orderNumber",
+      header: "الطلب",
+      mobile: "primary",
+      cell: (row) => (
+        <button
+          type="button"
+          aria-label={`عرض مرتجع الطلب ${row.orderNumber}`}
+          onClick={() =>
+            getRefund(row.id)
+              .then(setDetail)
+              .catch((cause: Error) => setError(cause.message))
+          }
+          className="tnum font-medium transition-colors hover:text-primary"
+          dir="ltr"
+        >
+          {row.orderNumber}
+        </button>
+      ),
+    },
+    { key: "cashier", header: "الكاشير", cell: (row) => row.cashierName },
+    { key: "reason", header: "السبب", cell: (row) => row.reason },
+    {
+      key: "amount",
+      header: "القيمة",
+      numeric: true,
+      cell: (row) => formatMoney(row.amount),
+    },
+    {
+      key: "at",
+      header: "التاريخ",
+      cell: (row) => (
+        <span className="text-muted">
+          {new Date(row.createdAt).toLocaleString("ar-EG")}
+        </span>
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div>
-        <PageHeader title="المرتجعات" />
-        <p className="-mt-4 text-sm text-muted">
-          استرجاع كلي أو جزئي من الطلب الأصلي مع تسجيل أثر النقد والمخزون.
-        </p>
-      </div>
-      {error && (
-        <p role="alert" className="rounded-xl border border-danger/30 bg-danger/5 p-3 text-sm text-danger">
-          {error}
-        </p>
-      )}
+    <div className="space-y-5">
+      <PageHeader
+        title="المرتجعات"
+        description="استرجاع كلي أو جزئي من الطلب الأصلي مع تسجيل أثر النقد والمخزون."
+      />
+      {error && <ErrorBanner>{error}</ErrorBanner>}
 
       {user?.role !== "cashier" && (
-        <p className="rounded-xl border border-line bg-surface p-3 text-sm text-muted">
-          تسجيل المرتجعات متاح لحساب الكاشير فقط — يعرض هذا الحساب سجل المرتجعات أدناه.
+        <p className="sheet p-4 text-sm text-muted">
+          تسجيل المرتجعات متاح لحساب الكاشير فقط — يعرض هذا الحساب سجل
+          المرتجعات أدناه.
         </p>
       )}
-      {user?.role === "cashier" && <section className="rounded-2xl border border-line bg-surface p-4">
-        <label className="relative block">
-          <Search className="pointer-events-none absolute inset-y-0 right-3 my-auto size-5 text-muted" />
-          <input
-            aria-label="البحث عن طلب"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="رقم الطلب أو اسم الكاشير"
-            className="h-11 w-full rounded-xl border border-line bg-paper pe-3 ps-11 outline-none focus:border-primary"
-          />
-        </label>
-        <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {visibleOrders.map((row) => (
-            <button
-              type="button"
-              key={row.id}
-              onClick={() => chooseOrder(row.id)}
-              className="flex items-center justify-between rounded-xl border border-line p-3 text-right hover:border-primary"
-            >
-              <span>
-                <strong className="block tnum" dir="ltr">{row.orderNumber}</strong>
-                <small className="text-muted">{row.cashierName}</small>
-              </span>
-              <span className="font-bold tnum">{formatMoney(row.total)}</span>
-            </button>
-          ))}
-        </div>
-      </section>}
 
-      <section className="rounded-2xl border border-line bg-surface">
-        <h2 className="border-b border-line p-4 font-bold">سجل المرتجعات</h2>
-        <Table headers={["الطلب", "الكاشير", "السبب", "القيمة", "التاريخ"]}>
-            {refunds.map((row) => (
-              <tr key={row.id}>
-                <td>
-                  <button
-                    type="button"
-                    aria-label={`عرض مرتجع الطلب ${row.orderNumber}`}
-                    onClick={() =>
-                      getRefund(row.id)
-                        .then(setDetail)
-                        .catch((cause: Error) => setError(cause.message))
-                    }
-                    className="font-medium tnum hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    dir="ltr"
-                  >
-                    {row.orderNumber}
-                  </button>
-                </td>
-                <td>{row.cashierName}</td>
-                <td>{row.reason}</td>
-                <td className="tnum">{formatMoney(row.amount)}</td>
-                <td>{new Date(row.createdAt).toLocaleString("ar-EG")}</td>
-              </tr>
-            ))}
-        </Table>
+      {user?.role === "cashier" && (
+        <Section title="اختر الطلب">
+          <label className="relative mb-4 block">
+            <Search className="pointer-events-none absolute inset-y-0 start-3 my-auto size-5 text-muted" />
+            <input
+              aria-label="البحث عن طلب"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="رقم الطلب أو اسم الكاشير"
+              className="input ps-11"
+            />
+          </label>
+          <DataTable
+            caption="اختيار طلب للارتجاع"
+            rows={visibleOrders}
+            rowKey={(row) => row.id}
+            columns={orderColumns}
+            empty={
+              <EmptyState
+                icon={<RotateCcw className="size-8" />}
+                title="لا توجد طلبات"
+                description="لا توجد طلبات مطابقة للبحث."
+              />
+            }
+            actions={(row) => (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void chooseOrder(row.id)}
+              >
+                اختيار
+              </Button>
+            )}
+          />
+        </Section>
+      )}
+
+      <section className="space-y-3">
+        <h2 className="font-bold">سجل المرتجعات</h2>
+        <DataTable
+          caption="سجل المرتجعات"
+          rows={refunds}
+          rowKey={(row) => row.id}
+          columns={refundColumns}
+          empty={
+            <EmptyState
+              icon={<RotateCcw className="size-8" />}
+              title="لا توجد مرتجعات بعد"
+            />
+          }
+        />
       </section>
 
       {order && (
-        <Modal title={`مرتجع الطلب ${order.orderNumber}`} open onClose={() => setOrder(null)}>
+        <Modal
+          title={`مرتجع الطلب ${order.orderNumber}`}
+          open
+          onClose={() => setOrder(null)}
+        >
           <div className="space-y-4">
             {order.lines.map((line) => {
               const current = refundDraftEntry(draft, line.id);
-              const available = Math.max(0, Number(line.quantity) - current.refundedQuantity);
+              const available = Math.max(
+                0,
+                Number(line.quantity) - current.refundedQuantity,
+              );
               return (
-                <div key={line.id} className="rounded-xl border border-line p-3">
+                <div key={line.id} className="sheet p-3">
                   <div className="flex justify-between gap-3">
-                    <div><strong>{line.productName}</strong><p className="text-xs text-muted">{line.sizeName ?? "صنف مباشر"}</p></div>
-                    <span className="text-xs text-muted">متاح: <b className="tnum">{available}</b></span>
+                    <div>
+                      <strong>{line.productName}</strong>
+                      <p className="text-xs text-muted">
+                        {line.sizeName ?? "صنف مباشر"}
+                      </p>
+                    </div>
+                    <span className="text-xs text-muted">
+                      متاح: <b className="tnum">{available}</b>
+                    </span>
                   </div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     <input
@@ -256,12 +325,16 @@ export default function RefundsPage() {
                         setClientRequestId(crypto.randomUUID());
                         setDraft((state) => ({
                           ...state,
-                          [line.id]: { ...refundDraftEntry(state, line.id), quantity: Number(event.target.value) },
+                          [line.id]: {
+                            ...refundDraftEntry(state, line.id),
+                            quantity: Number(event.target.value),
+                          },
                         }));
                       }}
-                      className="h-10 rounded-lg border border-line px-3 tnum"
+                      className="input tnum"
                     />
-                    {(line.type === "item" || line.type === "external_product") && (
+                    {(line.type === "item" ||
+                      line.type === "external_product") && (
                       <select
                         aria-label={`معالجة مخزون ${line.productName}`}
                         value={current.stockAction ?? "return_to_stock"}
@@ -269,13 +342,19 @@ export default function RefundsPage() {
                           setClientRequestId(crypto.randomUUID());
                           setDraft((state) => ({
                             ...state,
-                            [line.id]: { ...refundDraftEntry(state, line.id), stockAction: event.target.value as RefundStockAction },
+                            [line.id]: {
+                              ...refundDraftEntry(state, line.id),
+                              stockAction: event.target
+                                .value as RefundStockAction,
+                            },
                           }));
                         }}
-                        className="h-10 rounded-lg border border-line px-3"
+                        className="input"
                       >
                         <option value="return_to_stock">إعادة للمخزون</option>
-                        <option value="not_returnable">غير صالح للإعادة</option>
+                        <option value="not_returnable">
+                          غير صالح للإعادة
+                        </option>
                       </select>
                     )}
                   </div>
@@ -291,26 +370,52 @@ export default function RefundsPage() {
               }}
               placeholder="سبب المرتجع"
               maxLength={500}
-              className="min-h-24 w-full rounded-xl border border-line p-3"
+              className="input min-h-24"
             />
-            <Button onClick={submit} disabled={saving || selectedCount === 0 || reason.trim().length < 2} className="w-full justify-center">
-              <RotateCcw className="size-4" /> {saving ? "جارِ التسجيل…" : "تأكيد رد النقد"}
+            <Button
+              onClick={submit}
+              disabled={
+                saving || selectedCount === 0 || reason.trim().length < 2
+              }
+              className="w-full justify-center"
+            >
+              <RotateCcw className="size-4" />{" "}
+              {saving ? "جارِ التسجيل…" : "تأكيد رد النقد"}
             </Button>
           </div>
         </Modal>
       )}
 
       {detail && (
-        <Modal title={`مرتجع ${detail.orderNumber}`} open onClose={() => setDetail(null)}>
+        <Modal
+          title={`مرتجع ${detail.orderNumber}`}
+          open
+          onClose={() => setDetail(null)}
+        >
           <dl className="mb-4 grid grid-cols-2 gap-3 rounded-xl bg-paper p-4">
-            <div><dt className="text-xs text-muted">القيمة المستردة</dt><dd className="font-bold tnum">{formatMoney(detail.amount)}</dd></div>
-            <div><dt className="text-xs text-muted">الكاشير</dt><dd>{detail.cashierName}</dd></div>
-            <div className="col-span-2"><dt className="text-xs text-muted">السبب</dt><dd>{detail.reason}</dd></div>
+            <div>
+              <dt className="text-xs text-muted">القيمة المستردة</dt>
+              <dd className="tnum font-bold">{formatMoney(detail.amount)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted">الكاشير</dt>
+              <dd>{detail.cashierName}</dd>
+            </div>
+            <div className="col-span-2">
+              <dt className="text-xs text-muted">السبب</dt>
+              <dd>{detail.reason}</dd>
+            </div>
           </dl>
           <div className="space-y-2">
             {detail.lines.map((line) => (
-              <div key={line.id} className="flex justify-between rounded-lg border border-line p-3">
-                <span>{line.productName} {line.sizeName ? `- ${line.sizeName}` : ""} × <b className="tnum">{line.quantity}</b></span>
+              <div
+                key={line.id}
+                className="flex justify-between rounded-lg border border-line p-3"
+              >
+                <span>
+                  {line.productName} {line.sizeName ? `- ${line.sizeName}` : ""}{" "}
+                  × <b className="tnum">{line.quantity}</b>
+                </span>
                 <b className="tnum">{formatMoney(line.refundAmount)}</b>
               </div>
             ))}

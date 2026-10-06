@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Beaker,
@@ -30,13 +30,14 @@ import {
   PreparationMark,
   RecipeFlowRail,
   RecipeHeaderActions,
-  RecipeTabs,
-  type RecipeTab,
 } from "@/components/recipes/recipe-controls";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DataTable, type DataColumn } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
-import { Table } from "@/components/ui/table";
+import { Stat, StatStrip } from "@/components/ui/stat";
+import { Tabs } from "@/components/ui/tabs";
+import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
 import { formatMoney, itemLabel } from "@/lib/format";
 import {
   catalogRefreshOutcome,
@@ -55,6 +56,8 @@ import {
   refreshProducts,
 } from "@/services/products-service";
 
+type RecipeTab = "products" | "prepared" | "preparations";
+
 export default function RecipesPage() {
   const [catalog, setCatalog] = useState<ExternalProductCatalog | null>(null);
   const [recipes, setRecipes] = useState<PreparedRecipe[]>([]);
@@ -64,9 +67,7 @@ export default function RecipesPage() {
   const [tab, setTab] = useState<RecipeTab>("products");
   const [form, setForm] = useState<PreparedRecipe | null | undefined>();
   const [preparing, setPreparing] = useState<PreparedRecipe | null>(null);
-  const [stockProduct, setStockProduct] = useState<ExternalProduct | null>(
-    null,
-  );
+  const [stockProduct, setStockProduct] = useState<ExternalProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -147,11 +148,6 @@ export default function RecipesPage() {
   }, [refreshing]);
 
   const products = catalog?.products ?? [];
-  const counts = {
-    products: products.length,
-    prepared: recipes.length,
-    preparations: preparations.length,
-  };
 
   function saved() {
     setForm(undefined);
@@ -182,10 +178,55 @@ export default function RecipesPage() {
     });
   }
 
+  const historyColumns: DataColumn<PreparationSummary>[] = [
+    {
+      key: "id",
+      header: "التحضير",
+      mobile: "primary",
+      cell: (row) => (
+        <Link
+          href={`/recipes/preparations/detail?id=${row.id}`}
+          className="flex items-center gap-2 hover:text-primary"
+        >
+          <PreparationMark />
+          <span className="tnum font-medium">#{row.id}</span>
+        </Link>
+      ),
+    },
+    { key: "recipe", header: "الوصفة", cell: (row) => row.recipeName },
+    { key: "output", header: "الناتج", cell: (row) => row.outputItemName },
+    {
+      key: "quantity",
+      header: "الكمية",
+      numeric: true,
+      cell: (row) =>
+        Number(row.producedQuantity).toLocaleString("ar-EG", {
+          maximumFractionDigits: 3,
+        }),
+    },
+    {
+      key: "cost",
+      header: "التكلفة",
+      numeric: true,
+      cell: (row) => formatMoney(row.totalCost),
+    },
+    { key: "by", header: "نفذها", cell: (row) => row.preparedByName },
+    {
+      key: "at",
+      header: "الوقت",
+      cell: (row) => (
+        <span className="text-muted">
+          {new Date(row.occurredAt).toLocaleString("ar-EG")}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <div>
       <PageHeader
         title="الوصفات والتحضير"
+        description="اربط الأصناف المُحضّرة بمكوّناتها، وتابع التكلفة والتحضير."
         actions={
           <RecipeHeaderActions
             onPrepared={() => setForm(null)}
@@ -195,106 +236,138 @@ export default function RecipesPage() {
         }
       />
 
-      <section className="mb-6 overflow-hidden rounded-2xl border border-line bg-sidebar text-white shadow-[0_16px_45px_rgb(43_33_24/0.10)]">
-        <div className="grid divide-y divide-white/10 sm:grid-cols-2 sm:divide-x sm:divide-x-reverse sm:divide-y-0 lg:grid-cols-4">
-          <Summary
-            icon={<RefreshCw className="size-5 text-accent" />}
-            label="منتجات جاهزة للبيع"
-            value={String(
-              products.filter((product) => product.sellable).length,
-            )}
-          />
-          <Summary
-            icon={<Scale className="size-5 text-accent" />}
-            label="مقاسات البيع"
-            value={String(
-              products.reduce(
-                (sum, product) => sum + Math.max(1, product.sizes.length),
-                0,
-              ),
-            )}
-          />
-          <Summary
-            icon={<Beaker className="size-5 text-accent" />}
-            label="أصناف مُحضّرة"
-            value={String(recipes.length)}
-          />
-          <Summary
-            icon={<TriangleAlert className="size-5 text-danger" />}
-            label="إعداد مخزون غير مكتمل"
-            value={String(
-              products.filter((product) => !product.stockConfigured).length,
-            )}
-            danger={products.some((product) => !product.stockConfigured)}
-          />
+      <StatStrip className="mb-5">
+        <Stat
+          icon={<RefreshCw className="size-4" />}
+          label="منتجات جاهزة للبيع"
+          value={String(products.filter((product) => product.sellable).length)}
+        />
+        <Stat
+          icon={<Scale className="size-4" />}
+          label="مقاسات البيع"
+          value={String(
+            products.reduce(
+              (sum, product) => sum + Math.max(1, product.sizes.length),
+              0,
+            ),
+          )}
+        />
+        <Stat
+          icon={<Beaker className="size-4" />}
+          label="أصناف مُحضّرة"
+          value={String(recipes.length)}
+        />
+        <Stat
+          icon={<TriangleAlert className="size-4" />}
+          label="إعداد مخزون غير مكتمل"
+          value={String(
+            products.filter((product) => !product.stockConfigured).length,
+          )}
+          tone={
+            products.some((product) => !product.stockConfigured)
+              ? "danger"
+              : "default"
+          }
+        />
+      </StatStrip>
+
+      {error && <ErrorBanner className="mb-4">{error}</ErrorBanner>}
+      {catalog && (
+        <div className="mb-4">
+          <CatalogSyncStatus catalog={catalog} />
         </div>
-      </section>
-
-      {error && (
-        <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">
-          {error}
-        </p>
       )}
-      {catalog && <CatalogSyncStatus catalog={catalog} />}
 
-      <RecipeTabs active={tab} counts={counts} onChange={setTab} />
-      <section
-        id={`recipes-${tab}-panel`}
-        role="tabpanel"
-        aria-labelledby={`recipes-${tab}-tab`}
-        tabIndex={0}
-      >
-        {loading ? (
-          <p className="text-muted">جارِ تحميل الكتالوج وحساب الوصفات…</p>
-        ) : tab === "products" ? (
-          products.length === 0 ? (
-            <Empty
-              title="لا توجد منتجات خارجية"
-              description="استخدم تحديث المنتجات لتحميل الكتالوج الخارجي."
-            />
-          ) : (
-            <div className="grid gap-4 xl:grid-cols-2">
-              {products.map((product) => (
-                <ExternalProductCard
-                  key={product.externalId}
-                  product={product}
-                  categoryName={(() => {
-                    const category = catalog?.categories.find(
-                      (candidate) =>
-                        candidate.externalId === product.externalCategoryId,
-                    );
-                    return category
-                      ? `${category.nameAr} / ${category.nameEn}`
-                      : "—";
-                  })()}
-                  onStockSetup={() => setStockProduct(product)}
-                />
-              ))}
-            </div>
-          )
-        ) : tab === "prepared" ? (
-          recipes.length === 0 ? (
-            <Empty
-              title="لا توجد وصفات تحضير بعد"
-              description="اربط صنفاً مُحضّراً بوصفة أساسية ثم جهّز دفعاته."
-            />
-          ) : (
-            <div className="grid gap-4 xl:grid-cols-2">
-              {recipes.map((recipe) => (
-                <PreparedCard
-                  key={recipe.id}
-                  recipe={recipe}
-                  onEdit={() => setForm(recipe)}
-                  onToggle={() => void toggle(recipe)}
-                  onPrepare={() => setPreparing(recipe)}
-                />
-              ))}
-            </div>
-          )
+      <Tabs
+        items={[
+          { id: "products", label: "منتجات القائمة", badge: products.length },
+          { id: "prepared", label: "الأصناف المُحضّرة", badge: recipes.length },
+          {
+            id: "preparations",
+            label: "سجل التحضير",
+            badge: preparations.length,
+          },
+        ]}
+        active={tab}
+        onChange={setTab}
+        ariaLabel="أقسام الوصفات"
+        className="mb-5"
+      />
+
+      {loading ? (
+        <LoadingState label="جارِ تحميل الكتالوج وحساب الوصفات…" />
+      ) : tab === "products" ? (
+        products.length === 0 ? (
+          <EmptyState
+            icon={<ChefHat className="size-8" />}
+            title="لا توجد منتجات خارجية"
+            description="استخدم زر تحديث المنتجات لتحميل الكتالوج الخارجي."
+          />
         ) : (
-          <PreparationHistory rows={preparations} />
-        )}
-      </section>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {products.map((product) => (
+              <ExternalProductCard
+                key={product.externalId}
+                product={product}
+                categoryName={(() => {
+                  const category = catalog?.categories.find(
+                    (candidate) =>
+                      candidate.externalId === product.externalCategoryId,
+                  );
+                  return category
+                    ? `${category.nameAr} / ${category.nameEn}`
+                    : "—";
+                })()}
+                onStockSetup={() => setStockProduct(product)}
+              />
+            ))}
+          </div>
+        )
+      ) : tab === "prepared" ? (
+        recipes.length === 0 ? (
+          <EmptyState
+            icon={<ChefHat className="size-8" />}
+            title="لا توجد وصفات تحضير بعد"
+            description="اربط صنفاً مُحضّراً بوصفة أساسية ثم جهّز دفعاته."
+          />
+        ) : (
+          <div className="grid gap-4 xl:grid-cols-2">
+            {recipes.map((recipe) => (
+              <PreparedCard
+                key={recipe.id}
+                recipe={recipe}
+                onEdit={() => setForm(recipe)}
+                onToggle={() => void toggle(recipe)}
+                onPrepare={() => setPreparing(recipe)}
+              />
+            ))}
+          </div>
+        )
+      ) : (
+        <DataTable
+          caption="سجل التحضير"
+          rows={preparations}
+          rowKey={(row) => row.id}
+          columns={historyColumns}
+          empty={
+            <EmptyState
+              icon={<ChefHat className="size-8" />}
+              title="لم تُنفذ عمليات تحضير بعد"
+              description="عند تحضير دفعة ستظهر هنا كوثيقة تكلفة ومخزون ثابتة."
+            />
+          }
+          actions={(row) => (
+            <Link
+              href={`/recipes/preparations/detail?id=${row.id}`}
+              aria-label={`عرض عملية التحضير رقم ${row.id}`}
+              title="عرض التفاصيل"
+              className="inline-flex rounded-lg p-2 text-muted transition-colors hover:bg-line/50 hover:text-ink"
+            >
+              <Eye className="size-4" />
+            </Link>
+          )}
+        />
+      )}
 
       {form !== undefined && (
         <RecipeFormModal
@@ -341,7 +414,7 @@ function PreparedCard({
 }) {
   return (
     <article
-      className={`overflow-hidden rounded-2xl border border-line bg-surface ${recipe.isActive ? "" : "opacity-60"}`}
+      className={`sheet overflow-hidden ${recipe.isActive ? "" : "opacity-60"}`}
     >
       <div className="flex items-start justify-between gap-3 border-b border-line bg-paper/45 px-4 py-3">
         <div className="flex items-center gap-3">
@@ -361,7 +434,7 @@ function PreparedCard({
             type="button"
             onClick={onEdit}
             aria-label={`تعديل ${recipe.name}`}
-            className="rounded-lg p-2 text-muted hover:bg-line/60 hover:text-ink"
+            className="rounded-lg p-2 text-muted transition-colors hover:bg-line/60 hover:text-ink"
           >
             <Pencil className="size-4" />
           </button>
@@ -373,7 +446,11 @@ function PreparedCard({
                 ? `إيقاف ${recipe.name}`
                 : `إعادة تفعيل ${recipe.name}`
             }
-            className={`rounded-lg p-2 ${recipe.isActive ? "text-muted hover:bg-danger/10 hover:text-danger" : "text-success hover:bg-success/10"}`}
+            className={`rounded-lg p-2 transition-colors ${
+              recipe.isActive
+                ? "text-muted hover:bg-danger/10 hover:text-danger"
+                : "text-success hover:bg-success/10"
+            }`}
           >
             {recipe.isActive ? (
               <PowerOff className="size-4" />
@@ -386,7 +463,9 @@ function PreparedCard({
       <div className="space-y-3 p-4">
         <RecipeFlowRail
           ingredientLabel={`${recipe.ingredients.length} مكوّن`}
-          outputLabel={`${Number(recipe.baseYield).toLocaleString("ar-EG", { maximumFractionDigits: 3 })} ${recipe.outputStockUnit}`}
+          outputLabel={`${Number(recipe.baseYield).toLocaleString("ar-EG", {
+            maximumFractionDigits: 3,
+          })} ${recipe.outputStockUnit}`}
           costLabel={
             recipe.currentCost === null ? "—" : formatMoney(recipe.currentCost)
           }
@@ -416,48 +495,5 @@ function PreparedCard({
         </Button>
       </div>
     </article>
-  );
-}
-
-function PreparationHistory({ rows }: { rows: PreparationSummary[] }) {
-  if (rows.length === 0) return <Empty title="لم تُنفذ عمليات تحضير بعد" description="عند تحضير دفعة ستظهر هنا كوثيقة تكلفة ومخزون ثابتة." />;
-  return <Table headers={["التحضير", "الوصفة", "الناتج", "الكمية", "التكلفة", "نفذها", "الوقت", ""]}>{rows.map((row) => <tr key={row.id}>
-    <td className="px-4 py-3"><div className="flex items-center gap-2"><PreparationMark /><span className="font-medium">#{row.id}</span></div></td><td className="px-4 py-3">{row.recipeName}</td><td className="px-4 py-3">{row.outputItemName}</td><td className="tnum px-4 py-3">{Number(row.producedQuantity).toLocaleString("ar-EG", { maximumFractionDigits: 3 })}</td><td className="tnum px-4 py-3">{formatMoney(row.totalCost)}</td><td className="px-4 py-3">{row.preparedByName}</td><td className="px-4 py-3 text-muted">{new Date(row.occurredAt).toLocaleString("ar-EG")}</td><td className="px-4 py-3"><Link href={`/recipes/preparations/detail?id=${row.id}`} aria-label={`عرض عملية التحضير رقم ${row.id}`} title="عرض التفاصيل" className="inline-flex rounded-lg p-2 text-muted hover:bg-line/50 hover:text-ink"><Eye className="size-4" /></Link></td>
-  </tr>)}</Table>;
-}
-
-function Empty({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-line bg-surface p-10 text-center">
-      <ChefHat className="mx-auto mb-3 size-8 text-muted" />
-      <p className="font-medium">{title}</p>
-      <p className="mt-1 text-sm text-muted">{description}</p>
-    </div>
-  );
-}
-
-function Summary({
-  icon,
-  label,
-  value,
-  danger = false,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  danger?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-3 px-4 py-4">
-      <div className="rounded-lg bg-white/8 p-2">{icon}</div>
-      <div>
-        <p className="text-xs text-sidebar-ink">{label}</p>
-        <p
-          className={`tnum mt-0.5 text-xl font-bold ${danger ? "text-accent" : ""}`}
-        >
-          {value}
-        </p>
-      </div>
-    </div>
   );
 }

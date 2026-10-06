@@ -1,12 +1,16 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { Plus } from "lucide-react";
 import type { Category, Item, ItemType } from "@cashier/shared";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
+import { SelectField } from "@/components/ui/select-field";
+import { ErrorBanner, LoadingState } from "@/components/ui/states";
 import { formatItemCode } from "@/lib/format";
 import { createItem, updateItem } from "@/services/items-service";
+import { createCategory, listCategories } from "@/services/categories-service";
 import {
   eligibleItemCategories,
   stockMeaningFieldsLocked,
@@ -37,9 +41,9 @@ export function ItemFormModal({
   onSaved,
 }: {
   item: Item | null;
-  categories: Category[];
+  categories?: Category[];
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (savedId: number) => void;
 }) {
   const [form, setForm] = useState(
     item
@@ -56,28 +60,77 @@ export function ItemFormModal({
         }
       : emptyForm,
   );
+  const [categoryList, setCategoryList] = useState<Category[]>(categories ?? []);
+  const [categoriesLoading, setCategoriesLoading] = useState(
+    categories === undefined,
+  );
+  const [categoriesError, setCategoriesError] = useState("");
+  const [newCategoryOpen, setNewCategoryOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [savingCategory, setSavingCategory] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const stockMeaningLocked = item ? stockMeaningFieldsLocked(item) : false;
 
+  useEffect(() => {
+    if (categories !== undefined) return;
+    let cancelled = false;
+    listCategories()
+      .then((rows) => {
+        if (!cancelled) setCategoryList(rows);
+      })
+      .catch((caught) => {
+        if (cancelled) return;
+        setCategoriesError(
+          caught instanceof Error ? caught.message : "تعذر تحميل التصنيفات",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setCategoriesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [categories]);
+
   const categoryOptions = useMemo(() => {
-    const eligible = eligibleItemCategories(categories);
+    const eligible = eligibleItemCategories(categoryList);
     if (item && !eligible.some((category) => category.id === item.categoryId)) {
-      const current = categories.find(
+      const current = categoryList.find(
         (category) => category.id === item.categoryId,
       );
       if (current) return [...eligible, current];
     }
     return eligible;
-  }, [categories, item]);
+  }, [categoryList, item]);
   const categoryNames = new Map(
-    categories.map((category) => [category.id, category.name]),
+    categoryList.map((category) => [category.id, category.name]),
   );
 
   const set =
     (key: keyof typeof emptyForm) =>
     (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setForm((current) => ({ ...current, [key]: event.target.value }));
+
+  async function addCategory() {
+    const name = newCategoryName.trim();
+    if (!name) return;
+    setSavingCategory(true);
+    setError("");
+    try {
+      const created = await createCategory({ name, parentId: null });
+      setCategoryList(await listCategories());
+      setForm((current) => ({ ...current, categoryId: String(created.id) }));
+      setNewCategoryName("");
+      setNewCategoryOpen(false);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "تعذر إنشاء التصنيف",
+      );
+    } finally {
+      setSavingCategory(false);
+    }
+  }
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -100,10 +153,11 @@ export function ItemFormModal({
     try {
       if (item) {
         await updateItem(item.id, body);
+        onSaved(item.id);
       } else {
-        await createItem(body);
+        const created = await createItem(body);
+        onSaved(created.id);
       }
-      onSaved();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "تعذر حفظ الصنف");
     } finally {
@@ -131,23 +185,62 @@ export function ItemFormModal({
           maxLength={191}
           required
         />
-        <SelectField
-          label="التصنيف"
-          value={form.categoryId}
-          onChange={set("categoryId")}
-          required
-        >
-          <option value="" disabled>
-            اختر التصنيف
-          </option>
-          {categoryOptions.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.parentId === null
-                ? category.name
-                : `${categoryNames.get(category.parentId)} ← ${category.name}`}
-            </option>
-          ))}
-        </SelectField>
+        <div>
+          {categoriesLoading ? (
+            <LoadingState label="جارِ تحميل التصنيفات…" />
+          ) : categoriesError ? (
+            <ErrorBanner>{categoriesError}</ErrorBanner>
+          ) : (
+            <SelectField
+              label="التصنيف"
+              value={form.categoryId}
+              onChange={set("categoryId")}
+              required
+            >
+              <option value="" disabled>
+                اختر التصنيف
+              </option>
+              {categoryOptions.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.parentId === null
+                    ? category.name
+                    : `${categoryNames.get(category.parentId)} ← ${category.name}`}
+                </option>
+              ))}
+            </SelectField>
+          )}
+          <button
+            type="button"
+            onClick={() => setNewCategoryOpen((open) => !open)}
+            className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+          >
+            <Plus className="size-3.5" />
+            تصنيف جديد
+          </button>
+        </div>
+        {newCategoryOpen && (
+          <div className="flex gap-2 rounded-xl border border-line bg-paper/55 p-3">
+            <input
+              aria-label="اسم التصنيف الجديد"
+              value={newCategoryName}
+              onChange={(event) => setNewCategoryName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                void addCategory();
+              }}
+              placeholder="مثال: مشروبات ساخنة"
+              className="input min-w-0 flex-1"
+            />
+            <Button
+              size="sm"
+              onClick={() => void addCategory()}
+              disabled={savingCategory || !newCategoryName.trim()}
+            >
+              {savingCategory ? "جارٍ الإضافة…" : "إضافة"}
+            </Button>
+          </div>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <SelectField
             label="نوع الصنف"
@@ -244,26 +337,5 @@ export function ItemFormModal({
         </div>
       </form>
     </Modal>
-  );
-}
-
-function SelectField({
-  label,
-  children,
-  ...props
-}: React.SelectHTMLAttributes<HTMLSelectElement> & {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block space-y-1.5">
-      <span className="text-sm font-medium">{label}</span>
-      <select
-        className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
-        {...props}
-      >
-        {children}
-      </select>
-    </label>
   );
 }
