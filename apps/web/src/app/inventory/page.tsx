@@ -69,7 +69,9 @@ export default function InventoryPage() {
 function InventoryView() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
-  const requestedCafe = useSearchParams().get("warehouse") === "cafe";
+  const searchParams = useSearchParams();
+  const requestedCafe = searchParams.get("warehouse") === "cafe";
+  const requestedState = searchParams.get("state");
   const [tab, setTab] = useState<WarehouseTab>(
     requestedCafe ? "cafe" : isAdmin ? "main" : "cafe",
   );
@@ -91,7 +93,11 @@ function InventoryView() {
   const [adjustingError, setAdjustingError] = useState("");
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState<number | null>(null);
-  const [state, setState] = useState<StockFilter>("all");
+  const [state, setState] = useState<StockFilter>(() =>
+    requestedState === "low" || requestedState === "inactive"
+      ? requestedState
+      : "all",
+  );
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {

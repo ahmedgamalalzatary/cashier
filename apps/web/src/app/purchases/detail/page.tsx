@@ -1,16 +1,19 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import type { PurchaseInvoiceDetail } from "@cashier/shared";
+import type { PurchaseInvoiceDetail, Supplier } from "@cashier/shared";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import { PaymentModal } from "@/components/suppliers/payment-modal";
 import { Stat, StatStrip } from "@/components/ui/stat";
 import { Table } from "@/components/ui/table";
 import { ErrorBanner, LoadingState } from "@/components/ui/states";
 import { formatMoney, itemLabel } from "@/lib/format";
 import { getPurchase } from "@/services/purchases-service";
+import { getSupplierStatement } from "@/services/suppliers-service";
 
 export default function PurchaseDetailPage() {
   return (
@@ -23,20 +26,41 @@ export default function PurchaseDetailPage() {
 function PurchaseDetailView() {
   const id = useSearchParams().get("id");
   const [invoice, setInvoice] = useState<PurchaseInvoiceDetail | null>(null);
+  const [paying, setPaying] = useState<Supplier | null>(null);
+  const [paymentError, setPaymentError] = useState("");
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    getPurchase(Number(id))
-      .then(setInvoice)
-      .catch((caught) =>
-        setError(
-          caught instanceof Error ? caught.message : "تعذر تحميل فاتورة الشراء",
-        ),
+  const load = useCallback(async () => {
+    try {
+      setInvoice(await getPurchase(Number(id)));
+      setError("");
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "تعذر تحميل فاتورة الشراء",
       );
+    }
   }, [id]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   if (error) return <ErrorBanner>{error}</ErrorBanner>;
   if (!invoice) return <LoadingState label="جارِ تحميل الفاتورة…" />;
+
+  async function openPayment() {
+    if (!invoice) return;
+    try {
+      const statement = await getSupplierStatement(invoice.supplierId);
+      setPaymentError("");
+      setPaying(statement.supplier);
+    } catch (caught) {
+      setPaymentError(
+        caught instanceof Error ? caught.message : "تعذر تحميل بيانات المورد",
+      );
+    }
+  }
 
   const due = Number(invoice.dueAmount);
   const paid = Number(invoice.paidAmount);
@@ -47,15 +71,39 @@ function PurchaseDetailView() {
         back={{ href: "/purchases", label: "رجوع إلى المشتريات" }}
         title={`فاتورة شراء ${invoice.invoiceNumber || `#${invoice.id}`}`}
         actions={
-          <Badge tone={due === 0 ? "success" : paid > 0 ? "neutral" : "danger"}>
-            {due === 0
-              ? "مدفوع بالكامل"
-              : paid > 0
-                ? "دفعة جزئية"
-                : "آجل بالكامل"}
-          </Badge>
+          <>
+            <Link
+              href={`/transfers?direct=1&invoice=${invoice.id}`}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-strong"
+            >
+              تحويل إلى الكافيه
+            </Link>
+            <Button variant="secondary" onClick={() => void openPayment()}>
+              تسجيل دفعة للمورد
+            </Button>
+            <Badge tone={due === 0 ? "success" : paid > 0 ? "neutral" : "danger"}>
+              {due === 0
+                ? "مدفوع بالكامل"
+                : paid > 0
+                  ? "دفعة جزئية"
+                  : "آجل بالكامل"}
+            </Badge>
+          </>
         }
       />
+
+      {paymentError && <ErrorBanner className="mb-4">{paymentError}</ErrorBanner>}
+      {paying && (
+        <PaymentModal
+          key={paying.id}
+          supplier={paying}
+          onClose={() => setPaying(null)}
+          onSaved={() => {
+            setPaying(null);
+            void load();
+          }}
+        />
+      )}
 
       <StatStrip className="mb-5">
         <Stat label="المورد" value={invoice.supplierName} />
@@ -131,14 +179,6 @@ function PurchaseDetailView() {
           </div>
         </dl>
       </div>
-
-      <p className="mt-4 text-sm text-muted">
-        لإضافة هذه الكميات إلى مخزن الكافيه،{" "}
-        <Link href="/transfers" className="font-medium text-primary hover:underline">
-          أنشئ طلب تحويل
-        </Link>
-        .
-      </p>
     </div>
   );
 }

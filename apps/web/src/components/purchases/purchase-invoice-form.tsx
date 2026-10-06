@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ReceiptText, Trash2 } from "lucide-react";
 import type { Category, Item, Supplier } from "@cashier/shared";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,7 @@ function localToday() {
 
 export function PurchaseInvoiceForm() {
   const router = useRouter();
+  const requestedSupplierId = useSearchParams().get("supplier");
   const nextKey = useRef(2);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [items, setItems] = useState<Item[]>([]);
@@ -62,11 +63,22 @@ export function PurchaseInvoiceForm() {
   useEffect(() => {
     Promise.all([listSuppliers(), listItems(), listCategories()])
       .then(([supplierRows, itemRows, categoryRows]) => {
-        setSuppliers(supplierRows.filter((supplier) => supplier.isActive));
+        const activeSuppliers = supplierRows.filter(
+          (supplier) => supplier.isActive,
+        );
+        setSuppliers(activeSuppliers);
         setItems(
           itemRows.filter((item) => item.isActive && item.type !== "prepared"),
         );
         setCategories(categoryRows);
+        // preselect only a supplier that is actually selectable
+        const requested = Number(requestedSupplierId);
+        if (
+          requestedSupplierId &&
+          activeSuppliers.some((supplier) => supplier.id === requested)
+        ) {
+          setSupplierId(String(requested));
+        }
       })
       .catch((caught) =>
         setError(
@@ -76,7 +88,7 @@ export function PurchaseInvoiceForm() {
         ),
       )
       .finally(() => setLoading(false));
-  }, []);
+  }, [requestedSupplierId]);
 
   const itemMap = useMemo(
     () => new Map(items.map((item) => [item.id, item])),

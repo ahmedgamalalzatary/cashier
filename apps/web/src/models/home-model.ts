@@ -205,14 +205,14 @@ export function attentionItems({
       id: "cafe-low",
       count: lowStockCount(cafeStock),
       label: `${countPhrase(lowStockCount(cafeStock), ITEM_COUNT)} تحت حد التنبيه في الكافيه`,
-      href: "/inventory?warehouse=cafe",
+      href: "/inventory?warehouse=cafe&state=low",
       tone: "warn",
     },
     {
       id: "main-low",
       count: lowStockCount(mainStock),
       label: `${countPhrase(lowStockCount(mainStock), ITEM_COUNT)} تحت حد التنبيه في المخزن الرئيسي`,
-      href: "/inventory",
+      href: "/inventory?state=low",
       tone: "warn",
     },
     {

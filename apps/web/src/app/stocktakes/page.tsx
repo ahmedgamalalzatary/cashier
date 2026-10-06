@@ -15,6 +15,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Section } from "@/components/ui/section";
 import { Badge } from "@/components/ui/badge";
 import { SelectField } from "@/components/ui/select-field";
+import { SearchSelect } from "@/components/ui/search-select";
 import { EmptyState, ErrorBanner } from "@/components/ui/states";
 import { Table } from "@/components/ui/table";
 import {
@@ -229,18 +230,17 @@ export default function StocktakesPage() {
 
         <Section title="تسوية صنف واحد" icon={<Scale className="size-5" />}>
           <div className="space-y-4">
-            <SelectField
+            <SearchSelect
               label="الصنف"
               value={manualItem}
-              onChange={(e) => setManualItem(e.target.value)}
-            >
-              <option value="">اختر الصنف</option>
-              {stock.map((row) => (
-                <option key={row.itemId} value={row.itemId}>
-                  {row.name} — الحالي {row.quantity} {row.stockUnit}
-                </option>
-              ))}
-            </SelectField>
+              onChange={setManualItem}
+              options={stock.map((row) => ({
+                value: row.itemId,
+                label: row.name,
+                hint: `${row.quantity} ${row.stockUnit}`,
+              }))}
+              placeholder="اختر الصنف"
+            />
             <Field
               label="الكمية الفعلية"
               type="number"

@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { PurchaseInvoiceForm } from "@/components/purchases/purchase-invoice-form";
+import { LoadingState } from "@/components/ui/states";
 
 export default function NewPurchasePage() {
   return (
@@ -9,7 +11,9 @@ export default function NewPurchasePage() {
         title="فاتورة شراء جديدة"
         description="سجّل المورد والأصناف هنا؛ تُضاف الكميات فوراً إلى المخزن الرئيسي."
       />
-      <PurchaseInvoiceForm />
+      <Suspense fallback={<LoadingState label="جارِ تجهيز الفاتورة…" />}>
+        <PurchaseInvoiceForm />
+      </Suspense>
     </div>
   );
 }

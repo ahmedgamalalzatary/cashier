@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeftRight, ClipboardList, Eye } from "lucide-react";
 import type {
   InventoryStockRow,
@@ -52,14 +53,38 @@ function RequestStatus({ status }: { status: TransferRequestStatus }) {
 }
 
 export default function TransfersPage() {
+  return (
+    <Suspense fallback={<LoadingState label="جارِ تحميل التحويلات…" />}>
+      <TransfersView />
+    </Suspense>
+  );
+}
+
+function TransfersView() {
   const { user } = useAuth();
+  const router = useRouter();
   const isAdmin = user?.role === "admin";
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const requestedNew = searchParams.get("new");
+  const requestedInvoice = searchParams.get("invoice");
   const [stock, setStock] = useState<InventoryStockRow[]>([]);
   const [mainStock, setMainStock] = useState<InventoryStockRow[]>([]);
   const [requests, setRequests] = useState<TransferRequestSummary[]>([]);
   const [transfers, setTransfers] = useState<TransferSummary[]>([]);
-  const [tab, setTab] = useState<TransferTab>("requests");
-  const [formMode, setFormMode] = useState<FormMode>(null);
+  const [tab, setTab] = useState<TransferTab>(() =>
+    requestedTab === "history" ? "history" : "requests",
+  );
+  // The session is already resolved before this page renders, so the role is
+  // known here: `direct` is an admin-only capability (T1).
+  const [formMode, setFormMode] = useState<FormMode>(() => {
+    if (isAdmin && searchParams.get("direct") === "1") return "direct";
+    return requestedNew === "request" ? "request" : null;
+  });
+  const [directInvoiceId] = useState<number | null>(() => {
+    const invoiceId = Number(requestedInvoice);
+    return isAdmin && invoiceId > 0 ? invoiceId : null;
+  });
   const [reviewingId, setReviewingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -103,6 +128,16 @@ export default function TransfersPage() {
   const pendingRequests = requests.filter(
     (request) => request.status === "pending",
   ).length;
+
+  // Intents from other pages (?tab=history, ?new=request, ?direct=1&invoice=id)
+  // are read once as initial state, then cleared so a refresh does not reopen
+  // the form.
+  useEffect(() => {
+    if (requestedTab !== "history" && !requestedNew && !requestedInvoice) {
+      return;
+    }
+    router.replace("/transfers");
+  }, [requestedInvoice, requestedNew, requestedTab, router, searchParams]);
 
   function saved() {
     setFormMode(null);
@@ -280,6 +315,7 @@ export default function TransfersPage() {
           mode={formMode}
           items={stock}
           mainStock={mainStock}
+          initialInvoiceId={formMode === "direct" ? (directInvoiceId ?? undefined) : undefined}
           onClose={() => setFormMode(null)}
           onSaved={saved}
         />

@@ -24,6 +24,7 @@ import { itemLabel } from "@/lib/format";
 import { Button } from "../ui/button";
 import { Field } from "../ui/field";
 import { Modal } from "../ui/modal";
+import { SearchSelect } from "../ui/search-select";
 
 export function RecipeFormModal({
   editing,
@@ -113,7 +114,7 @@ export function RecipeFormModal({
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <SelectField
+          <SearchSelect
             label="الصنف المُحضّر الناتج"
             value={form.outputItemId}
             onChange={(outputItemId) =>
@@ -121,15 +122,14 @@ export function RecipeFormModal({
                 selectRecipeOutputItem(current, outputItemId),
               )
             }
+            options={preparedItems.map((item) => ({
+              value: item.id,
+              label: itemLabel(item.code, item.name),
+              hint: item.stockUnit,
+            }))}
+            placeholder="اختر الصنف الناتج"
             required
-          >
-            <option value="">اختر الصنف الناتج</option>
-            {preparedItems.map((item) => (
-              <option key={item.id} value={item.id}>
-                {itemLabel(item.code, item.name)} ({item.stockUnit})
-              </option>
-            ))}
-          </SelectField>
+          />
           <Field
             label={`ناتج الوصفة الأساسي${outputUnit(form.outputItemId, items)}`}
             type="number"
@@ -215,7 +215,7 @@ function IngredientEditor({
             key={line.key}
             className="grid items-end gap-3 sm:grid-cols-[1fr_12rem_auto]"
           >
-            <SelectField
+            <SearchSelect
               label={`المكوّن ${index + 1}`}
               value={line.itemId}
               onChange={(itemId) =>
@@ -225,15 +225,14 @@ function IngredientEditor({
                   ),
                 )
               }
+              options={items.map((item) => ({
+                value: item.id,
+                label: itemLabel(item.code, item.name),
+                hint: item.stockUnit,
+              }))}
+              placeholder="اختر الصنف"
               required
-            >
-              <option value="">اختر الصنف</option>
-              {items.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {itemLabel(item.code, item.name)}
-                </option>
-              ))}
-            </SelectField>
+            />
             <Field
               label={`الكمية${selected ? ` (${selected.stockUnit})` : ""}`}
               type="number"

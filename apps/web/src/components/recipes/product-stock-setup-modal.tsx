@@ -13,6 +13,7 @@ import { configureProductStock } from "../../services/products-service";
 import { Button } from "../ui/button";
 import { Field } from "../ui/field";
 import { Modal } from "../ui/modal";
+import { SearchSelect } from "../ui/search-select";
 
 type IngredientRow = { key: string; itemId: string; quantity: string };
 type ModifierForm = {
@@ -310,30 +311,26 @@ function IngredientRows({
             key={row.key}
             className="grid items-end gap-3 sm:grid-cols-[1fr_12rem_auto]"
           >
-            <label className="block space-y-1.5">
-              <span className="text-sm font-medium">المكوّن {index + 1}</span>
-              <select
-                required
-                value={row.itemId}
-                onChange={(event) =>
-                  onChange(
-                    rows.map((current) =>
-                      current.key === row.key
-                        ? { ...current, itemId: event.target.value }
-                        : current,
-                    ),
-                  )
-                }
-                className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm"
-              >
-                <option value="">اختر الصنف</option>
-                {items.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {itemLabel(item.code, item.name)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SearchSelect
+              label={`المكوّن ${index + 1}`}
+              value={row.itemId}
+              onChange={(itemId) =>
+                onChange(
+                  rows.map((current) =>
+                    current.key === row.key
+                      ? { ...current, itemId }
+                      : current,
+                  ),
+                )
+              }
+              options={items.map((item) => ({
+                value: item.id,
+                label: itemLabel(item.code, item.name),
+                hint: item.stockUnit,
+              }))}
+              placeholder="اختر الصنف"
+              required
+            />
             <Field
               label={`الكمية${selected ? ` (${selected.stockUnit})` : ""}`}
               type="number"

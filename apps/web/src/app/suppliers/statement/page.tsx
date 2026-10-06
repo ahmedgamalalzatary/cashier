@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type {
@@ -9,7 +9,9 @@ import type {
   SupplierStatementMovement,
 } from "@cashier/shared";
 import { formatMoney } from "@/lib/format";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import { PaymentModal } from "@/components/suppliers/payment-modal";
 import { Stat, StatStrip } from "@/components/ui/stat";
 import { Table } from "@/components/ui/table";
 import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
@@ -30,15 +32,22 @@ function SupplierStatementView() {
     payments: SupplierPayment[];
     movements: SupplierStatementMovement[];
   } | null>(null);
+  const [paying, setPaying] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    getSupplierStatement(Number(id))
-      .then(setData)
-      .catch((e) =>
-        setError(e instanceof Error ? e.message : "تعذر تحميل كشف الحساب"),
-      );
+  const load = useCallback(async () => {
+    try {
+      setData(await getSupplierStatement(Number(id)));
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "تعذر تحميل كشف الحساب");
+    }
   }, [id]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   if (error) return <ErrorBanner>{error}</ErrorBanner>;
   if (!data) return <LoadingState />;
@@ -57,7 +66,31 @@ function SupplierStatementView() {
       <PageHeader
         back={{ href: "/suppliers", label: "رجوع إلى الموردين" }}
         title={`كشف حساب — ${supplier.name}`}
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setPaying(true)}>
+              تسجيل دفعة
+            </Button>
+            <Link
+              href={`/purchases/new?supplier=${supplier.id}`}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-strong"
+            >
+              فاتورة شراء جديدة
+            </Link>
+          </>
+        }
       />
+
+      {paying && (
+        <PaymentModal
+          supplier={supplier}
+          onClose={() => setPaying(false)}
+          onSaved={() => {
+            setPaying(false);
+            void load();
+          }}
+        />
+      )}
 
       <StatStrip className="mb-6">
         <Stat

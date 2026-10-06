@@ -9,6 +9,7 @@ import type {
 import { Button } from "@/components/ui/button";
 import { Field, TextAreaField } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
+import { SearchSelect } from "@/components/ui/search-select";
 import { itemLabel } from "@/lib/format";
 import {
   invoiceTransferRows,
@@ -29,16 +30,21 @@ import {
 
 type SourceTab = "invoice" | "manual";
 
+const quantity = (value: string | number | undefined) =>
+  Number(value ?? 0).toLocaleString("ar-EG", { maximumFractionDigits: 3 });
+
 export function TransferFormModal({
   mode,
   items,
   mainStock,
+  initialInvoiceId,
   onClose,
   onSaved,
 }: {
   mode: "request" | "direct";
   items: InventoryStockRow[];
   mainStock: InventoryStockRow[];
+  initialInvoiceId?: number;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -83,6 +89,14 @@ export function TransferFormModal({
       cancelled = true;
     };
   }, [invoiceSourceAllowed]);
+
+  // A purchase invoice can hand the user straight here (?direct=1&invoice=id)
+  useEffect(() => {
+    if (invoiceSourceAllowed && initialInvoiceId !== undefined) {
+      void loadInvoice(String(initialInvoiceId));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialInvoiceId, invoiceSourceAllowed]);
 
   async function loadInvoice(id: string) {
     setInvoiceId(id);
@@ -374,30 +388,24 @@ export function TransferFormModal({
                       </button>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-[1fr_9rem]">
-                      <label className="block space-y-1.5">
-                        <span className="text-sm font-medium">الصنف</span>
-                        <select
-                          value={line.itemId}
-                          required
-                          onChange={(event) =>
-                            updateLine(line.key, { itemId: event.target.value })
-                          }
-                          className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                        >
-                          <option value="" disabled>
-                            اختر الصنف
-                          </option>
-                          {activeItems.map((candidate) => (
-                            <option
-                              key={candidate.itemId}
-                              value={candidate.itemId}
-                              disabled={usedItemIds.has(candidate.itemId)}
-                            >
-                              {itemLabel(candidate.code, candidate.name)}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                      <SearchSelect
+                        label="الصنف"
+                        value={line.itemId}
+                        onChange={(itemId) =>
+                          updateLine(line.key, { itemId })
+                        }
+                        options={activeItems.map((candidate) => ({
+                          value: candidate.itemId,
+                          label: itemLabel(candidate.code, candidate.name),
+                          hint:
+                            mode === "direct"
+                              ? `في الكافيه: ${quantity(candidate.quantity)} · في الرئيسي: ${quantity(stockByItem.get(candidate.itemId)?.quantity)} ${candidate.stockUnit}`
+                              : `في الكافيه: ${quantity(candidate.quantity)} ${candidate.stockUnit}`,
+                          disabled: usedItemIds.has(candidate.itemId),
+                        }))}
+                        placeholder="اختر الصنف"
+                        required
+                      />
                       <Field
                         label={`الكمية${item ? ` (${item.stockUnit})` : ""}`}
                         type="number"
@@ -416,14 +424,20 @@ export function TransferFormModal({
                         dir="ltr"
                       />
                     </div>
-                    {mode === "direct" && item && (
-                      <p className="mt-2 text-xs text-muted">
-                        المتاح في الرئيسي:{" "}
-                        {Number(stock?.quantity ?? 0).toLocaleString("ar-EG", {
-                          maximumFractionDigits: 3,
-                        })}{" "}
-                        {item.stockUnit}
-                      </p>
+                    {mode === "direct" ? (
+                      item && (
+                        <p className="mt-2 text-xs text-muted">
+                          المتاح في الرئيسي: {quantity(stock?.quantity)}{" "}
+                          {item.stockUnit}
+                        </p>
+                      )
+                    ) : (
+                      item && (
+                        <p className="mt-2 text-xs text-muted">
+                          الرصيد الحالي في الكافيه: {quantity(item.quantity)}{" "}
+                          {item.stockUnit}
+                        </p>
+                      )
                     )}
                   </div>
                 );

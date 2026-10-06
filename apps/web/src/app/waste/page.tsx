@@ -15,6 +15,7 @@ import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { Section } from "@/components/ui/section";
 import { SelectField } from "@/components/ui/select-field";
+import { SearchSelect } from "@/components/ui/search-select";
 import { EmptyState, ErrorBanner } from "@/components/ui/states";
 import { formatMoney } from "@/lib/format";
 import { warehouseForWasteTarget } from "@/lib/waste-target";
@@ -83,15 +84,15 @@ export default function WastePage() {
   const targets = useMemo(
     () => [
       ...catalog.items.map((item) => ({
-        key: `item:${item.id}`,
+        value: `item:${item.id}`,
         label: `${item.name} — ${item.stockUnit}`,
       })),
       ...(catalog.recipes ?? []).map((recipe) => ({
-        key: `recipe:${recipe.recipeId}:${recipe.recipeSizeId}`,
+        value: `recipe:${recipe.recipeId}:${recipe.recipeSizeId}`,
         label: `${recipe.recipeName}${recipe.sizeName ? ` — ${recipe.sizeName}` : ""}`,
       })),
       ...catalog.products.map((product) => ({
-        key: `product:${product.externalProductId}:${product.externalSizeId ?? 0}`,
+        value: `product:${product.externalProductId}:${product.externalSizeId ?? 0}`,
         label: `${product.productName}${product.sizeName ? ` — ${product.sizeName}` : ""}`,
       })),
     ],
@@ -238,28 +239,21 @@ export default function WastePage() {
               <option value="main">المخزن الرئيسي</option>
             </SelectField>
           )}
-          <SelectField
+          <SearchSelect
             label="الصنف أو المنتج"
             disabled={saving}
             value={targetKey}
-            onChange={(event) => {
-              setTargetKey(event.target.value);
+            onChange={(next) => {
+              setTargetKey(next);
               setClientRequestId(crypto.randomUUID());
-              const next = warehouseForWasteTarget(
-                event.target.value,
-                warehouse,
-              );
-              setWarehouse(next.warehouse);
-              setCafeForcedNotice(next.cafeForced);
+              const next2 = warehouseForWasteTarget(next, warehouse);
+              setWarehouse(next2.warehouse);
+              setCafeForcedNotice(next2.cafeForced);
             }}
-          >
-            <option value="">اختر الصنف أو منتج الوصفة</option>
-            {targets.map((target) => (
-              <option key={target.key} value={target.key}>
-                {target.label}
-              </option>
-            ))}
-          </SelectField>
+            options={targets}
+            placeholder="اختر الصنف أو منتج الوصفة"
+            required
+          />
           {(selectedProduct || selectedRecipe) && (
             <p
               className="text-xs text-muted md:col-span-2"
