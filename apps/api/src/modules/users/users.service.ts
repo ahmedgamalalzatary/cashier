@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import type { AuthUser } from "@cashier/shared";
 import { HttpError } from "../../middleware/error.js";
 import type { UsersRepository } from "./users.repository.js";
 import type { UserInput, UserUpdateInput } from "./users.schemas.js";
@@ -12,6 +13,9 @@ function duplicateUsername(error: unknown) {
   );
 }
 
+const SUPER_ADMIN_ONLY = "إدارة المديرين متاحة للمدير الرئيسي فقط";
+const SUPER_ADMIN_MANAGED = "بيانات المدير الرئيسي تُدار من إعدادات الخادم";
+
 export class UsersService {
   constructor(private repo: UsersRepository) {}
 
@@ -19,7 +23,8 @@ export class UsersService {
     return this.repo.list();
   }
 
-  async create(data: UserInput) {
+  async create(actor: AuthUser, data: UserInput) {
+    if (!actor.isSuperAdmin) throw new HttpError(403, SUPER_ADMIN_ONLY);
     try {
       return await this.repo.create(data, await bcrypt.hash(data.password, 10));
     } catch (error) {
@@ -29,13 +34,9 @@ export class UsersService {
     }
   }
 
-  async update(actorId: number, id: number, data: UserUpdateInput) {
-    if (id === actorId && data.password) {
-      throw new HttpError(
-        409,
-        "غيّر كلمة مرور حسابك من خيار تغيير كلمة المرور",
-      );
-    }
+  async update(actor: AuthUser, id: number, data: UserUpdateInput) {
+    if (!actor.isSuperAdmin) throw new HttpError(403, SUPER_ADMIN_ONLY);
+    if (id === actor.id) throw new HttpError(409, SUPER_ADMIN_MANAGED);
     const passwordHash = data.password
       ? await bcrypt.hash(data.password, 10)
       : undefined;
@@ -43,20 +44,11 @@ export class UsersService {
       await this.repo.transaction(async (repo) => {
         const user = await repo.findByIdForUpdate(id);
         if (!user) throw new HttpError(404, "المستخدم غير موجود");
+        if (user.isSuperAdmin) throw new HttpError(409, SUPER_ADMIN_MANAGED);
         if (user.role === "cashier" || data.role === "cashier") {
           throw new HttpError(
             409,
             "تُدار حسابات الكاشير وصلاحية الدخول من سجل الموظف",
-          );
-        }
-        if (
-          id === actorId &&
-          (data.isActive === false ||
-            (data.role !== undefined && data.role !== "admin"))
-        ) {
-          throw new HttpError(
-            409,
-            "لا يمكنك إيقاف حسابك أو إزالة صلاحية المدير منه",
           );
         }
         const { password: _password, ...changes } = data;

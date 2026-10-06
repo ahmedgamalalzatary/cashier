@@ -5,6 +5,7 @@ import type { Db } from "../db/index.js";
 import { users } from "../db/schema.js";
 import { HttpError } from "./error.js";
 import type { AuthUser } from "@cashier/shared";
+import { toAuthUser } from "../modules/auth/auth-user.js";
 
 declare global {
   // Express request fields are extended globally by the framework's type definitions.
@@ -89,12 +90,7 @@ export function authenticate(db: Db, jwtSecret: string) {
       .limit(1);
     if (!user?.isActive || payload.tokenVersion !== user.tokenVersion)
       throw new HttpError(401, "انتهت الجلسة — سجّل الدخول من جديد");
-    req.user = {
-      id: user.id,
-      name: user.name,
-      role: user.role,
-      branchId: user.role === "cashier" ? user.branchId : null,
-    };
+    req.user = toAuthUser(user);
     next();
   };
 }

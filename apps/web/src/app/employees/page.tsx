@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Ban, KeyRound, Pencil, Plus, Power, UserMinus } from "lucide-react";
+import { Ban, KeyRound, Lock, Pencil, Plus, Power, UserMinus } from "lucide-react";
 import type { Employee } from "@cashier/shared";
 import { CashierAccessModal } from "@/components/employees/cashier-access-modal";
+import { CashierPasswordModal } from "@/components/employees/cashier-password-modal";
 import { EmployeeModal } from "@/components/employees/employee-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,9 @@ export default function EmployeesPage() {
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<Employee | null | undefined>();
   const [accessEmployee, setAccessEmployee] = useState<Employee | null>(null);
+  const [passwordEmployee, setPasswordEmployee] = useState<Employee | null>(
+    null,
+  );
   const [confirming, setConfirming] = useState<ConfirmAction | null>(null);
   const [confirmingBusy, setConfirmingBusy] = useState(false);
   const [confirmingError, setConfirmingError] = useState("");
@@ -201,6 +205,14 @@ export default function EmployeesPage() {
                     <UserMinus className="size-4" />
                   </IconButton>
                 ))}
+              {employee.isActive && employee.cashierAccess?.isActive && (
+                <IconButton
+                  title="إعادة تعيين كلمة المرور"
+                  onClick={() => setPasswordEmployee(employee)}
+                >
+                  <Lock className="size-4" />
+                </IconButton>
+              )}
               {employee.isActive ? (
                 <IconButton
                   title="إيقاف الموظف"
@@ -240,6 +252,16 @@ export default function EmployeesPage() {
           onClose={() => setAccessEmployee(null)}
           onSaved={() => {
             setAccessEmployee(null);
+            void load();
+          }}
+        />
+      )}
+      {passwordEmployee && (
+        <CashierPasswordModal
+          employee={passwordEmployee}
+          onClose={() => setPasswordEmployee(null)}
+          onSaved={() => {
+            setPasswordEmployee(null);
             void load();
           }}
         />

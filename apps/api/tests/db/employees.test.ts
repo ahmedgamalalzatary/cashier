@@ -203,6 +203,66 @@ describe("employees", () => {
     expect(response.status).toBe(400);
   });
 
+  it("lets an admin reset an active cashier's password and revokes the old session", async () => {
+    const authorization = await loginAs(app(), "admin");
+    const employee = await request(app())
+      .post("/api/employees")
+      .set(authorization)
+      .send({ name: "سالي" });
+    await request(app())
+      .post(`/api/employees/${employee.body.id}/cashier-access`)
+      .set(authorization)
+      .send({ username: "sally", password: "secret123" });
+    const login = await request(app())
+      .post("/api/auth/login")
+      .send({ username: "sally", password: "secret123" });
+    const cashierAuthorization = {
+      Authorization: `Bearer ${login.body.token}`,
+    };
+
+    const reset = await request(app())
+      .put(`/api/employees/${employee.body.id}/cashier-password`)
+      .set(authorization)
+      .send({ password: "new-secret-456" });
+    expect(reset.status).toBe(200);
+
+    expect(
+      (
+        await request(app()).post("/api/auth/login").send({
+          username: "sally",
+          password: "secret123",
+        })
+      ).status,
+    ).toBe(401);
+    expect(
+      (
+        await request(app()).post("/api/auth/login").send({
+          username: "sally",
+          password: "new-secret-456",
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (await request(app()).get("/api/auth/me").set(cashierAuthorization))
+        .status,
+    ).toBe(401);
+  });
+
+  it("rejects cashier password resets for employees without an active account", async () => {
+    const authorization = await loginAs(app(), "admin");
+    const employee = await request(app())
+      .post("/api/employees")
+      .set(authorization)
+      .send({ name: "بلا حساب" });
+
+    const reset = await request(app())
+      .put(`/api/employees/${employee.body.id}/cashier-password`)
+      .set(authorization)
+      .send({ password: "new-secret-456" });
+
+    expect(reset.status).toBe(404);
+  });
+
   it("does not revoke cashier access while that employee has an open shift", async () => {
     const authorization = await loginAs(app(), "admin");
     const employee = await request(app())

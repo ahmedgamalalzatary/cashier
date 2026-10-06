@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
 import {
   Coffee,
   Building2,
@@ -20,7 +19,6 @@ import {
   BarChart3,
   Tags,
   LogOut,
-  KeyRound,
   UserCog,
   ShoppingCart,
   ShoppingBag,
@@ -32,7 +30,6 @@ import {
 import { useAuth } from "@/components/auth/auth-provider";
 import { NAV_GROUPS, NAV_ITEMS } from "@/lib/navigation";
 import { normalizePath } from "@/lib/auth";
-import { ChangePasswordModal } from "@/components/auth/change-password-modal";
 
 type NavHref = (typeof NAV_ITEMS)[number]["href"];
 
@@ -71,7 +68,6 @@ export function Sidebar({
 }) {
   const pathname = normalizePath(usePathname());
   const { user, logout } = useAuth();
-  const [passwordOpen, setPasswordOpen] = useState(false);
   return (
     <>
       {open && (
@@ -151,14 +147,6 @@ export function Sidebar({
           </div>
           <button
             type="button"
-            onClick={() => setPasswordOpen(true)}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-white/5 hover:text-white"
-          >
-            <KeyRound className="size-4.5" />
-            تغيير كلمة المرور
-          </button>
-          <button
-            type="button"
             onClick={logout}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-white/5 hover:text-white"
           >
@@ -167,9 +155,6 @@ export function Sidebar({
           </button>
         </div>
       </aside>
-      {passwordOpen && (
-        <ChangePasswordModal onClose={() => setPasswordOpen(false)} />
-      )}
     </>
   );
 }

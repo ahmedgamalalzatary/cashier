@@ -17,6 +17,7 @@ describe("branch selection", () => {
         id: failure === "read" ? 101 : 102,
         name: "Admin",
         role: "admin",
+        isSuperAdmin: false,
       };
       const browser = Object.assign(new EventTarget(), {
         localStorage: {
@@ -64,7 +65,12 @@ describe("branch selection", () => {
   });
 
   it("adopts a cross-tab branch change after a failed local save", () => {
-    const user: AuthUser = { id: 104, name: "Admin", role: "admin" };
+    const user: AuthUser = {
+      id: 104,
+      name: "Admin",
+      role: "admin",
+      isSuperAdmin: false,
+    };
     let stored = "1";
     const browser = Object.assign(new EventTarget(), {
       localStorage: {

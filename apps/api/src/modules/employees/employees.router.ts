@@ -9,6 +9,7 @@ export function employeesRouter(controller: EmployeesController) {
   router.post("/", controller.create);
   router.put("/:id", controller.update);
   router.post("/:id/cashier-access", controller.grantCashierAccess);
+  router.put("/:id/cashier-password", controller.resetCashierPassword);
   router.delete("/:id/cashier-access", controller.revokeCashierAccess);
   router.delete("/:id", controller.deactivate);
   return router;

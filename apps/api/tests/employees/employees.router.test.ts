@@ -15,11 +15,18 @@ describe("employee route authorization", () => {
       update: vi.fn((_req, res) => res.status(200).end()),
       grantCashierAccess: vi.fn((_req, res) => res.status(201).end()),
       revokeCashierAccess: vi.fn((_req, res) => res.status(204).end()),
+      resetCashierPassword: vi.fn((_req, res) => res.status(200).end()),
       deactivate: vi.fn((_req, res) => res.status(204).end()),
     } as unknown as EmployeesController;
     const app = express();
     app.use((req, _res, next) => {
-      req.user = { id: 1, name: "Cashier", role: "cashier" };
+      req.user = {
+        id: 1,
+        name: "Cashier",
+        role: "cashier",
+        branchId: 1,
+        isSuperAdmin: false,
+      };
       next();
     });
     app.use(express.json(), employeesRouter(controller));
@@ -29,18 +36,20 @@ describe("employee route authorization", () => {
       request(app).post("/").send({}),
       request(app).put("/1").send({}),
       request(app).post("/1/cashier-access").send({}),
+      request(app).put("/1/cashier-password").send({}),
       request(app).delete("/1/cashier-access"),
       request(app).delete("/1"),
     ]);
 
     expect(responses.map(({ status }) => status)).toEqual([
-      403, 403, 403, 403, 403, 403,
+      403, 403, 403, 403, 403, 403, 403,
     ]);
     expect(controller.list).not.toHaveBeenCalled();
     expect(controller.create).not.toHaveBeenCalled();
     expect(controller.update).not.toHaveBeenCalled();
     expect(controller.grantCashierAccess).not.toHaveBeenCalled();
     expect(controller.revokeCashierAccess).not.toHaveBeenCalled();
+    expect(controller.resetCashierPassword).not.toHaveBeenCalled();
     expect(controller.deactivate).not.toHaveBeenCalled();
   });
 });
@@ -49,7 +58,13 @@ describe("employee controller wiring", () => {
   function appWithService(service: EmployeesService) {
     const app = express();
     app.use((req, _res, next) => {
-      req.user = { id: 1, name: "Admin", role: "admin" };
+      req.user = {
+        id: 1,
+        name: "Admin",
+        role: "admin",
+        branchId: null,
+        isSuperAdmin: true,
+      };
       next();
     });
     app.use(express.json(), employeesRouter(new RealEmployeesController(service)));
@@ -64,6 +79,7 @@ describe("employee controller wiring", () => {
       create: vi.fn(async () => 1),
       grantCashierAccess: vi.fn(async () => ({ userId: 11, created: true })),
       revokeCashierAccess: vi.fn(async () => undefined),
+      resetCashierPassword: vi.fn(async () => undefined),
       deactivate: vi.fn(async () => undefined),
     } as unknown as EmployeesService;
     const app = appWithService(service);
@@ -89,6 +105,15 @@ describe("employee controller wiring", () => {
 
     expect((await request(app).delete("/1/cashier-access")).status).toBe(204);
     expect((await request(app).delete("/1")).status).toBe(204);
+
+    const reset = await request(app)
+      .put("/1/cashier-password")
+      .send({ password: "new-secret-456" });
+    expect(reset.status).toBe(200);
+    expect(service.resetCashierPassword).toHaveBeenCalledWith(
+      1,
+      "new-secret-456",
+    );
   });
 
   it("maps bad bodies and ids to 400 and missing rows to 404", async () => {

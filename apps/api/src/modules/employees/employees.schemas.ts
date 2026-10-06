@@ -87,6 +87,11 @@ export const cashierAccessInput = z.object({
   password: z.string().min(8).max(255),
 });
 
+export const cashierPasswordInput = z.object({
+  password: z.string().min(8).max(255),
+});
+
 export const employeeIdParam = z.coerce.number().int().positive();
 
 export type CashierAccessInput = z.infer<typeof cashierAccessInput>;
+export type CashierPasswordInput = z.infer<typeof cashierPasswordInput>;

@@ -54,3 +54,9 @@ export const grantCashierAccess = (id: number, body: CashierAccessBody) =>
 
 export const revokeCashierAccess = (id: number) =>
   api<void>(`/api/employees/${id}/cashier-access`, { method: "DELETE" });
+
+export const resetCashierPassword = (id: number, password: string) =>
+  api<{ ok: true }>(`/api/employees/${id}/cashier-password`, {
+    method: "PUT",
+    body: JSON.stringify({ password }),
+  });

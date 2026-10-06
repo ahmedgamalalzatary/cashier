@@ -91,7 +91,12 @@ export default function UsersPage() {
     {
       key: "role",
       header: "الصلاحية",
-      cell: (user) => (user.role === "admin" ? "مدير نظام" : "كاشير"),
+      cell: (user) => (
+        <span className="flex flex-wrap items-center gap-2">
+          {user.role === "admin" ? "مدير نظام" : "كاشير"}
+          {user.isSuperAdmin && <Badge tone="neutral">المدير الرئيسي</Badge>}
+        </span>
+      ),
     },
     {
       key: "status",
@@ -110,14 +115,16 @@ export default function UsersPage() {
         title="مستخدمو النظام"
         description="إدارة حسابات النظام. أنشئ المديرين هنا، وامنح دخول الكاشير من شاشة الموظفين حتى تظل ووردياته وساعات عمله مرتبطة بسجله."
         actions={
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
-            <Plus className="size-4" /> مدير جديد
-          </Button>
+          currentUser?.isSuperAdmin ? (
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+            >
+              <Plus className="size-4" /> مدير جديد
+            </Button>
+          ) : undefined
         }
       />
 
@@ -139,8 +146,23 @@ export default function UsersPage() {
               description="أنشئ أول حساب مستخدم."
             />
           }
-          actions={(user) =>
-            user.role === "admin" ? (
+          actions={(user) => {
+            if (user.role !== "admin") {
+              return (
+                <span className="text-xs text-muted">يُدار من سجل الموظف</span>
+              );
+            }
+            if (user.isSuperAdmin) {
+              return (
+                <span className="text-xs text-muted">
+                  يُدار من إعدادات الخادم
+                </span>
+              );
+            }
+            if (!currentUser?.isSuperAdmin) {
+              return <span className="text-xs text-muted">عرض فقط</span>;
+            }
+            return (
               <div className="flex items-center gap-1">
                 <IconButton
                   title="تعديل الحساب أو كلمة المرور"
@@ -151,27 +173,23 @@ export default function UsersPage() {
                 >
                   <Pencil className="size-4" />
                 </IconButton>
-                {user.id !== currentUser?.id && (
-                  <IconButton
-                    title={user.isActive ? "إيقاف الحساب" : "تفعيل الحساب"}
-                    danger={user.isActive}
-                    onClick={() => {
-                      setConfirmingError("");
-                      setConfirming(user);
-                    }}
-                  >
-                    {user.isActive ? (
-                      <Ban className="size-4" />
-                    ) : (
-                      <Power className="size-4" />
-                    )}
-                  </IconButton>
-                )}
+                <IconButton
+                  title={user.isActive ? "إيقاف الحساب" : "تفعيل الحساب"}
+                  danger={user.isActive}
+                  onClick={() => {
+                    setConfirmingError("");
+                    setConfirming(user);
+                  }}
+                >
+                  {user.isActive ? (
+                    <Ban className="size-4" />
+                  ) : (
+                    <Power className="size-4" />
+                  )}
+                </IconButton>
               </div>
-            ) : (
-              <span className="text-xs text-muted">يُدار من سجل الموظف</span>
-            )
-          }
+            );
+          }}
         />
       )}
 

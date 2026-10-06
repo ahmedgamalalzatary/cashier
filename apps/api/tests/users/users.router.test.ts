@@ -10,7 +10,13 @@ import { usersRouter } from "../../src/modules/users/users.router.js";
 function appWithStubs(controller: UsersController) {
   const app = express();
   app.use((req, _res, next) => {
-    req.user = { id: 7, name: "Admin", role: "admin" };
+    req.user = {
+      id: 7,
+      name: "Admin",
+      role: "admin",
+      branchId: null,
+      isSuperAdmin: true,
+    };
     next();
   });
   app.use(express.json(), usersRouter(controller));
@@ -66,7 +72,11 @@ describe("user controller wiring", () => {
 
     const updated = await request(app).put("/3").send({ name: "جديد" });
     expect(updated.status).toBe(200);
-    expect(service.update).toHaveBeenCalledWith(7, 3, { name: "جديد" });
+    expect(service.update).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 7, isSuperAdmin: true }),
+      3,
+      { name: "جديد" },
+    );
   });
 
   it("maps empty bodies and bad ids to 400 and missing users to 404", async () => {

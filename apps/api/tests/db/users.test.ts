@@ -7,7 +7,7 @@ import { createUser, loginAs } from "../helpers.js";
 const app = () => createApp(db, appOptions);
 
 describe("user management", () => {
-  it("lets an admin create another admin and lists only safe account fields", async () => {
+  it("lets the super-admin create another admin and lists safe account fields", async () => {
     const authorization = await loginAs(app(), "admin");
     const created = await request(app())
       .post("/api/users")
@@ -30,7 +30,11 @@ describe("user management", () => {
       username: "evening-admin",
       role: "admin",
       isActive: true,
+      isSuperAdmin: false,
     });
+    expect(
+      list.body.find((user: { username: string }) => user.username === "admin"),
+    ).toMatchObject({ isSuperAdmin: true });
     expect(list.body[0]).not.toHaveProperty("passwordHash");
 
     expect(
@@ -83,7 +87,7 @@ describe("user management", () => {
     ).toBe(200);
   });
 
-  it("invalidates a user's existing token when an admin resets the password", async () => {
+  it("invalidates a user's existing token when the super-admin resets the password", async () => {
     const adminAuthorization = await loginAs(app(), "admin");
     const credentials = await createUser("admin", "reset-target");
     const login = await request(app())
@@ -148,7 +152,7 @@ describe("user management", () => {
     ).toBe(409);
   });
 
-  it("rejects duplicate usernames and cashier access", async () => {
+  it("rejects duplicate usernames and cashier access to the page", async () => {
     const adminAuthorization = await loginAs(app(), "admin");
     await createUser("admin", "existing");
     const duplicate = await request(app())
@@ -175,37 +179,59 @@ describe("user management", () => {
     ).toBe(403);
   });
 
-  it("prevents an admin from deactivating or demoting their own account", async () => {
+  it("keeps a regular admin read-only on the users page", async () => {
+    const authorization = await loginAs(app(), "admin", {
+      isSuperAdmin: false,
+    });
+
+    expect(
+      (await request(app()).get("/api/users").set(authorization)).status,
+    ).toBe(200);
+    expect(
+      (
+        await request(app())
+          .post("/api/users")
+          .set(authorization)
+          .send({
+            name: "محاولة",
+            username: "blocked",
+            password: "secret-456",
+            role: "admin",
+          })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(app())
+          .put("/api/users/1")
+          .set(authorization)
+          .send({ name: "محاولة" })
+      ).status,
+    ).toBe(403);
+  });
+
+  it("prevents the super-admin from editing his own account", async () => {
     const authorization = await loginAs(app(), "admin");
     const list = await request(app()).get("/api/users").set(authorization);
     const admin = list.body.find(
       (user: { username: string }) => user.username === "admin",
     );
 
-    expect(
-      (
-        await request(app())
-          .put(`/api/users/${admin.id}`)
-          .set(authorization)
-          .send({ isActive: false })
-      ).status,
-    ).toBe(409);
-    expect(
-      (
-        await request(app())
-          .put(`/api/users/${admin.id}`)
-          .set(authorization)
-          .send({ role: "cashier" })
-      ).status,
-    ).toBe(409);
-    expect(
-      (
-        await request(app())
-          .put(`/api/users/${admin.id}`)
-          .set(authorization)
-          .send({ password: "replacement-789" })
-      ).status,
-    ).toBe(409);
+    for (const body of [
+      { isActive: false },
+      { role: "cashier" },
+      { password: "replacement-789" },
+      { name: "اسم آخر" },
+    ]) {
+      expect(
+        (
+          await request(app())
+            .put(`/api/users/${admin.id}`)
+            .set(authorization)
+            .send(body)
+        ).status,
+      ).toBe(409);
+    }
     expect(
       (await request(app()).get("/api/auth/me").set(authorization)).status,
     ).toBe(200);

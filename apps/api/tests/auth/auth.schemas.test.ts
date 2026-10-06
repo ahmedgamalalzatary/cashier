@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  changePasswordInput,
-  loginInput,
-} from "../../src/modules/auth/auth.schemas.js";
+import { loginInput } from "../../src/modules/auth/auth.schemas.js";
 
 describe("auth schemas", () => {
   it("accepts credentials and trims the username", () => {
@@ -22,20 +19,5 @@ describe("auth schemas", () => {
     expect(
       loginInput.safeParse({ username: "admin", password: "" }).success,
     ).toBe(false);
-  });
-
-  it("requires an 8+ character new password", () => {
-    expect(
-      changePasswordInput.safeParse({
-        currentPassword: "old",
-        newPassword: "short",
-      }).success,
-    ).toBe(false);
-    expect(
-      changePasswordInput.parse({
-        currentPassword: "old-secret",
-        newPassword: "new-secret-123",
-      }).newPassword,
-    ).toBe("new-secret-123");
   });
 });

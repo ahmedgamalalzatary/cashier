@@ -149,6 +149,16 @@ export class EmployeesRepository {
       .where(branchCondition(users, eq(users.id, input.userId)));
   }
 
+  async setCashierPassword(userId: number, passwordHash: string) {
+    await this.db
+      .update(users)
+      .set({
+        passwordHash,
+        tokenVersion: sql`${users.tokenVersion} + 1`,
+      })
+      .where(branchCondition(users, eq(users.id, userId)));
+  }
+
   async deactivate(employeeId: number) {
     await this.db
       .update(employees)

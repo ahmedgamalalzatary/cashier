@@ -13,6 +13,7 @@ const safeUserColumns = {
     number | null
   >`CASE WHEN ${users.role}='cashier' THEN ${users.branchId} ELSE NULL END`,
   isActive: users.isActive,
+  isSuperAdmin: users.isSuperAdmin,
   createdAt: users.createdAt,
 };
 

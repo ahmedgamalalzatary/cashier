@@ -133,7 +133,7 @@ describe("tokenless persisted session", () => {
 
     writeSession({
       token: tokenWithExpiration(Math.floor(Date.now() / 1000) + 60),
-      user: { id: 1, name: "Admin", role: "admin" },
+      user: { id: 1, name: "Admin", role: "admin", isSuperAdmin: false },
     });
 
     const persisted = JSON.parse(

@@ -17,7 +17,7 @@ const ADMIN_SEED_LOCK_TIMEOUT_S = 10;
 
 export async function seedAdmin(db: SeedHandle, admin: AdminSeedConfig) {
   const passwordHash = await bcrypt.hash(admin.password, 10);
-  const existingAdmin = await findManagedAdmin(db, admin.username);
+  const existingAdmin = await findSuperAdmin(db, admin.username);
 
   if (existingAdmin) {
     await db
@@ -26,8 +26,10 @@ export async function seedAdmin(db: SeedHandle, admin: AdminSeedConfig) {
         name: admin.name,
         username: admin.username,
         passwordHash,
-        tokenVersion: sql`${users.tokenVersion} + 1`,
+        role: 'admin',
         isActive: true,
+        isSuperAdmin: true,
+        tokenVersion: sql`${users.tokenVersion} + 1`,
       })
       .where(eq(users.id, existingAdmin.id));
     return 'updated' as const;
@@ -38,11 +40,16 @@ export async function seedAdmin(db: SeedHandle, admin: AdminSeedConfig) {
     username: admin.username,
     passwordHash,
     role: 'admin',
+    isSuperAdmin: true,
   });
   return 'created' as const;
 }
 
-async function findManagedAdmin(db: SeedHandle, username: string) {
+// The configured super-admin is resolved without ever guessing between several
+// candidates: a flagged row wins, then the configured username, then a lone
+// admin. Anything more ambiguous creates a fresh flagged account instead of
+// failing the boot.
+async function findSuperAdmin(db: SeedHandle, username: string) {
   const [usernameOwner] = await db
     .select()
     .from(users)
@@ -55,27 +62,40 @@ async function findManagedAdmin(db: SeedHandle, username: string) {
     );
   }
 
+  const [flagged] = await db
+    .select()
+    .from(users)
+    .where(eq(users.isSuperAdmin, true))
+    .orderBy(users.id)
+    .limit(1);
+
+  if (flagged) {
+    if (usernameOwner && usernameOwner.id !== flagged.id) {
+      throw new Error(
+        `Cannot seed admin: username "${username}" belongs to another user`,
+      );
+    }
+    return flagged;
+  }
+
   if (usernameOwner) return usernameOwner;
+
   const existingAdmins = await db
     .select()
     .from(users)
     .where(eq(users.role, 'admin'))
     .orderBy(users.id)
     .limit(2);
-  if (existingAdmins.length > 1) {
-    throw new Error(
-      'Cannot seed admin: multiple admin accounts exist and none matches the configured username',
-    );
-  }
-  return existingAdmins[0] ?? null;
+  return existingAdmins.length === 1 ? existingAdmins[0] : null;
 }
 
 // Boot-time sync for API startup: creates the configured admin on an empty
 // database, updates name/username/password when the environment values
 // differ, and otherwise stays silent. Sessions are revoked (tokenVersion
 // bump) only when the password actually changed, so restarts with unchanged
-// config never log anyone out. Operational state (isActive) is left alone;
-// use the manual db:seed script for resets and reactivation.
+// config never log anyone out. The super-admin flag, admin role, and active
+// state are always enforced, so a renamed or deactivated account recovers on
+// the next boot. Use the manual db:seed script for a full reset.
 export async function syncConfiguredAdmin(db: Db, admin: AdminSeedConfig) {
   // Boot-time sync runs in every API process, so concurrent boots must
   // serialize the whole check-then-create flow. A MySQL named lock gates
@@ -108,7 +128,7 @@ async function runSync(tx: SeedHandle, admin: AdminSeedConfig) {
     return 'created' as const;
   }
 
-  const existing = await findManagedAdmin(tx, admin.username);
+  const existing = await findSuperAdmin(tx, admin.username);
   if (!existing) {
     await seedAdmin(tx, admin);
     return 'created' as const;
@@ -118,8 +138,13 @@ async function runSync(tx: SeedHandle, admin: AdminSeedConfig) {
     admin.password,
     existing.passwordHash,
   ));
+  const needsForce =
+    existing.role !== 'admin' ||
+    !existing.isActive ||
+    !existing.isSuperAdmin;
   if (
     !passwordChanged &&
+    !needsForce &&
     existing.name === admin.name &&
     existing.username === admin.username
   ) {
@@ -131,6 +156,9 @@ async function runSync(tx: SeedHandle, admin: AdminSeedConfig) {
     .set({
       name: admin.name,
       username: admin.username,
+      role: 'admin',
+      isActive: true,
+      isSuperAdmin: true,
       ...(passwordChanged
         ? {
             passwordHash: await bcrypt.hash(admin.password, 10),

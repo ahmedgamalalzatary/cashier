@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import type { EmployeesService } from "./employees.service.js";
 import {
   cashierAccessInput,
+  cashierPasswordInput,
   employeeIdParam,
   employeeInput,
   employeeUpdateInput,
@@ -40,6 +41,15 @@ export class EmployeesController {
       employeeIdParam.parse(req.params.id),
     );
     res.status(204).send();
+  };
+
+  resetCashierPassword = async (req: Request, res: Response) => {
+    const { password } = cashierPasswordInput.parse(req.body);
+    await this.service.resetCashierPassword(
+      employeeIdParam.parse(req.params.id),
+      password,
+    );
+    res.json({ ok: true });
   };
 
   deactivate = async (req: Request, res: Response) => {

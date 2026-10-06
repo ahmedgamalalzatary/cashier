@@ -8,6 +8,8 @@ export type AuthUser = {
   role: Role;
   /** Cashiers belong to one branch; admins can select any branch. */
   branchId?: number | null;
+  /** Only the configured admin from server settings can manage admin accounts. */
+  isSuperAdmin: boolean;
 };
 
 export type Branch = {

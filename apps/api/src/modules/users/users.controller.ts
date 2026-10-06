@@ -11,13 +11,16 @@ export class UsersController {
   };
 
   create = async (req: Request, res: Response) => {
-    const id = await this.service.create(userInput.parse(req.body));
+    const id = await this.service.create(
+      req.user!,
+      userInput.parse(req.body),
+    );
     res.status(201).json({ id });
   };
 
   update = async (req: Request, res: Response) => {
     await this.service.update(
-      req.user!.id,
+      req.user!,
       idParam.parse(req.params.id),
       userUpdateInput.parse(req.body),
     );

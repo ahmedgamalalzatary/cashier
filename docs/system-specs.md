@@ -43,6 +43,13 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 - Cashier actions are stored against the authenticated user and are reportable through the linked employee, including shifts, orders, discounts, refunds, shift expenses, waste entries, and transfer requests where applicable.
 - There is no employee PIN or standalone attendance clock. Only cashiers have worked-time tracking, derived from their shift open and close times.
 
+#### Admin accounts (super-admin)
+
+- The **super-admin** is the admin account defined by server settings (`ADMIN_NAME` / `ADMIN_USERNAME` / `ADMIN_PASSWORD`). On every API start the boot sync forces its name, username, `admin` role, active state, and super-admin flag; it only re-hashes the password and revokes sessions when the configured password no longer matches. If the configured username is taken by a cashier, boot fails with a clear conflict error.
+- The super-admin can create, edit, deactivate, and reset the password of other admins. He cannot edit his own account in the app — his data comes from server settings.
+- A **regular admin** (created by the super-admin) has the same business powers as the super-admin but cannot manage any admin account — not others, not himself. The Users page is read-only for him.
+- Nobody changes his own password in the app: the super-admin's comes from server settings, a regular admin's is set by the super-admin, and a cashier's is set by an admin from the employee record (an explicit reset is available for an active cashier account).
+
 ### Branch workspaces
 
 - Admin creates, renames, archives, and restores branches from the Branches page and selects the active workspace from the application header.
@@ -86,7 +93,7 @@ Business endpoints select the workspace with `X-Branch-Id`. Admin defaults to Ma
 | Cafe waste entry                        | ✔     | ✔                  |
 | Main-warehouse waste, stocktake         | ✔     | ✘                  |
 | Items, categories, recipes, prices      | ✔     | ✘                  |
-| Application users and roles             | ✔     | ✘                  |
+| Application users and roles             | ✔ (super-admin manages admins) | ✘                  |
 | Purchases, suppliers, payments          | ✔     | ✘                  |
 | Employees, salaries, advances           | ✔     | ✘                  |
 | General expenses, expense categories    | ✔     | ✘                  |

@@ -1,9 +1,9 @@
 import bcrypt from "bcryptjs";
 import { HttpError } from "../../middleware/error.js";
 import { signToken } from "../../middleware/auth.js";
-import type { AuthUser } from "@cashier/shared";
+import { toAuthUser } from "./auth-user.js";
 import type { AuthRepository } from "./auth.repository.js";
-import type { ChangePasswordInput, LoginInput } from "./auth.schemas.js";
+import type { LoginInput } from "./auth.schemas.js";
 
 const DUMMY_PASSWORD_HASH =
   "$2b$10$wwlsALurZKzPIweY9o6D5e6qXOYOu1TNLB2AFMFb//vhE74irekS2";
@@ -31,42 +31,9 @@ export class AuthService {
       (user.role === "cashier" && !user.branchIsActive)
     )
       throw invalid;
-    const authUser: AuthUser = {
-      id: user.id,
-      name: user.name,
-      role: user.role,
-      branchId: user.role === "cashier" ? user.branchId : null,
-    };
+    const authUser = toAuthUser(user);
     return {
       token: signToken(authUser, user.tokenVersion, this.jwtSecret),
-      user: authUser,
-    };
-  }
-
-  async changePassword(userId: number, input: ChangePasswordInput) {
-    const user = await this.repo.findById(userId);
-    if (!user?.isActive || (user.role === "cashier" && !user.branchIsActive))
-      throw new HttpError(401, "انتهت الجلسة — سجّل الدخول من جديد");
-    if (
-      !(await this.comparePassword(input.currentPassword, user.passwordHash))
-    ) {
-      throw new HttpError(400, "كلمة المرور الحالية غير صحيحة");
-    }
-    await this.repo.updatePassword(
-      userId,
-      await bcrypt.hash(input.newPassword, 10),
-    );
-    const updatedUser = await this.repo.findById(userId);
-    if (!updatedUser?.isActive)
-      throw new HttpError(401, "انتهت الجلسة — سجّل الدخول من جديد");
-    const authUser: AuthUser = {
-      id: updatedUser.id,
-      name: updatedUser.name,
-      role: updatedUser.role,
-      branchId: updatedUser.role === "cashier" ? updatedUser.branchId : null,
-    };
-    return {
-      token: signToken(authUser, updatedUser.tokenVersion, this.jwtSecret),
       user: authUser,
     };
   }

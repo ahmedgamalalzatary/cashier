@@ -43,10 +43,9 @@ describe("auth routes", () => {
     expect(loggedOut.body).toEqual({ ok: true });
   });
 
-  it("rejects malformed login bodies and unauthenticated password changes", async () => {
+  it("rejects malformed login bodies and no longer exposes self password change", async () => {
     const service = {
       login: vi.fn(),
-      changePassword: vi.fn(),
     } as unknown as AuthService;
     const app = appWithStubs(new RealAuthController(service));
 
@@ -57,11 +56,10 @@ describe("auth routes", () => {
     expect(badBody.status).toBe(400);
     expect(service.login).not.toHaveBeenCalled();
 
-    const anonymous = await request(app).put("/password").send({
+    const removed = await request(app).put("/password").send({
       currentPassword: "old",
       newPassword: "new-secret-123",
     });
-    expect(anonymous.status).toBe(401);
-    expect(service.changePassword).not.toHaveBeenCalled();
+    expect(removed.status).toBe(404);
   });
 });

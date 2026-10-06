@@ -295,6 +295,13 @@
       "when": 1790525178748,
       "tag": "0041_cashier_concurrent_shifts",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "5",
+      "when": 1791290170336,
+      "tag": "0042_eager_warpath",
+      "breakpoints": true
     }
   ]
 }

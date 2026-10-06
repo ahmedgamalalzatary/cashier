@@ -80,6 +80,7 @@ export const users = mysqlTable(
     tokenVersion: int("token_version").notNull().default(0),
     role: mysqlEnum("role", ["admin", "cashier"]).notNull(),
     isActive: boolean("is_active").notNull().default(true),
+    isSuperAdmin: boolean("is_super_admin").notNull().default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [

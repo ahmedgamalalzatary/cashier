@@ -101,6 +101,20 @@ export class EmployeesService {
     });
   }
 
+  resetCashierPassword(employeeId: number, password: string) {
+    return this.repo.transaction(async (repo) => {
+      const employee = await repo.findByIdForUpdate(employeeId);
+      if (!employee) throw new HttpError(404, "الموظف غير موجود");
+      const user = await repo.findCashierAccessForUpdate(employeeId);
+      if (!user?.isActive)
+        throw new HttpError(404, "لا يوجد حساب كاشير نشط لهذا الموظف");
+      await repo.setCashierPassword(
+        user.id,
+        await bcrypt.hash(password, 10),
+      );
+    });
+  }
+
   deactivate(employeeId: number) {
     return this.repo.transaction(async (repo) => {
       const employee = await repo.findByIdForUpdate(employeeId);
