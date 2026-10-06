@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { login as loginRequest, logout as logoutRequest } from "@/services/auth-service";
+import { login as loginRequest, logout as logoutRequest, currentUser } from "@/services/auth-service";
 import {
   canOpenPath,
   loginPathFor,
@@ -16,6 +16,7 @@ import {
   postLoginPath,
   readSession,
   subscribeToSessionChanges,
+  updateSessionUser,
   writeSession,
   type AuthUser,
   type PersistedSession,
@@ -41,6 +42,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const sync = () => setSession(readSession());
     sync();
+    if (readSession()) {
+      void currentUser()
+        .then((user) => updateSessionUser(user))
+        .catch(() => undefined);
+    }
     return subscribeToSessionChanges(sync);
   }, []);
 

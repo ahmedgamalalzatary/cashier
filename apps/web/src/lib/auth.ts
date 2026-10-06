@@ -99,6 +99,17 @@ export function subscribeToSessionChanges(listener: () => void) {
   };
 }
 
+export function updateSessionUser(user: AuthUser) {
+  if (typeof window === "undefined") return;
+  const current = readSession();
+  if (!current) return;
+  window.localStorage.setItem(
+    SESSION_KEY,
+    JSON.stringify({ ...current, user }),
+  );
+  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+}
+
 export function canOpenPath(role: Role, pathname: string) {
   return (
     role === "admin" ||
