@@ -4,7 +4,7 @@ import { Printer, RefreshCw } from "lucide-react";
 import { ReportTable } from "@/components/reports/report-table";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
-import { Tabs } from "@/components/ui/tabs";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import { ErrorBanner, LoadingState } from "@/components/ui/states";
 import { cairoCalendarDate } from "@/lib/cairo-date";
 import { formatMoney } from "@/lib/format";
@@ -624,77 +624,80 @@ export default function ReportsPage() {
       </div>
       <div className="print-controls">
         <Tabs
+          idPrefix="reports"
           items={tabs.map(([id, label]) => ({ id, label }))}
           active={tab}
           onChange={setTab}
           ariaLabel="أقسام التقارير"
         />
       </div>
-      {data && (
-        <div className="space-y-2 rounded-xl border border-line bg-surface p-4 print:border-0">
-          <p>{branch.name}</p>
-          <p>
-            الفترة: {data.range.from} — {data.range.to}
-          </p>
-          <p className="text-xs text-muted">
-            توقيت القاهرة · وقت التحميل:{" "}
-            {new Date(data.range.generatedAt).toLocaleString("ar-EG", {
-              timeZone: "Africa/Cairo",
-            })}
-          </p>
-          <h2 className="text-xl font-bold">
-            {tabs.find(([key]) => key === tab)?.[1]}
-          </h2>
-          {(from !== data.range.from || to !== data.range.to) && (
-            <p className="print-controls text-sm text-muted">
-              التواريخ المختارة لم تطبق بعد. حدّث التقرير؛ الطباعة تستخدم الفترة
-              المحملة أعلاه.
+      <TabPanel idPrefix="reports" active={tab}>
+        {data && (
+          <div className="space-y-2 rounded-xl border border-line bg-surface p-4 print:border-0">
+            <p>{branch.name}</p>
+            <p>
+              الفترة: {data.range.from} — {data.range.to}
             </p>
-          )}
-          <p className="text-sm text-muted">
-            تقارير العمليات المسجلة في هذا الفرع. مبيعات الأونلاين وتكاليف خصمها
-            وسجل تعديل المعاملات لم تتوفر بعد.
-          </p>
-          {tab === "sales" && (
-            <>
-              <p className="text-sm text-muted">
-                مجمل الربح = المبيعات − المرتجعات − تكلفة المبيعات + التكلفة
-                المرتجعة. لا تخصم منه المصروفات أو الرواتب أو الهالك.
+            <p className="text-xs text-muted">
+              توقيت القاهرة · وقت التحميل:{" "}
+              {new Date(data.range.generatedAt).toLocaleString("ar-EG", {
+                timeZone: "Africa/Cairo",
+              })}
+            </p>
+            <h2 className="text-xl font-bold">
+              {tabs.find(([key]) => key === tab)?.[1]}
+            </h2>
+            {(from !== data.range.from || to !== data.range.to) && (
+              <p className="print-controls text-sm text-muted">
+                التواريخ المختارة لم تطبق بعد. حدّث التقرير؛ الطباعة تستخدم
+                الفترة المحملة أعلاه.
               </p>
-              <div className="grid gap-3 sm:grid-cols-3">
-                {[
-                  [
-                    "صافي المبيعات",
-                    reportTotal(data.sales.byDay, "sales") -
-                      reportTotal(data.sales.byDay, "refunds"),
-                  ],
-                  [
-                    "صافي تكلفة المبيعات",
-                    reportTotal(data.sales.byDay, "cost") -
-                      reportTotal(data.sales.byDay, "returnedCost"),
-                  ],
-                  ["مجمل الربح", reportTotal(data.sales.byDay, "profit")],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-lg bg-paper p-3">
-                    <p className="text-sm text-muted">{label}</p>
-                    <p className="tnum font-bold">{formatMoney(value)}</p>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-      {error && <ErrorBanner>{error}</ErrorBanner>}
-      {loading ? (
-        <LoadingState label="جارِ تحميل التقرير…" />
-      ) : (
-        <div className="space-y-8">
-          {visible.map((table) => (
-            <ReportTable key={table.title} {...table} />
-          ))}
-        </div>
-      )}
+            )}
+            <p className="text-sm text-muted">
+              تقارير العمليات المسجلة في هذا الفرع. مبيعات الأونلاين وتكاليف
+              خصمها وسجل تعديل المعاملات لم تتوفر بعد.
+            </p>
+            {tab === "sales" && (
+              <>
+                <p className="text-sm text-muted">
+                  مجمل الربح = المبيعات − المرتجعات − تكلفة المبيعات + التكلفة
+                  المرتجعة. لا تخصم منه المصروفات أو الرواتب أو الهالك.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {[
+                    [
+                      "صافي المبيعات",
+                      reportTotal(data.sales.byDay, "sales") -
+                        reportTotal(data.sales.byDay, "refunds"),
+                    ],
+                    [
+                      "صافي تكلفة المبيعات",
+                      reportTotal(data.sales.byDay, "cost") -
+                        reportTotal(data.sales.byDay, "returnedCost"),
+                    ],
+                    ["مجمل الربح", reportTotal(data.sales.byDay, "profit")],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-lg bg-paper p-3">
+                      <p className="text-sm text-muted">{label}</p>
+                      <p className="tnum font-bold">{formatMoney(value)}</p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+        {error && <ErrorBanner>{error}</ErrorBanner>}
+        {loading ? (
+          <LoadingState label="جارِ تحميل التقرير…" />
+        ) : (
+          <div className="space-y-8">
+            {visible.map((table) => (
+              <ReportTable key={table.title} {...table} />
+            ))}
+          </div>
+        )}
+      </TabPanel>
     </div>
   );
 }

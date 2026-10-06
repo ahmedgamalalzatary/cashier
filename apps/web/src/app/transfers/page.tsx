@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable, type DataColumn } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
-import { Tabs } from "@/components/ui/tabs";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
 import { formatMoney } from "@/lib/format";
 import {
@@ -68,6 +68,7 @@ function TransfersView() {
   const requestedTab = searchParams.get("tab");
   const requestedNew = searchParams.get("new");
   const requestedInvoice = searchParams.get("invoice");
+  const requestedDirect = searchParams.get("direct") === "1";
   const [stock, setStock] = useState<InventoryStockRow[]>([]);
   const [mainStock, setMainStock] = useState<InventoryStockRow[]>([]);
   const [requests, setRequests] = useState<TransferRequestSummary[]>([]);
@@ -78,7 +79,7 @@ function TransfersView() {
   // The session is already resolved before this page renders, so the role is
   // known here: `direct` is an admin-only capability (T1).
   const [formMode, setFormMode] = useState<FormMode>(() => {
-    if (isAdmin && searchParams.get("direct") === "1") return "direct";
+    if (isAdmin && requestedDirect) return "direct";
     return requestedNew === "request" ? "request" : null;
   });
   const [directInvoiceId] = useState<number | null>(() => {
@@ -111,9 +112,7 @@ function TransfersView() {
       } catch (caught) {
         if (!cancelled)
           setError(
-            caught instanceof Error
-              ? caught.message
-              : "تعذر تحميل التحويلات",
+            caught instanceof Error ? caught.message : "تعذر تحميل التحويلات",
           );
       } finally {
         if (!cancelled) setLoading(false);
@@ -133,11 +132,23 @@ function TransfersView() {
   // are read once as initial state, then cleared so a refresh does not reopen
   // the form.
   useEffect(() => {
-    if (requestedTab !== "history" && !requestedNew && !requestedInvoice) {
+    if (
+      requestedTab !== "history" &&
+      !requestedNew &&
+      !requestedInvoice &&
+      !requestedDirect
+    ) {
       return;
     }
     router.replace("/transfers");
-  }, [requestedInvoice, requestedNew, requestedTab, router, searchParams]);
+  }, [
+    requestedDirect,
+    requestedInvoice,
+    requestedNew,
+    requestedTab,
+    router,
+    searchParams,
+  ]);
 
   function saved() {
     setFormMode(null);
@@ -245,6 +256,7 @@ function TransfersView() {
       {error && <ErrorBanner className="mb-4">{error}</ErrorBanner>}
 
       <Tabs
+        idPrefix="transfers"
         items={[
           {
             id: "requests",
@@ -259,56 +271,58 @@ function TransfersView() {
         className="mb-5"
       />
 
-      {loading ? (
-        <LoadingState label="جارِ تحميل التحويلات…" />
-      ) : tab === "requests" ? (
-        <DataTable
-          caption="طلبات التحويل"
-          rows={requests}
-          rowKey={(request) => request.id}
-          columns={requestColumns}
-          empty={
-            <EmptyState
-              icon={<ClipboardList className="size-8" />}
-              title="لا توجد طلبات تحويل"
-              description="طلبات فريق الكافيه ستظهر هنا للجميع لتجنب تكرار الاحتياج."
-            />
-          }
-          actions={(request) => (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setReviewingId(request.id)}
-            >
-              <Eye className="size-4" /> عرض
-            </Button>
-          )}
-        />
-      ) : (
-        <DataTable
-          caption="سجل التحويلات"
-          rows={transfers}
-          rowKey={(transfer) => transfer.id}
-          columns={transferColumns}
-          empty={
-            <EmptyState
-              icon={<ArrowLeftRight className="size-8" />}
-              title="لم تُنفذ تحويلات بعد"
-              description="التحويلات المعتمدة والمباشرة ستظهر هنا كوثائق مخزنية ثابتة."
-            />
-          }
-          actions={(transfer) => (
-            <Link
-              href={`/transfers/detail?id=${transfer.id}`}
-              aria-label={`عرض التحويل رقم ${transfer.id}`}
-              title="عرض التحويل"
-              className="inline-flex rounded-lg p-2 text-muted transition-colors hover:bg-line/50 hover:text-ink"
-            >
-              <Eye className="size-4" />
-            </Link>
-          )}
-        />
-      )}
+      <TabPanel idPrefix="transfers" active={tab}>
+        {loading ? (
+          <LoadingState label="جارِ تحميل التحويلات…" />
+        ) : tab === "requests" ? (
+          <DataTable
+            caption="طلبات التحويل"
+            rows={requests}
+            rowKey={(request) => request.id}
+            columns={requestColumns}
+            empty={
+              <EmptyState
+                icon={<ClipboardList className="size-8" />}
+                title="لا توجد طلبات تحويل"
+                description="طلبات فريق الكافيه ستظهر هنا للجميع لتجنب تكرار الاحتياج."
+              />
+            }
+            actions={(request) => (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setReviewingId(request.id)}
+              >
+                <Eye className="size-4" /> عرض
+              </Button>
+            )}
+          />
+        ) : (
+          <DataTable
+            caption="سجل التحويلات"
+            rows={transfers}
+            rowKey={(transfer) => transfer.id}
+            columns={transferColumns}
+            empty={
+              <EmptyState
+                icon={<ArrowLeftRight className="size-8" />}
+                title="لم تُنفذ تحويلات بعد"
+                description="التحويلات المعتمدة والمباشرة ستظهر هنا كوثائق مخزنية ثابتة."
+              />
+            }
+            actions={(transfer) => (
+              <Link
+                href={`/transfers/detail?id=${transfer.id}`}
+                aria-label={`عرض التحويل رقم ${transfer.id}`}
+                title="عرض التحويل"
+                className="inline-flex rounded-lg p-2 text-muted transition-colors hover:bg-line/50 hover:text-ink"
+              >
+                <Eye className="size-4" />
+              </Link>
+            )}
+          />
+        )}
+      </TabPanel>
 
       {/* wait for stock: an invoice opened from the URL computes availability once */}
       {formMode && !loading && (
@@ -316,7 +330,9 @@ function TransfersView() {
           mode={formMode}
           items={stock}
           mainStock={mainStock}
-          initialInvoiceId={formMode === "direct" ? (directInvoiceId ?? undefined) : undefined}
+          initialInvoiceId={
+            formMode === "direct" ? (directInvoiceId ?? undefined) : undefined
+          }
           onClose={() => setFormMode(null)}
           onSaved={saved}
         />

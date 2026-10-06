@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import ReportsPage from "../../../src/app/reports/page";
 import { Button } from "../../../src/components/ui/button";
 import { PageHeader } from "../../../src/components/ui/page-header";
+import { Tabs } from "../../../src/components/ui/tabs";
 import { getReports } from "../../../src/services/reports-service";
 import { reportsFixture } from "../../fixtures/reports";
 import { cairoCalendarDate } from "../../../src/lib/cairo-date";
@@ -80,6 +81,10 @@ function action(tree: ReturnType<typeof render>, print: boolean) {
   return nodes(header.props.actions as ReactNode).filter(
     (node) => node.type === Button,
   )[print ? 1 : 0];
+}
+function openTab(tree: ReturnType<typeof render>, id: string) {
+  const tabs = nodes(tree).find((node) => node.type === Tabs)!;
+  (tabs.props.onChange as (tab: string) => void)(id);
 }
 async function settle() {
   await Promise.resolve();
@@ -176,9 +181,7 @@ describe("report loading and printing", () => {
     render();
     hooks.effect!();
     await settle();
-    const tab = nodes(render()).filter((node) => node.type === "button")[6];
-    expect(tab).toBeDefined();
-    (tab.props.onClick as () => void)();
+    openTab(render(), "operations");
     const html = renderToStaticMarkup(render());
     expect(html).toContain("Transfer Staff");
     expect(html).toContain("Prep Staff");
@@ -200,13 +203,11 @@ describe("report loading and printing", () => {
   });
   it("explains current stock and supplier balance snapshots", async () => {
     await loaded();
-    const tree = render();
-    const tabs = nodes(tree).filter((node) => node.type === "button");
-    (tabs[1].props.onClick as () => void)();
+    openTab(render(), "stock");
     expect(renderToStaticMarkup(render())).toContain(
       "لا تمثل رصيد نهاية الفترة",
     );
-    (tabs[5].props.onClick as () => void)();
+    openTab(render(), "suppliers");
     expect(renderToStaticMarkup(render())).toContain(
       "جميع المشتريات والمدفوعات",
     );

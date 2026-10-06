@@ -66,7 +66,13 @@ describe("purchase controller wiring", () => {
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({ id: 44 });
-    expect(service.create).toHaveBeenCalledWith(validBody, 7);
+    expect(service.create).toHaveBeenCalledWith(
+      {
+        ...validBody,
+        lines: validBody.lines.map((line) => ({ ...line, toCafeQuantity: 0 })),
+      },
+      7,
+    );
   });
 
   it("maps duplicate lines to 400, bad ids to 400, and missing invoices to 404", async () => {

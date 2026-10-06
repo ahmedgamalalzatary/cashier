@@ -3,6 +3,7 @@ import { transactionWithDeadlockRetry } from "../../lib/deadlock-retry.js";
 import { HttpError } from "../../middleware/error.js";
 import type { AuthUser } from "@cashier/shared";
 import type { InventoryTransaction } from "../inventory/inventory.service.js";
+import { moveStockToCafe } from "./move-stock.js";
 import type { TransfersRepository } from "./transfers.repository.js";
 import type {
   TransferApprovalInput,
@@ -129,7 +130,7 @@ export class TransfersService {
         );
       }
       await this.validateItems(repo, data.lines);
-      const transferId = await this.moveStock(
+      const transferId = await moveStockToCafe(
         repo,
         inventory,
         {
@@ -158,7 +159,7 @@ export class TransfersService {
   createDirect(data: TransferDirectInput, adminId: number) {
     return this.transactionWithDeadlockRetry(async (repo, inventory) => {
       await this.validateItems(repo, data.lines);
-      return this.moveStock(
+      return moveStockToCafe(
         repo,
         inventory,
         {
@@ -194,56 +195,5 @@ export class TransfersService {
       if (!item.isActive)
         throw new HttpError(409, `الصنف "${item.name}" موقوف`);
     }
-  }
-
-  private async moveStock(
-    repo: TransfersRepository,
-    inventory: Parameters<Parameters<TransfersRepository["transaction"]>[0]>[1],
-    header: {
-      requestId: number | null;
-      createdBy: number;
-      approvedBy: number;
-      notes: string | null;
-    },
-    lines: Array<{ itemId: number; quantity: number }>,
-  ) {
-    const transferId = await repo.createTransfer(header);
-    const occurredAt = new Date();
-    const orderedLines = [...lines].sort((a, b) => a.itemId - b.itemId);
-    for (const line of orderedLines) {
-      const consumed = await inventory.consume({
-        itemId: line.itemId,
-        warehouse: "main",
-        quantity: line.quantity,
-        movementType: "transfer_out",
-        referenceType: "transfer",
-        referenceId: transferId,
-        occurredAt,
-      });
-      for (const allocation of consumed.allocations) {
-        if (allocation.batchId === null) {
-          throw new HttpError(409, "الرصيد المتاح لا يكفي");
-        }
-        const received = await inventory.receive({
-          itemId: line.itemId,
-          warehouse: "cafe",
-          quantity: Number(allocation.quantity),
-          unitCost: allocation.unitCost,
-          movementType: "transfer_in",
-          referenceType: "transfer",
-          referenceId: transferId,
-          occurredAt,
-        });
-        await repo.createTransferLine({
-          transferId,
-          itemId: line.itemId,
-          quantity: allocation.quantity,
-          unitCost: allocation.unitCost,
-          sourceBatchId: allocation.batchId,
-          cafeBatchId: received.batchId,
-        });
-      }
-    }
-    return transferId;
   }
 }

@@ -42,7 +42,7 @@ import { OrderReceipt } from "@/components/pos/order-receipt";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
-import { Tabs } from "@/components/ui/tabs";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import { formatMoney } from "@/lib/format";
 import { catalogRefreshOutcome } from "@/models/catalog-refresh";
 import {
@@ -250,7 +250,10 @@ export default function PosPage() {
     { mainCategoryId, subCategoryId, query },
   );
   const hasOwnOpenShift = isOwnOpenShift(currentShift, user);
-  const quickCash = useMemo(() => quickCashOptions(totals.total), [totals.total]);
+  const quickCash = useMemo(
+    () => quickCashOptions(totals.total),
+    [totals.total],
+  );
   const canComplete =
     hasOwnOpenShift &&
     cart.length > 0 &&
@@ -380,9 +383,7 @@ export default function PosPage() {
           )}
           <div className="flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-sm text-muted">
             <Clock3 className="size-4 text-primary" />
-            <span className="tnum">
-              {recentOrders.length} طلب محفوظ حديثاً
-            </span>
+            <span className="tnum">{recentOrders.length} طلب محفوظ حديثاً</span>
           </div>
         </div>
       </header>
@@ -432,6 +433,7 @@ export default function PosPage() {
               />
             </label>
             <Tabs
+              idPrefix="pos-catalog"
               items={[
                 { id: "local", label: "المنتجات المحلية" },
                 { id: "external", label: "المنتجات الخارجية" },
@@ -443,7 +445,10 @@ export default function PosPage() {
             />
             {catalogSource === "local" ? (
               <>
-                <div className="flex flex-wrap gap-2 mt-3" aria-label="الأقسام الرئيسية">
+                <div
+                  className="flex flex-wrap gap-2 mt-3"
+                  aria-label="الأقسام الرئيسية"
+                >
                   <CategoryButton
                     active={mainCategoryId === null}
                     onClick={() => {
@@ -469,7 +474,10 @@ export default function PosPage() {
                     ))}
                 </div>
                 {mainCategoryId !== null && (
-                  <div className="flex flex-wrap gap-2 mt-3" aria-label="الأقسام الفرعية">
+                  <div
+                    className="flex flex-wrap gap-2 mt-3"
+                    aria-label="الأقسام الفرعية"
+                  >
                     <CategoryButton
                       active={subCategoryId === null}
                       onClick={() => setSubCategoryId(null)}
@@ -515,87 +523,91 @@ export default function PosPage() {
             )}
           </div>
 
-          {loading ? (
-            <div className="sheet p-12 text-center text-sm text-muted">
-              جارِ تحميل قائمة البيع…
-            </div>
-          ) : (catalogSource === "local"
-              ? visibleLocalProducts.length
-              : visibleProducts.length) === 0 ? (
-            <div className="empty-state">
-              <ReceiptText className="mx-auto mb-3 size-8 text-muted" />
-              <p className="font-medium">لا توجد منتجات جاهزة للبيع</p>
-              <p className="mt-1 text-sm text-muted">
-                المنتجات غير المتاحة أو غير المكتملة لا تظهر هنا.
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
-              {catalogSource === "local"
-                ? visibleLocalProducts.map((product) => (
-                    <button
-                      type="button"
-                      key={`item:${product.id}`}
-                      // Stock badges are informational only (T4): the tile
-                      // stays clickable whatever the balance is.
-                      onClick={() => {
-                        setCart((current) =>
-                          addLocalSelection(current, product),
-                        );
-                        setError("");
-                      }}
-                      className="flex min-h-[6.5rem] flex-col justify-between rounded-2xl border border-line bg-surface p-4 text-start transition hover:border-primary hover:shadow-md"
-                    >
-                      <div>
-                        <p className="font-bold">{product.name}</p>
-                        <p className="text-xs text-muted">{product.stockUnit}</p>
-                        {(() => {
-                          const stock = cafeStock.get(product.id);
-                          if (!stock) return null;
-                          const qty = Number(stock.quantity);
-                          return (
-                            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                              <span className="tnum">
-                                المتاح:{" "}
-                                {qty.toLocaleString("ar-EG", {
-                                  maximumFractionDigits: 3,
-                                })}{" "}
-                                {stock.stockUnit}
-                              </span>
-                              {qty <= 0 ? (
-                                <Badge tone="danger">نفد من الكافيه</Badge>
-                              ) : stock.isLowStock ? (
-                                <Badge tone="danger">منخفض</Badge>
-                              ) : null}
-                            </p>
+          <TabPanel idPrefix="pos-catalog" active={catalogSource}>
+            {loading ? (
+              <div className="sheet p-12 text-center text-sm text-muted">
+                جارِ تحميل قائمة البيع…
+              </div>
+            ) : (catalogSource === "local"
+                ? visibleLocalProducts.length
+                : visibleProducts.length) === 0 ? (
+              <div className="empty-state">
+                <ReceiptText className="mx-auto mb-3 size-8 text-muted" />
+                <p className="font-medium">لا توجد منتجات جاهزة للبيع</p>
+                <p className="mt-1 text-sm text-muted">
+                  المنتجات غير المتاحة أو غير المكتملة لا تظهر هنا.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+                {catalogSource === "local"
+                  ? visibleLocalProducts.map((product) => (
+                      <button
+                        type="button"
+                        key={`item:${product.id}`}
+                        // Stock badges are informational only (T4): the tile
+                        // stays clickable whatever the balance is.
+                        onClick={() => {
+                          setCart((current) =>
+                            addLocalSelection(current, product),
                           );
-                        })()}
-                      </div>
-                      <p className="mt-3 inline-flex w-fit rounded-lg bg-primary/10 px-2.5 py-1 font-bold text-primary">
-                        {formatMoney(product.sellingPrice)}
-                      </p>
-                    </button>
-                  ))
-                : visibleProducts.map((product) => (
-                    <button
-                      type="button"
-                      key={product.externalId}
-                      onClick={() => setSelecting(product)}
-                      className="flex min-h-[6.5rem] flex-col justify-between rounded-2xl border border-line bg-surface p-4 text-start transition hover:border-primary hover:shadow-md"
-                    >
-                      <div>
-                        <p className="font-bold">{product.nameAr}</p>
-                        <p className="text-xs text-muted" dir="ltr">
-                          {product.nameEn}
+                          setError("");
+                        }}
+                        className="flex min-h-[6.5rem] flex-col justify-between rounded-2xl border border-line bg-surface p-4 text-start transition hover:border-primary hover:shadow-md"
+                      >
+                        <div>
+                          <p className="font-bold">{product.name}</p>
+                          <p className="text-xs text-muted">
+                            {product.stockUnit}
+                          </p>
+                          {(() => {
+                            const stock = cafeStock.get(product.id);
+                            if (!stock) return null;
+                            const qty = Number(stock.quantity);
+                            return (
+                              <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+                                <span className="tnum">
+                                  المتاح:{" "}
+                                  {qty.toLocaleString("ar-EG", {
+                                    maximumFractionDigits: 3,
+                                  })}{" "}
+                                  {stock.stockUnit}
+                                </span>
+                                {qty <= 0 ? (
+                                  <Badge tone="danger">نفد من الكافيه</Badge>
+                                ) : stock.isLowStock ? (
+                                  <Badge tone="danger">منخفض</Badge>
+                                ) : null}
+                              </p>
+                            );
+                          })()}
+                        </div>
+                        <p className="mt-3 inline-flex w-fit rounded-lg bg-primary/10 px-2.5 py-1 font-bold text-primary">
+                          {formatMoney(product.sellingPrice)}
                         </p>
-                      </div>
-                      <p className="mt-3 inline-flex w-fit rounded-lg bg-primary/10 px-2.5 py-1 font-bold text-primary">
-                        {formatMoney(catalogTilePrice(product, nowMs))}
-                      </p>
-                    </button>
-                  ))}
-            </div>
-          )}
+                      </button>
+                    ))
+                  : visibleProducts.map((product) => (
+                      <button
+                        type="button"
+                        key={product.externalId}
+                        onClick={() => setSelecting(product)}
+                        className="flex min-h-[6.5rem] flex-col justify-between rounded-2xl border border-line bg-surface p-4 text-start transition hover:border-primary hover:shadow-md"
+                      >
+                        <div>
+                          <p className="font-bold">{product.nameAr}</p>
+                          <p className="text-xs text-muted" dir="ltr">
+                            {product.nameEn}
+                          </p>
+                        </div>
+                        <p className="mt-3 inline-flex w-fit rounded-lg bg-primary/10 px-2.5 py-1 font-bold text-primary">
+                          {formatMoney(catalogTilePrice(product, nowMs))}
+                        </p>
+                      </button>
+                    ))}
+              </div>
+            )}
+          </TabPanel>
         </section>
 
         <aside className="pos-ticket overflow-hidden rounded-2xl border border-line bg-surface xl:sticky xl:top-6">
@@ -673,7 +685,9 @@ export default function PosPage() {
                 min="0"
                 step="0.01"
                 value={cashReceived || ""}
-                onChange={(event) => setCashReceived(Number(event.target.value))}
+                onChange={(event) =>
+                  setCashReceived(Number(event.target.value))
+                }
                 placeholder="النقد المستلم"
                 className="input tnum"
               />
@@ -1003,7 +1017,9 @@ function CartRow({
           </p>
         </div>
         <span className="flex items-start gap-1">
-          <span className="tnum font-bold">{formatMoney(cartLineTotal(line))}</span>
+          <span className="tnum font-bold">
+            {formatMoney(cartLineTotal(line))}
+          </span>
           <button
             type="button"
             onClick={onRemove}

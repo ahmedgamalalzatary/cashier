@@ -43,10 +43,8 @@ describe("orders feature boundaries", () => {
 
   it("separates cashier and online orders into labelled tab panels", () => {
     const page = read("src/app/orders/page.tsx");
-    expect(page).toContain("OrdersTabs");
-    expect(page).toContain('id="orders-cashier-panel"');
-    expect(page).toContain('id="orders-online-panel"');
-    expect(page).toContain("ExternalOrdersPanel");
+    expect(page).toContain('idPrefix="orders"');
+    expect(page).toMatch(/<TabPanel idPrefix="orders"[\s\S]*?ExternalOrdersPanel[\s\S]*?<\/TabPanel>/);
   });
 
   it("loads server-filtered and paginated online orders through dedicated boundaries", () => {

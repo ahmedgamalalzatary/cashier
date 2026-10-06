@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { DataTable, type DataColumn } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { Stat, StatStrip } from "@/components/ui/stat";
-import { Tabs } from "@/components/ui/tabs";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
 import { cairoCalendarDate } from "@/lib/cairo-date";
 import { formatMoney } from "@/lib/format";
@@ -189,6 +189,7 @@ export default function OrdersPage() {
       />
 
       <Tabs
+        idPrefix="orders"
         items={[
           { id: "cashier", label: "طلبات الكاشير" },
           { id: "online", label: "طلبات الأونلاين" },
@@ -199,103 +200,105 @@ export default function OrdersPage() {
         className="mb-5"
       />
 
-      <section hidden={activeTab !== "cashier"}>
-        <StatStrip className="mb-5">
-          <Stat
-            icon={<ReceiptText className="size-4" />}
-            label="عدد الطلبات المعروضة"
-            value={totals.countLabel}
-          />
-          <Stat
-            icon={<Coins className="size-4" />}
-            label="إجمالي المبيعات"
-            value={totals.sales}
-          />
-          <Stat
-            icon={<Scissors className="size-4" />}
-            label="إجمالي الخصومات"
-            value={totals.discounts}
-          />
-          <Stat
-            icon={<TriangleAlert className="size-4" />}
-            label="طلبات برصيد سالب"
-            value={String(flagged)}
-            tone={flagged > 0 ? "danger" : "default"}
-          />
-        </StatStrip>
-
-        {error && <ErrorBanner className="mb-4">{error}</ErrorBanner>}
-
-        <div className="toolbar mb-4">
-          <label className="relative min-w-[14rem] flex-1">
-            <Search className="pointer-events-none absolute inset-y-0 start-3 my-auto size-4 text-muted" />
-            <input
-              aria-label="البحث عن طلب"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="ابحث برقم الطلب أو اسم الكاشير"
-              className="input ps-9"
+      <TabPanel idPrefix="orders" active={activeTab}>
+        <section hidden={activeTab !== "cashier"}>
+          <StatStrip className="mb-5">
+            <Stat
+              icon={<ReceiptText className="size-4" />}
+              label="عدد الطلبات المعروضة"
+              value={totals.countLabel}
             />
-          </label>
-          <select
-            aria-label="تصفية حسب الكاشير"
-            value={cashierId}
-            onChange={(event) => setCashierId(event.target.value)}
-            className="input w-auto"
-          >
-            <option value="">كل الكاشيرية</option>
-            {cashiers.map((cashier) => (
-              <option key={cashier.id} value={cashier.id}>
-                {cashier.name}
-              </option>
-            ))}
-          </select>
-          <div className="flex gap-2">
-            <input
-              aria-label="تصفية حسب اليوم"
-              type="date"
-              value={day}
-              onChange={(event) => setDay(event.target.value)}
+            <Stat
+              icon={<Coins className="size-4" />}
+              label="إجمالي المبيعات"
+              value={totals.sales}
+            />
+            <Stat
+              icon={<Scissors className="size-4" />}
+              label="إجمالي الخصومات"
+              value={totals.discounts}
+            />
+            <Stat
+              icon={<TriangleAlert className="size-4" />}
+              label="طلبات برصيد سالب"
+              value={String(flagged)}
+              tone={flagged > 0 ? "danger" : "default"}
+            />
+          </StatStrip>
+
+          {error && <ErrorBanner className="mb-4">{error}</ErrorBanner>}
+
+          <div className="toolbar mb-4">
+            <label className="relative min-w-[14rem] flex-1">
+              <Search className="pointer-events-none absolute inset-y-0 start-3 my-auto size-4 text-muted" />
+              <input
+                aria-label="البحث عن طلب"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="ابحث برقم الطلب أو اسم الكاشير"
+                className="input ps-9"
+              />
+            </label>
+            <select
+              aria-label="تصفية حسب الكاشير"
+              value={cashierId}
+              onChange={(event) => setCashierId(event.target.value)}
               className="input w-auto"
-            />
-            <button
-              type="button"
-              onClick={() => setDay(day ? "" : cairoCalendarDate())}
-              className="shrink-0 rounded-lg border border-line px-3 text-sm text-muted transition-colors hover:border-primary hover:text-primary"
             >
-              {day ? "كل الأيام" : "اليوم"}
-            </button>
+              <option value="">كل الكاشيرية</option>
+              {cashiers.map((cashier) => (
+                <option key={cashier.id} value={cashier.id}>
+                  {cashier.name}
+                </option>
+              ))}
+            </select>
+            <div className="flex gap-2">
+              <input
+                aria-label="تصفية حسب اليوم"
+                type="date"
+                value={day}
+                onChange={(event) => setDay(event.target.value)}
+                className="input w-auto"
+              />
+              <button
+                type="button"
+                onClick={() => setDay(day ? "" : cairoCalendarDate())}
+                className="shrink-0 rounded-lg border border-line px-3 text-sm text-muted transition-colors hover:border-primary hover:text-primary"
+              >
+                {day ? "كل الأيام" : "اليوم"}
+              </button>
+            </div>
           </div>
-        </div>
 
-        {loading ? (
-          <LoadingState label="جارِ تحميل سجل الطلبات…" />
-        ) : (
-          <DataTable
-            caption="سجل طلبات الكاشير"
-            rows={visibleRows}
-            rowKey={(row) => row.id}
-            columns={columns}
-            empty={
-              orders.length === 0 ? (
-                <EmptyState
-                  icon={<ReceiptText className="size-8" />}
-                  title="لم يُسجَّل أي طلب بعد"
-                  description="أول عملية بيع من نقطة البيع تظهر هنا فوراً."
-                />
-              ) : (
-                <p className="empty-state text-sm text-muted">
-                  لا توجد طلبات تطابق عوامل التصفية الحالية.
-                </p>
-              )
-            }
-          />
-        )}
-      </section>
+          {loading ? (
+            <LoadingState label="جارِ تحميل سجل الطلبات…" />
+          ) : (
+            <DataTable
+              caption="سجل طلبات الكاشير"
+              rows={visibleRows}
+              rowKey={(row) => row.id}
+              columns={columns}
+              empty={
+                orders.length === 0 ? (
+                  <EmptyState
+                    icon={<ReceiptText className="size-8" />}
+                    title="لم يُسجَّل أي طلب بعد"
+                    description="أول عملية بيع من نقطة البيع تظهر هنا فوراً."
+                  />
+                ) : (
+                  <p className="empty-state text-sm text-muted">
+                    لا توجد طلبات تطابق عوامل التصفية الحالية.
+                  </p>
+                )
+              }
+            />
+          )}
+        </section>
 
-      <section hidden={activeTab !== "online"}>
-        <ExternalOrdersPanel />
-      </section>
+        <section hidden={activeTab !== "online"}>
+          <ExternalOrdersPanel />
+        </section>
+      </TabPanel>
     </div>
   );
 }

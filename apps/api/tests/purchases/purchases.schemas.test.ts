@@ -38,6 +38,20 @@ describe("purchase schema", () => {
     expect(parsed.notes).toBeNull();
   });
 
+  it("accepts an optional to-cafe quantity and rejects negative or over-precise ones", () => {
+    const parse = (toCafeQuantity: unknown) =>
+      purchaseInput.safeParse({
+        ...validPurchase,
+        lines: [{ ...validLine, toCafeQuantity }],
+      });
+
+    expect(purchaseInput.parse(validPurchase).lines[0].toCafeQuantity).toBe(0);
+    expect(parse(1.5).success).toBe(true);
+    expect(parse(0).success).toBe(true);
+    expect(parse(-1).success).toBe(false);
+    expect(parse(0.0001).success).toBe(false);
+  });
+
   it("rejects a duplicate item in the lines", () => {
     const result = purchaseInput.safeParse({
       ...validPurchase,

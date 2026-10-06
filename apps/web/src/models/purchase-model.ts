@@ -7,6 +7,8 @@ export type PurchaseLineForm = {
   quantity: string;
   unitMode: PurchaseUnitMode;
   unitPrice: string;
+  // stock-unit amount sent to the cafe with the invoice; blank means none
+  toCafeQuantity?: string;
 };
 
 const BIGINT_ZERO = BigInt(0);
@@ -77,6 +79,7 @@ export function purchaseRequestBody(input: {
       quantity: Number(line.quantity),
       unitMode: line.unitMode,
       unitPrice: Number(line.unitPrice),
+      toCafeQuantity: Number(line.toCafeQuantity ?? "") || 0,
     })),
   };
 }

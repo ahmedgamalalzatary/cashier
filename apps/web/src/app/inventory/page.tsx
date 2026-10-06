@@ -29,7 +29,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { Stat, StatStrip } from "@/components/ui/stat";
-import { Tabs } from "@/components/ui/tabs";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
 import { ItemFormModal } from "@/components/warehouse/item-form-modal";
 import { formatItemCode, formatMoney, sumDecimalValues } from "@/lib/format";
@@ -104,7 +104,12 @@ function InventoryView() {
     let cancelled = false;
     // Items, categories and main stock are admin-only APIs: one failing call
     // in the batch would break the whole page, so cashiers load cafe stock only.
-    type Loaded = [Item[], Category[], InventoryStockRow[], InventoryStockRow[]];
+    type Loaded = [
+      Item[],
+      Category[],
+      InventoryStockRow[],
+      InventoryStockRow[],
+    ];
     const load: Promise<Loaded> = isAdmin
       ? Promise.all([
           listItems(),
@@ -112,7 +117,12 @@ function InventoryView() {
           getMainWarehouseStock(),
           getCafeWarehouseStock(),
         ])
-      : getCafeWarehouseStock().then((cafeRows): Loaded => [[], [], [], cafeRows]);
+      : getCafeWarehouseStock().then((cafeRows): Loaded => [
+          [],
+          [],
+          [],
+          cafeRows,
+        ]);
     load
       .then(([itemRows, categoryRows, mainRows, cafeRows]) => {
         if (cancelled) return;
@@ -307,8 +317,7 @@ function InventoryView() {
             rows={filterStockRows(cafeStock, { query, state }, categories)}
             rowKey={(row) => row.itemId}
             columns={columns.filter(
-              (column) =>
-                !["type", "minimum", "value"].includes(column.key),
+              (column) => !["type", "minimum", "value"].includes(column.key),
             )}
             empty={
               <EmptyState
@@ -341,6 +350,7 @@ function InventoryView() {
       />
 
       <Tabs
+        idPrefix="inventory"
         items={[
           { id: "main", label: "المخزن الرئيسي" },
           { id: "cafe", label: "مخزن الكافيه" },
@@ -421,87 +431,91 @@ function InventoryView() {
         </select>
       </div>
 
-      {loading ? (
-        <LoadingState label="جارِ تحميل دفتر المخزن…" />
-      ) : (
-        <DataTable
-          caption="أرصدة المخزون"
-          rows={visibleRows}
-          rowKey={(row) => row.itemId}
-          rowClassName={(row) => (row.isActive ? undefined : "opacity-55")}
-          columns={columns}
-          empty={
-            stock.length === 0 ? (
-              <EmptyState
-                icon={<Boxes className="size-8" />}
-                title="المخزن لا يحتوي على أصناف بعد"
-                description="أضف أول صنف، ثم سجّل فاتورة شراء لتعبئة رصيده."
-                action={
-                  <Button
+      <TabPanel idPrefix="inventory" active={tab}>
+        {loading ? (
+          <LoadingState label="جارِ تحميل دفتر المخزن…" />
+        ) : (
+          <DataTable
+            caption="أرصدة المخزون"
+            rows={visibleRows}
+            rowKey={(row) => row.itemId}
+            rowClassName={(row) => (row.isActive ? undefined : "opacity-55")}
+            columns={columns}
+            empty={
+              stock.length === 0 ? (
+                <EmptyState
+                  icon={<Boxes className="size-8" />}
+                  title="المخزن لا يحتوي على أصناف بعد"
+                  description="أضف أول صنف، ثم سجّل فاتورة شراء لتعبئة رصيده."
+                  action={
+                    <Button
+                      onClick={() => {
+                        setEditing(null);
+                        setFormOpen(true);
+                      }}
+                    >
+                      <Plus className="size-4" /> صنف جديد
+                    </Button>
+                  }
+                />
+              ) : (
+                <p className="empty-state text-sm text-muted">
+                  لا توجد أصناف تطابق عوامل التصفية الحالية.
+                </p>
+              )
+            }
+            actions={(row) => {
+              const item = items.find(
+                (candidate) => candidate.id === row.itemId,
+              );
+              if (!item) return null;
+              return (
+                <div className="flex items-center gap-1">
+                  <IconButton
+                    title="تسوية الرصيد"
                     onClick={() => {
-                      setEditing(null);
+                      setAdjustQty("");
+                      setAdjustNote("");
+                      setAdjustingError("");
+                      setAdjusting(row);
+                    }}
+                  >
+                    <Scale className="size-4" />
+                  </IconButton>
+                  <IconButton
+                    title="تعديل"
+                    onClick={() => {
+                      setEditing(item);
                       setFormOpen(true);
                     }}
                   >
-                    <Plus className="size-4" /> صنف جديد
-                  </Button>
-                }
-              />
-            ) : (
-              <p className="empty-state text-sm text-muted">
-                لا توجد أصناف تطابق عوامل التصفية الحالية.
-              </p>
-            )
-          }
-          actions={(row) => {
-            const item = items.find((candidate) => candidate.id === row.itemId);
-            if (!item) return null;
-            return (
-              <div className="flex items-center gap-1">
-                <IconButton
-                  title="تسوية الرصيد"
-                  onClick={() => {
-                    setAdjustQty("");
-                    setAdjustNote("");
-                    setAdjustingError("");
-                    setAdjusting(row);
-                  }}
-                >
-                  <Scale className="size-4" />
-                </IconButton>
-                <IconButton
-                  title="تعديل"
-                  onClick={() => {
-                    setEditing(item);
-                    setFormOpen(true);
-                  }}
-                >
-                  <Pencil className="size-4" />
-                </IconButton>
-                {item.isActive ? (
-                  <IconButton
-                    title="إيقاف"
-                    danger
-                    onClick={() => {
-                      setConfirmingError("");
-                      setConfirming(item);
-                    }}
-                  >
-                    <Ban className="size-4" />
+                    <Pencil className="size-4" />
                   </IconButton>
-                ) : (
-                  <IconButton
-                    title="إعادة التفعيل"
-                    onClick={() => reactivate(item)}
-                  >
-                    <RotateCcw className="size-4" />
-                  </IconButton>
-                )}
-              </div>
-            );
-          }}
-        />
-      )}
+                  {item.isActive ? (
+                    <IconButton
+                      title="إيقاف"
+                      danger
+                      onClick={() => {
+                        setConfirmingError("");
+                        setConfirming(item);
+                      }}
+                    >
+                      <Ban className="size-4" />
+                    </IconButton>
+                  ) : (
+                    <IconButton
+                      title="إعادة التفعيل"
+                      onClick={() => reactivate(item)}
+                    >
+                      <RotateCcw className="size-4" />
+                    </IconButton>
+                  )}
+                </div>
+              );
+            }}
+          />
+        )}
+      </TabPanel>
 
       {formOpen && (
         <ItemFormModal
@@ -577,7 +591,10 @@ function InventoryView() {
               >
                 إلغاء
               </Button>
-              <Button onClick={() => void saveAdjustment()} disabled={adjustingBusy}>
+              <Button
+                onClick={() => void saveAdjustment()}
+                disabled={adjustingBusy}
+              >
                 {adjustingBusy ? "جارِ الحفظ…" : "حفظ التسوية"}
               </Button>
             </div>

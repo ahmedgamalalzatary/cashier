@@ -1,6 +1,7 @@
 import { requestFingerprint as hashRequest } from '../../lib/request-fingerprint.js';
 import { transactionWithDeadlockRetry } from '../../lib/deadlock-retry.js';
 import { HttpError } from '../../middleware/error.js';
+import { moveStockToCafe } from '../transfers/move-stock.js';
 import type { PurchasesRepository } from './purchases.repository.js';
 import type { PurchaseInput } from './purchases.schemas.js';
 
@@ -31,7 +32,12 @@ const requestFingerprint = (data: PurchaseInput) =>
     purchasedAt: data.purchasedAt,
     paidAmount: data.paidAmount,
     notes: data.notes ?? null,
-    lines: [...data.lines].sort((a, b) => a.itemId - b.itemId),
+    // a zero to-cafe amount hashes like a line without one
+    lines: [...data.lines]
+      .sort((a, b) => a.itemId - b.itemId)
+      .map(({ toCafeQuantity, ...line }) =>
+        toCafeQuantity ? { ...line, toCafeQuantity } : line,
+      ),
   });
 const MAX_INVOICE_CENTS = 999_999_999_999n;
 const MAX_STOCK_QUANTITY_MILLI = 99_999_999_999_999n;
@@ -44,7 +50,7 @@ export class PurchasesService {
     const fingerprint = requestFingerprint(data);
     try {
       return await transactionWithDeadlockRetry(() =>
-        this.repo.transaction(async (repo, inventory) => {
+        this.repo.transaction(async (repo, inventory, transfers) => {
         const replay = await repo.findByClientRequestId(data.clientRequestId);
         if (replay) {
           this.assertReplay(replay, fingerprint, createdBy);
@@ -97,8 +103,16 @@ export class PurchasesService {
         if (unitCost > MAX_UNIT_COST_SCALED) {
           throw new HttpError(400, 'تكلفة وحدة المخزون خارج النطاق المسموح');
         }
+        const toCafeQuantity = numberToScaled(line.toCafeQuantity ?? 0, 3);
+        if (toCafeQuantity > stockQuantity) {
+          throw new HttpError(
+            400,
+            'الكمية المحولة للكافيه أكبر من الكمية المستلمة',
+          );
+        }
         return {
           ...line,
+          toCafeQuantity,
           quantityText: formatScaled(enteredQuantity, 3),
           stockQuantityText: formatScaled(stockQuantity, 3),
           unitPriceText: formatScaled(unitPrice, 2),
@@ -165,6 +179,25 @@ export class PurchasesService {
           amount: formatScaled(paidAmount, 2),
           paidAt: data.purchasedAt,
         });
+      }
+      const cafeLines = stockLines
+        .filter((line) => line.toCafeQuantity > 0n)
+        .map((line) => ({
+          itemId: line.itemId,
+          quantity: Number(formatScaled(line.toCafeQuantity, 3)),
+        }));
+      if (cafeLines.length > 0) {
+        await moveStockToCafe(
+          transfers,
+          inventory,
+          {
+            requestId: null,
+            createdBy,
+            approvedBy: createdBy,
+            notes: `تحويل مع فاتورة الشراء #${invoiceId}`,
+          },
+          cafeLines,
+        );
       }
       return invoiceId;
         }),

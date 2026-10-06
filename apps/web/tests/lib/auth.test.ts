@@ -186,11 +186,11 @@ describe("login redirects", () => {
     expect(postLoginPath("?next=https%3A%2F%2Fevil.example", "admin")).toBe(
       "/",
     );
-    expect(postLoginPath("?next=%2Fwarehouse", "cashier")).toBe("/");
+    expect(postLoginPath("?next=%2Fsuppliers", "cashier")).toBe("/");
   });
 
   it("derives every protected route from the shared navigation config", () => {
-    expect(ADMIN_PATHS).toContain("/warehouse");
+    expect(ADMIN_PATHS).toContain("/suppliers");
     expect(ADMIN_PATHS).toContain("/categories");
     expect(ADMIN_PATHS).toContain("/users");
     expect(ADMIN_PATHS).toContain("/recipes");

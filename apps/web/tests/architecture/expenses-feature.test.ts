@@ -20,12 +20,20 @@ describe("expenses feature", () => {
     expect(service).toContain('method: "PATCH"');
   });
 
-  it("clears the form after a successful reload, not before", () => {
-    const page = read("app/expenses/page.tsx");
-    const reload = page.indexOf("await load()");
-    const clear = page.indexOf('setAmount("")');
+  it("clears the form once the expense is created", () => {
+    const form = read("components/expenses/expense-entry-form.tsx");
+    const created = form.indexOf("await createExpense(");
+    const clear = form.indexOf('setAmount("")');
 
-    expect(reload).toBeGreaterThan(-1);
-    expect(clear).toBeGreaterThan(reload);
+    expect(created).toBeGreaterThan(-1);
+    expect(clear).toBeGreaterThan(created);
+  });
+
+  it("reports a refresh failure after a saved expense instead of hiding it", () => {
+    const page = read("app/expenses/page.tsx");
+    expect(page).not.toContain("load().catch(() => undefined)");
+    expect(page).toMatch(
+      /onSaved=\{[\s\S]*?load\(\)\.catch\([\s\S]*?تم تسجيل المصروف، لكن تعذر تحديث البيانات/,
+    );
   });
 });

@@ -28,6 +28,7 @@ function PurchaseDetailView() {
   const [invoice, setInvoice] = useState<PurchaseInvoiceDetail | null>(null);
   const [paying, setPaying] = useState<Supplier | null>(null);
   const [paymentError, setPaymentError] = useState("");
+  const [paymentSaved, setPaymentSaved] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -79,14 +80,14 @@ function PurchaseDetailView() {
               تحويل إلى الكافيه
             </Link>
             <Button variant="secondary" onClick={() => void openPayment()}>
-              تسجيل دفعة للمورد
+              دفعة على حساب المورد
             </Button>
             <Badge tone={due === 0 ? "success" : paid > 0 ? "neutral" : "danger"}>
               {due === 0
-                ? "مدفوع بالكامل"
+                ? "مدفوعة بالكامل عند الشراء"
                 : paid > 0
-                  ? "دفعة جزئية"
-                  : "آجل بالكامل"}
+                  ? "دفعة جزئية عند الشراء"
+                  : "آجلة بالكامل عند الشراء"}
             </Badge>
           </>
         }
@@ -100,9 +101,20 @@ function PurchaseDetailView() {
           onClose={() => setPaying(null)}
           onSaved={() => {
             setPaying(null);
-            void load();
+            setPaymentSaved(true);
           }}
         />
+      )}
+      {paymentSaved && (
+        <p className="mb-4 rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm">
+          سُجّلت الدفعة على حساب المورد، ولا تغيّر بيانات هذه الفاتورة.{" "}
+          <Link
+            href={`/suppliers/statement?id=${invoice.supplierId}`}
+            className="font-medium text-primary underline"
+          >
+            عرض كشف حساب المورد
+          </Link>
+        </p>
       )}
 
       <StatStrip className="mb-5">
@@ -166,7 +178,7 @@ function PurchaseDetailView() {
             </dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-sidebar-ink">المدفوع</dt>
+            <dt className="text-sidebar-ink">المدفوع عند الشراء</dt>
             <dd className="tnum text-success">
               {formatMoney(invoice.paidAmount)}
             </dd>

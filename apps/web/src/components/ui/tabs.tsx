@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type KeyboardEvent } from "react";
+import { useRef, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 export type TabItem<T extends string> = {
@@ -9,14 +9,22 @@ export type TabItem<T extends string> = {
   badge?: number;
 };
 
-/** The single tab pattern: a segmented control. Arrow keys are RTL-aware. */
+const tabId = (idPrefix: string, id: string) => `${idPrefix}-${id}-tab`;
+const panelId = (idPrefix: string) => `${idPrefix}-panel`;
+
+/**
+ * The single tab pattern: a segmented control. Arrow keys are RTL-aware.
+ * Pair it with a <TabPanel> using the same idPrefix (unique per page).
+ */
 export function Tabs<T extends string>({
+  idPrefix,
   items,
   active,
   onChange,
   ariaLabel,
   className,
 }: {
+  idPrefix: string;
   items: ReadonlyArray<TabItem<T>>;
   active: T;
   onChange: (tab: T) => void;
@@ -50,10 +58,11 @@ export function Tabs<T extends string>({
           ref={(node) => {
             refs.current[index] = node;
           }}
-          id={`tab-${item.id}`}
+          id={tabId(idPrefix, item.id)}
           type="button"
           role="tab"
           aria-selected={active === item.id}
+          aria-controls={active === item.id ? panelId(idPrefix) : undefined}
           tabIndex={active === item.id ? 0 : -1}
           data-active={active === item.id}
           onClick={() => onChange(item.id)}
@@ -68,6 +77,30 @@ export function Tabs<T extends string>({
           )}
         </button>
       ))}
+    </div>
+  );
+}
+
+/** The content area for the selected tab of the <Tabs> with the same idPrefix. */
+export function TabPanel({
+  idPrefix,
+  active,
+  children,
+  className,
+}: {
+  idPrefix: string;
+  active: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      role="tabpanel"
+      id={panelId(idPrefix)}
+      aria-labelledby={tabId(idPrefix, active)}
+      className={className}
+    >
+      {children}
     </div>
   );
 }

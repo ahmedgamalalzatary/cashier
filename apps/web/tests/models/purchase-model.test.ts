@@ -65,6 +65,23 @@ describe("purchase form model", () => {
     ).toBe(4.02);
   });
 
+  it("sends each line's to-cafe amount, blank as zero", () => {
+    const body = purchaseRequestBody({
+      clientRequestId: "11111111-1111-4111-8111-111111111111",
+      supplierId: "7",
+      invoiceNumber: "",
+      purchasedAt: "2026-07-19",
+      paidAmount: 0,
+      notes: "",
+      lines: [
+        { ...newPurchaseLine(1), itemId: "4", quantity: "2", unitPrice: "1", toCafeQuantity: "1.5" },
+        { ...newPurchaseLine(2), itemId: "5", quantity: "1", unitPrice: "1" },
+      ],
+    });
+
+    expect(body.lines.map((line) => line.toCafeQuantity)).toEqual([1.5, 0]);
+  });
+
   it("sums invoice lines and builds the API request", () => {
     const first = {
       ...newPurchaseLine(1),

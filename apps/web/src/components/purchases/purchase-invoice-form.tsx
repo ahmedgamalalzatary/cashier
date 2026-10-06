@@ -144,6 +144,8 @@ export function PurchaseInvoiceForm() {
     updateLine(line.key, {
       itemId,
       unitMode: item?.purchaseUnit ? "purchase" : "stock",
+      // the amount was in the previous item's unit
+      toCafeQuantity: "",
     });
   }
 
@@ -288,7 +290,7 @@ export function PurchaseInvoiceForm() {
                         <Trash2 className="size-4" />
                       </button>
                     </div>
-                    <div className="grid gap-3 lg:grid-cols-[minmax(12rem,1.5fr)_9rem_8rem_9rem]">
+                    <div className="grid gap-3 lg:grid-cols-[minmax(12rem,1.5fr)_9rem_8rem_9rem_9rem]">
                       <EntityPicker
                         label="الصنف"
                         value={line.itemId}
@@ -357,6 +359,22 @@ export function PurchaseInvoiceForm() {
                         required
                         dir="ltr"
                       />
+                      <Field
+                        label={`للكافيه الآن (${item?.stockUnit ?? "وحدة المخزون"})`}
+                        type="number"
+                        min="0"
+                        max={item ? amounts.stockQuantity : undefined}
+                        step="0.001"
+                        placeholder="0"
+                        value={line.toCafeQuantity ?? ""}
+                        onChange={(event) =>
+                          updateLine(line.key, {
+                            toCafeQuantity: event.target.value,
+                          })
+                        }
+                        disabled={!item}
+                        dir="ltr"
+                      />
                     </div>
                     {item && (
                       <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
@@ -369,6 +387,21 @@ export function PurchaseInvoiceForm() {
                             {item.stockUnit}
                           </b>
                         </span>
+                        {Number(line.toCafeQuantity) > 0 && (
+                          <span>
+                            يبقى في الرئيسي:{" "}
+                            <b className="tnum text-ink">
+                              {Math.max(
+                                0,
+                                amounts.stockQuantity -
+                                  Number(line.toCafeQuantity),
+                              ).toLocaleString("ar-EG", {
+                                maximumFractionDigits: 3,
+                              })}{" "}
+                              {item.stockUnit}
+                            </b>
+                          </span>
+                        )}
                         <span>
                           إجمالي السطر:{" "}
                           <b className="tnum text-ink">
@@ -460,7 +493,7 @@ export function PurchaseInvoiceForm() {
             </Button>
             <p className="text-center text-xs leading-5 text-muted">
               بعد التأكيد لا يمكن تعديل الفاتورة؛ تضاف الكميات فوراً إلى المخزن
-              الرئيسي.
+              الرئيسي، وما حددته للكافيه يُحوَّل إليه في نفس الحفظ.
             </p>
           </div>
         </aside>

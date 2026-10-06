@@ -17,6 +17,7 @@ export type PurchaseCreateBody = {
     quantity: number;
     unitMode: PurchaseUnitMode;
     unitPrice: number;
+    toCafeQuantity: number;
   }>;
 };
 

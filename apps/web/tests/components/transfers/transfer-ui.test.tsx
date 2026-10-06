@@ -2,42 +2,16 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Modal } from "../../../src/components/ui/modal";
-import {
-  CafeHeaderActions,
-  CafeTabs,
-} from "../../../src/components/transfers/cafe-controls";
 
 describe("transfer UI accessibility", () => {
   it("shows direct transfers only to admins", () => {
-    const cashier = renderToStaticMarkup(
-      <CafeHeaderActions
-        isAdmin={false}
-        onRequest={() => undefined}
-        onDirect={() => undefined}
-      />,
-    );
-    const admin = renderToStaticMarkup(
-      <CafeHeaderActions
-        isAdmin
-        onRequest={() => undefined}
-        onDirect={() => undefined}
-      />,
+    const page = readFileSync(
+      new URL("../../../src/app/transfers/page.tsx", import.meta.url),
+      "utf8",
     );
 
-    expect(cashier).toContain("طلب تحويل");
-    expect(cashier).not.toContain("تحويل مباشر");
-    expect(admin).toContain("تحويل مباشر");
-  });
-
-  it("exposes the selected cafe section as an accessible tab", () => {
-    const html = renderToStaticMarkup(
-      <CafeTabs active="requests" pendingRequests={2} onChange={() => undefined} />,
-    );
-
-    expect(html).toContain('role="tablist"');
-    expect(html).toContain('role="tab"');
-    expect(html).toContain('aria-selected="true"');
-    expect(html).toContain('aria-controls="cafe-requests-panel"');
+    expect(page).toMatch(/\{isAdmin && \([\s\S]{0,200}تحويل مباشر/);
+    expect(page).toContain("طلب تحويل");
   });
 
   it("keeps modal content scrollable within a short viewport", () => {

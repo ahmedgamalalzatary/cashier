@@ -5,6 +5,11 @@ const page = readFileSync(
   new URL("../../src/app/waste/page.tsx", import.meta.url),
   "utf8",
 );
+// the entry form is shared by the waste page and the POS pop-up
+const form = readFileSync(
+  new URL("../../src/components/waste/waste-entry-form.tsx", import.meta.url),
+  "utf8",
+);
 
 describe("waste submission flow", () => {
   it("formats allocation unit costs as money", () => {
@@ -12,17 +17,17 @@ describe("waste submission flow", () => {
   });
 
   it("reuses a draft-scoped request id across retries", () => {
-    expect(page).toContain(
+    expect(form).toContain(
       "const [clientRequestId, setClientRequestId] = useState(() =>",
     );
-    expect(page).toMatch(/createWaste\(\{[\s\S]{0,100}?clientRequestId,/);
-    expect(page).not.toMatch(
+    expect(form).toMatch(/createWaste\(\{[\s\S]{0,100}?clientRequestId,/);
+    expect(form).not.toMatch(
       /createWaste\(\{[\s\S]{0,100}?clientRequestId:\s*crypto\.randomUUID\(\)/,
     );
-    expect(page.match(/disabled=\{saving\}/g)).toHaveLength(5);
+    expect(form.match(/disabled=\{saving\}/g)).toHaveLength(5);
   });
 
   it("tells the user a product is always recorded in the cafe warehouse", () => {
-    expect(page).toContain("يُسجل في مخزن الكافيه فقط");
+    expect(form).toContain("يُسجل في مخزن الكافيه فقط");
   });
 });

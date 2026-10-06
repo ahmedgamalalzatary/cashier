@@ -39,6 +39,7 @@ describe("purchases service", () => {
           quantity: 2,
           unitMode: "purchase",
           unitPrice: 50,
+          toCafeQuantity: 0,
         },
       ],
     };

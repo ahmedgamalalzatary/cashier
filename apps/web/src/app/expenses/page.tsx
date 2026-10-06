@@ -109,7 +109,12 @@ export default function ExpensesPage() {
       >
         <ExpenseEntryForm
           categories={categories}
-          onSaved={() => void load().catch(() => undefined)}
+          onSaved={() => {
+            setError("");
+            void load().catch(() =>
+              setError("تم تسجيل المصروف، لكن تعذر تحديث البيانات"),
+            );
+          }}
         />
       </Section>
 

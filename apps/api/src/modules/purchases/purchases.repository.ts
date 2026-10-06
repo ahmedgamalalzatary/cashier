@@ -15,6 +15,7 @@ import {
 } from "../../db/schema.js";
 import { InventoryRepository } from "../inventory/inventory.repository.js";
 import { InventoryTransaction } from "../inventory/inventory.service.js";
+import { TransfersRepository } from "../transfers/transfers.repository.js";
 
 export type PurchaseLineWrite = {
   invoiceId: number;
@@ -34,6 +35,7 @@ export class PurchasesRepository {
     fn: (
       repo: PurchasesRepository,
       inventory: InventoryTransaction,
+      transfers: TransfersRepository,
     ) => Promise<T>,
   ): Promise<T> {
     return branchTransaction(this.db, (tx) => {
@@ -41,6 +43,7 @@ export class PurchasesRepository {
       return fn(
         new PurchasesRepository(transactionDb),
         new InventoryTransaction(new InventoryRepository(transactionDb)),
+        new TransfersRepository(transactionDb),
       );
     });
   }

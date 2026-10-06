@@ -36,7 +36,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable, type DataColumn } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { Stat, StatStrip } from "@/components/ui/stat";
-import { Tabs } from "@/components/ui/tabs";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
 import { formatMoney, itemLabel } from "@/lib/format";
 import {
@@ -67,7 +67,9 @@ export default function RecipesPage() {
   const [tab, setTab] = useState<RecipeTab>("products");
   const [form, setForm] = useState<PreparedRecipe | null | undefined>();
   const [preparing, setPreparing] = useState<PreparedRecipe | null>(null);
-  const [stockProduct, setStockProduct] = useState<ExternalProduct | null>(null);
+  const [stockProduct, setStockProduct] = useState<ExternalProduct | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -279,6 +281,7 @@ export default function RecipesPage() {
       )}
 
       <Tabs
+        idPrefix="recipes"
         items={[
           { id: "products", label: "منتجات القائمة", badge: products.length },
           { id: "prepared", label: "الأصناف المُحضّرة", badge: recipes.length },
@@ -294,80 +297,82 @@ export default function RecipesPage() {
         className="mb-5"
       />
 
-      {loading ? (
-        <LoadingState label="جارِ تحميل الكتالوج وحساب الوصفات…" />
-      ) : tab === "products" ? (
-        products.length === 0 ? (
-          <EmptyState
-            icon={<ChefHat className="size-8" />}
-            title="لا توجد منتجات خارجية"
-            description="استخدم زر تحديث المنتجات لتحميل الكتالوج الخارجي."
-          />
-        ) : (
-          <div className="grid gap-4 xl:grid-cols-2">
-            {products.map((product) => (
-              <ExternalProductCard
-                key={product.externalId}
-                product={product}
-                categoryName={(() => {
-                  const category = catalog?.categories.find(
-                    (candidate) =>
-                      candidate.externalId === product.externalCategoryId,
-                  );
-                  return category
-                    ? `${category.nameAr} / ${category.nameEn}`
-                    : "—";
-                })()}
-                onStockSetup={() => setStockProduct(product)}
-              />
-            ))}
-          </div>
-        )
-      ) : tab === "prepared" ? (
-        recipes.length === 0 ? (
-          <EmptyState
-            icon={<ChefHat className="size-8" />}
-            title="لا توجد وصفات تحضير بعد"
-            description="اربط صنفاً مُحضّراً بوصفة أساسية ثم جهّز دفعاته."
-          />
-        ) : (
-          <div className="grid gap-4 xl:grid-cols-2">
-            {recipes.map((recipe) => (
-              <PreparedCard
-                key={recipe.id}
-                recipe={recipe}
-                onEdit={() => setForm(recipe)}
-                onToggle={() => void toggle(recipe)}
-                onPrepare={() => setPreparing(recipe)}
-              />
-            ))}
-          </div>
-        )
-      ) : (
-        <DataTable
-          caption="سجل التحضير"
-          rows={preparations}
-          rowKey={(row) => row.id}
-          columns={historyColumns}
-          empty={
+      <TabPanel idPrefix="recipes" active={tab}>
+        {loading ? (
+          <LoadingState label="جارِ تحميل الكتالوج وحساب الوصفات…" />
+        ) : tab === "products" ? (
+          products.length === 0 ? (
             <EmptyState
               icon={<ChefHat className="size-8" />}
-              title="لم تُنفذ عمليات تحضير بعد"
-              description="عند تحضير دفعة ستظهر هنا كوثيقة تكلفة ومخزون ثابتة."
+              title="لا توجد منتجات خارجية"
+              description="استخدم زر تحديث المنتجات لتحميل الكتالوج الخارجي."
             />
-          }
-          actions={(row) => (
-            <Link
-              href={`/recipes/preparations/detail?id=${row.id}`}
-              aria-label={`عرض عملية التحضير رقم ${row.id}`}
-              title="عرض التفاصيل"
-              className="inline-flex rounded-lg p-2 text-muted transition-colors hover:bg-line/50 hover:text-ink"
-            >
-              <Eye className="size-4" />
-            </Link>
-          )}
-        />
-      )}
+          ) : (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {products.map((product) => (
+                <ExternalProductCard
+                  key={product.externalId}
+                  product={product}
+                  categoryName={(() => {
+                    const category = catalog?.categories.find(
+                      (candidate) =>
+                        candidate.externalId === product.externalCategoryId,
+                    );
+                    return category
+                      ? `${category.nameAr} / ${category.nameEn}`
+                      : "—";
+                  })()}
+                  onStockSetup={() => setStockProduct(product)}
+                />
+              ))}
+            </div>
+          )
+        ) : tab === "prepared" ? (
+          recipes.length === 0 ? (
+            <EmptyState
+              icon={<ChefHat className="size-8" />}
+              title="لا توجد وصفات تحضير بعد"
+              description="اربط صنفاً مُحضّراً بوصفة أساسية ثم جهّز دفعاته."
+            />
+          ) : (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {recipes.map((recipe) => (
+                <PreparedCard
+                  key={recipe.id}
+                  recipe={recipe}
+                  onEdit={() => setForm(recipe)}
+                  onToggle={() => void toggle(recipe)}
+                  onPrepare={() => setPreparing(recipe)}
+                />
+              ))}
+            </div>
+          )
+        ) : (
+          <DataTable
+            caption="سجل التحضير"
+            rows={preparations}
+            rowKey={(row) => row.id}
+            columns={historyColumns}
+            empty={
+              <EmptyState
+                icon={<ChefHat className="size-8" />}
+                title="لم تُنفذ عمليات تحضير بعد"
+                description="عند تحضير دفعة ستظهر هنا كوثيقة تكلفة ومخزون ثابتة."
+              />
+            }
+            actions={(row) => (
+              <Link
+                href={`/recipes/preparations/detail?id=${row.id}`}
+                aria-label={`عرض عملية التحضير رقم ${row.id}`}
+                title="عرض التفاصيل"
+                className="inline-flex rounded-lg p-2 text-muted transition-colors hover:bg-line/50 hover:text-ink"
+              >
+                <Eye className="size-4" />
+              </Link>
+            )}
+          />
+        )}
+      </TabPanel>
 
       {form !== undefined && (
         <RecipeFormModal

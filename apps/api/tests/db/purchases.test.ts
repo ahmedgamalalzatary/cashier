@@ -11,6 +11,8 @@ import {
   stockMovements,
   supplierPayments,
   suppliers,
+  transferLines,
+  transfers,
 } from "../../src/db/schema.js";
 import { appOptions, db, nextTestItemCode } from "../setup.js";
 import { loginAs } from "../helpers.js";
@@ -503,5 +505,103 @@ describe("purchase invoices", () => {
       .send({ ...body, paidAmount: 5 });
     expect(changed.status).toBe(409);
     expect(await db.select().from(purchaseInvoices)).toHaveLength(1);
+  });
+
+  it("sends part of a line to the cafe in the same save, once even on replay", async () => {
+    const fixture = await createPurchaseFixture();
+    const body = {
+      clientRequestId: crypto.randomUUID(),
+      supplierId: fixture.supplierId,
+      purchasedAt: "2026-07-20",
+      paidAmount: 0,
+      lines: [
+        {
+          itemId: fixture.itemId,
+          quantity: 2,
+          unitMode: "purchase",
+          unitPrice: 300,
+          toCafeQuantity: 20,
+        },
+      ],
+    };
+
+    const created = await request(app())
+      .post("/api/purchases")
+      .set(authorization)
+      .send(body);
+    expect(created.status).toBe(201);
+    const replay = await request(app())
+      .post("/api/purchases")
+      .set(authorization)
+      .send(body);
+    expect(replay.body.id).toBe(created.body.id);
+
+    const batches = await db
+      .select()
+      .from(stockBatches)
+      .where(eq(stockBatches.itemId, fixture.itemId));
+    expect(
+      batches.map(({ warehouse, remainingQuantity, unitCost }) => ({
+        warehouse,
+        remainingQuantity,
+        unitCost,
+      })),
+    ).toEqual(
+      expect.arrayContaining([
+        { warehouse: "main", remainingQuantity: "30.000", unitCost: "12.000000" },
+        { warehouse: "cafe", remainingQuantity: "20.000", unitCost: "12.000000" },
+      ]),
+    );
+    expect(batches).toHaveLength(2);
+
+    const transferRows = await db.select().from(transfers);
+    expect(transferRows).toHaveLength(1);
+    expect(transferRows[0]).toMatchObject({ requestId: null });
+    expect(transferRows[0].notes).toContain(`#${created.body.id}`);
+    const lines = await db.select().from(transferLines);
+    expect(lines).toEqual([
+      expect.objectContaining({
+        transferId: transferRows[0].id,
+        itemId: fixture.itemId,
+        quantity: "20.000",
+      }),
+    ]);
+
+    const changed = await request(app())
+      .post("/api/purchases")
+      .set(authorization)
+      .send({
+        ...body,
+        lines: [{ ...body.lines[0], toCafeQuantity: 10 }],
+      });
+    expect(changed.status).toBe(409);
+  });
+
+  it("rejects a to-cafe quantity above the received stock quantity and saves nothing", async () => {
+    const fixture = await createPurchaseFixture();
+
+    const response = await request(app())
+      .post("/api/purchases")
+      .set(authorization)
+      .send({
+        clientRequestId: crypto.randomUUID(),
+        supplierId: fixture.supplierId,
+        purchasedAt: "2026-07-20",
+        paidAmount: 0,
+        lines: [
+          {
+            itemId: fixture.itemId,
+            quantity: 1,
+            unitMode: "purchase",
+            unitPrice: 300,
+            toCafeQuantity: 25.001,
+          },
+        ],
+      });
+
+    expect(response.status).toBe(400);
+    expect(await db.select().from(purchaseInvoices)).toHaveLength(0);
+    expect(await db.select().from(stockBatches)).toHaveLength(0);
+    expect(await db.select().from(transfers)).toHaveLength(0);
   });
 });

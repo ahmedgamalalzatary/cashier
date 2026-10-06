@@ -44,6 +44,16 @@ const purchaseLineInput = z.object({
   quantity,
   unitMode: z.enum(['stock', 'purchase']),
   unitPrice: money,
+  // stock-unit amount moved main -> cafe in the same save
+  toCafeQuantity: z.coerce
+    .number()
+    .finite()
+    .min(0)
+    .max(99_999_999_999.999)
+    .refine((value) => Math.abs(Number(value.toFixed(3)) - value) <= 1e-9, {
+      message: 'الكمية تقبل ثلاث خانات عشرية كحد أقصى',
+    })
+    .default(0),
 });
 
 export const purchaseInput = z
