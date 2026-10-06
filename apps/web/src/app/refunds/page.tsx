@@ -14,13 +14,11 @@ import { Section } from "@/components/ui/section";
 import { EmptyState, ErrorBanner } from "@/components/ui/states";
 import { OrderPicker } from "@/components/refunds/order-picker";
 import { RefundOrderModal } from "@/components/refunds/refund-order-modal";
-import { useAuth } from "@/components/auth/auth-provider";
 import { formatMoney } from "@/lib/format";
 import { listOrders } from "@/services/orders-service";
 import { getRefund, listRefunds } from "@/services/refunds-service";
 
 export default function RefundsPage() {
-  const { user } = useAuth();
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [refunds, setRefunds] = useState<RefundSummary[]>([]);
   const [refundingOrderId, setRefundingOrderId] = useState<number | null>(null);
@@ -97,18 +95,9 @@ export default function RefundsPage() {
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
-      {user?.role !== "cashier" && (
-        <p className="sheet p-4 text-sm text-muted">
-          تسجيل المرتجعات متاح لحساب الكاشير فقط — يعرض هذا الحساب سجل
-          المرتجعات أدناه.
-        </p>
-      )}
-
-      {user?.role === "cashier" && (
-        <Section title="اختر الطلب">
-          <OrderPicker orders={orders} onPick={setRefundingOrderId} />
-        </Section>
-      )}
+      <Section title="اختر الطلب">
+        <OrderPicker orders={orders} onPick={setRefundingOrderId} />
+      </Section>
 
       <section className="space-y-3">
         <h2 className="font-bold">سجل المرتجعات</h2>

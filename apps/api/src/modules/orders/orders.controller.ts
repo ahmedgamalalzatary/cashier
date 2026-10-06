@@ -38,7 +38,7 @@ export class OrdersController {
   create = async (req: Request, res: Response) => {
     const order = await this.service.create(
       orderInput.parse(req.body),
-      req.user!.id,
+      req.user!,
     );
     res.status(201).json(order);
   };

@@ -22,7 +22,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import Link from "next/link";
 import { CashierShiftControls } from "@/components/shifts/cashier-shift-controls";
 import { ExpenseEntryForm } from "@/components/expenses/expense-entry-form";
 import { OrderPicker } from "@/components/refunds/order-picker";
@@ -56,6 +55,7 @@ import {
   filterCatalog,
   filterLocalCatalog,
   isOwnOpenShift,
+  canSell,
   orderPayload,
   setCartLineQuantity,
   type PosCartLine,
@@ -250,12 +250,13 @@ export default function PosPage() {
     { mainCategoryId, subCategoryId, query },
   );
   const hasOwnOpenShift = isOwnOpenShift(currentShift, user);
+  const canSellNow = canSell(user, hasOwnOpenShift);
   const quickCash = useMemo(
     () => quickCashOptions(totals.total),
     [totals.total],
   );
   const canComplete =
-    hasOwnOpenShift &&
+    canSellNow &&
     cart.length > 0 &&
     totals.discountValid &&
     totals.hasEnoughCash &&
@@ -287,11 +288,13 @@ export default function PosPage() {
     setSaving(true);
     setError("");
     try {
-      const freshShift = await getCurrentShift().catch(() => null);
-      setCurrentShift(freshShift);
-      if (!isOwnOpenShift(freshShift, user)) {
-        setError("تغيرت حالة الوردية — تحقق منها قبل إتمام البيع");
-        return;
+      if (user?.role !== "admin") {
+        const freshShift = await getCurrentShift().catch(() => null);
+        setCurrentShift(freshShift);
+        if (!isOwnOpenShift(freshShift, user)) {
+          setError("تغيرت حالة الوردية — تحقق منها قبل إتمام البيع");
+          return;
+        }
       }
       const payload = orderPayload(
         cart,
@@ -401,21 +404,9 @@ export default function PosPage() {
             : "لم تتم المزامنة بعد"}
         </div>
       )}
-      {!loading && !hasOwnOpenShift && (
+      {!loading && user?.role === "cashier" && !hasOwnOpenShift && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/35 bg-accent/10 px-4 py-3 text-sm">
-          <span>
-            {user?.role === "cashier"
-              ? "يجب فتح وردية تخص هذا الكاشير قبل تسجيل البيع."
-              : "المدير لا يسجل مبيعات؛ استخدم حساب كاشير."}
-          </span>
-          {user?.role === "admin" && (
-            <Link
-              className="rounded-lg bg-sidebar px-3 py-2 text-white"
-              href="/shifts"
-            >
-              إدارة الورديات
-            </Link>
-          )}
+          <span>يجب فتح وردية تخص هذا الكاشير قبل تسجيل البيع.</span>
         </div>
       )}
 
@@ -613,6 +604,11 @@ export default function PosPage() {
         <aside className="pos-ticket overflow-hidden rounded-2xl border border-line bg-surface xl:sticky xl:top-6">
           <div className="flex items-center gap-2 bg-sidebar px-4 py-3 text-white">
             <ShoppingBasket className="size-4" /> تذكرة الطلب
+            {user?.role === "admin" && (
+              <span className="ms-auto rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium">
+                بيع إداري — بدون وردية
+              </span>
+            )}
           </div>
           <div className="max-h-[42vh] min-h-40 overflow-y-auto">
             {cart.length === 0 ? (

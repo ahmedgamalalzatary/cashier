@@ -85,7 +85,7 @@ Business endpoints select the workspace with `X-Branch-Id`. Admin defaults to Ma
 
 | Capability                              | Admin | Cashier            |
 | --------------------------------------- | ----- | ------------------ |
-| POS sales, discounts, refunds           | ✘     | ✔                  |
+| POS sales, discounts, refunds           | ✔ (no shift, flagged as إداري) | ✔ (own shift) |
 | Open/close shift, shift expenses        | ✘     | ✔ (own shift)      |
 | Force-close, reopen, or correct a shift | ✔     | ✘                  |
 | Transfer requests (cafe → ask main)     | ✔     | ✔ (create request) |

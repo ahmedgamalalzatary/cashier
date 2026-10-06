@@ -562,6 +562,8 @@ export type OrderSummary = {
   changeAmount: string;
   totalCost: string;
   isNegativeStock: boolean;
+  /** True when an admin completed the sale without an open shift. */
+  isAdminSale: boolean;
   createdAt: string;
 };
 
@@ -656,12 +658,14 @@ export type RefundSummary = {
   id: number;
   orderId: number;
   orderNumber: string;
-  shiftId: number;
+  shiftId: number | null;
   cashierId: number;
   cashierName: string;
   reason: string;
   amount: string;
   totalCostReturned: string;
+  /** True when an admin issued the refund without an open shift. */
+  isAdminRefund: boolean;
   createdAt: string;
 };
 

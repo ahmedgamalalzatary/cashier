@@ -18,7 +18,7 @@ import {
   stockMovements,
 } from "../../src/db/schema.js";
 import { appOptions, db, nextTestItemCode } from "../setup.js";
-import { loginAs } from "../helpers.js";
+import { createUser, loginAs } from "../helpers.js";
 
 const app = () => createApp(db, appOptions);
 let cashierAuthorization: { readonly Authorization: string };
@@ -151,17 +151,40 @@ const saleBody = (clientRequestId = randomUUID()) => ({
 });
 
 describe("external-product POS orders", () => {
-  it("requires authentication and only lets cashiers record sales", async () => {
+  it("requires authentication and lets an admin sell without a shift", async () => {
     expect((await request(app()).get("/api/orders")).status).toBe(401);
     expect((await request(app()).post("/api/orders").send(saleBody())).status).toBe(401);
-    expect(
-      (
-        await request(app())
-          .post("/api/orders")
-          .set(adminAuthorization)
-          .send(saleBody())
-      ).status,
-    ).toBe(403);
+
+    await createExternalProductFixture();
+    const response = await request(app())
+      .post("/api/orders")
+      .set(adminAuthorization)
+      .send(saleBody());
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({
+      shiftId: null,
+      isAdminSale: true,
+      cashierName: "مدير",
+    });
+  });
+
+  it("still requires an open shift from a cashier", async () => {
+    const credentials = await createUser("cashier", "no-shift-cashier");
+    const login = await request(app())
+      .post("/api/auth/login")
+      .send(credentials);
+    const noShiftAuthorization = {
+      Authorization: `Bearer ${login.body.token}`,
+    };
+    await createExternalProductFixture();
+
+    const response = await request(app())
+      .post("/api/orders")
+      .set(noShiftAuthorization)
+      .send(saleBody());
+
+    expect(response.status).toBe(409);
   });
 
   it("snapshots names and deducts size plus modifier ingredients through FIFO", async () => {
@@ -177,6 +200,8 @@ describe("external-product POS orders", () => {
       subtotal: "260.00",
       total: "260.00",
       totalCost: "0.80",
+      isAdminSale: false,
+      shiftId: expect.any(Number),
       lines: [
         {
           type: "external_product",

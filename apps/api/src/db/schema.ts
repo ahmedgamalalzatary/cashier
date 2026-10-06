@@ -1381,6 +1381,7 @@ export const orders = mysqlTable(
       .notNull()
       .default("0"),
     isNegativeStock: boolean("is_negative_stock").notNull().default(false),
+    isAdminSale: boolean("is_admin_sale").notNull().default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [
@@ -1531,9 +1532,7 @@ export const refunds = mysqlTable(
     orderId: int("order_id")
       .notNull()
       .references(() => orders.id),
-    shiftId: int("shift_id")
-      .notNull()
-      .references(() => shifts.id),
+    shiftId: int("shift_id").references(() => shifts.id),
     cashierId: int("cashier_id")
       .notNull()
       .references(() => users.id),
@@ -1545,6 +1544,7 @@ export const refunds = mysqlTable(
     })
       .notNull()
       .default("0"),
+    isAdminRefund: boolean("is_admin_refund").notNull().default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [

@@ -21,6 +21,6 @@ export class RefundsController {
   create = async (req: Request, res: Response) => {
     res
       .status(201)
-      .json(await this.service.create(refundInput.parse(req.body), req.user!.id));
+      .json(await this.service.create(refundInput.parse(req.body), req.user!));
   };
 }

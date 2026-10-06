@@ -185,13 +185,15 @@ export class ReportsRepository {
 
   salesByCashier(from: Date, to: Date) {
     return this.rows<Record<string, unknown>>(sql`
-      SELECT e.id employeeId,e.name cashierName,COUNT(DISTINCT o.id) ordersCount,
+      SELECT u.id employeeId,
+        CASE WHEN u.role='admin' THEN CONCAT(u.name,' (إدارة)') ELSE COALESCE(e.name,u.name) END cashierName,
+        COUNT(DISTINCT o.id) ordersCount,
         COALESCE(SUM(o.total),0) sales,COALESCE(SUM(o.discount_amount),0) discounts,
         COALESCE((SELECT SUM(r.amount) FROM ${branchTable("refunds")} r WHERE r.cashier_id=u.id AND r.created_at >= ${from} AND r.created_at < ${to}),0) refunds,
         COALESCE(SUM(o.total_cost),0) cost,
         COALESCE(SUM(o.total-o.total_cost),0)-COALESCE((SELECT SUM(r.amount-r.total_cost_returned) FROM ${branchTable("refunds")} r WHERE r.cashier_id=u.id AND r.created_at >= ${from} AND r.created_at < ${to}),0) profit
-      FROM users u JOIN ${branchTable("employees")} e ON e.id=u.employee_id LEFT JOIN ${branchTable("orders")} o ON o.cashier_id=u.id AND o.created_at >= ${from} AND o.created_at < ${to}
-      WHERE u.role='cashier' GROUP BY e.id,e.name,u.id ORDER BY sales DESC
+      FROM users u LEFT JOIN ${branchTable("employees")} e ON e.id=u.employee_id LEFT JOIN ${branchTable("orders")} o ON o.cashier_id=u.id AND o.created_at >= ${from} AND o.created_at < ${to}
+      WHERE u.role IN ('admin','cashier') GROUP BY u.id,u.name,u.role,e.id,e.name ORDER BY sales DESC
     `);
   }
 

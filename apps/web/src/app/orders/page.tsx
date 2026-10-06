@@ -121,7 +121,16 @@ export default function OrdersPage() {
         );
       },
     },
-    { key: "cashier", header: "الكاشير", cell: (row) => row.cashierName },
+    {
+      key: "cashier",
+      header: "الكاشير",
+      cell: (row) => (
+        <span className="flex flex-wrap items-center gap-2">
+          {row.cashierName}
+          {row.isAdminSale && <Badge tone="neutral">إداري</Badge>}
+        </span>
+      ),
+    },
     {
       key: "discount",
       header: "الخصم",

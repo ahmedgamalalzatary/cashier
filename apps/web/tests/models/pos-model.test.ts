@@ -10,6 +10,7 @@ import {
   defaultExternalSize,
   filterCatalog,
   isOwnOpenShift,
+  canSell,
   orderPayload,
   setCartLineQuantity,
 } from "../../src/models/pos-model";
@@ -398,5 +399,13 @@ describe("POS model", () => {
     expect(isOwnOpenShift(shift, { id: 5, role: "admin" })).toBe(false);
     expect(isOwnOpenShift(null, cashier)).toBe(false);
     expect(isOwnOpenShift(shift, null)).toBe(false);
+  });
+
+  it("lets an admin sell without a shift but still requires one from a cashier", () => {
+    expect(canSell({ role: "admin" }, false)).toBe(true);
+    expect(canSell({ role: "admin" }, true)).toBe(true);
+    expect(canSell({ role: "cashier" }, true)).toBe(true);
+    expect(canSell({ role: "cashier" }, false)).toBe(false);
+    expect(canSell(null, false)).toBe(false);
   });
 });

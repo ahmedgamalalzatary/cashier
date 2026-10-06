@@ -1,3 +1,4 @@
+import type { AuthUser } from "@cashier/shared";
 import { requestFingerprint as hashRequest } from "../../lib/request-fingerprint.js";
 import { transactionWithDeadlockRetry } from "../../lib/deadlock-retry.js";
 import { HttpError } from "../../middleware/error.js";
@@ -114,7 +115,9 @@ export class RefundsService {
     return { ...refund, lines: await this.repo.listLines(id) };
   }
 
-  async create(input: RefundInput, cashierId: number) {
+  async create(input: RefundInput, actor: AuthUser) {
+    const cashierId = actor.id;
+    const isAdminRefund = actor.role === "admin";
     const requestFingerprint = fingerprint(input);
     let refundId: number;
     try {
@@ -125,8 +128,12 @@ export class RefundsService {
           this.assertReplay(replay, requestFingerprint, cashierId);
           return replay.id;
         }
-        const shift = await repo.findOpenShiftForCashier(cashierId);
-        if (!shift) throw new HttpError(409, "يجب فتح وردية قبل تسجيل المرتجع");
+        let shiftId: number | null = null;
+        if (!isAdminRefund) {
+          const shift = await repo.findOpenShiftForCashier(cashierId);
+          if (!shift) throw new HttpError(409, "يجب فتح وردية قبل تسجيل المرتجع");
+          shiftId = shift.id;
+        }
         const order = await repo.lockOrder(input.orderId);
         if (!order) throw new HttpError(404, "الطلب الأصلي غير موجود");
 
@@ -243,11 +250,12 @@ export class RefundsService {
           clientRequestId: input.clientRequestId,
           requestFingerprint,
           orderId: order.id,
-          shiftId: shift.id,
+          shiftId,
           cashierId,
           reason: input.reason,
           amount: format(refundAmount, 2),
           totalCostReturned: "0.00",
+          isAdminRefund,
           createdAt: occurredAt,
         });
 
@@ -371,7 +379,7 @@ export class RefundsService {
                 });
               }
               await repo.createWaste({
-                shiftId: shift.id,
+                shiftId,
                 warehouse: "cafe",
                 targetType: "item",
                 itemId: entry.line.itemId!,
@@ -422,7 +430,7 @@ export class RefundsService {
                 });
               }
               await repo.createWaste({
-                shiftId: shift.id,
+                shiftId,
                 warehouse: "cafe",
                 targetType: "external_product",
                 externalProductId: entry.line.externalProductId!,

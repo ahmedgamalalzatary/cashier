@@ -278,6 +278,14 @@ export function isOwnOpenShift(
   return shift.cashierUserId === user.id;
 }
 
+export function canSell(
+  user: { role: string } | null | undefined,
+  hasOwnOpenShift: boolean,
+): boolean {
+  if (user?.role === "admin") return true;
+  return hasOwnOpenShift;
+}
+
 export function cartLineTotal(line: PosCartLine): string {
   return formatScaled(
     stringToScaled(line.unitPrice, 2) * BigInt(line.quantity),

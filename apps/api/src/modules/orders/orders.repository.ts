@@ -330,6 +330,7 @@ export class OrdersRepository {
         changeAmount: orders.changeAmount,
         totalCost: orders.totalCost,
         isNegativeStock: orders.isNegativeStock,
+        isAdminSale: orders.isAdminSale,
         createdAt: orders.createdAt,
       })
       .from(orders)
@@ -356,6 +357,7 @@ export class OrdersRepository {
         changeAmount: orders.changeAmount,
         totalCost: orders.totalCost,
         isNegativeStock: orders.isNegativeStock,
+        isAdminSale: orders.isAdminSale,
         createdAt: orders.createdAt,
       })
       .from(orders)

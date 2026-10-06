@@ -1,7 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
+import type { AuthUser } from "@cashier/shared";
 import { requestFingerprint as hashRequest } from "../../src/lib/request-fingerprint.js";
 import type { OrdersRepository } from "../../src/modules/orders/orders.repository.js";
 import { OrdersService } from "../../src/modules/orders/orders.service.js";
+
+const cashierActor: AuthUser = {
+  id: 7,
+  name: "Cashier",
+  role: "cashier",
+  branchId: 1,
+  isSuperAdmin: false,
+};
+
+const adminActor: AuthUser = {
+  id: 9,
+  name: "Admin",
+  role: "admin",
+  branchId: null,
+  isSuperAdmin: true,
+};
 
 const product = (externalId: number) => ({
   externalId,
@@ -111,7 +128,7 @@ describe("OrdersService idempotency fingerprint", () => {
         discount: null,
         cashReceived: 20,
       },
-      7,
+      cashierActor,
     );
     const replay = await service.create(
       {
@@ -120,7 +137,7 @@ describe("OrdersService idempotency fingerprint", () => {
         discount: null,
         cashReceived: 20,
       },
-      7,
+      cashierActor,
     );
 
     expect(replay.id).toBe(5);
@@ -185,7 +202,7 @@ describe("OrdersService idempotency fingerprint", () => {
         discount: null,
         cashReceived: 20,
       },
-      7,
+      cashierActor,
     );
     const replay = await service.create(
       {
@@ -194,7 +211,7 @@ describe("OrdersService idempotency fingerprint", () => {
         discount: null,
         cashReceived: 20,
       },
-      7,
+      cashierActor,
     );
 
     expect(replay.id).toBe(5);
@@ -251,7 +268,7 @@ describe("OrdersService line normalization", () => {
 
     await new OrdersService(repo).create(
       { ...orderInput, lines: [line(1), line(1)] },
-      7,
+      cashierActor,
     );
 
     expect(tx.createLine).toHaveBeenCalledTimes(1);
@@ -268,7 +285,7 @@ describe("OrdersService line normalization", () => {
 
     await new OrdersService(repo).create(
       { ...orderInput, lines: [line(1, extra), line(1, plain)] },
-      7,
+      cashierActor,
     );
 
     expect(tx.createLine).toHaveBeenCalledTimes(2);
@@ -286,7 +303,7 @@ describe("OrdersService replay rules", () => {
     });
 
     await expect(
-      new OrdersService(repoForCreate(tx)).create(orderInput, 7),
+      new OrdersService(repoForCreate(tx)).create(orderInput, cashierActor),
     ).rejects.toMatchObject({ status: 409 });
   });
 
@@ -305,7 +322,7 @@ describe("OrdersService replay rules", () => {
     });
 
     await expect(
-      new OrdersService(repoForCreate(tx)).create(orderInput, 7),
+      new OrdersService(repoForCreate(tx)).create(orderInput, cashierActor),
     ).rejects.toMatchObject({ status: 409 });
   });
 
@@ -332,7 +349,7 @@ describe("OrdersService replay rules", () => {
       stored,
     );
 
-    const order = await new OrdersService(repo).create(orderInput, 7);
+    const order = await new OrdersService(repo).create(orderInput, cashierActor);
 
     expect(order).toMatchObject({ id: 5 });
   });
@@ -346,14 +363,14 @@ describe("OrdersService create guards", () => {
       }),
     );
     await expect(
-      new OrdersService(noShift).create(orderInput, 7),
+      new OrdersService(noShift).create(orderInput, cashierActor),
     ).rejects.toMatchObject({ status: 409 });
 
     const noProduct = repoForCreate(
       txForCreate({ loadExternalProducts: vi.fn(async () => []) }),
     );
     await expect(
-      new OrdersService(noProduct).create(orderInput, 7),
+      new OrdersService(noProduct).create(orderInput, cashierActor),
     ).rejects.toMatchObject({ status: 404 });
   });
 
@@ -362,7 +379,7 @@ describe("OrdersService create guards", () => {
       txForCreate({ lockStockItems: vi.fn(async () => []) }),
     );
     await expect(
-      new OrdersService(missing).create(orderInput, 7),
+      new OrdersService(missing).create(orderInput, cashierActor),
     ).rejects.toMatchObject({ status: 409 });
 
     const inactive = repoForCreate(
@@ -371,7 +388,7 @@ describe("OrdersService create guards", () => {
       }),
     );
     await expect(
-      new OrdersService(inactive).create(orderInput, 7),
+      new OrdersService(inactive).create(orderInput, cashierActor),
     ).rejects.toMatchObject({ status: 409 });
   });
 
@@ -380,7 +397,7 @@ describe("OrdersService create guards", () => {
     await expect(
       new OrdersService(tooMany).create(
         { ...orderInput, lines: [{ ...line(1), quantity: 1000 }] },
-        7,
+        cashierActor,
       ),
     ).rejects.toMatchObject({ status: 400 });
 
@@ -392,7 +409,7 @@ describe("OrdersService create guards", () => {
           discount: { type: "fixed", value: 999 },
           cashReceived: 999,
         },
-        7,
+        cashierActor,
       ),
     ).rejects.toMatchObject({ status: 400 });
 
@@ -400,7 +417,7 @@ describe("OrdersService create guards", () => {
     await expect(
       new OrdersService(shortCash).create(
         { ...orderInput, cashReceived: 1 },
-        7,
+        cashierActor,
       ),
     ).rejects.toMatchObject({ status: 400 });
   });
@@ -415,8 +432,42 @@ describe("OrdersService create guards", () => {
     });
 
     await expect(
-      new OrdersService(repoForCreate(tx)).create(orderInput, 7),
+      new OrdersService(repoForCreate(tx)).create(orderInput, cashierActor),
     ).rejects.toMatchObject({ status: 400 });
+  });
+});
+
+describe("OrdersService admin sales", () => {
+  it("skips the shift lookup and flags the sale for an admin", async () => {
+    const tx = txForCreate();
+    const repo = repoForCreate(tx);
+
+    await new OrdersService(repo).create(orderInput, adminActor);
+
+    expect(tx.findOpenShiftForCashier).not.toHaveBeenCalled();
+    expect(tx.createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cashierId: 9,
+        shiftId: null,
+        isAdminSale: true,
+      }),
+    );
+  });
+
+  it("keeps the shift and clears the admin flag for a cashier", async () => {
+    const tx = txForCreate();
+    const repo = repoForCreate(tx);
+
+    await new OrdersService(repo).create(orderInput, cashierActor);
+
+    expect(tx.findOpenShiftForCashier).toHaveBeenCalledWith(7);
+    expect(tx.createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cashierId: 7,
+        shiftId: 1,
+        isAdminSale: false,
+      }),
+    );
   });
 });
 

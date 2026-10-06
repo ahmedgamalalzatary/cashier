@@ -142,6 +142,13 @@ function OrderDetailView() {
         />
       </StatStrip>
 
+      {order.isAdminSale && (
+        <p className="mb-4 flex items-center gap-2 rounded-lg border border-line bg-surface p-3 text-sm">
+          <Badge tone="neutral">إداري</Badge>
+          بيع إداري — بدون وردية
+        </p>
+      )}
+
       {order.isNegativeStock && (
         <p className="mb-4 flex items-center gap-2 rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm text-danger">
           <TriangleAlert className="size-4 shrink-0" />

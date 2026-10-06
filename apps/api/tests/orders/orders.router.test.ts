@@ -32,7 +32,13 @@ describe("orders routes", () => {
 function appWithStubs(controller: OrdersController, role = "cashier") {
   const app = express();
   app.use((req, _res, next) => {
-    req.user = { id: 7, name: "Cashier", role };
+    req.user = {
+      id: 7,
+      name: "Cashier",
+      role: role as "admin" | "cashier",
+      branchId: role === "cashier" ? 1 : null,
+      isSuperAdmin: false,
+    };
     next();
   });
   app.use(express.json(), ordersRouter(controller));
@@ -56,7 +62,7 @@ const validBody = {
 };
 
 describe("order route authorization", () => {
-  it("blocks non-cashiers from creating orders", async () => {
+  it("lets an admin create an order through the same route", async () => {
     const done = (_req: unknown, res: { json: (body: unknown) => void }) =>
       res.json({ ok: true });
     const controller = {
@@ -70,13 +76,13 @@ describe("order route authorization", () => {
       .post("/")
       .send(validBody);
 
-    expect(response.status).toBe(403);
-    expect(controller.create).not.toHaveBeenCalled();
+    expect(response.status).toBe(201);
+    expect(controller.create).toHaveBeenCalledOnce();
   });
 });
 
 describe("order controller wiring", () => {
-  it("creates with the parsed input and cashier id for 201", async () => {
+  it("creates with the parsed input and the full actor for 201", async () => {
     const service = {
       create: vi.fn(async () => ({ id: 5 })),
     } as unknown as OrdersService;
@@ -89,7 +95,10 @@ describe("order controller wiring", () => {
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({ id: 5 });
-    expect(service.create).toHaveBeenCalledWith(validBody, 7);
+    expect(service.create).toHaveBeenCalledWith(
+      validBody,
+      expect.objectContaining({ id: 7, role: "cashier" }),
+    );
   });
 
   it("paginates the external list with safe defaults", async () => {

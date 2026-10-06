@@ -76,6 +76,16 @@ describe("POS feature boundaries", () => {
     expect(page).not.toContain("pe-12");
   });
 
+  it("lets admins sell without a shift and flags it as an admin sale", () => {
+    const page = fs.readFileSync(
+      path.resolve(process.cwd(), "src/app/pos/page.tsx"),
+      "utf8",
+    );
+    expect(page).toContain("canSell");
+    expect(page).toContain("بيع إداري");
+    expect(page).not.toContain("المدير لا يسجل مبيعات");
+  });
+
   it("anchors the printed receipt with logical insets", () => {
     const css = fs.readFileSync(
       path.resolve(process.cwd(), "src/app/globals.css"),

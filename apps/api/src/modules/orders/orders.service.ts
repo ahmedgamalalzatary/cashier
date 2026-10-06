@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { AuthUser } from "@cashier/shared";
 import { requestFingerprint as hashRequest } from "../../lib/request-fingerprint.js";
 import { transactionWithDeadlockRetry } from "../../lib/deadlock-retry.js";
 import { HttpError } from "../../middleware/error.js";
@@ -90,7 +91,9 @@ function requestFingerprint(data: OrderInput) {
 export class OrdersService {
   constructor(private repo: OrdersRepository) {}
 
-  async create(data: OrderInput, cashierId: number) {
+  async create(data: OrderInput, actor: AuthUser) {
+    const cashierId = actor.id;
+    const isAdminSale = actor.role === "admin";
     let orderId: number;
     const fingerprint = requestFingerprint(data);
     try {
@@ -102,9 +105,13 @@ export class OrdersService {
           return existing.id;
         }
 
-        const shift = await repo.findOpenShiftForCashier(cashierId);
-        if (!shift) {
-          throw new HttpError(409, "يجب فتح وردية قبل تسجيل البيع");
+        let shiftId: number | null = null;
+        if (!isAdminSale) {
+          const shift = await repo.findOpenShiftForCashier(cashierId);
+          if (!shift) {
+            throw new HttpError(409, "يجب فتح وردية قبل تسجيل البيع");
+          }
+          shiftId = shift.id;
         }
         const normalized = normalizeLines(data.lines);
         if (normalized.some((line) => line.quantity > 999)) {
@@ -192,7 +199,8 @@ export class OrdersService {
           clientRequestId: data.clientRequestId,
           requestFingerprint: fingerprint,
           cashierId,
-          shiftId: shift.id,
+          shiftId,
+          isAdminSale,
           subtotal: formatScaled(subtotal, 2),
           discountType: data.discount?.type ?? null,
           discountValue:

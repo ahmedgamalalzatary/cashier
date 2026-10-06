@@ -247,6 +247,7 @@ export class RefundsRepository {
         reason: refunds.reason,
         amount: refunds.amount,
         totalCostReturned: refunds.totalCostReturned,
+        isAdminRefund: refunds.isAdminRefund,
         createdAt: refunds.createdAt,
       })
       .from(refunds)
@@ -272,6 +273,7 @@ export class RefundsRepository {
         reason: refunds.reason,
         amount: refunds.amount,
         totalCostReturned: refunds.totalCostReturned,
+        isAdminRefund: refunds.isAdminRefund,
         createdAt: refunds.createdAt,
       })
       .from(refunds)

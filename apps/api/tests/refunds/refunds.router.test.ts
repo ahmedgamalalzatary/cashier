@@ -10,7 +10,13 @@ import { refundsRouter } from "../../src/modules/refunds/refunds.router.js";
 function appWithStubs(controller: RefundsController, role = "cashier") {
   const app = express();
   app.use((req, _res, next) => {
-    req.user = { id: 9, name: "Cashier", role };
+    req.user = {
+      id: 9,
+      name: "Cashier",
+      role: role as "admin" | "cashier",
+      branchId: role === "cashier" ? 1 : null,
+      isSuperAdmin: false,
+    };
     next();
   });
   app.use(express.json(), refundsRouter(controller));
@@ -45,15 +51,15 @@ const validBody = {
 };
 
 describe("refund route authorization", () => {
-  it("blocks non-cashiers from creating refunds", async () => {
+  it("lets an admin create a refund through the same route", async () => {
     const controller = stubController();
 
     const response = await request(appWithStubs(controller, "admin"))
       .post("/")
       .send(validBody);
 
-    expect(response.status).toBe(403);
-    expect(controller.create).not.toHaveBeenCalled();
+    expect(response.status).toBe(201);
+    expect(controller.create).toHaveBeenCalledOnce();
   });
 
   it("lets cashiers reach list, detail, quantities, and create", async () => {
@@ -89,7 +95,10 @@ describe("refund controller wiring", () => {
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({ id: 55 });
-    expect(service.create).toHaveBeenCalledWith(validBody, 9);
+    expect(service.create).toHaveBeenCalledWith(
+      validBody,
+      expect.objectContaining({ id: 9, role: "cashier" }),
+    );
   });
 
   it("maps duplicate lines to 400, bad ids to 400, and missing rows to 404", async () => {

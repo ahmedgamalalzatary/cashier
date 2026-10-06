@@ -527,6 +527,68 @@ describe("refunds", () => {
     expect(response.status).toBe(409);
   });
 
+  it("lets an admin refund without a shift and keeps it out of the cashier drawer", async () => {
+    const fixture = await soldResaleOrder();
+    const adminAuthorization = await loginAs(app(), "admin");
+
+    const response = await request(app())
+      .post("/api/refunds")
+      .set(adminAuthorization)
+      .send({
+        clientRequestId: crypto.randomUUID(),
+        orderId: fixture.orderId,
+        reason: "طلب العميل",
+        lines: [
+          {
+            orderLineId: fixture.lineId,
+            quantity: 1,
+            stockAction: "return_to_stock",
+          },
+        ],
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({
+      shiftId: null,
+      isAdminRefund: true,
+      cashierName: "مدير",
+      amount: "9.00",
+    });
+    const shift = (
+      await request(app()).get("/api/shifts/current").set(authorization)
+    ).body;
+    expect(shift.totals.refunds).toBe("0.00");
+  });
+
+  it("still requires an open shift from a cashier", async () => {
+    const fixture = await soldResaleOrder();
+    const current = (
+      await request(app()).get("/api/shifts/current").set(authorization)
+    ).body;
+    await request(app())
+      .post(`/api/shifts/${current.id}/close`)
+      .set(authorization)
+      .send({ actualCash: 100 });
+
+    const response = await request(app())
+      .post("/api/refunds")
+      .set(authorization)
+      .send({
+        clientRequestId: crypto.randomUUID(),
+        orderId: fixture.orderId,
+        reason: "طلب العميل",
+        lines: [
+          {
+            orderLineId: fixture.lineId,
+            quantity: 1,
+            stockAction: "return_to_stock",
+          },
+        ],
+      });
+
+    expect(response.status).toBe(409);
+  });
+
   it("maps repeated partial stock returns exactly across original sale allocations", async () => {
     const fixture = await soldResaleOrder();
     const [first] = await db

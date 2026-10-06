@@ -1,8 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
+import type { AuthUser } from "@cashier/shared";
 import type { RefundsRepository } from "../../src/modules/refunds/refunds.repository.js";
 import { RefundsService } from "../../src/modules/refunds/refunds.service.js";
 
-const cashierId = 9;
+const cashierActor: AuthUser = {
+  id: 9,
+  name: "Cashier",
+  role: "cashier",
+  branchId: 1,
+  isSuperAdmin: false,
+};
+
+const adminActor: AuthUser = {
+  id: 11,
+  name: "Admin",
+  role: "admin",
+  branchId: null,
+  isSuperAdmin: true,
+};
 
 const recipeLine = (overrides: Record<string, unknown> = {}) => ({
   id: 1,
@@ -79,7 +94,7 @@ describe("RefundsService.create discount-share math", () => {
           { orderLineId: 1, quantity: 2, stockAction: null },
         ],
       },
-      cashierId,
+      cashierActor,
     );
 
     expect(refund).toEqual({ id: 55, lines: [] });
@@ -110,7 +125,7 @@ describe("RefundsService.create discount-share math", () => {
     const repo = repoForCreate(tx);
 
     await expect(
-      new RefundsService(repo).create(refundInput, cashierId),
+      new RefundsService(repo).create(refundInput, cashierActor),
     ).rejects.toMatchObject({ status: 409 });
     expect(tx.createRefund).not.toHaveBeenCalled();
   });
@@ -130,7 +145,7 @@ describe("RefundsService.create discount-share math", () => {
 
     const refund = await new RefundsService(repo).create(
       refundInput,
-      cashierId,
+      cashierActor,
     );
 
     // the goods still come back; only the cash leg is zero
@@ -149,14 +164,14 @@ describe("RefundsService.create guards", () => {
       }),
     );
     await expect(
-      new RefundsService(noShift).create(refundInput, cashierId),
+      new RefundsService(noShift).create(refundInput, cashierActor),
     ).rejects.toMatchObject({ status: 409 });
 
     const noOrder = repoForCreate(
       txForCreate({ lockOrder: vi.fn(async () => undefined) }),
     );
     await expect(
-      new RefundsService(noOrder).create(refundInput, cashierId),
+      new RefundsService(noOrder).create(refundInput, cashierActor),
     ).rejects.toMatchObject({ status: 404 });
   });
 
@@ -165,7 +180,7 @@ describe("RefundsService.create guards", () => {
     const repo = repoForCreate(tx);
 
     await expect(
-      new RefundsService(repo).create(refundInput, cashierId),
+      new RefundsService(repo).create(refundInput, cashierActor),
     ).rejects.toMatchObject({ status: 400 });
   });
 
@@ -178,7 +193,7 @@ describe("RefundsService.create guards", () => {
     const repo = repoForCreate(tx);
 
     await expect(
-      new RefundsService(repo).create(refundInput, cashierId),
+      new RefundsService(repo).create(refundInput, cashierActor),
     ).rejects.toMatchObject({ status: 409 });
   });
 
@@ -190,7 +205,7 @@ describe("RefundsService.create guards", () => {
           ...refundInput,
           lines: [{ orderLineId: 1, quantity: 1.5, stockAction: null }],
         },
-        cashierId,
+        cashierActor,
       ),
     ).rejects.toMatchObject({ status: 400 });
 
@@ -202,7 +217,7 @@ describe("RefundsService.create guards", () => {
     await expect(
       new RefundsService(repoForCreate(itemTx)).create(
         refundInput,
-        cashierId,
+        cashierActor,
       ),
     ).rejects.toMatchObject({ status: 400 });
 
@@ -215,9 +230,43 @@ describe("RefundsService.create guards", () => {
             { orderLineId: 1, quantity: 2, stockAction: "return_to_stock" },
           ],
         },
-        cashierId,
+        cashierActor,
       ),
     ).rejects.toMatchObject({ status: 400 });
+  });
+});
+
+describe("RefundsService admin refunds", () => {
+  it("skips the shift lookup and flags the refund for an admin", async () => {
+    const tx = txForCreate();
+    const repo = repoForCreate(tx);
+
+    await new RefundsService(repo).create(refundInput, adminActor);
+
+    expect(tx.findOpenShiftForCashier).not.toHaveBeenCalled();
+    expect(tx.createRefund).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cashierId: 11,
+        shiftId: null,
+        isAdminRefund: true,
+      }),
+    );
+  });
+
+  it("keeps the shift and clears the admin flag for a cashier", async () => {
+    const tx = txForCreate();
+    const repo = repoForCreate(tx);
+
+    await new RefundsService(repo).create(refundInput, cashierActor);
+
+    expect(tx.findOpenShiftForCashier).toHaveBeenCalledWith(9);
+    expect(tx.createRefund).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cashierId: 9,
+        shiftId: 3,
+        isAdminRefund: false,
+      }),
+    );
   });
 });
 

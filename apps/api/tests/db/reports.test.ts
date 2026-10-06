@@ -89,7 +89,7 @@ describe("reports", () => {
         byProduct: [],
         byCategory: [],
         byShift: [],
-        byCashier: [],
+        byCashier: [expect.objectContaining({ cashierName: "مدير (إدارة)" })],
       },
       stock: { current: [], lowStock: [], ledger: [] },
       money: { cashFlow: [], expenseBreakdown: [], shiftOverShort: [] },
@@ -107,6 +107,40 @@ describe("reports", () => {
     const auth = await loginAs(app, "cashier");
     const response = await request(app).get("/api/reports/dashboard").set(auth);
     expect(response.status).toBe(403);
+  });
+
+  it("lists admin sales in the by-cashier report marked as إدارة", async () => {
+    const auth = await loginAs(app, "admin");
+    const [admin] = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, "admin"));
+    await db.insert(orders).values({
+      orderNumber: "admin-sale",
+      clientRequestId: randomUUID(),
+      requestFingerprint: "fixture",
+      cashierId: admin.id,
+      shiftId: null,
+      subtotal: "50.00",
+      total: "50.00",
+      cashReceived: "50.00",
+      changeAmount: "0.00",
+      totalCost: "10.00",
+      isAdminSale: true,
+      createdAt: new Date("2026-09-11T08:00:00Z"),
+    });
+
+    const response = await request(app)
+      .get("/api/reports?from=2026-09-11&to=2026-09-11")
+      .set(auth);
+
+    expect(response.status).toBe(200);
+    const row = response.body.sales.byCashier.find((entry: {
+      cashierName: string;
+    }) => entry.cashierName.includes("إدارة"));
+    expect(row).toBeDefined();
+    expect(Number(row.sales)).toBe(50);
+    expect(Number(row.ordersCount)).toBe(1);
   });
 
   it("separates current supplier balances from dated purchases and payments", async () => {

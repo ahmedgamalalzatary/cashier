@@ -19,6 +19,7 @@ const order: OrderDetail = {
   changeAmount: "28.00",
   totalCost: "20.00",
   isNegativeStock: false,
+  isAdminSale: false,
   createdAt: "2026-07-20T10:00:00.000Z",
   lines: [
     {

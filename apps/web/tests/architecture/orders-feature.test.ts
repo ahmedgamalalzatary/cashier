@@ -41,6 +41,11 @@ describe("orders feature boundaries", () => {
     }
   });
 
+  it("marks admin sales on both the list and the detail", () => {
+    expect(read("src/app/orders/page.tsx")).toContain("isAdminSale");
+    expect(read("src/app/orders/detail/page.tsx")).toContain("isAdminSale");
+  });
+
   it("separates cashier and online orders into labelled tab panels", () => {
     const page = read("src/app/orders/page.tsx");
     expect(page).toContain('idPrefix="orders"');

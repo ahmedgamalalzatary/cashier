@@ -32,8 +32,9 @@ describe("refund submission flow", () => {
     );
   });
 
-  it("tells non-cashiers that recording refunds is cashier-only", () => {
-    expect(page).toContain("لحساب الكاشير فقط");
+  it("lets admins record refunds from the same picker", () => {
+    expect(page).not.toContain("لحساب الكاشير فقط");
+    expect(page).toContain("<OrderPicker");
   });
 
   it("clears the refunds search icon on the inline-start side", () => {
