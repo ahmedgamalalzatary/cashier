@@ -1,0 +1,118 @@
+"use client";
+
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { login as loginRequest, logout as logoutRequest, currentUser } from "../../services/auth-service";
+import {
+  canOpenPath,
+  loginPathFor,
+  normalizePath,
+  postLoginPath,
+  readSession,
+  subscribeToSessionChanges,
+  updateSessionUser,
+  writeSession,
+  type AuthUser,
+  type PersistedSession,
+} from "@cashier/web-core/lib/auth";
+
+type AuthContextValue = {
+  user: AuthUser | null;
+  login(username: string, password: string): Promise<void>;
+  logout(): Promise<void>;
+};
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  // trailingSlash is on for the Tauri file-protocol build, so usePathname gives
+  // "/login/" — the route checks below all compare against slash-free paths.
+  const pathname = normalizePath(usePathname());
+  const router = useRouter();
+  const [session, setSession] = useState<PersistedSession | null | undefined>(
+    undefined,
+  );
+
+  useEffect(() => {
+    const sync = () => setSession(readSession());
+    sync();
+    const stored = readSession();
+    if (stored) {
+      const requestedUserId = stored.user.id;
+      void currentUser()
+        .then((user) => {
+          // a logout or another login may have replaced the session while this
+          // request was in flight — never write this user into it
+          if (readSession()?.user.id !== requestedUserId) return;
+          updateSessionUser(user);
+        })
+        .catch(() => undefined);
+    }
+    return subscribeToSessionChanges(sync);
+  }, []);
+
+  useEffect(() => {
+    if (session === undefined) return;
+    if (!session && pathname !== "/login")
+      router.replace(loginPathFor(pathname));
+    else if (session && pathname === "/login")
+      router.replace(postLoginPath(window.location.search, session.user.role));
+    else if (session && !canOpenPath(session.user.role, pathname))
+      router.replace("/");
+  }, [pathname, router, session]);
+
+  async function login(username: string, password: string) {
+    const next = await loginRequest(username, password);
+    writeSession(next);
+    setSession(readSession());
+    router.replace(postLoginPath(window.location.search, next.user.role));
+  }
+
+  async function logout() {
+    // best-effort: the cookie may already be expired, the client state is
+    // what gates the UI, and the server clears the cookie when reachable.
+    // Still awaited so a logout fully completes before a later login.
+    await logoutRequest().catch(() => undefined);
+    writeSession(null);
+    setSession(null);
+    router.replace("/login");
+  }
+
+  const blocked =
+    session === undefined ||
+    (!session && pathname !== "/login") ||
+    (!!session &&
+      (pathname === "/login" || !canOpenPath(session.user.role, pathname)));
+
+  if (blocked) {
+    return (
+      <div
+        className="grid min-h-screen place-items-center bg-paper"
+        role="status"
+        aria-label="جاري التحميل"
+      >
+        <span className="size-8 animate-spin rounded-full border-2 border-line border-t-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <AuthContext.Provider
+      value={{ user: session?.user ?? null, login, logout }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const value = useContext(AuthContext);
+  if (!value) throw new Error("useAuth must be used inside AuthProvider");
+  return value;
+}
