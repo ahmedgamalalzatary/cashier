@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import {
   confirmStocktakeInput,
@@ -9,18 +10,18 @@ import {
 describe("stocktake schemas", () => {
   it("accepts a scoped session and non-negative counted quantities", () => {
     expect(
-      startStocktakeInput.parse({ warehouse: "main", categoryId: "3" }),
+      startStocktakeInput.parse({ warehouse: "main", categoryId: testId(3) }),
     ).toEqual({
       warehouse: "main",
-      categoryId: 3,
+      categoryId: testId(3),
       note: null,
     });
     expect(
       updateStocktakeCountsInput.parse({
-        lines: [{ itemId: "7", countedQuantity: "0" }],
+        lines: [{ itemId: testId(7), countedQuantity: "0" }],
       }),
     ).toEqual({
-      lines: [{ itemId: 7, countedQuantity: 0 }],
+      lines: [{ itemId: testId(7), countedQuantity: 0 }],
     });
   });
 
@@ -28,31 +29,31 @@ describe("stocktake schemas", () => {
     expect(() =>
       updateStocktakeCountsInput.parse({
         lines: [
-          { itemId: 7, countedQuantity: 1 },
-          { itemId: 7, countedQuantity: 2 },
+          { itemId: testId(7), countedQuantity: 1 },
+          { itemId: testId(7), countedQuantity: 2 },
         ],
       }),
     ).toThrow();
     expect(() =>
       updateStocktakeCountsInput.parse({
-        lines: [{ itemId: 7, countedQuantity: 1.0005 }],
+        lines: [{ itemId: testId(7), countedQuantity: 1.0005 }],
       }),
     ).toThrow();
     expect(() =>
       updateStocktakeCountsInput.parse({
-        lines: [{ itemId: 7, countedQuantity: "" }],
+        lines: [{ itemId: testId(7), countedQuantity: "" }],
       }),
     ).toThrow();
     expect(() =>
       updateStocktakeCountsInput.parse({
-        lines: [{ itemId: 7, countedQuantity: "   " }],
+        lines: [{ itemId: testId(7), countedQuantity: "   " }],
       }),
     ).toThrow();
     expect(() => confirmStocktakeInput.parse({ note: " " })).toThrow();
     expect(() =>
       manualAdjustmentInput.parse({
         warehouse: "cafe",
-        itemId: 7,
+        itemId: testId(7),
         countedQuantity: 2,
         note: " ",
       }),

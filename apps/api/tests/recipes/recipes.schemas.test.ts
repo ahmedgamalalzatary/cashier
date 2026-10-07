@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import {
   preparationInput,
@@ -6,13 +7,13 @@ import {
 
 const validRecipe = {
   name: "كابتشينو",
-  categoryId: 2,
+  categoryId: testId(2),
   type: "prepared",
-  outputItemId: 5,
+  outputItemId: testId(5),
   baseYield: 10,
   ingredients: [
-    { itemId: 1, quantity: 0.5 },
-    { itemId: 2, quantity: 0.2 },
+    { itemId: testId(1), quantity: 0.5 },
+    { itemId: testId(2), quantity: 0.2 },
   ],
 };
 
@@ -35,8 +36,8 @@ describe("recipe schema", () => {
       recipeInput.safeParse({
         ...validRecipe,
         ingredients: [
-          { itemId: 1, quantity: 0.5 },
-          { itemId: 1, quantity: 0.2 },
+          { itemId: testId(1), quantity: 0.5 },
+          { itemId: testId(1), quantity: 0.2 },
         ],
       }).success,
     ).toBe(false);
@@ -46,7 +47,7 @@ describe("recipe schema", () => {
     expect(
       recipeInput.safeParse({
         ...validRecipe,
-        ingredients: [{ itemId: 1, quantity: 0.0005 }],
+        ingredients: [{ itemId: testId(1), quantity: 0.0005 }],
       }).success,
     ).toBe(false);
     expect(

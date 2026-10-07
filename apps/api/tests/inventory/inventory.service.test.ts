@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import { InventoryService } from "../../src/modules/inventory/inventory.service.js";
 import type {
@@ -6,15 +7,15 @@ import type {
   StockMovementWrite,
 } from "../../src/modules/inventory/inventory.repository.js";
 
-type ItemRecord = { id: number; isActive: boolean };
+type ItemRecord = { id: string; isActive: boolean };
 
 class FakeInventoryRepository implements InventoryRepositoryPort {
-  items = new Map<number, ItemRecord>([[1, { id: 1, isActive: true }]]);
+  items = new Map<string, ItemRecord>([[testId(1), { id: testId(1), isActive: true }]]);
   batches: StockBatchRecord[] = [];
   movements: StockMovementWrite[] = [];
   deficitAllocations: Array<{
-    deficitMovementId: number;
-    batchId: number;
+    deficitMovementId: string;
+    batchId: string;
     quantity: string;
     unitCost: string;
   }> = [];
@@ -36,22 +37,22 @@ class FakeInventoryRepository implements InventoryRepositoryPort {
     return result;
   }
 
-  async findItemForUpdate(id: number) {
+  async findItemForUpdate(id: string) {
     return this.items.get(id);
   }
 
   async createBatch(data: Omit<StockBatchRecord, "id">) {
-    const id = this.nextBatchId++;
+    const id = testId(this.nextBatchId++);
     this.batches.push({ id, ...data });
     return id;
   }
 
   async createMovement(data: StockMovementWrite) {
     this.movements.push(data);
-    return this.movements.length;
+    return testId(this.movements.length);
   }
 
-  async outstandingDeficits(itemId: number, warehouse: "main" | "cafe") {
+  async outstandingDeficits(itemId: string, warehouse: "main" | "cafe") {
     return this.movements.flatMap((movement, index) => {
       if (
         movement.itemId !== itemId ||
@@ -60,7 +61,7 @@ class FakeInventoryRepository implements InventoryRepositoryPort {
         Number(movement.quantity) >= 0
       )
         return [];
-      const movementId = index + 1;
+      const movementId = testId(index + 1);
       const allocated = this.deficitAllocations
         .filter((allocation) => allocation.deficitMovementId === movementId)
         .reduce((sum, allocation) => sum + Number(allocation.quantity), 0);
@@ -72,15 +73,15 @@ class FakeInventoryRepository implements InventoryRepositoryPort {
   }
 
   async createDeficitAllocation(data: {
-    deficitMovementId: number;
-    batchId: number;
+    deficitMovementId: string;
+    batchId: string;
     quantity: string;
     unitCost: string;
   }) {
     this.deficitAllocations.push(data);
   }
 
-  async lockAvailableBatches(itemId: number, warehouse: "main" | "cafe") {
+  async lockAvailableBatches(itemId: string, warehouse: "main" | "cafe") {
     return this.batches.filter(
       (batch) =>
         batch.itemId === itemId &&
@@ -89,7 +90,7 @@ class FakeInventoryRepository implements InventoryRepositoryPort {
     );
   }
 
-  async updateBatchRemaining(id: number, remainingQuantity: string) {
+  async updateBatchRemaining(id: string, remainingQuantity: string) {
     const batch = this.batches.find((candidate) => candidate.id === id);
     if (batch) batch.remainingQuantity = remainingQuantity;
   }
@@ -105,23 +106,23 @@ describe("FIFO inventory service", () => {
     const service = new InventoryService(repo);
 
     const result = await service.receive({
-      itemId: 1,
+      itemId: testId(1),
       warehouse: "main",
       quantity: 3.5,
       unitCost: "4.25",
       movementType: "purchase",
       referenceType: "purchase_invoice",
-      referenceId: 7,
+      referenceId: testId(7),
     });
 
-    expect(result).toEqual({ batchId: 1, deficitAllocations: [] });
+    expect(result).toEqual({ batchId: testId(1), deficitAllocations: [] });
     expect(repo.batches[0]).toMatchObject({
       initialQuantity: "3.500",
       remainingQuantity: "3.500",
       unitCost: "4.250000",
     });
     expect(repo.movements[0]).toMatchObject({
-      batchId: 1,
+      batchId: testId(1),
       quantity: "3.500",
       unitCost: "4.250000",
     });
@@ -133,20 +134,20 @@ describe("FIFO inventory service", () => {
 
     await expect(
       service.receive({
-        itemId: 1,
+        itemId: testId(1),
         warehouse: "main",
         quantity: 1,
         unitCost: "0",
         movementType: "stocktake_surplus",
       }),
-    ).resolves.toEqual({ batchId: 1, deficitAllocations: [] });
+    ).resolves.toEqual({ batchId: testId(1), deficitAllocations: [] });
     expect(repo.batches[0].unitCost).toBe("0.000000");
   });
 
   it("uses incoming stock to reconcile an earlier negative balance", async () => {
     const repo = new FakeInventoryRepository();
     repo.movements.push({
-      itemId: 1,
+      itemId: testId(1),
       warehouse: "cafe",
       batchId: null,
       movementType: "sale",
@@ -160,7 +161,7 @@ describe("FIFO inventory service", () => {
     const service = new InventoryService(repo);
 
     await service.receive({
-      itemId: 1,
+      itemId: testId(1),
       warehouse: "cafe",
       quantity: 3,
       unitCost: "8",
@@ -173,8 +174,8 @@ describe("FIFO inventory service", () => {
     });
     expect(repo.deficitAllocations).toEqual([
       {
-        deficitMovementId: 1,
-        batchId: 1,
+        deficitMovementId: testId(1),
+        batchId: testId(1),
         quantity: "1.000",
         unitCost: "8.000000",
       },
@@ -186,7 +187,7 @@ describe("FIFO inventory service", () => {
     const service = new InventoryService(repo);
 
     await service.receive({
-      itemId: 1,
+      itemId: testId(1),
       warehouse: "main",
       quantity: 1,
       unitCost: "9999999999.999999",
@@ -196,7 +197,7 @@ describe("FIFO inventory service", () => {
 
     await expect(
       service.receive({
-        itemId: 1,
+        itemId: testId(1),
         warehouse: "main",
         quantity: 1,
         unitCost: "10000000000.000000",
@@ -209,37 +210,37 @@ describe("FIFO inventory service", () => {
     const repo = new FakeInventoryRepository();
     repo.batches = [
       {
-        id: 1,
-        itemId: 1,
+        id: testId(1),
+        itemId: testId(1),
         warehouse: "main",
         initialQuantity: "2.000",
         remainingQuantity: "2.000",
         unitCost: "10.000000",
         receivedAt: new Date("2026-07-01T00:00:00Z"),
         sourceType: "purchase",
-        sourceId: 1,
+        sourceId: testId(1),
       },
       {
-        id: 2,
-        itemId: 1,
+        id: testId(2),
+        itemId: testId(1),
         warehouse: "main",
         initialQuantity: "5.000",
         remainingQuantity: "5.000",
         unitCost: "12.000000",
         receivedAt: new Date("2026-07-02T00:00:00Z"),
         sourceType: "purchase",
-        sourceId: 2,
+        sourceId: testId(2),
       },
     ];
     const service = new InventoryService(repo);
 
     const result = await service.consume({
-      itemId: 1,
+      itemId: testId(1),
       warehouse: "main",
       quantity: 4,
       movementType: "transfer_out",
       referenceType: "transfer",
-      referenceId: 9,
+      referenceId: testId(9),
     });
 
     expect(repo.batches.map((batch) => batch.remainingQuantity)).toEqual([
@@ -255,14 +256,14 @@ describe("FIFO inventory service", () => {
       totalCost: "44.000000",
       allocations: [
         {
-          batchId: 1,
-          movementId: 1,
+          batchId: testId(1),
+          movementId: testId(1),
           quantity: "2.000",
           unitCost: "10.000000",
         },
         {
-          batchId: 2,
-          movementId: 2,
+          batchId: testId(2),
+          movementId: testId(2),
           quantity: "2.000",
           unitCost: "12.000000",
         },
@@ -274,22 +275,22 @@ describe("FIFO inventory service", () => {
     const repo = new FakeInventoryRepository();
     repo.batches = [
       {
-        id: 1,
-        itemId: 1,
+        id: testId(1),
+        itemId: testId(1),
         warehouse: "main",
         initialQuantity: "2.000",
         remainingQuantity: "2.000",
         unitCost: "10.000000",
         receivedAt: new Date("2026-07-01T00:00:00Z"),
         sourceType: "purchase",
-        sourceId: 1,
+        sourceId: testId(1),
       },
     ];
     const service = new InventoryService(repo);
 
     await expect(
       service.consume({
-        itemId: 1,
+        itemId: testId(1),
         warehouse: "main",
         quantity: 3,
         movementType: "transfer_out",
@@ -303,21 +304,21 @@ describe("FIFO inventory service", () => {
     const repo = new FakeInventoryRepository();
     repo.batches = [
       {
-        id: 1,
-        itemId: 1,
+        id: testId(1),
+        itemId: testId(1),
         warehouse: "cafe",
         initialQuantity: "1.000",
         remainingQuantity: "1.000",
         unitCost: "8.000000",
         receivedAt: new Date("2026-07-01T00:00:00Z"),
         sourceType: "transfer_in",
-        sourceId: 1,
+        sourceId: testId(1),
       },
     ];
     const service = new InventoryService(repo);
 
     const result = await service.consume({
-      itemId: 1,
+      itemId: testId(1),
       warehouse: "cafe",
       quantity: 2,
       movementType: "sale",
@@ -335,14 +336,14 @@ describe("FIFO inventory service", () => {
       totalCost: "8.000000",
       allocations: [
         {
-          batchId: 1,
-          movementId: 1,
+          batchId: testId(1),
+          movementId: testId(1),
           quantity: "1.000",
           unitCost: "8.000000",
         },
         {
           batchId: null,
-          movementId: 2,
+          movementId: testId(2),
           quantity: "1.000",
           unitCost: "0.000000",
         },
@@ -357,14 +358,14 @@ describe("FIFO inventory service", () => {
     await expect(
       service.transaction(async (inventory) => {
         await inventory.receive({
-          itemId: 1,
+          itemId: testId(1),
           warehouse: "main",
           quantity: 2,
           unitCost: "5",
           movementType: "purchase",
         });
         await inventory.consume({
-          itemId: 1,
+          itemId: testId(1),
           warehouse: "main",
           quantity: 1,
           movementType: "transfer_out",
@@ -379,7 +380,7 @@ describe("FIFO inventory service", () => {
 
 describe("inventory input validation", () => {
   const baseReceive = {
-    itemId: 1,
+    itemId: testId(1),
     warehouse: "main" as const,
     quantity: 1,
     unitCost: "5",
@@ -397,7 +398,7 @@ describe("inventory input validation", () => {
     }
     await expect(
       service.consume({
-        itemId: 1,
+        itemId: testId(1),
         warehouse: "main",
         quantity: 1.0005,
         movementType: "sale",
@@ -420,10 +421,10 @@ describe("inventory input validation", () => {
 describe("inventory item guards", () => {
   it("404s a missing item and 409s an inactive one", async () => {
     const missing = new FakeInventoryRepository();
-    missing.items.delete(1);
+    missing.items.delete(testId(1));
     await expect(
       new InventoryService(missing).receive({
-        itemId: 1,
+        itemId: testId(1),
         warehouse: "main",
         quantity: 1,
         unitCost: "5",
@@ -432,10 +433,10 @@ describe("inventory item guards", () => {
     ).rejects.toMatchObject({ status: 404 });
 
     const inactive = new FakeInventoryRepository();
-    inactive.items.set(1, { id: 1, isActive: false });
+    inactive.items.set(testId(1), { id: testId(1), isActive: false });
     await expect(
       new InventoryService(inactive).consume({
-        itemId: 1,
+        itemId: testId(1),
         warehouse: "main",
         quantity: 1,
         movementType: "sale",
@@ -446,7 +447,7 @@ describe("inventory item guards", () => {
 
 describe("inventory deficit and stock flags", () => {
   const deficitMovement = (quantity: string) => ({
-    itemId: 1,
+    itemId: testId(1),
     warehouse: "cafe" as const,
     batchId: null,
     movementType: "sale",
@@ -464,7 +465,7 @@ describe("inventory deficit and stock flags", () => {
     const service = new InventoryService(repo);
 
     const result = await service.receive({
-      itemId: 1,
+      itemId: testId(1),
       warehouse: "cafe",
       quantity: 2,
       unitCost: "8",
@@ -476,18 +477,18 @@ describe("inventory deficit and stock flags", () => {
       remainingQuantity: "0.000",
     });
     expect(result.deficitAllocations).toEqual([
-      { deficitMovementId: 1, batchId: 1, quantity: "1.000", unitCost: "8.000000" },
-      { deficitMovementId: 2, batchId: 1, quantity: "1.000", unitCost: "8.000000" },
+      { deficitMovementId: testId(1), batchId: testId(1), quantity: "1.000", unitCost: "8.000000" },
+      { deficitMovementId: testId(2), batchId: testId(1), quantity: "1.000", unitCost: "8.000000" },
     ]);
   });
 
   it("flags low and negative stock levels", async () => {
     const repo = new FakeInventoryRepository();
     const row = (overrides: Record<string, unknown>) => ({
-      itemId: 1,
+      itemId: testId(1),
       code: 1001,
       name: "بن",
-      categoryId: 1,
+      categoryId: testId(1),
       categoryName: "خامات",
       type: "raw",
       stockUnit: "كجم",

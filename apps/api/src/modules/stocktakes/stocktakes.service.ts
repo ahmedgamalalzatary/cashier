@@ -12,7 +12,7 @@ const number3 = (value: string) => Number(Number(value).toFixed(3));
 export class StocktakesService {
   constructor(private repo: StocktakesRepositoryPort) {}
 
-  async start(input: StartStocktakeInput, userId: number) {
+  async start(input: StartStocktakeInput, userId: string) {
     const id = await this.repo.transaction(async (repo) => {
       const rows = await repo.snapshotItems(input.warehouse, input.categoryId);
       if (!rows.length)
@@ -26,12 +26,12 @@ export class StocktakesService {
   list() {
     return this.repo.list();
   }
-  async find(id: number) {
+  async find(id: string) {
     const row = await this.repo.detail(id);
     if (!row) throw new HttpError(404, "جلسة الجرد غير موجودة");
     return row;
   }
-  async updateCounts(id: number, input: UpdateStocktakeCountsInput) {
+  async updateCounts(id: string, input: UpdateStocktakeCountsInput) {
     await this.repo.transaction(async (repo) => {
       const session = await repo.findSessionForUpdate(id);
       if (!session) throw new HttpError(404, "جلسة الجرد غير موجودة");
@@ -50,7 +50,7 @@ export class StocktakesService {
     });
     return this.find(id);
   }
-  async confirm(id: number, input: ConfirmStocktakeInput, _userId?: number) {
+  async confirm(id: string, input: ConfirmStocktakeInput, _userId?: string) {
     await this.repo.transaction(async (repo) => {
       const session = await repo.findSessionForUpdate(id);
       if (!session) throw new HttpError(404, "جلسة الجرد غير موجودة");
@@ -84,7 +84,7 @@ export class StocktakesService {
     });
     return this.find(id);
   }
-  async manual(input: ManualAdjustmentInput, userId: number) {
+  async manual(input: ManualAdjustmentInput, userId: string) {
     const id = await this.repo.transaction(async (repo) => {
       const recorded = await repo.currentQuantity(
         input.itemId,
@@ -117,9 +117,9 @@ export class StocktakesService {
   }
   private async adjust(
     repo: StocktakesRepositoryPort,
-    id: number,
+    id: string,
     warehouse: "main" | "cafe",
-    itemId: number,
+    itemId: string,
     recorded: number,
     counted: number,
     note: string,

@@ -17,11 +17,11 @@ const optionalText = (maximum: number) =>
   );
 
 const transferLineInput = z.object({
-  itemId: z.coerce.number().int().positive(),
+  itemId: z.string().uuid(),
   quantity,
 });
 
-const hasUniqueLines = (data: { lines: Array<{ itemId: number }> }) =>
+const hasUniqueLines = (data: { lines: Array<{ itemId: string }> }) =>
   new Set(data.lines.map((line) => line.itemId)).size === data.lines.length;
 
 export const transferRequestInput = z
@@ -39,7 +39,7 @@ export const transferDirectInput = z
   .object({
     notes: optionalText(2000),
     /** links the transfer to the invoice it moves stock for */
-    purchaseInvoiceId: z.coerce.number().int().positive().nullish(),
+    purchaseInvoiceId: z.string().uuid().nullish(),
     lines: z.array(transferLineInput).min(1).max(100),
   })
   .refine(hasUniqueLines, {

@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it, vi } from "vitest";
 import type { RecipesRepository } from "../../src/modules/recipes/recipes.repository.js";
 import { RecipesService } from "../../src/modules/recipes/recipes.service.js";
@@ -5,10 +6,10 @@ import { RecipesService } from "../../src/modules/recipes/recipes.service.js";
 describe("RecipesService external-product boundary", () => {
   it("treats legacy local sellable products as absent", async () => {
     const legacyProduct = {
-      id: 7,
+      id: testId(7),
       name: "Legacy product",
       type: "product" as const,
-      categoryId: 2,
+      categoryId: testId(2),
       categoryName: "Drinks",
       outputItemId: null,
       outputItemName: null,
@@ -26,17 +27,17 @@ describe("RecipesService external-product boundary", () => {
     } as unknown as RecipesRepository;
     const service = new RecipesService(repository);
 
-    await expect(service.get(7)).rejects.toMatchObject({ status: 404 });
-    await expect(service.deactivate(7)).rejects.toMatchObject({ status: 404 });
+    await expect(service.get(testId(7))).rejects.toMatchObject({ status: 404 });
+    await expect(service.deactivate(testId(7))).rejects.toMatchObject({ status: 404 });
   });
 });
 
 const preparedRecipe = (overrides: Record<string, unknown> = {}) => ({
-  id: 3,
+  id: testId(3),
   name: "كابتشينو",
   type: "prepared",
   isActive: true,
-  outputItemId: 5,
+  outputItemId: testId(5),
   ...overrides,
 });
 
@@ -46,13 +47,13 @@ function txForPrepare(overrides: Record<string, unknown> = {}) {
     findRecipeHeader: vi.fn(async () => ({ outputItemName: "كابتشينو جاهز" })),
     listSizes: vi.fn(async () => [{ outputQuantity: "10.000" }]),
     listIngredients: vi.fn(async () => [
-      { itemId: 1, itemName: "بن", quantity: "1.000" },
+      { itemId: testId(1), itemName: "بن", quantity: "1.000" },
     ]),
     lockItems: vi.fn(async () => [
-      { id: 5, name: "كابتشينو جاهز", isActive: true },
-      { id: 1, name: "بن", isActive: true },
+      { id: testId(5), name: "كابتشينو جاهز", isActive: true },
+      { id: testId(1), name: "بن", isActive: true },
     ]),
-    createPreparation: vi.fn(async () => 77),
+    createPreparation: vi.fn(async () => testId(77)),
     createPreparationAllocation: vi.fn(async () => undefined),
     completePreparation: vi.fn(async () => undefined),
     ...overrides,
@@ -66,7 +67,7 @@ function serviceForPrepare(tx: Record<string, unknown>) {
         tx,
         {
           consume: vi.fn(async () => ({ allocations: [] })),
-          receive: vi.fn(async () => ({ batchId: 9 })),
+          receive: vi.fn(async () => ({ batchId: testId(9) })),
         },
       ),
     ),
@@ -80,14 +81,14 @@ describe("RecipesService.prepare guards", () => {
       txForPrepare({ lockRecipe: vi.fn(async () => undefined) }),
     );
     await expect(
-      missing.prepare(999, { quantity: 2, notes: null }, 9),
+      missing.prepare(testId(999), { quantity: 2, notes: null }, testId(9)),
     ).rejects.toMatchObject({ status: 404 });
 
     const legacy = serviceForPrepare(
       txForPrepare({ lockRecipe: vi.fn(async () => preparedRecipe({ type: "product" })) }),
     );
     await expect(
-      legacy.prepare(7, { quantity: 2, notes: null }, 9),
+      legacy.prepare(testId(7), { quantity: 2, notes: null }, testId(9)),
     ).rejects.toMatchObject({ status: 404 });
   });
 
@@ -96,21 +97,21 @@ describe("RecipesService.prepare guards", () => {
       txForPrepare({ lockRecipe: vi.fn(async () => preparedRecipe({ isActive: false })) }),
     );
     await expect(
-      inactive.prepare(3, { quantity: 2, notes: null }, 9),
+      inactive.prepare(testId(3), { quantity: 2, notes: null }, testId(9)),
     ).rejects.toMatchObject({ status: 409 });
 
     const noOutput = serviceForPrepare(
       txForPrepare({ lockRecipe: vi.fn(async () => preparedRecipe({ outputItemId: null })) }),
     );
     await expect(
-      noOutput.prepare(3, { quantity: 2, notes: null }, 9),
+      noOutput.prepare(testId(3), { quantity: 2, notes: null }, testId(9)),
     ).rejects.toMatchObject({ status: 409 });
 
     const badHeader = serviceForPrepare(
       txForPrepare({ findRecipeHeader: vi.fn(async () => ({ outputItemName: null })) }),
     );
     await expect(
-      badHeader.prepare(3, { quantity: 2, notes: null }, 9),
+      badHeader.prepare(testId(3), { quantity: 2, notes: null }, testId(9)),
     ).rejects.toMatchObject({ status: 409 });
   });
 
@@ -118,36 +119,36 @@ describe("RecipesService.prepare guards", () => {
     for (const sizes of [[], [{ outputQuantity: null }], [{ outputQuantity: "1.000" }, { outputQuantity: "2.000" }]]) {
       const service = serviceForPrepare(txForPrepare({ listSizes: vi.fn(async () => sizes) }));
       await expect(
-        service.prepare(3, { quantity: 2, notes: null }, 9),
+        service.prepare(testId(3), { quantity: 2, notes: null }, testId(9)),
       ).rejects.toMatchObject({ status: 409 });
     }
   });
 
   it("404s missing locked items and 409s inactive ones", async () => {
     const missing = serviceForPrepare(
-      txForPrepare({ lockItems: vi.fn(async () => [{ id: 5, name: "جاهز", isActive: true }]) }),
+      txForPrepare({ lockItems: vi.fn(async () => [{ id: testId(5), name: "جاهز", isActive: true }]) }),
     );
     await expect(
-      missing.prepare(3, { quantity: 2, notes: null }, 9),
+      missing.prepare(testId(3), { quantity: 2, notes: null }, testId(9)),
     ).rejects.toMatchObject({ status: 404 });
 
     const inactive = serviceForPrepare(
       txForPrepare({
         lockItems: vi.fn(async () => [
-          { id: 5, name: "جاهز", isActive: true },
-          { id: 1, name: "بن", isActive: false },
+          { id: testId(5), name: "جاهز", isActive: true },
+          { id: testId(1), name: "بن", isActive: false },
         ]),
       }),
     );
     await expect(
-      inactive.prepare(3, { quantity: 2, notes: null }, 9),
+      inactive.prepare(testId(3), { quantity: 2, notes: null }, testId(9)),
     ).rejects.toMatchObject({ status: 409 });
   });
 
   it("400s a yield too small to scale any ingredient", async () => {
     const service = serviceForPrepare(txForPrepare());
     await expect(
-      service.prepare(3, { quantity: 0.001, notes: null }, 9),
+      service.prepare(testId(3), { quantity: 0.001, notes: null }, testId(9)),
     ).rejects.toMatchObject({ status: 400 });
   });
 });

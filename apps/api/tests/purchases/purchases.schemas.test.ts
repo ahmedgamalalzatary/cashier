@@ -1,8 +1,9 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import { purchaseInput } from "../../src/modules/purchases/purchases.schemas.js";
 
 const validLine = {
-  itemId: 5,
+  itemId: testId(5),
   quantity: 2.5,
   unitMode: "stock",
   unitPrice: 10.25,
@@ -10,7 +11,7 @@ const validLine = {
 
 const validPurchase = {
   clientRequestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-  supplierId: 1,
+  supplierId: testId(1),
   invoiceNumber: "INV-1",
   purchasedAt: "2026-07-20",
   paidAmount: 10,
@@ -99,16 +100,16 @@ describe("purchase schema", () => {
     }
   });
 
-  it("rejects empty lines and coerces string ids", () => {
+  it("rejects empty lines and preserves UUID ids", () => {
     expect(
       purchaseInput.safeParse({ ...validPurchase, lines: [] }).success,
     ).toBe(false);
     const parsed = purchaseInput.parse({
       ...validPurchase,
-      supplierId: "1",
-      lines: [{ ...validLine, itemId: "5" }],
+      supplierId: testId(1),
+      lines: [{ ...validLine, itemId: testId(5) }],
     });
-    expect(parsed.supplierId).toBe(1);
-    expect(parsed.lines[0]?.itemId).toBe(5);
+    expect(parsed.supplierId).toBe(testId(1));
+    expect(parsed.lines[0]?.itemId).toBe(testId(5));
   });
 });

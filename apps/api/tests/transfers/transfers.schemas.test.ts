@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import {
   transferApprovalInput,
@@ -11,7 +12,7 @@ const requestId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const validRequest = {
   clientRequestId: requestId,
   notes: "احتياج الوردية",
-  lines: [{ itemId: 5, quantity: 2.5 }],
+  lines: [{ itemId: testId(5), quantity: 2.5 }],
 };
 
 describe("transfer request schema", () => {
@@ -22,13 +23,13 @@ describe("transfer request schema", () => {
     });
 
     expect(parsed.notes).toBeNull();
-    expect(parsed.lines).toEqual([{ itemId: 5, quantity: 2.5 }]);
+    expect(parsed.lines).toEqual([{ itemId: testId(5), quantity: 2.5 }]);
   });
 
   it("rejects a duplicate itemId in request, direct, and approval inputs", () => {
     const lines = [
-      { itemId: 5, quantity: 1 },
-      { itemId: 5, quantity: 2 },
+      { itemId: testId(5), quantity: 1 },
+      { itemId: testId(5), quantity: 2 },
     ];
 
     for (const schema of [
@@ -57,7 +58,7 @@ describe("transfer request schema", () => {
     for (const quantity of [0, -1, 1.0005]) {
       const result = transferRequestInput.safeParse({
         ...validRequest,
-        lines: [{ itemId: 5, quantity }],
+        lines: [{ itemId: testId(5), quantity }],
       });
 
       expect(result.success).toBe(false);
@@ -65,7 +66,7 @@ describe("transfer request schema", () => {
 
     const ok = transferRequestInput.parse({
       ...validRequest,
-      lines: [{ itemId: 5, quantity: 1.005 }],
+      lines: [{ itemId: testId(5), quantity: 1.005 }],
     });
     expect(ok.lines[0]?.quantity).toBe(1.005);
   });
@@ -85,12 +86,12 @@ describe("transfer request schema", () => {
     ).toBe(true);
   });
 
-  it("coerces string numbers from form payloads", () => {
+  it("preserves UUID ids while coercing quantity strings", () => {
     const parsed = transferRequestInput.parse({
       ...validRequest,
-      lines: [{ itemId: "5", quantity: "2.5" }],
+      lines: [{ itemId: testId(5), quantity: "2.5" }],
     });
 
-    expect(parsed.lines).toEqual([{ itemId: 5, quantity: 2.5 }]);
+    expect(parsed.lines).toEqual([{ itemId: testId(5), quantity: 2.5 }]);
   });
 });

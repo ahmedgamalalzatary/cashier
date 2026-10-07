@@ -19,18 +19,18 @@ import { InventoryTransaction } from "../inventory/inventory.service.js";
 import { HttpError } from "@cashier/server-core";
 
 export type StocktakeSessionRecord = {
-  id: number;
+  id: string;
   warehouse: Warehouse;
   status: "draft" | "confirmed";
-  createdBy: number;
+  createdBy: string;
 };
 export type StocktakeLineRecord = {
-  id: number;
-  itemId: number;
+  id: string;
+  itemId: string;
   recordedQuantity: string;
   countedQuantity: string | null;
 };
-export type StocktakeSnapshot = { itemId: number; recordedQuantity: string };
+export type StocktakeSnapshot = { itemId: string; recordedQuantity: string };
 
 export interface StocktakesRepositoryPort {
   transaction<T>(
@@ -38,35 +38,35 @@ export interface StocktakesRepositoryPort {
   ): Promise<T>;
   createSession(data: {
     warehouse: Warehouse;
-    categoryId: number | null;
+    categoryId: string | null;
     note: string | null;
-    createdBy: number;
+    createdBy: string;
     kind?: "stocktake" | "manual";
-  }): Promise<number>;
+  }): Promise<string>;
   snapshotItems(
     warehouse: Warehouse,
-    categoryId: number | null,
+    categoryId: string | null,
   ): Promise<StocktakeSnapshot[]>;
-  createLines(stocktakeId: number, rows: StocktakeSnapshot[]): Promise<void>;
-  findSessionForUpdate(id: number): Promise<StocktakeSessionRecord | undefined>;
-  listLinesForUpdate(id: number): Promise<StocktakeLineRecord[]>;
+  createLines(stocktakeId: string, rows: StocktakeSnapshot[]): Promise<void>;
+  findSessionForUpdate(id: string): Promise<StocktakeSessionRecord | undefined>;
+  listLinesForUpdate(id: string): Promise<StocktakeLineRecord[]>;
   updateCounts(
-    id: number,
-    lines: Array<{ itemId: number; countedQuantity: number }>,
+    id: string,
+    lines: Array<{ itemId: string; countedQuantity: number }>,
   ): Promise<void>;
-  currentQuantity(itemId: number, warehouse: Warehouse): Promise<string>;
-  currentFifoCost(itemId: number, warehouse: Warehouse): Promise<string>;
-  markConfirmed(id: number, note: string): Promise<void>;
-  detail(id: number): Promise<unknown>;
+  currentQuantity(itemId: string, warehouse: Warehouse): Promise<string>;
+  currentFifoCost(itemId: string, warehouse: Warehouse): Promise<string>;
+  markConfirmed(id: string, note: string): Promise<void>;
+  detail(id: string): Promise<unknown>;
   list(): Promise<unknown[]>;
   createManualSession(data: {
     warehouse: Warehouse;
     note: string;
-    createdBy: number;
-  }): Promise<number>;
+    createdBy: string;
+  }): Promise<string>;
   createManualLine(data: {
-    stocktakeId: number;
-    itemId: number;
+    stocktakeId: string;
+    itemId: string;
     recordedQuantity: string;
     countedQuantity: string;
   }): Promise<void>;
@@ -89,17 +89,17 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
   }
   async createSession(data: {
     warehouse: Warehouse;
-    categoryId: number | null;
+    categoryId: string | null;
     note: string | null;
-    createdBy: number;
+    createdBy: string;
     kind?: "stocktake" | "manual";
   }) {
     const [result] = await this.db
       .insert(stocktakes)
-      .values(branchValues({ ...data, kind: data.kind ?? "stocktake" }));
-    return result.insertId;
+      .values(branchValues({ ...data, kind: data.kind ?? "stocktake" })).$returningId();
+    return result.id;
   }
-  snapshotItems(warehouse: Warehouse, categoryId: number | null) {
+  snapshotItems(warehouse: Warehouse, categoryId: string | null) {
     const recordedQuantity = sql<string>`CAST(COALESCE((SELECT SUM(sm.quantity) FROM ${branchTable("stock_movements")} sm WHERE sm.item_id=${items.id} AND sm.warehouse=${warehouse}),0) AS DECIMAL(14,3))`;
     return this.db
       .select({ itemId: items.id, recordedQuantity })
@@ -124,13 +124,13 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
       )
       .orderBy(asc(items.id));
   }
-  async createLines(stocktakeId: number, rows: StocktakeSnapshot[]) {
+  async createLines(stocktakeId: string, rows: StocktakeSnapshot[]) {
     if (rows.length)
       await this.db
         .insert(stocktakeLines)
         .values(branchValues(rows.map((row) => ({ stocktakeId, ...row }))));
   }
-  async findSessionForUpdate(id: number) {
+  async findSessionForUpdate(id: string) {
     const [row] = await this.db
       .select({
         id: stocktakes.id,
@@ -143,7 +143,7 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
       .for("update");
     return row;
   }
-  listLinesForUpdate(id: number) {
+  listLinesForUpdate(id: string) {
     return this.db
       .select({
         id: stocktakeLines.id,
@@ -159,8 +159,8 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
       .for("update");
   }
   async updateCounts(
-    id: number,
-    lines: Array<{ itemId: number; countedQuantity: number }>,
+    id: string,
+    lines: Array<{ itemId: string; countedQuantity: number }>,
   ) {
     for (const line of lines) {
       const [result] = await this.db
@@ -179,7 +179,7 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
         throw new Error("STOCKTAKE_LINE_NOT_FOUND");
     }
   }
-  async currentQuantity(itemId: number, warehouse: Warehouse) {
+  async currentQuantity(itemId: string, warehouse: Warehouse) {
     const item = await new InventoryRepository(this.db).findItemForUpdate(
       itemId,
     );
@@ -192,7 +192,7 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
       (row as unknown as Array<{ quantity: string }>)[0]?.quantity ?? "0.000",
     );
   }
-  async currentFifoCost(itemId: number, warehouse: Warehouse) {
+  async currentFifoCost(itemId: string, warehouse: Warehouse) {
     // Surplus found on an empty shelf has no batch with stock left, so fall back
     // to the newest batch of any remaining quantity. Valuing found stock at zero
     // would hide its cost from every later sale's COGS. Rows with stock still
@@ -210,13 +210,13 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
         "0.000000",
     );
   }
-  async markConfirmed(id: number, note: string) {
+  async markConfirmed(id: string, note: string) {
     await this.db
       .update(stocktakes)
       .set({ status: "confirmed", note, confirmedAt: new Date() })
       .where(branchCondition(stocktakes, eq(stocktakes.id, id)));
   }
-  async detail(id: number) {
+  async detail(id: string) {
     const [header] = await this.db
       .select({
         id: stocktakes.id,
@@ -289,13 +289,13 @@ export class StocktakesRepository implements StocktakesRepositoryPort {
   createManualSession(data: {
     warehouse: Warehouse;
     note: string;
-    createdBy: number;
+    createdBy: string;
   }) {
     return this.createSession({ ...data, categoryId: null, kind: "manual" });
   }
   async createManualLine(data: {
-    stocktakeId: number;
-    itemId: number;
+    stocktakeId: string;
+    itemId: string;
     recordedQuantity: string;
     countedQuantity: string;
   }) {

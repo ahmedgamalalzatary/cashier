@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, it, testId, testBranchValues } from "../support/ids.js";
+import { describe, expect } from "vitest";
 import request from "supertest";
 import { and, eq } from "drizzle-orm";
 import { createApp } from "../../../../apps/api/src/app.js";
@@ -25,24 +26,24 @@ beforeEach(async () => {
 });
 
 async function createPurchaseFixture() {
-  const [supplierResult] = await db.insert(suppliers).values({
+  const [supplierResult] = await db.insert(suppliers).values(testBranchValues({
     name: "مورد البن",
-  });
-  const [categoryResult] = await db.insert(categories).values({
+  })).$returningId();
+  const [categoryResult] = await db.insert(categories).values(testBranchValues({
     name: "خامات",
-  });
-  const [itemResult] = await db.insert(items).values({
+  })).$returningId();
+  const [itemResult] = await db.insert(items).values(testBranchValues({
     code: nextTestItemCode(),
     name: "بن",
-    categoryId: categoryResult.insertId,
+    categoryId: categoryResult.id,
     type: "raw",
     stockUnit: "كجم",
     purchaseUnit: "شيكارة",
     purchaseToStockFactor: "25.000000",
-  });
+  })).$returningId();
   return {
-    supplierId: supplierResult.insertId,
-    itemId: itemResult.insertId,
+    supplierId: supplierResult.id,
+    itemId: itemResult.id,
   };
 }
 
@@ -71,7 +72,7 @@ describe("purchase invoices", () => {
       });
 
     expect(response.status).toBe(201);
-    expect(response.body.id).toBeTypeOf("number");
+    expect(response.body.id).toEqual(expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));
 
     const [batch] = await db
       .select()
@@ -425,7 +426,7 @@ describe("purchase invoices", () => {
 
   it("allocates a purchase receipt against outstanding negative stock", async () => {
     const fixture = await createPurchaseFixture();
-    const [deficit] = await db.insert(stockMovements).values({
+    const [deficit] = await db.insert(stockMovements).values(testBranchValues({
       itemId: fixture.itemId,
       warehouse: "main",
       batchId: null,
@@ -433,7 +434,7 @@ describe("purchase invoices", () => {
       quantity: "-2.000",
       unitCost: "0.000000",
       occurredAt: new Date("2026-07-19T00:00:00.000Z"),
-    });
+    })).$returningId();
 
     const response = await request(app())
       .post("/api/purchases")
@@ -458,7 +459,7 @@ describe("purchase invoices", () => {
     expect(batch.remainingQuantity).toBe("1.000");
     const [allocation] = await db.select().from(stockDeficitAllocations);
     expect(allocation).toMatchObject({
-      deficitMovementId: deficit.insertId,
+      deficitMovementId: deficit.id,
       batchId: batch.id,
       quantity: "2.000",
       unitCost: "10.000000",
@@ -743,7 +744,7 @@ describe("purchase invoices", () => {
       .post("/api/transfers/direct")
       .set(authorization)
       .send({
-        purchaseInvoiceId: 999_999,
+        purchaseInvoiceId: testId(999999),
         lines: [{ itemId: fixture.itemId, quantity: 1 }],
       });
     expect(unknown.status).toBe(404);
@@ -752,15 +753,15 @@ describe("purchase invoices", () => {
 
   it("rejects a direct transfer naming an item the invoice never bought", async () => {
     const fixture = await createPurchaseFixture();
-    const [category] = await db.insert(categories).values({ name: "خامات" });
-    const [otherItem] = await db.insert(items).values({
+    const [category] = await db.insert(categories).values(testBranchValues({ name: "خامات" })).$returningId();
+    const [otherItem] = await db.insert(items).values(testBranchValues({
       code: nextTestItemCode(),
       name: "سكر",
-      categoryId: category.insertId,
+      categoryId: category.id,
       type: "raw",
       stockUnit: "كجم",
-    });
-    const otherItemId = otherItem.insertId;
+    })).$returningId();
+    const otherItemId = otherItem.id;
     const created = await request(app())
       .post("/api/purchases")
       .set(authorization)

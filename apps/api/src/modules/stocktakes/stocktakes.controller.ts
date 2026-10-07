@@ -8,7 +8,7 @@ import {
 } from "./stocktakes.schemas.js";
 import type { StocktakesService } from "./stocktakes.service.js";
 
-const routeId = z.coerce.number().int().positive();
+const routeId = z.string().uuid();
 export class StocktakesController {
   constructor(private service: StocktakesService) {}
   list = async (_req: Request, res: Response) =>

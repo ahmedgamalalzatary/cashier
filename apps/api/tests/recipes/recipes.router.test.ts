@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -10,7 +11,7 @@ import { recipesRouter } from "../../src/modules/recipes/recipes.router.js";
 function appWithStubs(controller: RecipesController) {
   const app = express();
   app.use((req, _res, next) => {
-    req.user = { id: 9, name: "Cashier", role: "cashier" };
+    req.user = { id: testId(9), name: "Cashier", role: "cashier" };
     next();
   });
   app.use(express.json(), recipesRouter(controller));
@@ -41,11 +42,11 @@ function stubController() {
 
 const validRecipe = {
   name: "كابتشينو",
-  categoryId: 2,
+  categoryId: testId(2),
   type: "prepared",
-  outputItemId: 5,
+  outputItemId: testId(5),
   baseYield: 10,
-  ingredients: [{ itemId: 1, quantity: 0.5 }],
+  ingredients: [{ itemId: testId(1), quantity: 0.5 }],
 };
 
 describe("recipe routes", () => {
@@ -56,13 +57,13 @@ describe("recipe routes", () => {
     const responses = await Promise.all([
       request(app).get("/"),
       request(app).post("/").send(validRecipe),
-      request(app).get("/3"),
-      request(app).put("/3").send(validRecipe),
-      request(app).delete("/3"),
-      request(app).put("/3/active"),
-      request(app).post("/3/prepare").send({ quantity: 2, notes: null }),
+      request(app).get("/00000000-0000-7000-8000-000000000003"),
+      request(app).put("/00000000-0000-7000-8000-000000000003").send(validRecipe),
+      request(app).delete("/00000000-0000-7000-8000-000000000003"),
+      request(app).put("/00000000-0000-7000-8000-000000000003/active"),
+      request(app).post("/00000000-0000-7000-8000-000000000003/prepare").send({ quantity: 2, notes: null }),
       request(app).get("/preparations"),
-      request(app).get("/preparations/77"),
+      request(app).get("/preparations/00000000-0000-7000-8000-00000000004d"),
     ]);
 
     expect(responses.map(({ status }) => status)).toEqual([
@@ -87,25 +88,25 @@ describe("recipe routes", () => {
 describe("recipe controller wiring", () => {
   it("creates and prepares with parsed bodies, user id, and 201", async () => {
     const service = {
-      create: vi.fn(async () => 3),
-      prepare: vi.fn(async () => 77),
+      create: vi.fn(async () => testId(3)),
+      prepare: vi.fn(async () => testId(77)),
     } as unknown as RecipesService;
     const app = appWithStubs(new RealRecipesController(service));
 
     const created = await request(app).post("/").send(validRecipe);
     expect(created.status).toBe(201);
-    expect(created.body).toEqual({ id: 3 });
+    expect(created.body).toEqual({ id: testId(3) });
     expect(service.create).toHaveBeenCalledWith(validRecipe);
 
     const prepared = await request(app)
-      .post("/3/prepare")
+      .post("/00000000-0000-7000-8000-000000000003/prepare")
       .send({ quantity: 2, notes: null });
     expect(prepared.status).toBe(201);
-    expect(prepared.body).toEqual({ preparationId: 77 });
+    expect(prepared.body).toEqual({ preparationId: testId(77) });
     expect(service.prepare).toHaveBeenCalledWith(
-      3,
+      testId(3),
       { quantity: 2, notes: null },
-      9,
+      testId(9),
     );
   });
 
@@ -122,12 +123,12 @@ describe("recipe controller wiring", () => {
         .status,
     ).toBe(400);
     expect(
-      (await request(app).post("/3/prepare").send({ quantity: 0, notes: null }))
+      (await request(app).post("/00000000-0000-7000-8000-000000000003/prepare").send({ quantity: 0, notes: null }))
         .status,
     ).toBe(400);
     expect((await request(app).get("/abc")).status).toBe(400);
 
-    const missing = await request(app).get("/999");
+    const missing = await request(app).get("/00000000-0000-7000-8000-0000000003e7");
     expect(missing.status).toBe(404);
   });
 });

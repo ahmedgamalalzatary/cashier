@@ -34,7 +34,7 @@ const requestFingerprint = (data: PurchaseInput) =>
     notes: data.notes ?? null,
     // a zero to-cafe amount hashes like a line without one
     lines: [...data.lines]
-      .sort((a, b) => a.itemId - b.itemId)
+      .sort((a, b) => (a.itemId).localeCompare(b.itemId))
       .map(({ toCafeQuantity, ...line }) =>
         toCafeQuantity ? { ...line, toCafeQuantity } : line,
       ),
@@ -46,7 +46,7 @@ const MAX_UNIT_COST_SCALED = 9_999_999_999_999_999n;
 export class PurchasesService {
   constructor(private repo: PurchasesRepository) {}
 
-  async create(data: PurchaseInput, createdBy: number) {
+  async create(data: PurchaseInput, createdBy: string) {
     const fingerprint = requestFingerprint(data);
     try {
       return await transactionWithDeadlockRetry(() =>
@@ -147,7 +147,7 @@ export class PurchasesService {
       });
       const occurredAt = new Date(`${data.purchasedAt}T00:00:00.000Z`);
       const stockLines = [...calculatedLines].sort(
-        (a, b) => a.itemId - b.itemId,
+        (a, b) => (a.itemId).localeCompare(b.itemId),
       );
       for (const line of stockLines) {
         await repo.createLine({
@@ -219,9 +219,9 @@ export class PurchasesService {
   }
 
   private assertReplay(
-    replay: { createdBy: number; requestFingerprint: string },
+    replay: { createdBy: string; requestFingerprint: string },
     fingerprint: string,
-    createdBy: number,
+    createdBy: string,
   ) {
     if (replay.requestFingerprint !== fingerprint) {
       throw new HttpError(409, 'معرّف الطلب مستخدم لبيانات شراء مختلفة');
@@ -235,7 +235,7 @@ export class PurchasesService {
     return this.repo.list();
   }
 
-  async get(id: number) {
+  async get(id: string) {
     const invoice = await this.repo.findById(id);
     if (!invoice) throw new HttpError(404, 'فاتورة الشراء غير موجودة');
     return {

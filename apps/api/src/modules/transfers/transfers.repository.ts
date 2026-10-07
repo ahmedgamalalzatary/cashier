@@ -44,7 +44,7 @@ export class TransfersRepository {
     });
   }
 
-  lockItems(ids: number[]) {
+  lockItems(ids: string[]) {
     return this.db
       .select({ id: items.id, name: items.name, isActive: items.isActive })
       .from(items)
@@ -53,7 +53,7 @@ export class TransfersRepository {
           items,
           inArray(
             items.id,
-            [...ids].sort((a, b) => a - b),
+            [...ids].sort((a, b) => (a).localeCompare(b)),
           ),
         ),
       )
@@ -62,7 +62,7 @@ export class TransfersRepository {
   }
 
   /** Locks the invoice row so two transfers of the same invoice serialise. */
-  async lockPurchaseInvoice(invoiceId: number) {
+  async lockPurchaseInvoice(invoiceId: string) {
     const [row] = await this.db
       .select({ id: purchaseInvoices.id })
       .from(purchaseInvoices)
@@ -74,7 +74,7 @@ export class TransfersRepository {
   }
 
   /** Stock quantity the invoice bought, per item, in thousandths. */
-  async purchaseInvoiceQuantities(invoiceId: number) {
+  async purchaseInvoiceQuantities(invoiceId: string) {
     const rows = await this.db
       .select({
         itemId: purchaseLines.itemId,
@@ -89,7 +89,7 @@ export class TransfersRepository {
   }
 
   /** Quantity of that invoice already sent to the cafe, per item, in thousandths. */
-  async purchaseInvoiceTransferredMilli(invoiceId: number) {
+  async purchaseInvoiceTransferredMilli(invoiceId: string) {
     const rows = await this.db
       .select({
         itemId: transferLines.itemId,
@@ -102,7 +102,7 @@ export class TransfersRepository {
     return new Map(rows.map((row) => [row.itemId, Number(row.milli)]));
   }
 
-  async findOpenShiftForCashier(cashierUserId: number) {
+  async findOpenShiftForCashier(cashierUserId: string) {
     const [row] = await this.db
       .select({ id: shifts.id })
       .from(shifts)
@@ -117,16 +117,16 @@ export class TransfersRepository {
   }
 
   async createRequest(data: {
-    requestedBy: number;
-    shiftId: number | null;
+    requestedBy: string;
+    shiftId: string | null;
     notes: string | null;
     clientRequestId: string;
     requestFingerprint: string;
   }) {
     const [result] = await this.db
       .insert(transferRequests)
-      .values(branchValues(data));
-    return result.insertId;
+      .values(branchValues(data)).$returningId();
+    return result.id;
   }
 
   async findRequestByClientRequestId(clientRequestId: string) {
@@ -147,8 +147,8 @@ export class TransfersRepository {
   }
 
   async createRequestLine(data: {
-    requestId: number;
-    itemId: number;
+    requestId: string;
+    itemId: string;
     quantity: string;
   }) {
     await this.db.insert(transferRequestLines).values(branchValues(data));
@@ -182,7 +182,7 @@ export class TransfersRepository {
       .orderBy(desc(transferRequests.createdAt), desc(transferRequests.id));
   }
 
-  async findRequestById(id: number) {
+  async findRequestById(id: string) {
     const [row] = await this.db
       .select({
         id: transferRequests.id,
@@ -204,7 +204,7 @@ export class TransfersRepository {
     return row;
   }
 
-  async lockRequest(id: number) {
+  async lockRequest(id: string) {
     const [row] = await this.db
       .select()
       .from(transferRequests)
@@ -213,7 +213,7 @@ export class TransfersRepository {
     return row;
   }
 
-  listRequestLines(requestId: number) {
+  listRequestLines(requestId: string) {
     return this.db
       .select({
         id: transferRequestLines.id,
@@ -238,35 +238,35 @@ export class TransfersRepository {
   }
 
   async createTransfer(data: {
-    requestId: number | null;
-    purchaseInvoiceId: number | null;
-    createdBy: number;
-    approvedBy: number;
+    requestId: string | null;
+    purchaseInvoiceId: string | null;
+    createdBy: string;
+    approvedBy: string;
     notes: string | null;
   }) {
-    const [result] = await this.db.insert(transfers).values(branchValues(data));
-    return result.insertId;
+    const [result] = await this.db.insert(transfers).values(branchValues(data)).$returningId();
+    return result.id;
   }
 
   async createTransferLine(data: {
-    transferId: number;
-    itemId: number;
+    transferId: string;
+    itemId: string;
     quantity: string;
     unitCost: string;
-    sourceBatchId: number;
-    cafeBatchId: number;
+    sourceBatchId: string;
+    cafeBatchId: string;
   }) {
     await this.db.insert(transferLines).values(branchValues(data));
   }
 
-  async approveRequest(id: number, reviewedBy: number) {
+  async approveRequest(id: string, reviewedBy: string) {
     await this.db
       .update(transferRequests)
       .set({ status: "approved", reviewedBy, reviewedAt: new Date() })
       .where(branchCondition(transferRequests, eq(transferRequests.id, id)));
   }
 
-  async rejectRequest(id: number, reviewedBy: number, reason: string) {
+  async rejectRequest(id: string, reviewedBy: string, reason: string) {
     await this.db
       .update(transferRequests)
       .set({
@@ -306,7 +306,7 @@ export class TransfersRepository {
       .orderBy(desc(transfers.createdAt), desc(transfers.id));
   }
 
-  async findTransferById(id: number) {
+  async findTransferById(id: string) {
     const totalCost = sql<string>`CAST(COALESCE((
       SELECT SUM(ROUND(tl.quantity * tl.unit_cost, 2))
       FROM ${branchTable("transfer_lines")} tl
@@ -334,7 +334,7 @@ export class TransfersRepository {
     return row;
   }
 
-  listTransferLines(transferId: number) {
+  listTransferLines(transferId: string) {
     return this.db
       .select({
         id: transferLines.id,

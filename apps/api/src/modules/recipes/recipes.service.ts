@@ -79,7 +79,7 @@ export class RecipesService {
     });
   }
 
-  update(id: number, data: RecipeInput) {
+  update(id: string, data: RecipeInput) {
     return this.repo.transaction(async (repo) => {
       const existing = await repo.lockRecipe(id);
       if (existing?.type === 'product')
@@ -102,7 +102,7 @@ export class RecipesService {
     return Promise.all(headers.map((header) => this.decorate(header)));
   }
 
-  async get(id: number) {
+  async get(id: string) {
     const header = await this.repo.findRecipeHeader(id);
     if (header?.type === 'product')
       throw new HttpError(404, 'الوصفة غير موجودة');
@@ -110,7 +110,7 @@ export class RecipesService {
     return this.decorate(header);
   }
 
-  deactivate(id: number) {
+  deactivate(id: string) {
     return this.repo.transaction(async (repo) => {
       const recipe = await repo.lockRecipe(id);
       if (recipe?.type === 'product')
@@ -120,7 +120,7 @@ export class RecipesService {
     });
   }
 
-  reactivate(id: number) {
+  reactivate(id: string) {
     return this.repo.transaction(async (repo) => {
       const recipe = await repo.lockRecipe(id);
       if (recipe?.type === 'product')
@@ -132,7 +132,7 @@ export class RecipesService {
     });
   }
 
-  prepare(id: number, data: PreparationInput, preparedBy: number) {
+  prepare(id: string, data: PreparationInput, preparedBy: string) {
     return this.repo.transaction(async (repo, inventory) => {
       const recipe = await repo.lockRecipe(id);
       if (recipe?.type === 'product')
@@ -177,7 +177,7 @@ export class RecipesService {
             baseYield,
           ),
         }))
-        .sort((a, b) => a.itemId - b.itemId);
+        .sort((a, b) => (a.itemId).localeCompare(b.itemId));
       if (scaledIngredients.some((ingredient) => ingredient.scaledQuantity < 1n)) {
         throw new HttpError(
           400,
@@ -250,7 +250,7 @@ export class RecipesService {
     return this.repo.listPreparations();
   }
 
-  async getPreparation(id: number) {
+  async getPreparation(id: string) {
     const row = await this.repo.findPreparation(id);
     if (!row) throw new HttpError(404, 'عملية التحضير غير موجودة');
     return {
@@ -343,7 +343,7 @@ export class RecipesService {
   private async validateDefinition(
     repo: RecipesRepository,
     data: RecipeInput,
-    recipeId?: number,
+    recipeId?: string,
   ) {
     const category = await repo.findCategory(data.categoryId);
     if (!category) throw new HttpError(404, 'التصنيف غير موجود');
@@ -380,10 +380,10 @@ export class RecipesService {
   private async assertNoPreparedCycle(
     repo: RecipesRepository,
     data: RecipeInput,
-    recipeId?: number,
+    recipeId?: string,
   ) {
     const edges = await repo.listPreparedEdges();
-    const graph = new Map<number, number[]>();
+    const graph = new Map<string, string[]>();
     for (const edge of edges) {
       if (
         edge.recipeId === recipeId ||
@@ -399,7 +399,7 @@ export class RecipesService {
       data.ingredients.map((ingredient) => ingredient.itemId),
     );
 
-    const visited = new Set<number>();
+    const visited = new Set<string>();
     const stack = [data.outputItemId];
     while (stack.length > 0) {
       const current = stack.pop()!;
@@ -416,7 +416,7 @@ export class RecipesService {
 
   private async writeChildren(
     repo: RecipesRepository,
-    recipeId: number,
+    recipeId: string,
     data: RecipeInput,
   ) {
     const sizeId = await repo.createSize({
@@ -437,7 +437,7 @@ export class RecipesService {
 
   private async storedDefinition(
     repo: RecipesRepository,
-    recipeId: number,
+    recipeId: string,
     recipe: Awaited<ReturnType<RecipesRepository['lockRecipe']>> & {},
   ): Promise<RecipeInput> {
     const sizes = await repo.listSizes(recipeId);

@@ -22,7 +22,7 @@ const isDuplicateEntry = (error: unknown) =>
 const requestFingerprint = (data: TransferRequestInput) =>
   hashRequest({
     notes: data.notes ?? null,
-    lines: [...data.lines].sort((a, b) => a.itemId - b.itemId),
+    lines: [...data.lines].sort((a, b) => (a.itemId).localeCompare(b.itemId)),
   });
 
 export class TransfersService {
@@ -87,9 +87,9 @@ export class TransfersService {
   }
 
   private assertReplay(
-    replay: { requestedBy: number; requestFingerprint: string },
+    replay: { requestedBy: string; requestFingerprint: string },
     fingerprint: string,
-    actorId: number,
+    actorId: string,
   ) {
     if (replay.requestFingerprint !== fingerprint) {
       throw new HttpError(409, "معرّف الطلب مستخدم لبيانات تحويل مختلفة");
@@ -103,13 +103,13 @@ export class TransfersService {
     return this.repo.listRequests();
   }
 
-  async getRequest(id: number) {
+  async getRequest(id: string) {
     const row = await this.repo.findRequestById(id);
     if (!row) throw new HttpError(404, "طلب التحويل غير موجود");
     return { ...row, lines: await this.repo.listRequestLines(id) };
   }
 
-  approveRequest(id: number, data: TransferApprovalInput, approvedBy: number) {
+  approveRequest(id: string, data: TransferApprovalInput, approvedBy: string) {
     return this.transactionWithDeadlockRetry(async (repo, inventory) => {
       const request = await repo.lockRequest(id);
       if (!request) throw new HttpError(404, "طلب التحويل غير موجود");
@@ -147,7 +147,7 @@ export class TransfersService {
     });
   }
 
-  rejectRequest(id: number, reason: string, reviewedBy: number) {
+  rejectRequest(id: string, reason: string, reviewedBy: string) {
     return this.transactionWithDeadlockRetry(async (repo) => {
       const request = await repo.lockRequest(id);
       if (!request) throw new HttpError(404, "طلب التحويل غير موجود");
@@ -157,7 +157,7 @@ export class TransfersService {
     });
   }
 
-  createDirect(data: TransferDirectInput, adminId: number) {
+  createDirect(data: TransferDirectInput, adminId: string) {
     return this.transactionWithDeadlockRetry(async (repo, inventory) => {
       await this.validateItems(repo, data.lines);
       const purchaseInvoiceId = data.purchaseInvoiceId ?? null;
@@ -183,8 +183,8 @@ export class TransfersService {
   // otherwise the invoice page would offer the same quantity twice.
   private async assertInvoiceAllows(
     repo: TransfersRepository,
-    invoiceId: number,
-    lines: Array<{ itemId: number; quantity: number }>,
+    invoiceId: string,
+    lines: Array<{ itemId: string; quantity: number }>,
   ) {
     const invoice = await repo.lockPurchaseInvoice(invoiceId);
     if (!invoice) throw new HttpError(404, "فاتورة الشراء غير موجودة");
@@ -210,7 +210,7 @@ export class TransfersService {
     return this.repo.listTransfers();
   }
 
-  async getTransfer(id: number) {
+  async getTransfer(id: string) {
     const row = await this.repo.findTransferById(id);
     if (!row) throw new HttpError(404, "التحويل غير موجود");
     return { ...row, lines: await this.repo.listTransferLines(id) };
@@ -218,7 +218,7 @@ export class TransfersService {
 
   private async validateItems(
     repo: TransfersRepository,
-    lines: Array<{ itemId: number }>,
+    lines: Array<{ itemId: string }>,
   ) {
     const rows = await repo.lockItems(lines.map((line) => line.itemId));
     const rowsById = new Map(rows.map((row) => [row.id, row]));

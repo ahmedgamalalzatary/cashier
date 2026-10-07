@@ -14,7 +14,7 @@ const quantity = z.coerce
   });
 
 const ingredient = z.object({
-  itemId: z.coerce.number().int().positive(),
+  itemId: z.string().uuid(),
   quantity,
 });
 
@@ -30,9 +30,9 @@ const ingredients = z
 export const recipeInput = z
   .object({
     name: z.string().trim().min(1).max(191),
-    categoryId: z.coerce.number().int().positive(),
+    categoryId: z.string().uuid(),
     type: z.literal("prepared"),
-    outputItemId: z.coerce.number().int().positive(),
+    outputItemId: z.string().uuid(),
     baseYield: quantity,
     ingredients,
   })

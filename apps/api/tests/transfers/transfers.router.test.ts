@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -9,8 +10,8 @@ import { TransfersController as RealTransfersController } from "../../src/module
 import type { TransfersService } from "../../src/modules/transfers/transfers.service.js";
 import { transfersRouter } from "../../src/modules/transfers/transfers.router.js";
 
-const cashierUser = { id: 9, name: "Cashier", role: "cashier" } as const;
-const adminUser = { id: 7, name: "Admin", role: "admin" } as const;
+const cashierUser = { id: testId(9), name: "Cashier", role: "cashier" } as const;
+const adminUser = { id: testId(7), name: "Admin", role: "admin" } as const;
 
 function appWithStubs(
   controller: TransfersController,
@@ -45,14 +46,14 @@ describe("transfer route authorization", () => {
 
     const responses = await Promise.all([
       request(appWithStubs(controller))
-        .post("/requests/1/approve")
-        .send({ lines: [{ itemId: 5, quantity: 1 }] }),
+        .post("/requests/00000000-0000-7000-8000-000000000001/approve")
+        .send({ lines: [{ itemId: testId(5), quantity: 1 }] }),
       request(appWithStubs(controller))
-        .post("/requests/1/reject")
+        .post("/requests/00000000-0000-7000-8000-000000000001/reject")
         .send({ reason: "x" }),
       request(appWithStubs(controller))
         .post("/direct")
-        .send({ lines: [{ itemId: 5, quantity: 1 }] }),
+        .send({ lines: [{ itemId: testId(5), quantity: 1 }] }),
     ]);
 
     expect(responses.map(({ status }) => status)).toEqual([403, 403, 403]);
@@ -76,12 +77,12 @@ describe("transfer route authorization", () => {
 
     const responses = await Promise.all([
       request(appWithStubs(controller)).get("/requests"),
-      request(appWithStubs(controller)).get("/requests/1"),
+      request(appWithStubs(controller)).get("/requests/00000000-0000-7000-8000-000000000001"),
       request(appWithStubs(controller))
         .post("/requests")
         .send({ clientRequestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }),
       request(appWithStubs(controller)).get("/"),
-      request(appWithStubs(controller)).get("/7"),
+      request(appWithStubs(controller)).get("/00000000-0000-7000-8000-000000000007"),
     ]);
 
     expect(responses.every(({ status }) => status !== 403)).toBe(true);
@@ -97,7 +98,7 @@ describe("transfer controller wiring", () => {
   const validBody = {
     clientRequestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     notes: null,
-    lines: [{ itemId: 5, quantity: 1 }],
+    lines: [{ itemId: testId(5), quantity: 1 }],
   };
 
   function appWithService(service: TransfersService) {
@@ -106,19 +107,19 @@ describe("transfer controller wiring", () => {
 
   it("returns 201 with parsed bodies on create, approve, and direct", async () => {
     const service = {
-      createRequest: vi.fn(async () => 11),
-      approveRequest: vi.fn(async () => 22),
-      createDirect: vi.fn(async () => 33),
+      createRequest: vi.fn(async () => testId(11)),
+      approveRequest: vi.fn(async () => testId(22)),
+      createDirect: vi.fn(async () => testId(33)),
     } as unknown as TransfersService;
 
     const created = await request(appWithService(service))
       .post("/requests")
       .send(validBody);
     expect(created.status).toBe(201);
-    expect(created.body).toEqual({ id: 11 });
+    expect(created.body).toEqual({ id: testId(11) });
     expect(service.createRequest).toHaveBeenCalledWith(
       validBody,
-      expect.objectContaining({ id: 9 }),
+      expect.objectContaining({ id: testId(9) }),
     );
 
     const adminApp = appWithStubs(
@@ -126,26 +127,26 @@ describe("transfer controller wiring", () => {
       adminUser,
     );
     const approved = await request(adminApp)
-      .post("/requests/1/approve")
-      .send({ lines: [{ itemId: 5, quantity: 2 }] });
+      .post("/requests/00000000-0000-7000-8000-000000000001/approve")
+      .send({ lines: [{ itemId: testId(5), quantity: 2 }] });
     expect(approved.status).toBe(201);
-    expect(approved.body).toEqual({ transferId: 22 });
+    expect(approved.body).toEqual({ transferId: testId(22) });
     expect(service.approveRequest).toHaveBeenCalledWith(
-      1,
-      { lines: [{ itemId: 5, quantity: 2 }] },
-      7,
+      testId(1),
+      { lines: [{ itemId: testId(5), quantity: 2 }] },
+      testId(7),
     );
 
     const direct = await request(adminApp)
       .post("/direct")
-      .send({ notes: null, lines: [{ itemId: 5, quantity: 2 }] });
+      .send({ notes: null, lines: [{ itemId: testId(5), quantity: 2 }] });
     expect(direct.status).toBe(201);
-    expect(direct.body).toEqual({ transferId: 33 });
+    expect(direct.body).toEqual({ transferId: testId(33) });
   });
 
   it("maps duplicate lines to 400 and unknown ids to 404", async () => {
     const service = {
-      createRequest: vi.fn(async () => 11),
+      createRequest: vi.fn(async () => testId(11)),
       getRequest: vi
         .fn()
         .mockRejectedValue(new HttpError(404, "طلب التحويل غير موجود")),
@@ -157,8 +158,8 @@ describe("transfer controller wiring", () => {
       .send({
         ...validBody,
         lines: [
-          { itemId: 5, quantity: 1 },
-          { itemId: 5, quantity: 1 },
+          { itemId: testId(5), quantity: 1 },
+          { itemId: testId(5), quantity: 1 },
         ],
       });
     expect(duplicate.status).toBe(400);
@@ -168,7 +169,7 @@ describe("transfer controller wiring", () => {
     const badId = await request(app).get("/requests/abc");
     expect(badId.status).toBe(400);
 
-    const missing = await request(app).get("/requests/999");
+    const missing = await request(app).get("/requests/00000000-0000-7000-8000-0000000003e7");
     expect(missing.status).toBe(404);
     expect(missing.body).toEqual({ error: "طلب التحويل غير موجود" });
   });

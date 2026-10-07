@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, it, testBranchValues } from "../support/ids.js";
+import { describe, expect } from "vitest";
 import request from "supertest";
 import { and, eq } from "drizzle-orm";
 import { createApp } from "../../../../apps/api/src/app.js";
@@ -21,33 +22,33 @@ beforeEach(async () => {
 });
 
 async function createLeafCategory(name = "تحضيرات") {
-  const [category] = await db.insert(categories).values({ name });
-  return category.insertId;
+  const [category] = await db.insert(categories).values(testBranchValues({ name })).$returningId();
+  return category.id;
 }
 
 async function createItem(
-  categoryId: number,
+  categoryId: string,
   name: string,
   type: "raw" | "resale" | "prepared" = "raw",
   stockUnit = "جم",
 ) {
-  const [item] = await db.insert(items).values({
+  const [item] = await db.insert(items).values(testBranchValues({
     code: nextTestItemCode(),
     name,
     categoryId,
     type,
     stockUnit,
-  });
-  return item.insertId;
+  })).$returningId();
+  return item.id;
 }
 
 async function receiveCafeBatch(
-  itemId: number,
+  itemId: string,
   quantity: string,
   unitCost: string,
   receivedAt: Date,
 ) {
-  const [batch] = await db.insert(stockBatches).values({
+  const [batch] = await db.insert(stockBatches).values(testBranchValues({
     itemId,
     warehouse: "cafe",
     initialQuantity: quantity,
@@ -55,23 +56,23 @@ async function receiveCafeBatch(
     unitCost,
     receivedAt,
     sourceType: "transfer_in",
-  });
-  await db.insert(stockMovements).values({
+  })).$returningId();
+  await db.insert(stockMovements).values(testBranchValues({
     itemId,
     warehouse: "cafe",
-    batchId: batch.insertId,
+    batchId: batch.id,
     movementType: "transfer_in",
     quantity,
     unitCost,
     occurredAt: receivedAt,
-  });
-  return batch.insertId;
+  }));
+  return batch.id;
 }
 
 function preparedBody(input: {
-  categoryId: number;
-  outputItemId: number;
-  ingredientItemId: number;
+  categoryId: string;
+  outputItemId: string;
+  ingredientItemId: string;
   ingredientQuantity?: number;
   baseYield?: number;
   name?: string;

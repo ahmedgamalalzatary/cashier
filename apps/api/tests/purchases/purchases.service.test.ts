@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it, vi } from "vitest";
 import { HttpError } from "@cashier/server-core";
 import type { PurchasesRepository } from "../../src/modules/purchases/purchases.repository.js";
@@ -5,12 +6,12 @@ import { PurchasesService } from "../../src/modules/purchases/purchases.service.
 
 const purchaseInput = {
   clientRequestId: "11111111-1111-4111-8111-111111111111",
-  supplierId: 1,
+  supplierId: testId(1),
   invoiceNumber: "DUP-1",
   purchasedAt: "2026-07-20",
   paidAmount: 0,
   notes: null,
-  lines: [{ itemId: 5, quantity: 1, unitMode: "stock", unitPrice: 10 }],
+  lines: [{ itemId: testId(5), quantity: 1, unitMode: "stock", unitPrice: 10 }],
 } as const;
 
 function repoWithInvoiceRace(overrides: Record<string, unknown>) {
@@ -18,11 +19,11 @@ function repoWithInvoiceRace(overrides: Record<string, unknown>) {
     findByClientRequestId: vi.fn().mockResolvedValue(undefined),
     findSupplierForUpdate: vi
       .fn()
-      .mockResolvedValue({ id: 1, isActive: true }),
+      .mockResolvedValue({ id: testId(1), isActive: true }),
     hasInvoiceNumber: vi.fn().mockResolvedValue(false),
     lockItems: vi.fn().mockResolvedValue([
       {
-        id: 5,
+        id: testId(5),
         type: "raw",
         isActive: true,
         stockUnit: "كجم",
@@ -51,7 +52,7 @@ describe("PurchasesService duplicate invoice race", () => {
     });
 
     const failure = await new PurchasesService(repo)
-      .create(purchaseInput as never, 7)
+      .create(purchaseInput as never, testId(7))
       .catch((error: unknown) => error);
 
     expect(failure).toBeInstanceOf(HttpError);
@@ -69,11 +70,11 @@ describe("PurchasesService stock receive order", () => {
       findByClientRequestId: vi.fn().mockResolvedValue(undefined),
       findSupplierForUpdate: vi
         .fn()
-        .mockResolvedValue({ id: 1, isActive: true }),
+        .mockResolvedValue({ id: testId(1), isActive: true }),
       hasInvoiceNumber: vi.fn().mockResolvedValue(false),
       lockItems: vi.fn().mockResolvedValue([
         {
-          id: 2,
+          id: testId(2),
           type: "raw",
           isActive: true,
           stockUnit: "كجم",
@@ -81,7 +82,7 @@ describe("PurchasesService stock receive order", () => {
           purchaseToStockFactor: null,
         },
         {
-          id: 9,
+          id: testId(9),
           type: "raw",
           isActive: true,
           stockUnit: "كجم",
@@ -89,7 +90,7 @@ describe("PurchasesService stock receive order", () => {
           purchaseToStockFactor: null,
         },
       ]),
-      createInvoice: vi.fn().mockResolvedValue(44),
+      createInvoice: vi.fn().mockResolvedValue(testId(44)),
       createLine: vi.fn(),
     };
     const repo = {
@@ -101,19 +102,19 @@ describe("PurchasesService stock receive order", () => {
       {
         ...purchaseInput,
         lines: [
-          { itemId: 9, quantity: 1, unitMode: "stock", unitPrice: 10 },
-          { itemId: 2, quantity: 1, unitMode: "stock", unitPrice: 10 },
+          { itemId: testId(9), quantity: 1, unitMode: "stock", unitPrice: 10 },
+          { itemId: testId(2), quantity: 1, unitMode: "stock", unitPrice: 10 },
         ],
       } as never,
-      7,
+      testId(7),
     );
 
-    expect(receive.mock.calls.map((call) => call[0].itemId)).toEqual([2, 9]);
+    expect(receive.mock.calls.map((call) => call[0].itemId)).toEqual([testId(2), testId(9)]);
   });
 });
 
 const stockItem = (overrides: Record<string, unknown> = {}) => ({
-  id: 5,
+  id: testId(5),
   type: "raw",
   isActive: true,
   stockUnit: "كجم",
@@ -134,10 +135,10 @@ function repoForCreate(txRepo: Record<string, unknown>) {
 function txForCreate(overrides: Record<string, unknown> = {}) {
   return {
     findByClientRequestId: vi.fn(async () => undefined),
-    findSupplierForUpdate: vi.fn(async () => ({ id: 1, isActive: true })),
+    findSupplierForUpdate: vi.fn(async () => ({ id: testId(1), isActive: true })),
     hasInvoiceNumber: vi.fn(async () => false),
     lockItems: vi.fn(async () => [stockItem()]),
-    createInvoice: vi.fn(async () => 44),
+    createInvoice: vi.fn(async () => testId(44)),
     createLine: vi.fn(async () => undefined),
     createPayment: vi.fn(async () => undefined),
     ...overrides,
@@ -152,23 +153,23 @@ describe("PurchasesService supplier guards", () => {
       }),
     );
     await expect(
-      new PurchasesService(missing).create(purchaseInput as never, 7),
+      new PurchasesService(missing).create(purchaseInput as never, testId(7)),
     ).rejects.toMatchObject({ status: 404 });
 
     const inactive = repoForCreate(
       txForCreate({
-        findSupplierForUpdate: vi.fn(async () => ({ id: 1, isActive: false })),
+        findSupplierForUpdate: vi.fn(async () => ({ id: testId(1), isActive: false })),
       }),
     );
     await expect(
-      new PurchasesService(inactive).create(purchaseInput as never, 7),
+      new PurchasesService(inactive).create(purchaseInput as never, testId(7)),
     ).rejects.toMatchObject({ status: 409 });
 
     const duplicateInvoice = repoForCreate(
       txForCreate({ hasInvoiceNumber: vi.fn(async () => true) }),
     );
     await expect(
-      new PurchasesService(duplicateInvoice).create(purchaseInput as never, 7),
+      new PurchasesService(duplicateInvoice).create(purchaseInput as never, testId(7)),
     ).rejects.toMatchObject({ status: 409 });
   });
 });
@@ -183,7 +184,7 @@ describe("PurchasesService item guards", () => {
     for (const { lock, status } of cases) {
       const repo = repoForCreate(txForCreate({ lockItems: vi.fn(async () => lock) }));
       await expect(
-        new PurchasesService(repo).create(purchaseInput as never, 7),
+        new PurchasesService(repo).create(purchaseInput as never, testId(7)),
       ).rejects.toMatchObject({ status });
     }
 
@@ -194,9 +195,9 @@ describe("PurchasesService item guards", () => {
       new PurchasesService(noPurchaseUnit).create(
         {
           ...purchaseInput,
-          lines: [{ itemId: 5, quantity: 1, unitMode: "purchase", unitPrice: 10 }],
+          lines: [{ itemId: testId(5), quantity: 1, unitMode: "purchase", unitPrice: 10 }],
         } as never,
-        7,
+        testId(7),
       ),
     ).rejects.toMatchObject({ status: 409 });
   });
@@ -218,9 +219,9 @@ describe("PurchasesService cost guards", () => {
       new PurchasesService(fractional).create(
         {
           ...purchaseInput,
-          lines: [{ itemId: 5, quantity: 1, unitMode: "purchase", unitPrice: 10 }],
+          lines: [{ itemId: testId(5), quantity: 1, unitMode: "purchase", unitPrice: 10 }],
         } as never,
-        7,
+        testId(7),
       ),
     ).rejects.toMatchObject({ status: 400 });
 
@@ -230,10 +231,10 @@ describe("PurchasesService cost guards", () => {
         {
           ...purchaseInput,
           lines: [
-            { itemId: 5, quantity: 0.001, unitMode: "stock", unitPrice: 9999999999.99 },
+            { itemId: testId(5), quantity: 0.001, unitMode: "stock", unitPrice: 9999999999.99 },
           ],
         } as never,
-        7,
+        testId(7),
       ),
     ).rejects.toMatchObject({ status: 400 });
   });
@@ -244,7 +245,7 @@ describe("PurchasesService cost guards", () => {
     await expect(
       new PurchasesService(repo).create(
         { ...purchaseInput, paidAmount: 1000 } as never,
-        7,
+        testId(7),
       ),
     ).rejects.toMatchObject({ status: 400 });
   });
@@ -255,15 +256,15 @@ describe("PurchasesService replay and lookup", () => {
     const repo = repoForCreate(
       txForCreate({
         findByClientRequestId: vi.fn(async () => ({
-          id: 44,
-          createdBy: 555,
+          id: testId(44),
+          createdBy: testId(555),
           requestFingerprint: "other",
         })),
       }),
     );
 
     await expect(
-      new PurchasesService(repo).create(purchaseInput as never, 7),
+      new PurchasesService(repo).create(purchaseInput as never, testId(7)),
     ).rejects.toMatchObject({ status: 409 });
   });
 
@@ -272,7 +273,7 @@ describe("PurchasesService replay and lookup", () => {
       findById: vi.fn(async () => undefined),
     } as unknown as PurchasesRepository;
 
-    await expect(new PurchasesService(repo).get(999)).rejects.toMatchObject({
+    await expect(new PurchasesService(repo).get(testId(999))).rejects.toMatchObject({
       status: 404,
     });
   });

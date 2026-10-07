@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -11,7 +12,7 @@ import { inventoryRouter } from "../../src/modules/inventory/inventory.router.js
 function appWithStubs(controller: InventoryController, role = "cashier") {
   const app = express();
   app.use((req, _res, next) => {
-    req.user = { id: 9, name: "Cashier", role };
+    req.user = { id: testId(9), name: "Cashier", role };
     next();
   });
   app.use(express.json(), inventoryRouter(controller, requireRole("admin")));
@@ -38,13 +39,13 @@ describe("inventory route authorization", () => {
 describe("inventory controller wiring", () => {
   it("lists stock per warehouse through the service", async () => {
     const service = {
-      listStock: vi.fn(async () => [{ itemId: 1 }]),
+      listStock: vi.fn(async () => [{ itemId: testId(1) }]),
     } as unknown as InventoryService;
     const app = appWithStubs(new RealInventoryController(service));
 
     const cafe = await request(app).get("/cafe/stock");
     expect(cafe.status).toBe(200);
-    expect(cafe.body).toEqual([{ itemId: 1 }]);
+    expect(cafe.body).toEqual([{ itemId: testId(1) }]);
     expect(service.listStock).toHaveBeenCalledWith("cafe");
   });
 });

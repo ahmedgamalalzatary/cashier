@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -41,11 +42,11 @@ describe("supplier routes", () => {
     const responses = await Promise.all([
       request(app).get("/"),
       request(app).post("/").send({}),
-      request(app).get("/1"),
-      request(app).put("/1").send({}),
-      request(app).delete("/1"),
-      request(app).post("/1/payments").send({}),
-      request(app).get("/1/statement"),
+      request(app).get("/00000000-0000-7000-8000-000000000001"),
+      request(app).put("/00000000-0000-7000-8000-000000000001").send({}),
+      request(app).delete("/00000000-0000-7000-8000-000000000001"),
+      request(app).post("/00000000-0000-7000-8000-000000000001/payments").send({}),
+      request(app).get("/00000000-0000-7000-8000-000000000001/statement"),
     ]);
 
     expect(responses.every(({ status }) => status !== 404)).toBe(true);
@@ -66,8 +67,8 @@ describe("supplier routes", () => {
 describe("supplier controller wiring", () => {
   it("creates and pays with 201 and parsed bodies", async () => {
     const service = {
-      create: vi.fn(async () => 4),
-      addPayment: vi.fn(async () => 9),
+      create: vi.fn(async () => testId(4)),
+      addPayment: vi.fn(async () => testId(9)),
     } as unknown as SuppliersService;
     const app = appWithStubs(new RealSuppliersController(service));
 
@@ -76,15 +77,15 @@ describe("supplier controller wiring", () => {
       openingBalance: 0,
     });
     expect(created.status).toBe(201);
-    expect(created.body).toEqual({ id: 4 });
+    expect(created.body).toEqual({ id: testId(4) });
 
-    const paid = await request(app).post("/1/payments").send({
+    const paid = await request(app).post("/00000000-0000-7000-8000-000000000001/payments").send({
       amount: 25,
       paidAt: "2026-07-19",
     });
     expect(paid.status).toBe(201);
-    expect(paid.body).toEqual({ id: 9 });
-    expect(service.addPayment).toHaveBeenCalledWith(1, {
+    expect(paid.body).toEqual({ id: testId(9) });
+    expect(service.addPayment).toHaveBeenCalledWith(testId(1), {
       amount: 25,
       paidAt: "2026-07-19",
     });
@@ -103,10 +104,10 @@ describe("supplier controller wiring", () => {
       400,
     );
     expect(
-      (await request(app).post("/1/payments").send({ amount: -5 })).status,
+      (await request(app).post("/00000000-0000-7000-8000-000000000001/payments").send({ amount: -5 })).status,
     ).toBe(400);
 
-    const missing = await request(app).get("/999");
+    const missing = await request(app).get("/00000000-0000-7000-8000-0000000003e7");
     expect(missing.status).toBe(404);
   });
 });

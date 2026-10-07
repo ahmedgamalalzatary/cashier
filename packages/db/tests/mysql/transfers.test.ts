@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, it, testBranchValues } from "../support/ids.js";
+import { describe, expect } from "vitest";
 import request from "supertest";
 import { and, eq } from "drizzle-orm";
 import { createApp } from "../../../../apps/api/src/app.js";
@@ -15,7 +16,7 @@ import { createUser, loginAs } from "../support/api-helpers.js";
 const app = () => createApp(db, appOptions);
 let adminAuthorization: { readonly Authorization: string };
 let cashierAuthorization: { readonly Authorization: string };
-let openedShiftId: number;
+let openedShiftId: string;
 
 beforeEach(async () => {
   adminAuthorization = await loginAs(app(), "admin");
@@ -36,24 +37,24 @@ async function loginSecondCashier() {
 }
 
 async function createItem(name = "بن") {
-  const [category] = await db.insert(categories).values({ name: "خامات" });
-  const [item] = await db.insert(items).values({
+  const [category] = await db.insert(categories).values(testBranchValues({ name: "خامات" })).$returningId();
+  const [item] = await db.insert(items).values(testBranchValues({
     code: nextTestItemCode(),
     name,
-    categoryId: category.insertId,
+    categoryId: category.id,
     type: "raw",
     stockUnit: "كجم",
-  });
-  return item.insertId;
+  })).$returningId();
+  return item.id;
 }
 
 async function receiveMainBatch(
-  itemId: number,
+  itemId: string,
   quantity: string,
   unitCost: string,
   receivedAt: Date,
 ) {
-  const [batch] = await db.insert(stockBatches).values({
+  const [batch] = await db.insert(stockBatches).values(testBranchValues({
     itemId,
     warehouse: "main",
     initialQuantity: quantity,
@@ -61,22 +62,22 @@ async function receiveMainBatch(
     unitCost,
     receivedAt,
     sourceType: "purchase",
-  });
-  await db.insert(stockMovements).values({
+  })).$returningId();
+  await db.insert(stockMovements).values(testBranchValues({
     itemId,
     warehouse: "main",
-    batchId: batch.insertId,
+    batchId: batch.id,
     movementType: "purchase",
     quantity,
     unitCost,
     occurredAt: receivedAt,
-  });
-  return batch.insertId;
+  }));
+  return batch.id;
 }
 
 async function createRequest(
   authorization: { readonly Authorization: string },
-  itemId: number,
+  itemId: string,
   quantity = 1,
 ) {
   return request(app())
@@ -193,7 +194,7 @@ describe("cafe transfer requests and transfers", () => {
       .send({ lines: [{ itemId, quantity: 4 }] });
 
     expect(approved.status).toBe(201);
-    expect(approved.body.transferId).toBeTypeOf("number");
+    expect(approved.body.transferId).toEqual(expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));
 
     const [firstMainBatch] = await db
       .select()

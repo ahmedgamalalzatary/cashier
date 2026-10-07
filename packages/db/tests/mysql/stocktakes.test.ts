@@ -1,5 +1,6 @@
+import { it, testBranchValues } from "../support/ids.js";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 import { createApp } from "../../../../apps/api/src/app.js";
 import { categories, items, stockMovements } from "@cashier/db";
 import { InventoryRepository } from "../../../../apps/api/src/modules/inventory/inventory.repository.js";
@@ -12,16 +13,16 @@ describe("stocktake API", () => {
   it("confirms FIFO shortages and single-item surplus adjustments", async () => {
     const app = createApp(db, appOptions);
     const authorization = await loginAs(app, "admin");
-    const [category] = await db.insert(categories).values({ name: "خامات" });
-    const [item] = await db.insert(items).values({
+    const [category] = await db.insert(categories).values(testBranchValues({ name: "خامات" })).$returningId();
+    const [item] = await db.insert(items).values(testBranchValues({
       code: nextTestItemCode(),
       name: "بن",
-      categoryId: category.insertId,
+      categoryId: category.id,
       type: "raw",
       stockUnit: "كجم",
-    });
+    })).$returningId();
     await new InventoryService(new InventoryRepository(db)).receive({
-      itemId: item.insertId,
+      itemId: item.id,
       warehouse: "main",
       quantity: 5,
       unitCost: "10",
@@ -38,7 +39,7 @@ describe("stocktake API", () => {
     await request(app)
       .put(`/api/stocktakes/${started.body.id}/counts`)
       .set(authorization)
-      .send({ lines: [{ itemId: item.insertId, countedQuantity: 3 }] })
+      .send({ lines: [{ itemId: item.id, countedQuantity: 3 }] })
       .expect(200);
     await request(app)
       .post(`/api/stocktakes/${started.body.id}/confirm`)
@@ -51,7 +52,7 @@ describe("stocktake API", () => {
       .set(authorization)
       .send({
         warehouse: "main",
-        itemId: item.insertId,
+        itemId: item.id,
         countedQuantity: 4,
         note: "إعادة عد",
       })
@@ -73,14 +74,14 @@ describe("stocktake API", () => {
   it("rejects confirmation when stock changed after the snapshot", async () => {
     const app = createApp(db, appOptions);
     const authorization = await loginAs(app, "admin");
-    const [category] = await db.insert(categories).values({ name: "خامات" });
-    const [item] = await db.insert(items).values({
+    const [category] = await db.insert(categories).values(testBranchValues({ name: "خامات" })).$returningId();
+    const [item] = await db.insert(items).values(testBranchValues({
       code: nextTestItemCode(),
       name: "لبن",
-      categoryId: category.insertId,
+      categoryId: category.id,
       type: "raw",
       stockUnit: "لتر",
-    });
+    })).$returningId();
     const inventory = new InventoryService(new InventoryRepository(db));
     const started = await request(app)
       .post("/api/stocktakes")
@@ -89,9 +90,9 @@ describe("stocktake API", () => {
     await request(app)
       .put(`/api/stocktakes/${started.body.id}/counts`)
       .set(authorization)
-      .send({ lines: [{ itemId: item.insertId, countedQuantity: 0 }] });
+      .send({ lines: [{ itemId: item.id, countedQuantity: 0 }] });
     await inventory.receive({
-      itemId: item.insertId,
+      itemId: item.id,
       warehouse: "main",
       quantity: 1,
       unitCost: "4",
@@ -126,18 +127,18 @@ describe("stocktake API", () => {
     async ({ receipts, expectedCost }) => {
       const app = createApp(db, appOptions);
       const authorization = await loginAs(app, "admin");
-      const [category] = await db.insert(categories).values({ name: "خامات" });
-      const [item] = await db.insert(items).values({
+      const [category] = await db.insert(categories).values(testBranchValues({ name: "خامات" })).$returningId();
+      const [item] = await db.insert(items).values(testBranchValues({
         code: nextTestItemCode(),
         name: "سكر",
-        categoryId: category.insertId,
+        categoryId: category.id,
         type: "raw",
         stockUnit: "كجم",
-      });
+      })).$returningId();
       const inventory = new InventoryService(new InventoryRepository(db));
       for (const receipt of receipts) {
         await inventory.receive({
-          itemId: item.insertId,
+          itemId: item.id,
           warehouse: "main",
           quantity: 2,
           movementType: "purchase",
@@ -146,7 +147,7 @@ describe("stocktake API", () => {
       }
       // Empty both batches; receipt time and then ID determine the latest cost.
       await inventory.consume({
-        itemId: item.insertId,
+        itemId: item.id,
         warehouse: "main",
         quantity: 4,
         movementType: "waste",
@@ -157,7 +158,7 @@ describe("stocktake API", () => {
         .set(authorization)
         .send({
           warehouse: "main",
-          itemId: item.insertId,
+          itemId: item.id,
           countedQuantity: 3,
           note: "جرد اكتشاف زيادة",
         })
@@ -173,24 +174,24 @@ describe("stocktake API", () => {
   it("still values surplus from a stocked shelf at the oldest batch cost", async () => {
     const app = createApp(db, appOptions);
     const authorization = await loginAs(app, "admin");
-    const [category] = await db.insert(categories).values({ name: "خامات" });
-    const [item] = await db.insert(items).values({
+    const [category] = await db.insert(categories).values(testBranchValues({ name: "خامات" })).$returningId();
+    const [item] = await db.insert(items).values(testBranchValues({
       code: nextTestItemCode(),
       name: "شاي",
-      categoryId: category.insertId,
+      categoryId: category.id,
       type: "raw",
       stockUnit: "كجم",
-    });
+    })).$returningId();
     const inventory = new InventoryService(new InventoryRepository(db));
     await inventory.receive({
-      itemId: item.insertId,
+      itemId: item.id,
       warehouse: "main",
       quantity: 5,
       unitCost: "20",
       movementType: "purchase",
     });
     await inventory.receive({
-      itemId: item.insertId,
+      itemId: item.id,
       warehouse: "main",
       quantity: 5,
       unitCost: "30",
@@ -202,7 +203,7 @@ describe("stocktake API", () => {
       .set(authorization)
       .send({
         warehouse: "main",
-        itemId: item.insertId,
+        itemId: item.id,
         countedQuantity: 11,
         note: "جرد زيادة",
       })
@@ -218,63 +219,63 @@ describe("stocktake API", () => {
 
 describe("stocktake snapshot", () => {
   it("excludes inactive items when snapshotting all items", async () => {
-    const [category] = await db.insert(categories).values({ name: "خامات" });
-    const [active] = await db.insert(items).values({
+    const [category] = await db.insert(categories).values(testBranchValues({ name: "خامات" })).$returningId();
+    const [active] = await db.insert(items).values(testBranchValues({
       code: nextTestItemCode(),
       name: "بن",
-      categoryId: category.insertId,
+      categoryId: category.id,
       type: "raw",
       stockUnit: "كجم",
-    });
-    await db.insert(items).values({
+    })).$returningId();
+    await db.insert(items).values(testBranchValues({
       code: nextTestItemCode(),
       name: "شاي",
-      categoryId: category.insertId,
+      categoryId: category.id,
       type: "raw",
       stockUnit: "كجم",
       isActive: false,
-    });
+    }));
     const repo = new StocktakesRepository(db);
 
     const rows = await repo.snapshotItems("main", null);
 
-    expect(rows.map((row) => row.itemId)).toEqual([active.insertId]);
+    expect(rows.map((row) => row.itemId)).toEqual([active.id]);
   });
 
   it("excludes inactive items when snapshotting a category", async () => {
-    const [category] = await db.insert(categories).values({ name: "خامات" });
+    const [category] = await db.insert(categories).values(testBranchValues({ name: "خامات" })).$returningId();
     const [child] = await db
       .insert(categories)
-      .values({ name: "مشروبات", parentId: category.insertId });
-    const [inCategory] = await db.insert(items).values({
+      .values(testBranchValues({ name: "مشروبات", parentId: category.id })).$returningId();
+    const [inCategory] = await db.insert(items).values(testBranchValues({
       code: nextTestItemCode(),
       name: "بن",
-      categoryId: category.insertId,
+      categoryId: category.id,
       type: "raw",
       stockUnit: "كجم",
-    });
-    await db.insert(items).values({
+    })).$returningId();
+    await db.insert(items).values(testBranchValues({
       code: nextTestItemCode(),
       name: "شاي",
-      categoryId: category.insertId,
+      categoryId: category.id,
       type: "raw",
       stockUnit: "كجم",
       isActive: false,
-    });
-    const [inChild] = await db.insert(items).values({
+    }));
+    const [inChild] = await db.insert(items).values(testBranchValues({
       code: nextTestItemCode(),
       name: "لبن",
-      categoryId: child.insertId,
+      categoryId: child.id,
       type: "raw",
       stockUnit: "لتر",
-    });
+    })).$returningId();
     const repo = new StocktakesRepository(db);
 
-    const rows = await repo.snapshotItems("main", category.insertId);
+    const rows = await repo.snapshotItems("main", category.id);
 
     expect(rows.map((row) => row.itemId)).toEqual([
-      inCategory.insertId,
-      inChild.insertId,
+      inCategory.id,
+      inChild.id,
     ]);
   });
 });

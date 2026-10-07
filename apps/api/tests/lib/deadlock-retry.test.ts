@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthUser } from "@cashier/shared";
 import type { CategoriesRepository } from "../../src/modules/categories/categories.repository.js";
@@ -56,29 +57,29 @@ describe("categories.create retries after a deadlock", () => {
         ),
       findByIdForUpdate: vi
         .fn()
-        .mockResolvedValue({ id: 1, parentId: null, isActive: true }),
+        .mockResolvedValue({ id: testId(1), parentId: null, isActive: true }),
       hasActiveItems: vi.fn().mockResolvedValue(false),
       hasActiveRecipes: vi.fn().mockResolvedValue(false),
-      create: vi.fn().mockResolvedValue(9),
+      create: vi.fn().mockResolvedValue(testId(9)),
     } as unknown as CategoriesRepository & { transaction: ReturnType<typeof vi.fn> };
 
     const id = await new CategoriesService(repo).create({
       name: "New",
-      parentId: 1,
+      parentId: testId(1),
       isActive: true,
     } as never);
 
-    expect(id).toBe(9);
+    expect(id).toBe(testId(9));
     expect(repo.transaction).toHaveBeenCalledTimes(2);
   });
 });
 
 describe("orders.create retries after a deadlock", () => {
   it("retries the whole sale transaction once", async () => {
-    let stored: { id: number; cashierId: number; requestFingerprint: string } | undefined;
+    let stored: { id: string; cashierId: string; requestFingerprint: string } | undefined;
     const tx = {
       findByClientRequestId: vi.fn(async () => stored),
-      findOpenShiftForCashier: vi.fn().mockResolvedValue({ id: 1 }),
+      findOpenShiftForCashier: vi.fn().mockResolvedValue({ id: testId(1) }),
       loadExternalProducts: vi.fn().mockResolvedValue([
         {
           externalId: 1,
@@ -90,23 +91,23 @@ describe("orders.create retries after a deadlock", () => {
           isAvailable: true,
           isVisible: true,
           isCurrent: true,
-          ingredients: [{ itemId: 1, itemName: "حليب", quantity: "0.010" }],
+          ingredients: [{ itemId: testId(1), itemName: "حليب", quantity: "0.010" }],
           sizes: [],
           modifierGroups: [],
         },
       ]),
-      lockStockItems: vi.fn().mockResolvedValue([{ id: 1, isActive: true }]),
+      lockStockItems: vi.fn().mockResolvedValue([{ id: testId(1), isActive: true }]),
       createOrder: vi.fn(
-        async (row: { requestFingerprint: string; cashierId: number }) => {
+        async (row: { requestFingerprint: string; cashierId: string }) => {
           stored = {
-            id: 5,
+            id: testId(5),
             cashierId: row.cashierId,
             requestFingerprint: row.requestFingerprint,
           };
           return 5;
         },
       ),
-      createLine: vi.fn().mockResolvedValue(10),
+      createLine: vi.fn().mockResolvedValue(testId(10)),
       createLineModifier: vi.fn(),
       createAllocation: vi.fn(),
       updateLine: vi.fn(),
@@ -121,13 +122,13 @@ describe("orders.create retries after a deadlock", () => {
             run(tx, {
               consume: vi.fn().mockResolvedValue({
                 allocations: [
-                  { quantity: "0.010", unitCost: "1.000000", batchId: 1, movementId: 1 },
+                  { quantity: "0.010", unitCost: "1.000000", batchId: testId(1), movementId: testId(1) },
                 ],
               }),
             }),
         ),
       findByClientRequestId: vi.fn(async () => stored),
-      findOrder: vi.fn().mockResolvedValue({ id: 5 }),
+      findOrder: vi.fn().mockResolvedValue({ id: testId(5) }),
       listLines: vi.fn().mockResolvedValue([]),
       listAllocations: vi.fn().mockResolvedValue([]),
       listModifiers: vi.fn().mockResolvedValue([]),
@@ -151,7 +152,7 @@ describe("orders.create retries after a deadlock", () => {
       7,
     );
 
-    expect(replay.id).toBe(5);
+    expect(replay.id).toBe(testId(5));
     expect(repo.transaction).toHaveBeenCalledTimes(2);
   });
 });
@@ -160,11 +161,11 @@ describe("purchases.create retries after a deadlock", () => {
   it("retries the invoice transaction once", async () => {
     const transactionRepo = {
       findByClientRequestId: vi.fn().mockResolvedValue(undefined),
-      findSupplierForUpdate: vi.fn().mockResolvedValue({ id: 1, isActive: true }),
+      findSupplierForUpdate: vi.fn().mockResolvedValue({ id: testId(1), isActive: true }),
       hasInvoiceNumber: vi.fn().mockResolvedValue(false),
       lockItems: vi.fn().mockResolvedValue([
         {
-          id: 5,
+          id: testId(5),
           type: "raw",
           isActive: true,
           stockUnit: "كجم",
@@ -172,7 +173,7 @@ describe("purchases.create retries after a deadlock", () => {
           purchaseToStockFactor: null,
         },
       ]),
-      createInvoice: vi.fn().mockResolvedValue(44),
+      createInvoice: vi.fn().mockResolvedValue(testId(44)),
       createLine: vi.fn(),
     };
     const repo = {
@@ -188,17 +189,17 @@ describe("purchases.create retries after a deadlock", () => {
     const id = await new PurchasesService(repo).create(
       {
         clientRequestId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-        supplierId: 1,
+        supplierId: testId(1),
         invoiceNumber: "INV-1",
         purchasedAt: "2026-07-20",
         paidAmount: 0,
         notes: null,
-        lines: [{ itemId: 5, quantity: 1, unitMode: "stock", unitPrice: 10 }],
+        lines: [{ itemId: testId(5), quantity: 1, unitMode: "stock", unitPrice: 10 }],
       } as never,
-      7,
+      testId(7),
     );
 
-    expect(id).toBe(44);
+    expect(id).toBe(testId(44));
     expect(repo.transaction).toHaveBeenCalledTimes(2);
   });
 });
@@ -206,18 +207,18 @@ describe("purchases.create retries after a deadlock", () => {
 describe("refunds.create retries after a deadlock", () => {
   it("retries the refund transaction once", async () => {
     let stored:
-      | { id: number; cashierId: number; requestFingerprint: string }
+      | { id: string; cashierId: string; requestFingerprint: string }
       | undefined;
-    const order = { id: 1, subtotal: "16.00", total: "12.00" };
+    const order = { id: testId(1), subtotal: "16.00", total: "12.00" };
     const tx = {
       findByClientRequestId: vi.fn(async () => stored),
-      findOpenShiftForCashier: vi.fn().mockResolvedValue({ id: 1 }),
+      findOpenShiftForCashier: vi.fn().mockResolvedValue({ id: testId(1) }),
       lockOrder: vi.fn().mockResolvedValue(order),
       lockOrderLines: vi
         .fn()
         .mockResolvedValue([
           {
-            id: 10,
+            id: testId(10),
             type: "external_product",
             itemId: null,
             externalProductId: 1,
@@ -232,9 +233,9 @@ describe("refunds.create retries after a deadlock", () => {
       refundedQuantities: vi.fn().mockResolvedValue([]),
       financialTotals: vi.fn().mockResolvedValue({ gross: "0.00", refunded: "0.00" }),
       createRefund: vi.fn(
-        async (row: { requestFingerprint: string; cashierId: number }) => {
+        async (row: { requestFingerprint: string; cashierId: string }) => {
           stored = {
-            id: 7,
+            id: testId(7),
             cashierId: row.cashierId,
             requestFingerprint: row.requestFingerprint,
           };
@@ -242,10 +243,10 @@ describe("refunds.create retries after a deadlock", () => {
         },
       ),
       allocations: vi.fn().mockResolvedValue([
-        { id: 1, itemId: 1, quantity: "0.020", unitCost: "1.000000" },
+        { id: testId(1), itemId: testId(1), quantity: "0.020", unitCost: "1.000000" },
       ]),
       returnedAllocationQuantities: vi.fn().mockResolvedValue([]),
-      createLine: vi.fn().mockResolvedValue(20),
+      createLine: vi.fn().mockResolvedValue(testId(20)),
       createReturnAllocation: vi.fn(),
       createWaste: vi.fn(),
       updateTotalCost: vi.fn(),
@@ -256,21 +257,21 @@ describe("refunds.create retries after a deadlock", () => {
         .mockRejectedValueOnce(deadlock)
         .mockImplementationOnce(
           async (run: (r: typeof tx, inv: object) => Promise<number>) =>
-            run(tx, { receive: vi.fn().mockResolvedValue({ batchId: 3 }) }),
+            run(tx, { receive: vi.fn().mockResolvedValue({ batchId: testId(3) }) }),
         ),
       findByClientRequestId: vi.fn(async () => stored),
-      find: vi.fn().mockResolvedValue({ id: 7 }),
+      find: vi.fn().mockResolvedValue({ id: testId(7) }),
       listLines: vi.fn().mockResolvedValue([]),
     } as unknown as RefundsRepository & { transaction: ReturnType<typeof vi.fn> };
 
     const refund = await new RefundsService(repo).create(
       {
         clientRequestId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-        orderId: 1,
+        orderId: testId(1),
         reason: "تلف",
         lines: [
           {
-            orderLineId: 10,
+            orderLineId: testId(10),
             quantity: 1,
             stockAction: "return_to_stock",
           },
@@ -279,7 +280,7 @@ describe("refunds.create retries after a deadlock", () => {
       7,
     );
 
-    expect(refund.id).toBe(7);
+    expect(refund.id).toBe(testId(7));
     expect(repo.transaction).toHaveBeenCalledTimes(2);
   });
 });
@@ -288,11 +289,11 @@ describe("transfers.createRequest retries after a deadlock", () => {
   it("retries the request transaction once", async () => {
     const tx = {
       findRequestByClientRequestId: vi.fn().mockResolvedValue(undefined),
-      findOpenShiftForCashier: vi.fn().mockResolvedValue({ id: 1 }),
+      findOpenShiftForCashier: vi.fn().mockResolvedValue({ id: testId(1) }),
       lockItems: vi
         .fn()
-        .mockResolvedValue([{ id: 5, name: "حليب", isActive: true }]),
-      createRequest: vi.fn().mockResolvedValue(31),
+        .mockResolvedValue([{ id: testId(5), name: "حليب", isActive: true }]),
+      createRequest: vi.fn().mockResolvedValue(testId(31)),
       createRequestLine: vi.fn().mockResolvedValue(undefined),
     };
     const repo = {
@@ -311,12 +312,12 @@ describe("transfers.createRequest retries after a deadlock", () => {
       {
         clientRequestId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
         notes: null,
-        lines: [{ itemId: 5, quantity: 2 }],
+        lines: [{ itemId: testId(5), quantity: 2 }],
       } as never,
-      { id: 7, name: "كاشير", role: "cashier" } as AuthUser,
+      { id: testId(7), name: "كاشير", role: "cashier" } as AuthUser,
     );
 
-    expect(id).toBe(31);
+    expect(id).toBe(testId(31));
     expect(repo.transaction).toHaveBeenCalledTimes(2);
   });
 });
@@ -325,14 +326,14 @@ describe("waste.create retries after a deadlock", () => {
   it("retries the create transaction once", async () => {
     const tx = {
       findByClientRequestId: vi.fn().mockResolvedValue(undefined),
-      findOpenShiftForCashier: vi.fn().mockResolvedValue({ id: 1 }),
+      findOpenShiftForCashier: vi.fn().mockResolvedValue({ id: testId(1) }),
       findItem: vi.fn().mockResolvedValue({
-        id: 1,
+        id: testId(1),
         name: "بن",
         stockUnit: "كجم",
         isActive: true,
       }),
-      create: vi.fn().mockResolvedValue(12),
+      create: vi.fn().mockResolvedValue(testId(12)),
       updateCost: vi.fn(),
     };
     const repo = {
@@ -346,7 +347,7 @@ describe("waste.create retries after a deadlock", () => {
             }),
         ),
       findByClientRequestId: vi.fn().mockResolvedValue(undefined),
-      find: vi.fn().mockResolvedValue({ id: 12 }),
+      find: vi.fn().mockResolvedValue({ id: testId(12) }),
       allocations: vi.fn().mockResolvedValue([]),
     } as unknown as WasteRepository & { transaction: ReturnType<typeof vi.fn> };
 
@@ -354,15 +355,15 @@ describe("waste.create retries after a deadlock", () => {
       {
         clientRequestId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
         warehouse: "cafe",
-        target: { type: "item", itemId: 1 },
+        target: { type: "item", itemId: testId(1) },
         quantity: 1,
         reason: "spill",
         note: null,
       } as never,
-      { id: 7, name: "كاشير", role: "cashier" } as AuthUser,
+      { id: testId(7), name: "كاشير", role: "cashier" } as AuthUser,
     );
 
-    expect(entry.id).toBe(12);
+    expect(entry.id).toBe(testId(12));
     expect(repo.transaction).toHaveBeenCalledTimes(2);
   });
 });

@@ -55,7 +55,7 @@ export class SuppliersRepository {
       .orderBy(suppliers.name);
   }
 
-  async findById(id: number) {
+  async findById(id: string) {
     const [row] = await this.db
       .select(supplierColumns)
       .from(suppliers)
@@ -63,7 +63,7 @@ export class SuppliersRepository {
     return row;
   }
 
-  async findByIdForUpdate(id: number) {
+  async findByIdForUpdate(id: string) {
     const [row] = await this.db
       .select(supplierColumns)
       .from(suppliers)
@@ -72,7 +72,7 @@ export class SuppliersRepository {
     return row;
   }
 
-  async hasPayments(supplierId: number) {
+  async hasPayments(supplierId: string) {
     const [row] = await this.db
       .select({ id: supplierPayments.id })
       .from(supplierPayments)
@@ -86,7 +86,7 @@ export class SuppliersRepository {
     return Boolean(row);
   }
 
-  async hasPurchases(supplierId: number) {
+  async hasPurchases(supplierId: string) {
     const [row] = await this.db
       .select({ id: purchaseInvoices.id })
       .from(purchaseInvoices)
@@ -108,11 +108,11 @@ export class SuppliersRepository {
           ...data,
           openingBalance: data.openingBalance.toFixed(2),
         }),
-      );
-    return result.insertId;
+      ).$returningId();
+    return result.id;
   }
 
-  async update(id: number, data: SupplierUpdateInput) {
+  async update(id: string, data: SupplierUpdateInput) {
     const { openingBalance, ...rest } = data;
     const [result] = await this.db
       .update(suppliers)
@@ -126,7 +126,7 @@ export class SuppliersRepository {
     return result.affectedRows > 0;
   }
 
-  async deactivate(id: number) {
+  async deactivate(id: string) {
     const [result] = await this.db
       .update(suppliers)
       .set({ isActive: false })
@@ -139,7 +139,7 @@ export class SuppliersRepository {
     return result.affectedRows > 0;
   }
 
-  async createPayment(supplierId: number, data: PaymentInput) {
+  async createPayment(supplierId: string, data: PaymentInput) {
     const [result] = await this.db.insert(supplierPayments).values(
       branchValues({
         supplierId,
@@ -147,11 +147,11 @@ export class SuppliersRepository {
         paidAt: data.paidAt,
         notes: data.notes,
       }),
-    );
-    return result.insertId;
+    ).$returningId();
+    return result.id;
   }
 
-  listPayments(supplierId: number) {
+  listPayments(supplierId: string) {
     return this.db
       .select()
       .from(supplierPayments)
@@ -164,7 +164,7 @@ export class SuppliersRepository {
       .orderBy(supplierPayments.paidAt, supplierPayments.id);
   }
 
-  listPurchases(supplierId: number) {
+  listPurchases(supplierId: string) {
     return this.db
       .select({
         id: purchaseInvoices.id,

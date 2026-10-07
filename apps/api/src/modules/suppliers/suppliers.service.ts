@@ -13,7 +13,7 @@ export class SuppliersService {
     return this.repo.list();
   }
 
-  async getOrFail(id: number) {
+  async getOrFail(id: string) {
     const supplier = await this.repo.findById(id);
     if (!supplier) throw new HttpError(404, 'المورد غير موجود');
     return supplier;
@@ -23,7 +23,7 @@ export class SuppliersService {
     return this.repo.create(data);
   }
 
-  async update(id: number, data: SupplierUpdateInput) {
+  async update(id: string, data: SupplierUpdateInput) {
     return this.repo.transaction(async (repo) => {
       const supplier = await repo.findByIdForUpdate(id);
       if (!supplier) throw new HttpError(404, 'المورد غير موجود');
@@ -43,7 +43,7 @@ export class SuppliersService {
     });
   }
 
-  async deactivate(id: number) {
+  async deactivate(id: string) {
     return this.repo.transaction(async (repo) => {
       const supplier = await repo.findByIdForUpdate(id);
       if (!supplier) throw new HttpError(404, 'المورد غير موجود');
@@ -55,7 +55,7 @@ export class SuppliersService {
     });
   }
 
-  async addPayment(supplierId: number, data: PaymentInput) {
+  async addPayment(supplierId: string, data: PaymentInput) {
     return this.repo.transaction(async (repo) => {
       const supplier = await repo.findByIdForUpdate(supplierId);
       if (!supplier) throw new HttpError(404, 'المورد غير موجود');
@@ -64,7 +64,7 @@ export class SuppliersService {
     });
   }
 
-  async statement(supplierId: number) {
+  async statement(supplierId: string) {
     const supplier = await this.getOrFail(supplierId);
     const [payments, purchases] = await Promise.all([
       this.repo.listPayments(supplierId),
@@ -97,7 +97,7 @@ export class SuppliersService {
       (a, b) =>
         a.date.localeCompare(b.date) ||
         a.order - b.order ||
-        a.numericId - b.numericId,
+        (a.numericId).localeCompare(b.numericId),
     );
     let running = BigInt(supplier.openingBalance.replace('.', ''));
     const movements = datedMovements.map(

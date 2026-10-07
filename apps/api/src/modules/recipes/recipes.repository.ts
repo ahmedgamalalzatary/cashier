@@ -70,7 +70,7 @@ export class RecipesRepository {
       .orderBy(desc(recipes.createdAt), desc(recipes.id));
   }
 
-  async findRecipeHeader(id: number) {
+  async findRecipeHeader(id: string) {
     const [row] = await this.db
       .select({
         id: recipes.id,
@@ -98,7 +98,7 @@ export class RecipesRepository {
     return row;
   }
 
-  async lockRecipe(id: number) {
+  async lockRecipe(id: string) {
     const [row] = await this.db
       .select()
       .from(recipes)
@@ -107,7 +107,7 @@ export class RecipesRepository {
     return row;
   }
 
-  async findCategory(id: number) {
+  async findCategory(id: string) {
     const childCount = sql<number>`(
       SELECT COUNT(*) FROM ${branchTable("categories")} child WHERE child.parent_id = ${categories.id}
     )`;
@@ -123,8 +123,8 @@ export class RecipesRepository {
     return row;
   }
 
-  lockItems(ids: number[]) {
-    const orderedIds = [...new Set(ids)].sort((a, b) => a - b);
+  lockItems(ids: string[]) {
+    const orderedIds = [...new Set(ids)].sort((a, b) => (a).localeCompare(b));
     return this.db
       .select({
         id: items.id,
@@ -139,7 +139,7 @@ export class RecipesRepository {
       .for("update");
   }
 
-  async findRecipeByOutputItem(outputItemId: number, exceptId?: number) {
+  async findRecipeByOutputItem(outputItemId: string, exceptId?: string) {
     const [row] = await this.db
       .select({ id: recipes.id })
       .from(recipes)
@@ -179,20 +179,20 @@ export class RecipesRepository {
   async createRecipe(data: {
     name: string;
     type: "prepared";
-    categoryId: number;
-    outputItemId: number | null;
+    categoryId: string;
+    outputItemId: string | null;
   }) {
-    const [result] = await this.db.insert(recipes).values(branchValues(data));
-    return result.insertId;
+    const [result] = await this.db.insert(recipes).values(branchValues(data)).$returningId();
+    return result.id;
   }
 
   async updateRecipe(
-    id: number,
+    id: string,
     data: {
       name: string;
       type: "prepared";
-      categoryId: number;
-      outputItemId: number | null;
+      categoryId: string;
+      outputItemId: string | null;
     },
   ) {
     await this.db
@@ -202,7 +202,7 @@ export class RecipesRepository {
   }
 
   async createSize(data: {
-    recipeId: number;
+    recipeId: string;
     name: string;
     sellingPrice: string | null;
     outputQuantity: string | null;
@@ -210,19 +210,19 @@ export class RecipesRepository {
   }) {
     const [result] = await this.db
       .insert(recipeSizes)
-      .values(branchValues(data));
-    return result.insertId;
+      .values(branchValues(data)).$returningId();
+    return result.id;
   }
 
   async createIngredient(data: {
-    recipeSizeId: number;
-    itemId: number;
+    recipeSizeId: string;
+    itemId: string;
     quantity: string;
   }) {
     await this.db.insert(recipeIngredients).values(branchValues(data));
   }
 
-  async deleteRecipeChildren(recipeId: number) {
+  async deleteRecipeChildren(recipeId: string) {
     const sizes = await this.db
       .select({ id: recipeSizes.id })
       .from(recipeSizes)
@@ -243,7 +243,7 @@ export class RecipesRepository {
       .where(branchCondition(recipeSizes, eq(recipeSizes.recipeId, recipeId)));
   }
 
-  listSizes(recipeId: number) {
+  listSizes(recipeId: string) {
     return this.db
       .select()
       .from(recipeSizes)
@@ -251,7 +251,7 @@ export class RecipesRepository {
       .orderBy(recipeSizes.sortOrder, recipeSizes.id);
   }
 
-  listIngredients(recipeId: number) {
+  listIngredients(recipeId: string) {
     return this.db
       .select({
         id: recipeIngredients.id,
@@ -282,7 +282,7 @@ export class RecipesRepository {
       .orderBy(recipeSizes.sortOrder, recipeIngredients.id);
   }
 
-  availableCafeBatches(itemId: number) {
+  availableCafeBatches(itemId: string) {
     return this.db
       .select({
         id: stockBatches.id,
@@ -299,7 +299,7 @@ export class RecipesRepository {
       .orderBy(stockBatches.receivedAt, stockBatches.id);
   }
 
-  async setActive(id: number, isActive: boolean) {
+  async setActive(id: string, isActive: boolean) {
     await this.db
       .update(recipes)
       .set({ isActive })
@@ -307,12 +307,12 @@ export class RecipesRepository {
   }
 
   async createPreparation(data: {
-    recipeId: number;
+    recipeId: string;
     recipeName: string;
-    outputItemId: number;
+    outputItemId: string;
     outputItemName: string;
     producedQuantity: string;
-    preparedBy: number;
+    preparedBy: string;
     notes: string | null;
     occurredAt: Date;
   }) {
@@ -323,13 +323,13 @@ export class RecipesRepository {
         unitCost: "0.000000",
         outputBatchId: null,
       }),
-    );
-    return result.insertId;
+    ).$returningId();
+    return result.id;
   }
 
   async completePreparation(
-    id: number,
-    data: { totalCost: string; unitCost: string; outputBatchId: number },
+    id: string,
+    data: { totalCost: string; unitCost: string; outputBatchId: string },
   ) {
     await this.db
       .update(preparations)
@@ -338,12 +338,12 @@ export class RecipesRepository {
   }
 
   async createPreparationAllocation(data: {
-    preparationId: number;
-    ingredientItemId: number;
+    preparationId: string;
+    ingredientItemId: string;
     ingredientItemName: string;
     quantity: string;
     unitCost: string;
-    sourceBatchId: number;
+    sourceBatchId: string;
   }) {
     await this.db.insert(preparationAllocations).values(branchValues(data));
   }
@@ -380,7 +380,7 @@ export class RecipesRepository {
       .orderBy(desc(preparations.occurredAt), desc(preparations.id));
   }
 
-  async findPreparation(id: number) {
+  async findPreparation(id: string) {
     const [row] = await this.db
       .select({
         id: preparations.id,
@@ -412,7 +412,7 @@ export class RecipesRepository {
     return row;
   }
 
-  listPreparationAllocations(preparationId: number) {
+  listPreparationAllocations(preparationId: string) {
     return this.db
       .select({
         id: preparationAllocations.id,

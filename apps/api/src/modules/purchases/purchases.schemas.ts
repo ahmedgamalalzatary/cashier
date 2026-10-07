@@ -40,7 +40,7 @@ const calendarDate = z
   );
 
 const purchaseLineInput = z.object({
-  itemId: z.coerce.number().int().positive(),
+  itemId: z.string().uuid(),
   quantity,
   unitMode: z.enum(['stock', 'purchase']),
   unitPrice: money,
@@ -59,7 +59,7 @@ const purchaseLineInput = z.object({
 export const purchaseInput = z
   .object({
     clientRequestId: z.string().uuid(),
-    supplierId: z.coerce.number().int().positive(),
+    supplierId: z.string().uuid(),
     invoiceNumber: optionalText(100),
     purchasedAt: calendarDate,
     paidAmount: money.default(0),

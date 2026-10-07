@@ -20,8 +20,8 @@ import { InventoryTransaction } from "../inventory/inventory.service.js";
 import { TransfersRepository } from "../transfers/transfers.repository.js";
 
 export type PurchaseLineWrite = {
-  invoiceId: number;
-  itemId: number;
+  invoiceId: string;
+  itemId: string;
   quantity: string;
   unitMode: "stock" | "purchase";
   stockQuantity: string;
@@ -50,7 +50,7 @@ export class PurchasesRepository {
     });
   }
 
-  async findSupplierForUpdate(id: number) {
+  async findSupplierForUpdate(id: string) {
     const [row] = await this.db
       .select({ id: suppliers.id, isActive: suppliers.isActive })
       .from(suppliers)
@@ -59,7 +59,7 @@ export class PurchasesRepository {
     return row;
   }
 
-  lockItems(ids: number[]) {
+  lockItems(ids: string[]) {
     return this.db
       .select({
         id: items.id,
@@ -75,7 +75,7 @@ export class PurchasesRepository {
           items,
           inArray(
             items.id,
-            [...ids].sort((a, b) => a - b),
+            [...ids].sort((a, b) => (a).localeCompare(b)),
           ),
         ),
       )
@@ -83,7 +83,7 @@ export class PurchasesRepository {
       .for("update");
   }
 
-  async hasInvoiceNumber(supplierId: number, invoiceNumber: string) {
+  async hasInvoiceNumber(supplierId: string, invoiceNumber: string) {
     const [row] = await this.db
       .select({ id: purchaseInvoices.id })
       .from(purchaseInvoices)
@@ -101,20 +101,20 @@ export class PurchasesRepository {
   }
 
   async createInvoice(data: {
-    supplierId: number;
+    supplierId: string;
     invoiceNumber: string | null;
     purchasedAt: string;
     notes: string | null;
     totalAmount: string;
     paidAmount: string;
-    createdBy: number;
+    createdBy: string;
     clientRequestId: string;
     requestFingerprint: string;
   }) {
     const [result] = await this.db
       .insert(purchaseInvoices)
-      .values(branchValues(data));
-    return result.insertId;
+      .values(branchValues(data)).$returningId();
+    return result.id;
   }
 
   async findByClientRequestId(clientRequestId: string) {
@@ -139,8 +139,8 @@ export class PurchasesRepository {
   }
 
   async createPayment(data: {
-    supplierId: number;
-    purchaseInvoiceId: number;
+    supplierId: string;
+    purchaseInvoiceId: string;
     amount: string;
     paidAt: string;
   }) {
@@ -176,7 +176,7 @@ export class PurchasesRepository {
       .orderBy(desc(purchaseInvoices.purchasedAt), desc(purchaseInvoices.id));
   }
 
-  async findById(id: number) {
+  async findById(id: string) {
     const [row] = await this.db
       .select({
         id: purchaseInvoices.id,
@@ -205,7 +205,7 @@ export class PurchasesRepository {
     return row;
   }
 
-  async listLines(invoiceId: number) {
+  async listLines(invoiceId: string) {
     const [rows, transferred] = await Promise.all([
       this.db
         .select({
@@ -246,7 +246,7 @@ export class PurchasesRepository {
   }
 
   /** Transfers this invoice paid for, newest first. */
-  listLinkedTransfers(invoiceId: number) {
+  listLinkedTransfers(invoiceId: string) {
     return this.db
       .select({
         id: transfers.id,
@@ -264,7 +264,7 @@ export class PurchasesRepository {
   }
 
   /** What this invoice already sent to the cafe, per item. */
-  private async transferredToCafeByItem(invoiceId: number) {
+  private async transferredToCafeByItem(invoiceId: string) {
     const rows = await this.db
       .select({
         itemId: transferLines.itemId,

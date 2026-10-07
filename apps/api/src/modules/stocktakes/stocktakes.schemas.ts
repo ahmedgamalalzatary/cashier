@@ -1,9 +1,5 @@
 import { z } from "zod";
 
-const coerceNumber = (value: unknown) =>
-  typeof value === "string" || typeof value === "number"
-    ? Number(value)
-    : value;
 const coerceQuantity = (value: unknown) => {
   if (typeof value === "number") return value;
   if (typeof value === "string") {
@@ -12,7 +8,7 @@ const coerceQuantity = (value: unknown) => {
   }
   return value;
 };
-const id = z.preprocess(coerceNumber, z.number().int().positive());
+const id = z.string().uuid();
 const quantity = z
   .preprocess(coerceQuantity, z.number().min(0).max(99_999_999_999.999))
   .refine(
@@ -32,7 +28,7 @@ export const updateStocktakeCountsInput = z
     lines: z.array(z.object({ itemId: id, countedQuantity: quantity })).min(1),
   })
   .superRefine(({ lines }, context) => {
-    const seen = new Set<number>();
+    const seen = new Set<string>();
     lines.forEach((line, index) => {
       if (seen.has(line.itemId))
         context.addIssue({

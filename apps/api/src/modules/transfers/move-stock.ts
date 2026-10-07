@@ -8,17 +8,17 @@ export async function moveStockToCafe(
   repo: TransfersRepository,
   inventory: InventoryTransaction,
   header: {
-    requestId: number | null;
-    purchaseInvoiceId: number | null;
-    createdBy: number;
-    approvedBy: number;
+    requestId: string | null;
+    purchaseInvoiceId: string | null;
+    createdBy: string;
+    approvedBy: string;
     notes: string | null;
   },
-  lines: Array<{ itemId: number; quantity: number }>,
+  lines: Array<{ itemId: string; quantity: number }>,
 ) {
   const transferId = await repo.createTransfer(header);
   const occurredAt = new Date();
-  const orderedLines = [...lines].sort((a, b) => a.itemId - b.itemId);
+  const orderedLines = [...lines].sort((a, b) => (a.itemId).localeCompare(b.itemId));
   for (const line of orderedLines) {
     const consumed = await inventory.consume({
       itemId: line.itemId,

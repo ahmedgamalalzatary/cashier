@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, it } from "../support/ids.js";
+import { describe, expect } from "vitest";
 import request from "supertest";
 import { createApp } from "../../../../apps/api/src/app.js";
 import { appOptions, db } from "../support/api-setup.js";
@@ -33,7 +34,7 @@ describe("suppliers CRUD", () => {
   it("creates and lists a supplier with computed balance", async () => {
     const created = await createSupplier();
     expect(created.status).toBe(201);
-    expect(created.body.id).toBeTypeOf("number");
+    expect(created.body.id).toEqual(expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));
 
     const list = await api().get("/api/suppliers");
     expect(list.status).toBe(200);
@@ -108,13 +109,13 @@ describe("suppliers CRUD", () => {
   });
 
   it("404s on missing supplier", async () => {
-    const res = await api().put("/api/suppliers/999").send({ name: "x" });
+    const res = await api().put("/api/suppliers/00000000-0000-7000-8000-0000000003e7").send({ name: "x" });
     expect(res.status).toBe(404);
   });
 });
 
 describe("supplier payments & statement", () => {
-  let supplierId: number;
+  let supplierId: string;
   beforeEach(async () => {
     const { body } = await createSupplier();
     supplierId = body.id;
@@ -151,7 +152,7 @@ describe("supplier payments & statement", () => {
       name: "Concurrent supplier",
       openingBalance: 0,
     });
-    const id = created.body.id as number;
+    const id = created.body.id as string;
 
     const [payment, deactivation] = await Promise.all([
       api()

@@ -1,24 +1,25 @@
+import { beforeEach, it, testBranchValues } from "../support/ids.js";
 import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 import { categories, items, stockBatches } from "@cashier/db";
 import { InventoryRepository } from "../../../../apps/api/src/modules/inventory/inventory.repository.js";
 import type { InventoryRepositoryPort } from "../../../../apps/api/src/modules/inventory/inventory.repository.js";
 import { InventoryService } from "../../../../apps/api/src/modules/inventory/inventory.service.js";
 import { db, nextTestItemCode } from "../support/api-setup.js";
 
-let itemId: number;
+let itemId: string;
 let service: InventoryService;
 
 beforeEach(async () => {
-  const [category] = await db.insert(categories).values({ name: "خامات" });
-  const [item] = await db.insert(items).values({
+  const [category] = await db.insert(categories).values(testBranchValues({ name: "خامات" })).$returningId();
+  const [item] = await db.insert(items).values(testBranchValues({
     code: nextTestItemCode(),
     name: "بن",
-    categoryId: category.insertId,
+    categoryId: category.id,
     type: "raw",
     stockUnit: "كجم",
-  });
-  itemId = item.insertId;
+  })).$returningId();
+  itemId = item.id;
   service = new InventoryService(new InventoryRepository(db));
 });
 
@@ -52,14 +53,14 @@ describe("MySQL FIFO inventory", () => {
 
     expect(consumed.allocations).toEqual([
       {
-        batchId: expect.any(Number),
-        movementId: expect.any(Number),
+        batchId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
+        movementId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
         quantity: "2.000",
         unitCost: "10.000000",
       },
       {
-        batchId: expect.any(Number),
-        movementId: expect.any(Number),
+        batchId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
+        movementId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
         quantity: "2.000",
         unitCost: "12.000000",
       },
@@ -156,7 +157,7 @@ describe("MySQL FIFO inventory", () => {
 
     expect(receipt.deficitAllocations).toEqual([
       {
-        deficitMovementId: expect.any(Number),
+        deficitMovementId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
         batchId: receipt.batchId,
         quantity: "1.000",
         unitCost: "8.000000",

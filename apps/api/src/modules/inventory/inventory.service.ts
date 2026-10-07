@@ -6,12 +6,12 @@ import type {
 } from "./inventory.repository.js";
 
 type MovementContext = {
-  itemId: number;
+  itemId: string;
   warehouse: Warehouse;
   quantity: number;
   movementType: string;
   referenceType?: string | null;
-  referenceId?: number | null;
+  referenceId?: string | null;
   notes?: string | null;
   occurredAt?: Date;
 };
@@ -26,15 +26,15 @@ export type ConsumeStockInput = MovementContext & {
 };
 
 export type FifoAllocation = {
-  batchId: number | null;
-  movementId: number;
+  batchId: string | null;
+  movementId: string;
   quantity: string;
   unitCost: string;
 };
 
 export type DeficitAllocation = {
-  deficitMovementId: number;
-  batchId: number;
+  deficitMovementId: string;
+  batchId: string;
   quantity: string;
   unitCost: string;
 };
@@ -99,7 +99,7 @@ function costFromProduct(productAtScaleNine: bigint) {
 export class InventoryTransaction {
   constructor(private repo: InventoryRepositoryPort) {}
 
-  private async activeItemOrFail(itemId: number) {
+  private async activeItemOrFail(itemId: string) {
     const item = await this.repo.findItemForUpdate(itemId);
     if (!item) throw new HttpError(404, "الصنف غير موجود");
     if (!item.isActive) throw new HttpError(409, "الصنف موقوف");
@@ -118,7 +118,7 @@ export class InventoryTransaction {
     const incomingQuantity = decimalToScaled(quantity, 3);
     let unallocated = incomingQuantity;
     const pendingAllocations: Array<{
-      deficitMovementId: number;
+      deficitMovementId: string;
       quantity: string;
     }> = [];
     for (const deficit of deficits) {

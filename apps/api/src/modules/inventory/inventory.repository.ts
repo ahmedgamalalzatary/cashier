@@ -17,71 +17,71 @@ import type { ItemType, Warehouse } from "@cashier/shared";
 export type { Warehouse } from "@cashier/shared";
 
 export type StockBatchRecord = {
-  id: number;
-  itemId: number;
+  id: string;
+  itemId: string;
   warehouse: Warehouse;
   initialQuantity: string;
   remainingQuantity: string;
   unitCost: string;
   receivedAt: Date;
   sourceType: string;
-  sourceId: number | null;
+  sourceId: string | null;
 };
 
 export type StockMovementWrite = {
-  itemId: number;
+  itemId: string;
   warehouse: Warehouse;
-  batchId: number | null;
+  batchId: string | null;
   movementType: string;
   quantity: string;
   unitCost: string;
   referenceType: string | null;
-  referenceId: number | null;
+  referenceId: string | null;
   notes: string | null;
   occurredAt: Date;
 };
 
 export type OutstandingDeficitRecord = {
-  movementId: number;
+  movementId: string;
   remainingQuantity: string;
 };
 
 export type StockDeficitAllocationWrite = {
-  deficitMovementId: number;
-  batchId: number;
+  deficitMovementId: string;
+  batchId: string;
   quantity: string;
   unitCost: string;
 };
 
 export interface InventoryRepositoryPort {
   transaction<T>(fn: (repo: InventoryRepositoryPort) => Promise<T>): Promise<T>;
-  findItemForUpdate(id: number): Promise<
+  findItemForUpdate(id: string): Promise<
     | {
-        id: number;
+        id: string;
         isActive: boolean;
       }
     | undefined
   >;
-  createBatch(data: Omit<StockBatchRecord, "id">): Promise<number>;
-  createMovement(data: StockMovementWrite): Promise<number>;
+  createBatch(data: Omit<StockBatchRecord, "id">): Promise<string>;
+  createMovement(data: StockMovementWrite): Promise<string>;
   outstandingDeficits(
-    itemId: number,
+    itemId: string,
     warehouse: Warehouse,
   ): Promise<OutstandingDeficitRecord[]>;
   createDeficitAllocation(data: StockDeficitAllocationWrite): Promise<void>;
   lockAvailableBatches(
-    itemId: number,
+    itemId: string,
     warehouse: Warehouse,
   ): Promise<StockBatchRecord[]>;
-  updateBatchRemaining(id: number, remainingQuantity: string): Promise<void>;
+  updateBatchRemaining(id: string, remainingQuantity: string): Promise<void>;
   listStock(warehouse: Warehouse): Promise<InventoryStockRecord[]>;
 }
 
 export type InventoryStockRecord = {
-  itemId: number;
+  itemId: string;
   code: number;
   name: string;
-  categoryId: number;
+  categoryId: string;
   categoryName: string;
   type: ItemType;
   stockUnit: string;
@@ -102,7 +102,7 @@ export class InventoryRepository implements InventoryRepositoryPort {
     );
   }
 
-  async findItemForUpdate(id: number) {
+  async findItemForUpdate(id: string) {
     const [row] = await this.db
       .select({ id: items.id, isActive: items.isActive })
       .from(items)
@@ -114,18 +114,18 @@ export class InventoryRepository implements InventoryRepositoryPort {
   async createBatch(data: Omit<StockBatchRecord, "id">) {
     const [result] = await this.db
       .insert(stockBatches)
-      .values(branchValues(data));
-    return result.insertId;
+      .values(branchValues(data)).$returningId();
+    return result.id;
   }
 
   async createMovement(data: StockMovementWrite) {
     const [result] = await this.db
       .insert(stockMovements)
-      .values(branchValues(data));
-    return result.insertId;
+      .values(branchValues(data)).$returningId();
+    return result.id;
   }
 
-  outstandingDeficits(itemId: number, warehouse: Warehouse) {
+  outstandingDeficits(itemId: string, warehouse: Warehouse) {
     const allocatedQuantity = sql<string>`COALESCE((
       SELECT SUM(sda.quantity)
       FROM ${branchTable("stock_deficit_allocations")} sda
@@ -158,7 +158,7 @@ export class InventoryRepository implements InventoryRepositoryPort {
     await this.db.insert(stockDeficitAllocations).values(branchValues(data));
   }
 
-  lockAvailableBatches(itemId: number, warehouse: Warehouse) {
+  lockAvailableBatches(itemId: string, warehouse: Warehouse) {
     return this.db
       .select({
         id: stockBatches.id,
@@ -186,7 +186,7 @@ export class InventoryRepository implements InventoryRepositoryPort {
       .for("update");
   }
 
-  async updateBatchRemaining(id: number, remainingQuantity: string) {
+  async updateBatchRemaining(id: string, remainingQuantity: string) {
     await this.db
       .update(stockBatches)
       .set({ remainingQuantity })
