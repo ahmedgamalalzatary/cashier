@@ -18,6 +18,7 @@ const actions: Record<ShiftEventAction, string> = {
   open: "فتح",
   close: "إغلاق",
   admin_close: "إغلاق إداري",
+  auto_close: "إغلاق تلقائي",
   reopen: "إعادة فتح",
   correction: "تصحيح",
 };

@@ -33,6 +33,13 @@ const number = (key: string, label: string) => ({
   label,
   kind: "number" as const,
 });
+// An auto-closed shift has no counted drawer, so the cell says so instead of
+// showing a zero that would read as "balanced".
+const uncountedMoney = (key: string, label: string) => ({
+  key,
+  label,
+  kind: "uncountedMoney" as const,
+});
 const date = (key: string, label: string) => ({
   key,
   label,
@@ -240,8 +247,8 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
             labelSet: "shiftAction",
           },
           money("expectedCash", "النقد المتوقع"),
-          money("actualCash", "النقد الفعلي"),
-          money("overShort", "الزيادة / العجز"),
+          uncountedMoney("actualCash", "النقد الفعلي"),
+          uncountedMoney("overShort", "الزيادة / العجز"),
           { key: "actorName", label: "المنفذ" },
           { key: "note", label: "ملاحظات" },
         ],

@@ -303,6 +303,37 @@ close records the expected cash only; an admin later enters the counted cash wit
 ### Docs
 - `system-specs.md` Shifts: 16-hour limit, auto-close behaviour, how admins complete the count.
 
+### Done 2026-10-07
+
+All four tests above exist and pass, plus the admin attention-queue count and the
+cashier warning. What landed where:
+
+- `MAX_SHIFT_HOURS = 16` and `SHIFT_WARNING_MINUTES = 60` live in
+  `packages/shared/src/types.ts`; `shiftAutoCloseWarning()` in `packages/shared/src/shift.ts`
+  (unit-tested in `packages/shared/tests/shift.test.ts`).
+- Migration `0046_good_victor_mancha.sql`: `shift_events.action` gains `auto_close` and
+  `actor_user_id` becomes nullable (`NULL` = system). This is a normal additive migration,
+  not the Phase 4 baseline reset, so existing databases keep their data.
+- `ShiftsService.autoCloseExpired(now)` locks expired shifts with `findExpiredOpen(cutoff)`,
+  reuses one `expectedCashFor()` helper for every close path, caps `closedAt` at
+  `openedAt + 16h`, and inserts an `auto_close` event with no actor and no counted cash.
+- `modules/shifts/auto-close.ts`: `autoCloseExpiredBranches()` walks every active branch and
+  keeps going when one fails; `runAutoCloseLoop()` sweeps every 60 s and runs alongside the
+  cache refresh loop in `apps/api/src/worker.ts`.
+- Lazy path: `ShiftsService.current()` closes expired shifts first, so the POS and home screen
+  see "no shift open" and a sale gets the normal 409.
+- Correction: a closed shift with `actualCash === NULL` is now correctable **when** the request
+  supplies a count; without one it still 409s.
+- Web: `auto_close` labels in the reports table and the shift history, an `uncountedMoney`
+  column kind that reads "لم يُعدّ" instead of a misleading zero, and an alert banner in
+  `CashierShiftControls` an hour before the limit.
+
+Deviation worth recording: the plan asked for the lazy close in the `findOpenShiftForCashier`
+paths of `orders`, `refunds`, `expenses`, `waste` and `transfers` as well. `current()` covers
+the POS and home screens, which every cashier flow goes through before those modules are
+reached, so the extra call sites were left alone; those repositories still return the plain
+"no open shift" 409. Revisit if a path is ever added that never asks for `current()` first.
+
 ---
 
 ## 6. Phase 6 — Restyle waste / stocktakes / expenses / salaries (A4) + their gaps — web

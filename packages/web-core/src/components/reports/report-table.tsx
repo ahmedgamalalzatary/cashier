@@ -68,6 +68,7 @@ const labelSets: Record<string, Record<string, string>> = {
     open: "فتح",
     close: "إغلاق",
     admin_close: "إغلاق إداري",
+    auto_close: "إغلاق تلقائي",
     reopen: "إعادة فتح",
     correction: "تصحيح",
   },
@@ -78,8 +79,13 @@ function valueOf(
   kind?: string,
   labelSet?: string,
 ) {
+// uncountedMoney comes first: an auto-closed shift has no counted drawer and
+  // must say so rather than fall through to the generic dash.
+  if (kind === "uncountedMoney" && (value == null || value === ""))
+    return "لم يُعدّ";
   if (value == null || value === "") return "—";
-  if (kind === "money") return formatMoney(value);
+  if (kind === "uncountedMoney" || kind === "money")
+    return formatMoney(value);
   if (kind === "number") return arabicNumber.format(Number(value));
   if (kind === "date") {
     const options = { timeZone: "Africa/Cairo" };

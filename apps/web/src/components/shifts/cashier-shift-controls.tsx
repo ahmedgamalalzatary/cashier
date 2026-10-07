@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Shift } from "@cashier/shared";
+import { shiftAutoCloseWarning } from "@cashier/shared";
 import { Button } from "@cashier/web-core/components/ui/button";
 import { Modal } from "@cashier/web-core/components/ui/modal";
 import { ShiftActionModal } from "./shift-action-modal";
@@ -21,9 +22,19 @@ export function CashierShiftControls({
     { mode: "open" } | { mode: "close"; shift: Shift } | null
   >(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const autoCloseWarning = shiftAutoCloseWarning(current);
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="space-y-2">
+      {autoCloseWarning && (
+        <p
+          role="alert"
+          className="rounded-xl border border-line bg-surface px-4 py-3 text-sm font-semibold text-danger"
+        >
+          {autoCloseWarning.text}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2">
       <Button
         disabled={disabled}
         onClick={() =>
@@ -64,6 +75,7 @@ export function CashierShiftControls({
           <ShiftHistory />
         </Modal>
       )}
+      </div>
     </div>
   );
 }

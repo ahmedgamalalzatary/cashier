@@ -1,5 +1,18 @@
 // API response shapes shared between apps/api and apps/web
 
+/**
+ * A shift left open for this long is closed by the system. The drawer was never
+ * counted, so the close records the expected cash only and an admin enters the
+ * counted cash later with the existing correction flow.
+ */
+export const MAX_SHIFT_HOURS = 16;
+
+/**
+ * A shift is warned about this many minutes before the system closes it: a
+ * 16 hour shift starts warning at 15 hours.
+ */
+export const SHIFT_WARNING_MINUTES = 60;
+
 export type Role = "admin" | "cashier";
 
 export type AuthUser = {
@@ -115,7 +128,12 @@ export type ShiftTotals = {
 };
 
 export type ShiftEventAction =
-  "open" | "close" | "admin_close" | "reopen" | "correction";
+  | "open"
+  | "close"
+  | "admin_close"
+  | "auto_close"
+  | "reopen"
+  | "correction";
 
 export type ShiftEvent = {
   id: number;

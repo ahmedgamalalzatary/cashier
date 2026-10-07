@@ -1,5 +1,6 @@
 import { cairoMidnight, HttpError } from "@cashier/server-core";
 import type { AuthUser } from "@cashier/shared";
+import { MAX_SHIFT_HOURS } from "@cashier/shared";
 import type {
   AdminCloseShiftInput,
   CloseShiftInput,
@@ -27,8 +28,72 @@ function isDeadlock(error: unknown) {
   );
 }
 
+export const AUTO_CLOSE_NOTE =
+  "أُغلقت تلقائياً بعد 16 ساعة دون عدّ الدرج";
+
+const MAX_SHIFT_MS = MAX_SHIFT_HOURS * 3_600_000;
+
 export class ShiftsService {
   constructor(private repo: ShiftsRepository) {}
+
+  /**
+   * Closes every shift in this branch that has been open for MAX_SHIFT_HOURS.
+   * The drawer was never counted, so the close records the expected cash only and
+   * `closedAt` is capped at openedAt + MAX_SHIFT_HOURS: a shift left open for
+   * three days must still report 16 worked hours, not 72. An admin enters the
+   * counted cash later through the existing correction flow.
+   */
+  async autoCloseExpired(now = new Date()) {
+    const cutoff = new Date(now.getTime() - MAX_SHIFT_MS);
+    return this.repo.transaction(async (repo) => {
+      const expired = await repo.findExpiredOpen(cutoff);
+      let closed = 0;
+      for (const row of expired) {
+        const shift = await repo.findByIdForUpdate(row.id);
+        if (!shift || shift.status !== "open") continue;
+        const expectedCash = await this.expectedCashFor(repo, shift.id, shift.openingFloat);
+        const closedAt = new Date(
+          Math.min(now.getTime(), shift.openedAt.getTime() + MAX_SHIFT_MS),
+        );
+        await repo.close({
+          id: row.id,
+          closedByUserId: null,
+          closedAt,
+          actualCash: null,
+          expectedCash,
+          overShort: null,
+        });
+        await repo.createEvent({
+          shiftId: row.id,
+          action: "auto_close",
+          actorUserId: null,
+          note: AUTO_CLOSE_NOTE,
+          openingFloat: shift.openingFloat,
+          actualCash: null,
+          expectedCash,
+          overShort: null,
+          occurredAt: closedAt,
+        });
+        closed += 1;
+      }
+      return closed;
+    });
+  }
+
+  /** The same drawer arithmetic every close path uses. */
+  private async expectedCashFor(
+    repo: ShiftsRepository,
+    id: number,
+    openingFloat: string,
+  ) {
+    const totals = await repo.totals(id);
+    const expected =
+      toCents(openingFloat) +
+      toCents(totals.sales) -
+      toCents(totals.refunds) -
+      toCents(totals.expenses);
+    return fromCents(expected);
+  }
 
   async open(data: OpenShiftInput, cashierUserId: number) {
     let id: number;
@@ -93,6 +158,9 @@ export class ShiftsService {
 
   async current(actor: AuthUser) {
     if (actor.role !== "cashier") return null;
+    // Close an expired shift before answering, so the POS and the home screen
+    // see "no shift open" instead of a stale one the cashier cannot close.
+    await this.autoCloseExpired();
     const current = await this.repo.findCurrent(actor.id);
     if (!current) return null;
     return this.get(current.id);
@@ -270,16 +338,21 @@ export class ShiftsService {
     await this.repo.transaction(async (repo) => {
       const shift = await repo.findByIdForUpdate(id);
       if (!shift) throw new HttpError(404, "الوردية غير موجودة");
-      if (shift.status !== "closed" || shift.actualCash === null)
+      // An auto-closed shift has no counted cash yet (actualCash is NULL); the
+      // correction is exactly how an admin supplies it later.
+      if (shift.status !== "closed")
+        throw new HttpError(409, "يمكن تصحيح وردية مغلقة فقط");
+      if (shift.actualCash === null && data.actualCash === undefined)
         throw new HttpError(409, "يمكن تصحيح وردية مغلقة فقط");
       const totals = await repo.totals(id);
       const openingFloat =
         data.openingFloat === undefined
           ? shift.openingFloat
           : data.openingFloat.toFixed(2);
+      // an auto-closed shift arrives with actualCash null; the correction supplies it
       const actualCash =
         data.actualCash === undefined
-          ? shift.actualCash
+          ? shift.actualCash!
           : data.actualCash.toFixed(2);
       const expected =
         toCents(openingFloat) +
@@ -341,7 +414,9 @@ function workedMinutes(
   let workedMilliseconds = 0;
   for (const event of events) {
     if (
-      (event.action === "close" || event.action === "admin_close") &&
+      (event.action === "close" ||
+        event.action === "admin_close" ||
+        event.action === "auto_close") &&
       segmentStartedAt
     ) {
       workedMilliseconds += Math.max(

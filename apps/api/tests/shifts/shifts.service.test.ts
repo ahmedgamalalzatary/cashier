@@ -24,6 +24,10 @@ function repoWithTx(txRepo: Record<string, unknown>) {
     findById: vi.fn(),
     totals: vi.fn(),
     events: vi.fn(),
+    // current() auto-closes expired shifts before answering, so the stub repo
+    // has to answer the sweep as "nothing expired"
+    findExpiredOpen: vi.fn().mockResolvedValue([]),
+    findCurrent: vi.fn(),
   } as unknown as ShiftsRepository;
 }
 
@@ -240,7 +244,7 @@ describe("ShiftsService.correct guards", () => {
     ).rejects.toMatchObject({ status: 404 });
   });
 
-  it("409s when the shift is still open or was never counted", async () => {
+  it("409s when the shift is still open or when nothing was counted and nothing is supplied", async () => {
     const open = repoWithTx({
       findByIdForUpdate: vi.fn().mockResolvedValue(openShiftRow()),
     });
@@ -248,6 +252,8 @@ describe("ShiftsService.correct guards", () => {
       new ShiftsService(open).correct(1, correction, 1),
     ).rejects.toMatchObject({ status: 409 });
 
+    // an auto-closed shift has no counted drawer: correcting it without
+    // supplying the count is still a mistake
     const uncounted = repoWithTx({
       findByIdForUpdate: vi
         .fn()
@@ -256,8 +262,33 @@ describe("ShiftsService.correct guards", () => {
         ),
     });
     await expect(
-      new ShiftsService(uncounted).correct(1, correction, 1),
+      new ShiftsService(uncounted).correct(1, { note: "لا شيء" }, 1),
     ).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("accepts a count for an auto-closed shift that has none", async () => {
+    const correct = vi.fn();
+    const createEvent = vi.fn();
+    const corrected = openShiftRow({
+      status: "closed",
+      actualCash: "120.00",
+    });
+    const repo = repoWithTx({
+      findByIdForUpdate: vi.fn().mockResolvedValue(corrected),
+      totals: vi.fn().mockResolvedValue(zeroTotals),
+      correct,
+      createEvent,
+    });
+    // correct() returns the reloaded shift
+    vi.mocked(repo.findById).mockResolvedValue(corrected);
+    vi.mocked(repo.totals).mockResolvedValue(zeroTotals);
+    vi.mocked(repo.events).mockResolvedValue([]);
+
+    await new ShiftsService(repo).correct(1, correction, 1);
+
+    expect(correct).toHaveBeenCalledWith(
+      expect.objectContaining({ actualCash: "120.00" }),
+    );
   });
 });
 
@@ -280,6 +311,9 @@ describe("ShiftsService visibility", () => {
 
   it("returns null when the cashier has no open shift", async () => {
     const emptyRepo = {
+      transaction: vi.fn(async (run: (repo: unknown) => Promise<unknown>) =>
+        run({ findExpiredOpen: vi.fn().mockResolvedValue([]) }),
+      ),
       findCurrent: vi.fn().mockResolvedValue(undefined),
     } as unknown as ShiftsRepository;
     await expect(

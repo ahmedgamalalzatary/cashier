@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import type { Shift } from "@cashier/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@cashier/web-core/lib/api";
+import { Button } from "@cashier/web-core/components/ui/button";
 import { CashierShiftControls } from "../../../src/components/shifts/cashier-shift-controls";
 import { ShiftActionModal } from "../../../src/components/shifts/shift-action-modal";
 import { shiftFixture } from "../../fixtures/shift";
@@ -46,10 +47,29 @@ function render(
     children: ReactElement[];
   }>;
 }
+// The controls render an optional auto-close banner next to the buttons, so
+// look nodes up by type instead of by position.
+function findNode(
+  element: ReactElement<Record<string, unknown>>,
+  type: unknown,
+): ReactElement<Record<string, unknown>> | undefined {
+  const children = (element?.props?.children ?? []) as ReactElement[];
+  const list = Array.isArray(children) ? children : [children as ReactElement];
+  for (const child of list) {
+    if (!child || typeof child !== "object" || !child.props) continue;
+    if (child.type === type) return child as ReactElement<Record<string, unknown>>;
+    const nested = findNode(child as ReactElement<Record<string, unknown>>, type);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+function openButton(element: ReturnType<typeof render>) {
+  const button = findNode(element, Button);
+  if (!button) throw new Error("shift button not rendered");
+  return button as unknown as ReactElement<{ onClick: () => void }>;
+}
 function actionModal(element: ReturnType<typeof render>) {
-  return element.props.children.find(
-    (child) => child?.type === ShiftActionModal,
-  ) as ReactElement<{
+  return findNode(element, ShiftActionModal) as unknown as ReactElement<{
     onSubmit: (values: {
       openingFloat?: number;
       actualCash?: number;
@@ -67,7 +87,7 @@ describe("cashier shift actions used by Home and POS", () => {
     vi.mocked(api).mockResolvedValue(opened);
     const changed = vi.fn();
     const controls = render(null, changed);
-    (controls.props.children[0].props as { onClick: () => void }).onClick();
+    openButton(controls).props.onClick();
     await actionModal(render(null, changed)).props.onSubmit({
       openingFloat: 125.5,
     });
@@ -82,7 +102,7 @@ describe("cashier shift actions used by Home and POS", () => {
     vi.mocked(api).mockResolvedValue(shiftFixture({ status: "closed" }));
     const changed = vi.fn();
     const controls = render(selected, changed);
-    (controls.props.children[0].props as { onClick: () => void }).onClick();
+    openButton(controls).props.onClick();
     await actionModal(render(null, changed)).props.onSubmit({
       actualCash: 120,
     });
@@ -97,12 +117,35 @@ describe("cashier shift actions used by Home and POS", () => {
     const selected = shiftFixture();
     const changed = vi.fn();
     const controls = render(selected, changed);
-    (controls.props.children[0].props as { onClick: () => void }).onClick();
+    openButton(controls).props.onClick();
     await expect(
       actionModal(render(selected, changed)).props.onSubmit({
         actualCash: 120,
       }),
     ).rejects.toThrow("Already closed");
     expect(changed).not.toHaveBeenCalled();
+  });
+});
+describe("cashier auto-close warning", () => {
+  beforeEach(() => {
+    state.length = 0;
+    vi.mocked(api).mockReset();
+  });
+
+  it("stays silent for a young shift", () => {
+    const controls = render(shiftFixture({ workedMinutes: 60 }), vi.fn());
+    expect(JSON.stringify(controls.props)).not.toContain("role");
+  });
+
+  it("warns an hour before the system closes the shift", () => {
+    const controls = render(shiftFixture({ workedMinutes: 15 * 60 }), vi.fn());
+    const alert = findNode(controls, "p");
+    expect(alert).toBeDefined();
+    expect(alert?.props).toMatchObject({ role: "alert" });
+    expect(alert?.props.children).toContain("ستُغلق ورديتك تلقائياً");
+  });
+
+  it("never warns with no open shift", () => {
+    expect(findNode(render(null, vi.fn()), "p")).toBeUndefined();
   });
 });

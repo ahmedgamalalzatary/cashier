@@ -1324,12 +1324,12 @@ export const shiftEvents = mysqlTable(
       "open",
       "close",
       "admin_close",
+      "auto_close",
       "reopen",
       "correction",
     ]).notNull(),
-    actorUserId: int("actor_user_id")
-      .notNull()
-      .references(() => users.id),
+    // NULL means the system acted: an auto_close has no human actor.
+    actorUserId: int("actor_user_id").references(() => users.id),
     note: varchar("note", { length: 500 }),
     openingFloat: decimal("opening_float", { precision: 12, scale: 2 }),
     actualCash: decimal("actual_cash", { precision: 12, scale: 2 }),

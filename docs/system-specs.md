@@ -200,6 +200,16 @@ Business endpoints select the workspace with `X-Branch-Id`. Admin defaults to Ma
   - `expected = float + cash sales − cash refunds − shift expenses`
   - `over/short = actual − expected`
 - Over/short is stored against the shift and cashier, with full history in reports.
+- **Auto-close after 16 hours:** a shift left open for `MAX_SHIFT_HOURS` (16) is closed by the
+  system, so a forgotten shift cannot run forever and corrupt worked time or the drawer figures.
+  The drawer was never counted, so the close records `expected` only; `closedAt` is capped at
+  `openedAt + 16h` (not "now") so a shift left open for days still reports 16 worked hours, and
+  `actual_cash` / `over_short` / `closed_by_user_id` stay `NULL`. An `auto_close` audit event is
+  written with no actor. An admin completes the count later with the existing correction flow.
+- The sweep runs every 60 seconds across all active branches, and **lazily** when a cashier asks
+  for their current shift, so the POS and Home show "no shift open" instead of a stale one and a
+  sale gets the normal 409 until a new shift is opened. Cashiers see a warning banner an hour
+  before the limit.
 - Admin can view shifts, force-close a shift left open, and reopen/correct a closed shift with an audit note. Admin cannot open a shift.
 - Admin Home and Shifts show every open shift in the selected branch. Reopening conflicts only when that cashier already has an open shift. History pages retain access beyond 100 records and expose audit events and cash snapshots.
 - **Controls:** cashiers use **فتح وردية** / **إغلاق وعدّ الدرج** on Home or POS, and **سجل وردياتي** for their own paginated history (**تفاصيل الوردية** shows totals, closing time, and audit events). Admin uses the **الورديات** page to force-close with a note, reopen, or correct float/actual cash with a note.

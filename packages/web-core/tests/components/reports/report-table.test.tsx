@@ -153,3 +153,41 @@ describe("ReportTable event labels", () => {
     expect(dateOnly).not.toMatch(/[٠-٩]+:[٠-٩]+/);
   });
 });
+describe("uncounted cash", () => {
+  it("says the drawer was not counted instead of showing a zero", () => {
+    const markup = renderToStaticMarkup(
+      <ReportTable
+        title="Shift over/short"
+        rows={[
+          {
+            shiftId: 1,
+            expectedCash: "500.00",
+            actualCash: null,
+            overShort: null,
+          },
+        ]}
+        columns={[
+          { key: "expectedCash", label: "Expected", kind: "money" },
+          { key: "actualCash", label: "Actual", kind: "uncountedMoney" },
+          { key: "overShort", label: "Over/short", kind: "uncountedMoney" },
+        ]}
+      />,
+    );
+
+    expect(markup).toContain("لم يُعدّ");
+    // the expected figure is still a real number
+    expect(markup).toContain("٥٠٠٫٠٠");
+  });
+
+  it("still formats a counted amount", () => {
+    const markup = renderToStaticMarkup(
+      <ReportTable
+        title="Shift over/short"
+        rows={[{ shiftId: 1, actualCash: "900.00", overShort: "400.00" }]}
+        columns={[{ key: "actualCash", label: "Actual", kind: "uncountedMoney" }]}
+      />,
+    );
+
+    expect(markup).not.toContain("لم يُعدّ");
+  });
+});

@@ -7,6 +7,7 @@ import {
   createCacheRefreshService,
   refreshActiveBranches,
 } from "./modules/external/cache-refresh.module.js";
+import { runAutoCloseLoop } from "./modules/shifts/auto-close.js";
 
 const environment = loadRuntimeEnv();
 const db = createDb(environment.DATABASE_URL);
@@ -30,8 +31,13 @@ process.once("SIGINT", () => {
   shutdown.abort();
 });
 
+// Shifts left open by a forgotten cashier close themselves on a timer, so the
+// drawer and worked time stay meaningful without anyone touching the PC.
+const autoClose = runAutoCloseLoop(db, shutdown.signal);
+
 await runRefreshLoop(
   () => refreshActiveBranches(db, refresh, shutdown.signal),
   shutdown.signal,
 );
+await autoClose;
 await closeDb(db);

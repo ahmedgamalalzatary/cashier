@@ -3,7 +3,7 @@ import {
   branchValues,
   branchTransaction,
 } from "@cashier/db";
-import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lt, lte, sql } from "drizzle-orm";
 import type { Db } from "@cashier/db";
 import {
   employees,
@@ -108,11 +108,12 @@ export class ShiftsRepository {
 
   async close(input: {
     id: number;
-    closedByUserId: number;
+    // An auto-close has no human actor and no counted drawer: all three stay NULL.
+    closedByUserId: number | null;
     closedAt: Date;
-    actualCash: string;
+    actualCash: string | null;
     expectedCash: string;
-    overShort: string;
+    overShort: string | null;
   }) {
     await this.db
       .update(shifts)
@@ -154,6 +155,20 @@ export class ShiftsRepository {
         ),
       );
     return row;
+  }
+
+  async findExpiredOpen(cutoff: Date) {
+    return this.db
+      .select({ id: shifts.id, openedAt: shifts.openedAt })
+      .from(shifts)
+      .where(
+        branchCondition(
+          shifts,
+          and(eq(shifts.openSlot, 1), lte(shifts.openedAt, cutoff)),
+        ),
+      )
+      .orderBy(shifts.openedAt, shifts.id)
+      .for("update");
   }
 
   activeIds() {

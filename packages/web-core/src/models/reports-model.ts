@@ -2,7 +2,14 @@ import type { ReportRow } from "../services/reports-service";
 export type Column = {
   key: string;
   label: string;
-  kind?: "money" | "date" | "number" | "warehouse" | "event";
+  kind?:
+    | "money"
+    | // money that may be absent because the drawer was never counted
+      "uncountedMoney"
+    | "date"
+    | "number"
+    | "warehouse"
+    | "event";
   // Selects which code vocabulary an `event` column decodes. Columns that
   // print the same code for different things (a stocktake reference vs a
   // stocktake document kind) need distinct sets.
