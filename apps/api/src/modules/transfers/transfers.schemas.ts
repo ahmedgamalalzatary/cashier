@@ -38,6 +38,8 @@ export const transferRequestInput = z
 export const transferDirectInput = z
   .object({
     notes: optionalText(2000),
+    /** links the transfer to the invoice it moves stock for */
+    purchaseInvoiceId: z.coerce.number().int().positive().nullish(),
     lines: z.array(transferLineInput).min(1).max(100),
   })
   .refine(hasUniqueLines, {

@@ -135,6 +135,7 @@ export class TransfersService {
         inventory,
         {
           requestId: id,
+          purchaseInvoiceId: null,
           createdBy: request.requestedBy,
           approvedBy,
           notes: request.notes,
@@ -159,11 +160,16 @@ export class TransfersService {
   createDirect(data: TransferDirectInput, adminId: number) {
     return this.transactionWithDeadlockRetry(async (repo, inventory) => {
       await this.validateItems(repo, data.lines);
+      const purchaseInvoiceId = data.purchaseInvoiceId ?? null;
+      if (purchaseInvoiceId !== null) {
+        await this.assertInvoiceAllows(repo, purchaseInvoiceId, data.lines);
+      }
       return moveStockToCafe(
         repo,
         inventory,
         {
           requestId: null,
+          purchaseInvoiceId,
           createdBy: adminId,
           approvedBy: adminId,
           notes: data.notes ?? null,
@@ -171,6 +177,33 @@ export class TransfersService {
         data.lines,
       );
     });
+  }
+
+  // A linked transfer may only move what the invoice still owes the cafe,
+  // otherwise the invoice page would offer the same quantity twice.
+  private async assertInvoiceAllows(
+    repo: TransfersRepository,
+    invoiceId: number,
+    lines: Array<{ itemId: number; quantity: number }>,
+  ) {
+    const invoice = await repo.lockPurchaseInvoice(invoiceId);
+    if (!invoice) throw new HttpError(404, "فاتورة الشراء غير موجودة");
+    const bought = await repo.purchaseInvoiceQuantities(invoiceId);
+    const sent = await repo.purchaseInvoiceTransferredMilli(invoiceId);
+    for (const line of lines) {
+      const boughtMilli = bought.get(line.itemId);
+      if (boughtMilli === undefined) {
+        throw new HttpError(409, "أحد الأصناف غير مسجل في فاتورة الشراء");
+      }
+      const remainingMilli = boughtMilli - (sent.get(line.itemId) ?? 0);
+      const requestedMilli = Math.round(line.quantity * 1000);
+      if (requestedMilli > remainingMilli) {
+        throw new HttpError(
+          409,
+          `الكمية المطلوبة أكبر من المتبقي من فاتورة الشراء للصنف ${line.itemId}`,
+        );
+      }
+    }
   }
 
   listTransfers() {

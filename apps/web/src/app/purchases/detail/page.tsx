@@ -65,6 +65,12 @@ function PurchaseDetailView() {
 
   const due = Number(invoice.dueAmount);
   const paid = Number(invoice.paidAmount);
+  // every line already fully sent to the cafe: the button would only ever
+  // offer quantities the API rejects
+  const canTransferToCafe = invoice.lines.some(
+    (line) =>
+      Number(line.stockQuantity) - Number(line.transferredToCafeQuantity) > 0,
+  );
 
   return (
     <div>
@@ -73,12 +79,16 @@ function PurchaseDetailView() {
         title={`فاتورة شراء ${invoice.invoiceNumber || `#${invoice.id}`}`}
         actions={
           <>
-            <Link
-              href={`/transfers?direct=1&invoice=${invoice.id}`}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-strong"
-            >
-              تحويل إلى الكافيه
-            </Link>
+            {canTransferToCafe ? (
+              <Link
+                href={`/transfers?direct=1&invoice=${invoice.id}`}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-strong"
+              >
+                تحويل إلى الكافيه
+              </Link>
+            ) : (
+              <Badge tone="neutral">لا يتبقَّ رصيد للتحويل للكافيه</Badge>
+            )}
             <Button variant="secondary" onClick={() => void openPayment()}>
               دفعة على حساب المورد
             </Button>
@@ -133,6 +143,8 @@ function PurchaseDetailView() {
           "كمية الفاتورة",
           "سعر الوحدة",
           "الكمية بالمخزون",
+          "حُوِّل للكافيه",
+          "المتبقي للكافيه",
           "تكلفة وحدة المخزون",
           "الإجمالي",
         ]}
@@ -149,10 +161,24 @@ function PurchaseDetailView() {
               {line.unitName}
             </td>
             <td className="tnum px-4 py-3">{formatMoney(line.unitPrice)}</td>
-            <td className="tnum px-4 py-3">
+            <td className="tnum px-4 py-3 text-muted">
               {Number(line.stockQuantity).toLocaleString("ar-EG", {
                 maximumFractionDigits: 3,
               })}{" "}
+              {line.stockUnit}
+            </td>
+            <td className="tnum px-4 py-3">
+              {Number(line.transferredToCafeQuantity).toLocaleString("ar-EG", {
+                maximumFractionDigits: 3,
+              })}{" "}
+              {line.stockUnit}
+            </td>
+            <td className="tnum px-4 py-3 font-medium">
+              {Math.max(
+                0,
+                Number(line.stockQuantity) -
+                  Number(line.transferredToCafeQuantity),
+              ).toLocaleString("ar-EG", { maximumFractionDigits: 3 })}{" "}
               {line.stockUnit}
             </td>
             <td className="tnum px-4 py-3 text-muted">
@@ -164,6 +190,27 @@ function PurchaseDetailView() {
           </tr>
         ))}
       </Table>
+
+      {invoice.transfers.length > 0 && (
+        <div className="mt-5 rounded-xl border border-line p-4">
+          <p className="text-sm font-medium">تحويلات الكافيه المرتبطة بهذه الفاتورة</p>
+          <ul className="mt-2 space-y-1.5">
+            {invoice.transfers.map((transfer) => (
+              <li key={transfer.id} className="text-sm">
+                <Link
+                  href={`/transfers/detail?id=${transfer.id}`}
+                  className="font-medium text-primary underline"
+                >
+                  تحويل #{transfer.id}
+                </Link>
+                {transfer.notes && (
+                  <span className="text-muted"> — {transfer.notes}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_20rem]">
         <div className="sheet p-4">

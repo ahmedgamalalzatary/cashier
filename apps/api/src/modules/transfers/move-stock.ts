@@ -9,6 +9,7 @@ export async function moveStockToCafe(
   inventory: InventoryTransaction,
   header: {
     requestId: number | null;
+    purchaseInvoiceId: number | null;
     createdBy: number;
     approvedBy: number;
     notes: string | null;

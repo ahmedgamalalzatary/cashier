@@ -25,6 +25,7 @@ function invoiceLine(
     unitPrice: "10.00",
     unitCost: "10.00",
     lineTotal: "10.00",
+    transferredToCafeQuantity: "0.000",
     ...overrides,
   };
 }
@@ -182,6 +183,119 @@ describe("transfer model", () => {
       { key: 1, itemId: "3", quantity: "4" },
       { key: 9, itemId: "7", quantity: "2" },
     ]);
+  });
+
+  it("offers only what the invoice still owes the cafe, not the full invoice again", () => {
+    const [row] = invoiceTransferRows(
+      [
+        invoiceLine({
+          itemId: 3,
+          stockQuantity: "20.000",
+          transferredToCafeQuantity: "5.000",
+        }),
+      ],
+      [stockRow(3, "50.000")],
+    );
+
+    expect(row).toMatchObject({
+      invoiceQuantity: 20,
+      transferredQuantity: 5,
+      // 15 still owed, main stock is plenty
+      quantity: "15",
+      availableQuantity: 50,
+      clamped: false,
+      selected: true,
+    });
+  });
+
+  it("caps the invoice remainder at the main stock and flags it", () => {
+    const [row] = invoiceTransferRows(
+      [
+        invoiceLine({
+          itemId: 3,
+          stockQuantity: "20.000",
+          transferredToCafeQuantity: "18.000",
+        }),
+      ],
+      [stockRow(3, "1.500")],
+    );
+
+    expect(row).toMatchObject({
+      transferredQuantity: 18,
+      quantity: "1.5",
+      availableQuantity: 1.5,
+      clamped: true,
+    });
+  });
+
+  it("leaves a fully transferred item unselected", () => {
+    const [row] = invoiceTransferRows(
+      [
+        invoiceLine({
+          itemId: 3,
+          stockQuantity: "20.000",
+          transferredToCafeQuantity: "20.000",
+        }),
+      ],
+      [stockRow(3, "10.000")],
+    );
+
+    expect(row).toMatchObject({
+      transferredQuantity: 20,
+      quantity: "0",
+      selected: false,
+    });
+  });
+
+  it("sums repeated invoice lines before subtracting what already went to the cafe", () => {
+    const [row] = invoiceTransferRows(
+      [
+        invoiceLine({
+          itemId: 3,
+          stockQuantity: "2.000",
+          transferredToCafeQuantity: "0.400",
+        }),
+        invoiceLine({
+          itemId: 3,
+          stockQuantity: "1.500",
+          transferredToCafeQuantity: "0.400",
+        }),
+      ],
+      [stockRow(3, "10.000")],
+    );
+
+    // the cafe already holds 0.8 of this item from this invoice
+    expect(row).toMatchObject({
+      invoiceQuantity: 3.5,
+      transferredQuantity: 0.8,
+      quantity: "2.7",
+    });
+  });
+
+  it("carries the source invoice onto the direct transfer body", () => {
+    expect(
+      transferDirectBody({
+        notes: "  مباشر  ",
+        purchaseInvoiceId: 12,
+        lines: [{ key: 1, itemId: "3", quantity: "2.500" }],
+      }),
+    ).toEqual({
+      notes: "مباشر",
+      purchaseInvoiceId: 12,
+      lines: [{ itemId: 3, quantity: 2.5 }],
+    });
+  });
+
+  it("omits the invoice link when the transfer has no source invoice", () => {
+    expect(
+      transferDirectBody({
+        notes: "  ",
+        lines: [{ key: 1, itemId: "3", quantity: "1" }],
+      }),
+    ).toEqual({
+      notes: null,
+      lines: [{ itemId: 3, quantity: 1 }],
+    });
   });
 
   it("provides blank lines and totals their quantities", () => {

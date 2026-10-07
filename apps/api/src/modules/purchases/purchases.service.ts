@@ -192,6 +192,7 @@ export class PurchasesService {
           inventory,
           {
             requestId: null,
+            purchaseInvoiceId: invoiceId,
             createdBy,
             approvedBy: createdBy,
             notes: `تحويل مع فاتورة الشراء #${invoiceId}`,
@@ -237,6 +238,10 @@ export class PurchasesService {
   async get(id: number) {
     const invoice = await this.repo.findById(id);
     if (!invoice) throw new HttpError(404, 'فاتورة الشراء غير موجودة');
-    return { ...invoice, lines: await this.repo.listLines(id) };
+    return {
+      ...invoice,
+      lines: await this.repo.listLines(id),
+      transfers: await this.repo.listLinkedTransfers(id),
+    };
   }
 }

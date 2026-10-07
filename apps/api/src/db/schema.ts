@@ -638,6 +638,9 @@ export const transfers = mysqlTable(
     branchId: branchColumn(),
     id: int("id").autoincrement().primaryKey(),
     requestId: int("request_id").references(() => transferRequests.id),
+    purchaseInvoiceId: int("purchase_invoice_id").references(
+      () => purchaseInvoices.id,
+    ),
     createdBy: int("created_by")
       .notNull()
       .references(() => users.id),
@@ -660,6 +663,14 @@ export const transfers = mysqlTable(
       table.branchId,
       table.requestId,
     ),
+    scopedReference(
+      "transfers_purchaseInvoiceId_br_fk",
+      table.branchId,
+      table.purchaseInvoiceId,
+      (): AnyMySqlColumn => purchaseInvoices.branchId,
+      (): AnyMySqlColumn => purchaseInvoices.id,
+    ),
+    index("transfers_purchase_invoice_id_idx").on(table.purchaseInvoiceId),
     index("transfers_created_at_idx").on(table.createdAt),
   ],
 );

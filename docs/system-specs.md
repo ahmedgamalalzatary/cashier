@@ -151,7 +151,8 @@ Business endpoints select the workspace with `X-Branch-Id`. Admin defaults to Ma
 
 - Header: supplier, date, invoice number (supplier's paper ref), notes.
 - Lines: item, quantity (in purchase or stock unit), unit price → each line creates a FIFO batch.
-- **Send to cafe on save:** each line may carry a "to cafe now" amount in stock units (default 0, at most the line's stock quantity). The invoice and one direct transfer (main → cafe, FIFO, noted with the invoice number) are saved in one transaction, so either both exist or neither does.
+- **Send to cafe on save:** each line may carry a "to cafe now" amount in stock units (default 0, at most the line's stock quantity). The invoice and one direct transfer (main → cafe, FIFO, noted with the invoice number) are saved in one transaction, so either both exist or neither does. That transfer is **linked to the invoice** (`transfers.purchase_invoice_id`).
+- **Invoice ⇄ cafe link:** the invoice detail lists, per line, the quantity already transferred to the cafe and the remainder still owed. A later direct transfer started from that invoice is capped to the remainder (per item, summed across the invoice's lines) and may only carry items the invoice actually bought; exceeding either returns a conflict and moves no stock. An invoice whose lines are fully transferred offers no further transfer.
 - **Payment on invoice:** paid in full, partial, or fully on credit (آجل). Unpaid remainder increases the supplier's balance.
 - Confirmed purchase invoices are immutable so their FIFO batches and supplier accounting cannot drift; corrections use explicit stock/accounting adjustments rather than editing history.
 - **Supplier payments:** recorded any time against the supplier balance (amount, date, note); shown in the statement. A payment does not change any invoice's paid amount, which stays what was paid at purchase.
@@ -167,7 +168,7 @@ Business endpoints select the workspace with `X-Branch-Id`. Admin defaults to Ma
   2. Admin reviews, may edit each requested quantity (without adding or dropping item lines), then **approves** → stock moves main → cafe immediately; or **rejects** with a reason.
 - Cashiers and admins working in the same branch see that branch's cafe request queue. Other branches have separate queues. Request lines preserve the originally requested quantities; approved quantities are stored on the resulting transfer.
 - Approval is atomic. If any approved quantity is unavailable in the main warehouse, no stock moves, the API returns a conflict, and the request remains pending for adjustment and retry.
-- Admin can also create a **direct transfer** (no request) in one step.
+- Admin can also create a **direct transfer** (no request) in one step. A direct transfer may optionally name the purchase invoice it moves stock for (§5); request-approved transfers are never invoice-linked.
 - Reviewed requests and completed transfers are immutable audit records. Every transfer document lists items, quantities, source and cafe batch IDs, carried FIFO costs, requester, approver, and timestamps.
 
 ---
@@ -342,7 +343,7 @@ Online revenue counted once for completed orders, per-branch online stock costs,
 `users` (admin/cashier, credentials, one-to-one employee link required for cashiers) · `employees` (profile, pay type/rate; no PIN/login by default) · `salary_advances` · `salary_adjustments` (bonus/deduction) · `salary_payments`
 `categories` (self-referencing main/sub) · `items` (unit, conversion, type, minimums) · `stock_batches` (warehouse, item, qty remaining, unit cost, source) · `stock_movements` (ledger: type, warehouse, item, qty, cost, reference)
 `suppliers` · `purchase_invoices` + `purchase_lines` · `supplier_payments`
-`transfer_requests` + `transfers` + `transfer_lines`
+`transfer_requests` + `transfers` (+ optional branch-scoped `purchase_invoice_id`) + `transfer_lines`
 `recipes` (product/sub-recipe) + `recipe_sizes` + `recipe_ingredients` · `preparations` (batch runs)
 `shifts` + `shift_events` · `orders` + `order_lines` (price + FIFO cost snapshot) · `refunds` + `refund_lines`
 `waste_entries` · `expenses` + `expense_categories` · `stocktakes` + `stocktake_lines`

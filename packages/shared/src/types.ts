@@ -285,10 +285,20 @@ export type PurchaseInvoiceLine = {
   unitPrice: string;
   unitCost: string;
   lineTotal: string;
+  /** of this line's stock quantity, already sent to the cafe */
+  transferredToCafeQuantity: string;
+};
+
+export type PurchaseInvoiceTransferLink = {
+  id: number;
+  notes: string | null;
+  /** ISO timestamp. */
+  createdAt: string;
 };
 
 export type PurchaseInvoiceDetail = PurchaseInvoiceSummary & {
   lines: PurchaseInvoiceLine[];
+  transfers: PurchaseInvoiceTransferLink[];
 };
 
 export type TransferRequestStatus = "pending" | "approved" | "rejected";

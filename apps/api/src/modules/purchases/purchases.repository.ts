@@ -11,6 +11,8 @@ import {
   purchaseLines,
   supplierPayments,
   suppliers,
+  transferLines,
+  transfers,
   users,
 } from "../../db/schema.js";
 import { InventoryRepository } from "../inventory/inventory.repository.js";
@@ -204,36 +206,79 @@ export class PurchasesRepository {
   }
 
   async listLines(invoiceId: number) {
-    const rows = await this.db
-      .select({
-        id: purchaseLines.id,
-        itemId: purchaseLines.itemId,
-        itemCode: items.code,
-        itemName: items.name,
-        quantity: purchaseLines.quantity,
-        unitMode: purchaseLines.unitMode,
-        purchaseUnit: items.purchaseUnit,
-        stockQuantity: purchaseLines.stockQuantity,
-        stockUnit: items.stockUnit,
-        unitPrice: purchaseLines.unitPrice,
-        unitCost: purchaseLines.unitCost,
-        lineTotal: purchaseLines.lineTotal,
-      })
-      .from(purchaseLines)
-      .innerJoin(
-        items,
-        branchCondition(items, eq(purchaseLines.itemId, items.id)),
-      )
-      .where(
-        branchCondition(purchaseLines, eq(purchaseLines.invoiceId, invoiceId)),
-      )
-      .orderBy(purchaseLines.id);
+    const [rows, transferred] = await Promise.all([
+      this.db
+        .select({
+          id: purchaseLines.id,
+          itemId: purchaseLines.itemId,
+          itemCode: items.code,
+          itemName: items.name,
+          quantity: purchaseLines.quantity,
+          unitMode: purchaseLines.unitMode,
+          purchaseUnit: items.purchaseUnit,
+          stockQuantity: purchaseLines.stockQuantity,
+          stockUnit: items.stockUnit,
+          unitPrice: purchaseLines.unitPrice,
+          unitCost: purchaseLines.unitCost,
+          lineTotal: purchaseLines.lineTotal,
+        })
+        .from(purchaseLines)
+        .innerJoin(
+          items,
+          branchCondition(items, eq(purchaseLines.itemId, items.id)),
+        )
+        .where(
+          branchCondition(purchaseLines, eq(purchaseLines.invoiceId, invoiceId)),
+        )
+        .orderBy(purchaseLines.id),
+      this.transferredToCafeByItem(invoiceId),
+    ]);
     return rows.map(({ purchaseUnit, ...row }) => ({
       ...row,
+      transferredToCafeQuantity: Number(
+        transferred.get(row.itemId) ?? 0,
+      ).toFixed(3),
       unitName:
         row.unitMode === "purchase"
           ? (purchaseUnit ?? row.stockUnit)
           : row.stockUnit,
     }));
+  }
+
+  /** Transfers this invoice paid for, newest first. */
+  listLinkedTransfers(invoiceId: number) {
+    return this.db
+      .select({
+        id: transfers.id,
+        createdAt: transfers.createdAt,
+        notes: transfers.notes,
+      })
+      .from(transfers)
+      .where(
+        branchCondition(
+          transfers,
+          eq(transfers.purchaseInvoiceId, invoiceId),
+        ),
+      )
+      .orderBy(desc(transfers.id));
+  }
+
+  /** What this invoice already sent to the cafe, per item. */
+  private async transferredToCafeByItem(invoiceId: number) {
+    const rows = await this.db
+      .select({
+        itemId: transferLines.itemId,
+        quantity: sql<string>`SUM(CAST(${transferLines.quantity} AS DECIMAL(14,3)))`,
+      })
+      .from(transferLines)
+      .innerJoin(transfers, eq(transferLines.transferId, transfers.id))
+      .where(
+        branchCondition(
+          transfers,
+          eq(transfers.purchaseInvoiceId, invoiceId),
+        ),
+      )
+      .groupBy(transferLines.itemId);
+    return new Map(rows.map((row) => [row.itemId, row.quantity]));
   }
 }

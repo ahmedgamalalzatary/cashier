@@ -66,6 +66,9 @@ export function TransferFormModal({
   const [invoiceRows, setInvoiceRows] = useState<InvoiceTransferRow[]>([]);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [invoiceError, setInvoiceError] = useState("");
+  // the invoice the applied lines came from, so the API can cap them to what
+  // the invoice still owes the cafe
+  const [appliedInvoiceId, setAppliedInvoiceId] = useState<number | null>(null);
   const stockByItem = useMemo(
     () => new Map(mainStock.map((row) => [row.itemId, row])),
     [mainStock],
@@ -132,10 +135,13 @@ export function TransferFormModal({
     if (applied.length === 0) return;
     nextKey.current += applied.length;
     setLines((current) => mergeTransferLines(current, applied));
+    setAppliedInvoiceId(Number(invoiceId));
     setTab("manual");
   }
 
   function updateLine(key: number, changes: Partial<TransferLineForm>) {
+    // a hand-edited line is no longer the invoice's own quantity
+    setAppliedInvoiceId(null);
     setLines((current) =>
       current.map((line) =>
         line.key === key ? { ...line, ...changes } : line,
@@ -143,13 +149,26 @@ export function TransferFormModal({
     );
   }
 
+  // the invoice link only survives while every line still comes from it
+  const invoiceLinkApplies =
+    mode === "direct" &&
+    appliedInvoiceId !== null &&
+    lines.length > 0 &&
+    lines.every((line) => line.itemId !== "");
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     setSaving(true);
     setError("");
     try {
       if (mode === "direct") {
-        await createDirectTransfer(transferDirectBody({ notes, lines }));
+        await createDirectTransfer(
+          transferDirectBody({
+            notes,
+            purchaseInvoiceId: invoiceLinkApplies ? appliedInvoiceId : null,
+            lines,
+          }),
+        );
       } else {
         await createTransferRequest(
           transferRequestBody({ clientRequestId, notes, lines }),
@@ -192,7 +211,7 @@ export function TransferFormModal({
             {(
               [
                 { id: "invoice", label: "من فاتورة شراء" },
-                { id: "manual", label: "صنف صنف" },
+                { id: "manual", label: "إدخال يدوي" },
               ] as Array<{ id: SourceTab; label: string }>
             ).map((entry) => (
               <button
@@ -276,8 +295,10 @@ export function TransferFormModal({
                   {invoiceRows.map((row) => (
                     <div
                       key={row.itemId}
-                      className={`rounded-xl border border-line p-3 ${
-                        row.availableQuantity === 0 ? "opacity-60" : ""
+className={`rounded-xl border border-line p-3 ${
+                        row.availableQuantity === 0 || row.remainingQuantity === 0
+                          ? "opacity-60"
+                          : ""
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -285,7 +306,7 @@ export function TransferFormModal({
                           type="checkbox"
                           className="mt-1 size-4 accent-primary"
                           checked={row.selected}
-                          disabled={row.availableQuantity === 0}
+                          disabled={row.availableQuantity === 0 || row.remainingQuantity === 0}
                           aria-label={`تحويل ${row.name}`}
                           onChange={(event) =>
                             updateInvoiceRow(row.itemId, {
@@ -301,8 +322,21 @@ export function TransferFormModal({
                             بالفاتورة:{" "}
                             {row.invoiceQuantity.toLocaleString("ar-EG", {
                               maximumFractionDigits: 3,
+                            })}
+                            {row.transferredQuantity > 0 && (
+                              <>
+                                {" "}
+                                · حُوِّل للكافيه:{" "}
+                                {row.transferredQuantity.toLocaleString("ar-EG", {
+                                  maximumFractionDigits: 3,
+                                })}
+                              </>
+                            )}{" "}
+                            · المتبقي:{" "}
+                            {row.remainingQuantity.toLocaleString("ar-EG", {
+                              maximumFractionDigits: 3,
                             })}{" "}
-                            · المتاح:{" "}
+                            · المتاح في الرئيسي:{" "}
                             {row.availableQuantity.toLocaleString("ar-EG", {
                               maximumFractionDigits: 3,
                             })}{" "}
@@ -314,7 +348,7 @@ export function TransferFormModal({
                                 ? "الصنف موقوف ولا يمكن تحويله."
                                 : row.availableQuantity === 0
                                   ? "لم يتبقَ رصيد من هذا الصنف في المخزن الرئيسي."
-                                  : "الكمية المشتراة لم تعد متاحة بالكامل، وتم تخفيضها للمتاح."}
+                                  : "الكمية المتبقية من الفاتورة لم تعد متاحة بالكامل، وتم تخفيضها للمتاح."}
                             </p>
                           )}
                         </div>
@@ -322,7 +356,7 @@ export function TransferFormModal({
                           type="number"
                           min="0.001"
                           step="0.001"
-                          max={row.availableQuantity}
+                          max={Math.min(row.remainingQuantity, row.availableQuantity)}
                           dir="ltr"
                           aria-label={`كمية ${row.name}`}
                           disabled={!row.selected}

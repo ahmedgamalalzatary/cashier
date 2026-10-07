@@ -15,6 +15,8 @@ export type TransferRequestBody = {
 
 export type TransferDirectBody = {
   notes: string | null;
+  /** set when the transfer moves stock bought by that invoice */
+  purchaseInvoiceId?: number;
   lines: TransferLineBody[];
 };
 

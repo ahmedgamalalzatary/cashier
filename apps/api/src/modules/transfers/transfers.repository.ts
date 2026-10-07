@@ -9,6 +9,8 @@ import { alias } from "drizzle-orm/mysql-core";
 import type { Db } from "../../db/index.js";
 import {
   items,
+  purchaseInvoices,
+  purchaseLines,
   shifts,
   transferLines,
   transferRequestLines,
@@ -57,6 +59,47 @@ export class TransfersRepository {
       )
       .orderBy(asc(items.id))
       .for("update");
+  }
+
+  /** Locks the invoice row so two transfers of the same invoice serialise. */
+  async lockPurchaseInvoice(invoiceId: number) {
+    const [row] = await this.db
+      .select({ id: purchaseInvoices.id })
+      .from(purchaseInvoices)
+      .where(
+        branchCondition(purchaseInvoices, eq(purchaseInvoices.id, invoiceId)),
+      )
+      .for("update");
+    return row;
+  }
+
+  /** Stock quantity the invoice bought, per item, in thousandths. */
+  async purchaseInvoiceQuantities(invoiceId: number) {
+    const rows = await this.db
+      .select({
+        itemId: purchaseLines.itemId,
+        milli: sql<string>`CAST(SUM(CAST(${purchaseLines.stockQuantity} * 1000 AS SIGNED)) AS CHAR)`,
+      })
+      .from(purchaseLines)
+      .where(
+        branchCondition(purchaseLines, eq(purchaseLines.invoiceId, invoiceId)),
+      )
+      .groupBy(purchaseLines.itemId);
+    return new Map(rows.map((row) => [row.itemId, Number(row.milli)]));
+  }
+
+  /** Quantity of that invoice already sent to the cafe, per item, in thousandths. */
+  async purchaseInvoiceTransferredMilli(invoiceId: number) {
+    const rows = await this.db
+      .select({
+        itemId: transferLines.itemId,
+        milli: sql<string>`CAST(SUM(CAST(${transferLines.quantity} * 1000 AS SIGNED)) AS CHAR)`,
+      })
+      .from(transferLines)
+      .innerJoin(transfers, eq(transferLines.transferId, transfers.id))
+      .where(eq(transfers.purchaseInvoiceId, invoiceId))
+      .groupBy(transferLines.itemId);
+    return new Map(rows.map((row) => [row.itemId, Number(row.milli)]));
   }
 
   async findOpenShiftForCashier(cashierUserId: number) {
@@ -196,6 +239,7 @@ export class TransfersRepository {
 
   async createTransfer(data: {
     requestId: number | null;
+    purchaseInvoiceId: number | null;
     createdBy: number;
     approvedBy: number;
     notes: string | null;
