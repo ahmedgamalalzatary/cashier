@@ -12,7 +12,7 @@ import type { CacheRefreshStateStore } from "./cache-refresh.service.js";
 export class CacheRefreshRepository implements CacheRefreshStateStore {
   private lockConnection: PoolConnection | null = null;
   private get lockName() {
-    return `cashier:external-cache-refresh:${currentBranchId()}`;
+    return `cashier:cache-refresh:${currentBranchId()}`;
   }
 
   constructor(private readonly db: Db) {}

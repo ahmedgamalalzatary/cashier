@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { it } from "../support/ids.js";
+import { describe, expect } from "vitest";
 import request from "supertest";
 import type { ExternalOrderSummary } from "@cashier/shared";
 import { createApp } from "../../../../apps/api/src/app.js";

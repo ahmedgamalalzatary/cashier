@@ -35,7 +35,7 @@ export async function refreshActiveBranches(
   db: Db,
   refresh: Pick<CacheRefreshService, "runDue">,
   signal?: AbortSignal,
-  onError: (branchId: number, error: unknown) => void = (id, error) =>
+  onError: (branchId: string, error: unknown) => void = (id, error) =>
     console.error(`Cache refresh failed for branch ${id}`, error),
 ) {
   const active = await db

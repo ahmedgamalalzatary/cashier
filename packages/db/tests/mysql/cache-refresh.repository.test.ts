@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { it } from "../support/ids.js";
+import { describe, expect } from "vitest";
 import { CacheRefreshRepository } from "../../../../apps/api/src/modules/external/cache-refresh.repository.js";
 import { db } from "../support/api-setup.js";
 import { sql } from "drizzle-orm";

@@ -1,5 +1,6 @@
+import { repositoryIt as it } from "@cashier/db/test-support/ids";
 import { drizzle } from "drizzle-orm/mysql-proxy";
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 import type { Db } from "@cashier/db";
 import { ExternalOrdersRepository } from "../../src/modules/orders/external-orders.repository.js";
 

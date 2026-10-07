@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it, vi } from "vitest";
 import { CacheRefreshService } from "../../src/modules/external/cache-refresh.service.js";
 import type { ExternalOrderSummary } from "@cashier/shared";
@@ -8,7 +9,7 @@ describe("CacheRefreshService", () => {
   it("continues importing online orders when catalog synchronization is disabled and the catalog is unavailable", async () => {
     const saved: ExternalOrderSummary[] = [];
     const onlineOrder: ExternalOrderSummary = {
-      id: 17,
+      id: testId(17),
       customerName: "Customer",
       customerPhone: "01000000000",
       subtotal: "100.00",
@@ -58,7 +59,7 @@ describe("CacheRefreshService", () => {
     );
     await expect(service.runForced()).resolves.toBe(true);
     expect(saved).toEqual([
-      expect.objectContaining({ id: 17, totalAmount: "100.00" }),
+      expect.objectContaining({ id: testId(17), totalAmount: "100.00" }),
     ]);
   });
   it("uses one durable lock and refreshes catalog plus append-only orders", async () => {
@@ -80,7 +81,7 @@ describe("CacheRefreshService", () => {
     const catalog = { load: vi.fn().mockResolvedValue({ products: [] }) };
     const products = { applyCatalog: vi.fn() };
     const externalOrders = {
-      listAll: vi.fn().mockResolvedValue([{ id: 17 }]),
+      listAll: vi.fn().mockResolvedValue([{ id: testId(17) }]),
     };
     const orders = { insertUnseen: vi.fn() };
     const service = new CacheRefreshService(
@@ -95,7 +96,7 @@ describe("CacheRefreshService", () => {
     await expect(service.runDue()).resolves.toBe(true);
     expect(state.tryAcquire).toHaveBeenCalledOnce();
     expect(products.applyCatalog).toHaveBeenCalledWith({ products: [] });
-    expect(orders.insertUnseen).toHaveBeenCalledWith([{ id: 17 }]);
+    expect(orders.insertUnseen).toHaveBeenCalledWith([{ id: testId(17) }]);
     expect(state.markSuccess).toHaveBeenCalledOnce();
     expect(state.release).toHaveBeenCalledOnce();
   });
