@@ -7,7 +7,7 @@ import {
   listEmployees,
   revokeCashierAccess,
   updateEmployee,
-  employeePayPayload,
+  employeeSalaryPayload,
 } from "../../src/services/employees-service";
 
 vi.mock("../../src/lib/api", () => ({ api: vi.fn() }));
@@ -39,22 +39,9 @@ describe("employees service", () => {
     ]);
   });
 
-  it("normalizes legacy employee pay fields before saving", () => {
-    expect(employeePayPayload("daily", "200.00")).toEqual({
-      payType: null,
-      payRate: null,
-    });
-    expect(employeePayPayload("hourly", "30.00")).toEqual({
-      payType: null,
-      payRate: null,
-    });
-    expect(employeePayPayload("monthly", "5000.25")).toEqual({
-      payType: "monthly",
-      payRate: 5000.25,
-    });
-    expect(employeePayPayload("monthly", "")).toEqual({
-      payType: "monthly",
-      payRate: null,
-    });
+  it("sends the monthly salary alone, or nothing when it was never set", () => {
+    expect(employeeSalaryPayload("5000.25")).toEqual({ payRate: 5000.25 });
+    expect(employeeSalaryPayload("0")).toEqual({ payRate: 0 });
+    expect(employeeSalaryPayload("")).toEqual({ payRate: null });
   });
 });

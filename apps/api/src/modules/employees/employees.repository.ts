@@ -28,7 +28,6 @@ export class EmployeesRepository {
         phone: employees.phone,
         jobTitle: employees.jobTitle,
         hireDate: employees.hireDate,
-        payType: employees.payType,
         payRate: employees.payRate,
         notes: employees.notes,
         isActive: employees.isActive,

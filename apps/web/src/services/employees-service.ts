@@ -1,4 +1,4 @@
-import type { Employee, EmployeePayType } from "@cashier/shared";
+import type { Employee } from "@cashier/shared";
 import { api } from "../lib/api";
 
 export type EmployeeSaveBody = {
@@ -6,7 +6,6 @@ export type EmployeeSaveBody = {
   phone?: string | null;
   jobTitle?: string | null;
   hireDate?: string | null;
-  payType?: EmployeePayType | null;
   payRate?: number | null;
   notes?: string | null;
   isActive?: true;
@@ -17,16 +16,11 @@ export type CashierAccessBody = {
   password: string;
 };
 
-export function employeePayPayload(
-  payType: EmployeePayType | "",
+/** payroll is monthly only: an empty field means the salary was never set */
+export function employeeSalaryPayload(
   payRate: string,
-): Pick<EmployeeSaveBody, "payType" | "payRate"> {
-  return payType === "monthly"
-    ? {
-        payType: "monthly",
-        payRate: payRate === "" ? null : Number(payRate),
-      }
-    : { payType: null, payRate: null };
+): Pick<EmployeeSaveBody, "payRate"> {
+  return { payRate: payRate === "" ? null : Number(payRate) };
 }
 
 export const listEmployees = () => api<Employee[]>("/api/employees");

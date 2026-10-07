@@ -1,4 +1,5 @@
 import { HttpError } from "../../middleware/error.js";
+import type { SalaryBlockedReason } from "@cashier/shared";
 import type { SalariesRepository } from "./salaries.repository.js";
 import type { AdjustmentInput, AdvanceInput } from "./salaries.schemas.js";
 
@@ -12,6 +13,11 @@ const cents = (value: string | number) => Math.round(Number(value) * 100);
 const sum = (rows: Array<{ amount: string }>) =>
   rows.reduce((total, row) => total + cents(row.amount), 0);
 const money = (valueCents: number) => (valueCents / 100).toFixed(2);
+const monthsBetween = (from: string, to: string) => {
+  const [fromYear, fromMonth] = from.split("-").map(Number);
+  const [toYear, toMonth] = to.split("-").map(Number);
+  return (toYear - fromYear) * 12 + (toMonth - fromMonth);
+};
 
 export class SalariesService {
   constructor(private repo: SalariesRepository) {}
@@ -26,7 +32,7 @@ export class SalariesService {
       ? await repo.employeeForUpdate(employeeId)
       : await repo.employee(employeeId);
     if (!employee) throw new HttpError(404, "الموظف غير موجود");
-    if (employee.payType !== "monthly" || employee.payRate === null)
+    if (employee.payRate === null)
       throw new HttpError(409, "يجب تحديد راتب شهري للموظف أولاً");
     const entries = await repo.monthEntries(employeeId, start, end);
     const bonuses = sum(
@@ -69,76 +75,69 @@ export class SalariesService {
       month,
       employees: await Promise.all(
         employees.map(async (employee) => {
+          const identity = {
+            employeeId: employee.id,
+            employeeName: employee.name,
+            isActive: employee.isActive,
+            payRate: employee.payRate,
+          };
+          // why this row has no salary figure — the screen used to blame the
+          // missing salary for every case, which sent the admin chasing the
+          // wrong problem
+          const blocked = (
+            blockedReason: SalaryBlockedReason,
+            blockedMessage: string | null = null,
+            unpaidEarlierMonths = 0,
+          ) => ({
+            ...identity,
+            basePay: null,
+            bonuses: "0.00",
+            deductions: "0.00",
+            advances: "0.00",
+            netPay: null,
+            payment: null,
+            blockedReason,
+            blockedMessage,
+            unpaidEarlierMonths,
+          });
           const payment = paid.get(employee.id) ?? null;
           if (payment)
             return {
-              employeeId: employee.id,
-              employeeName: employee.name,
-              isActive: employee.isActive,
-              payType: employee.payType,
-              payRate: employee.payRate,
+              ...identity,
               basePay: payment.basePay,
               bonuses: payment.bonuses,
               deductions: payment.deductions,
               advances: payment.advances,
               netPay: payment.netPay,
               payment,
+              blockedReason: null,
+              blockedMessage: null,
+              unpaidEarlierMonths: 0,
             };
-          if (employee.payType !== "monthly" || employee.payRate === null)
-            return {
-              employeeId: employee.id,
-              employeeName: employee.name,
-              isActive: employee.isActive,
-              payType: employee.payType,
-              payRate: employee.payRate,
-              basePay: null,
-              bonuses: "0.00",
-              deductions: "0.00",
-              advances: "0.00",
-              netPay: null,
-              payment: null,
-            };
+          if (employee.payRate === null) return blocked("no_salary");
           const latest = await this.repo.latestPaymentForEmployee(employee.id);
-          if (latest && latest.periodMonth.slice(0, 7) >= month)
-            return {
-              employeeId: employee.id,
-              employeeName: employee.name,
-              isActive: employee.isActive,
-              payType: employee.payType,
-              payRate: employee.payRate,
-              basePay: null,
-              bonuses: "0.00",
-              deductions: "0.00",
-              advances: "0.00",
-              netPay: null,
-              payment: null,
-            };
+          const latestMonth = latest?.periodMonth.slice(0, 7) ?? null;
+          // paying this month locks every month between the last payment and it
+          const unpaidEarlierMonths = latestMonth
+            ? Math.max(0, monthsBetween(latestMonth, month) - 1)
+            : 0;
+          if (latestMonth && latestMonth >= month)
+            return blocked("month_closed", null, unpaidEarlierMonths);
           let c;
           try {
             c = await this.calculation(employee.id, month);
           } catch (error) {
             if (!(error instanceof HttpError) || error.status !== 409)
               throw error;
-            return {
-              employeeId: employee.id,
-              employeeName: employee.name,
-              isActive: employee.isActive,
-              payType: employee.payType,
-              payRate: employee.payRate,
-              basePay: null,
-              bonuses: "0.00",
-              deductions: "0.00",
-              advances: "0.00",
-              netPay: null,
-              payment: null,
-            };
+            return blocked("invalid_data", error.message, unpaidEarlierMonths);
           }
           return {
             ...c,
-            isActive: employee.isActive,
-            payType: employee.payType,
-            payRate: employee.payRate,
+            ...identity,
             payment: null,
+            blockedReason: null,
+            blockedMessage: null,
+            unpaidEarlierMonths,
           };
         }),
       ),

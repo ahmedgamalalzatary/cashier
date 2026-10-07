@@ -228,21 +228,22 @@ Open, close, admin-close, reopen, and correction routes keep their payloads. A d
 
 ### Employee records
 
-- Fields: name, phone, job title, hire date, pay type + rate, notes, active flag.
+- Fields: name, phone, job title, hire date, monthly salary, notes, active flag.
+- Payroll is **monthly only**: the salary field holds the monthly salary and an empty value means it was never set. There is no daily or hourly pay type, and a request carrying one is rejected rather than silently stored as a monthly salary.
 - Employees are static HR/payroll records with no login permission by default. Admin can grant or revoke cashier access from an employee record without replacing that record or losing its history.
 - Non-cashier employees have no PIN, system login, attendance, or worked-hours tracking.
 - For a cashier, each shift records worked duration and all actions performed during that shift.
 
 ### Salaries
 
-- **Pay types (per employee):**
-  - Monthly: fixed amount per month.
-  - Daily: stored daily rate; worked days are not automatically tracked for non-cashiers.
-  - Hourly: stored hourly rate; automatic worked hours are available only for cashiers from their shifts.
+- **Monthly salary:** one amount per employee; empty means the salary was never set and the employee is not payable.
 - **Advances (سلف):** recorded any time; cash out immediately (appears in cash-flow); accumulates against the employee until payday.
 - **Bonuses / deductions:** dated entries with amounts and notes.
 - **Payday screen:** for a chosen period per employee —
-  `net = computed pay + bonuses − deductions − advances` → confirm to record the salary payment. Full salary history retained. Payday is one calendar month at a time. A month on or before the latest paid month cannot be paid; the payday screen shows those months as not payable. Net pay is computed in integer cents so two-decimal amounts do not drift.
+  `net = monthly salary + bonuses − deductions − advances` → confirm to record the salary payment, showing the net amount in the confirmation. Full salary history retained. Payday is one calendar month at a time. A month on or before the latest paid month cannot be paid; the payday screen shows those months as not payable. Net pay is computed in integer cents so two-decimal amounts do not drift.
+- **Why a month is not payable:** every month row carries the real reason instead of a single generic message —
+  `no_salary` (set the monthly salary), `month_closed` (a later month was already paid), or `invalid_data` (the numbers themselves are inconsistent: broken advances or a negative net), the last carrying the underlying message.
+- **Earlier unpaid months:** a row also reports how many months between the last payment and the shown month are still unpaid. Paying this month locks them for good, so the confirmation warns about them before the payment is recorded.
 
 ---
 
@@ -340,7 +341,7 @@ Online revenue counted once for completed orders, per-branch online stock costs,
 
 ## 15. Data Model (core tables)
 
-`users` (admin/cashier, credentials, one-to-one employee link required for cashiers) · `employees` (profile, pay type/rate; no PIN/login by default) · `salary_advances` · `salary_adjustments` (bonus/deduction) · `salary_payments`
+`users` (admin/cashier, credentials, one-to-one employee link required for cashiers) · `employees` (profile, monthly salary; no PIN/login by default) · `salary_advances` · `salary_adjustments` (bonus/deduction) · `salary_payments`
 `categories` (self-referencing main/sub) · `items` (unit, conversion, type, minimums) · `stock_batches` (warehouse, item, qty remaining, unit cost, source) · `stock_movements` (ledger: type, warehouse, item, qty, cost, reference)
 `suppliers` · `purchase_invoices` + `purchase_lines` · `supplier_payments`
 `transfer_requests` + `transfers` (+ optional branch-scoped `purchase_invoice_id`) + `transfer_lines`

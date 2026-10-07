@@ -186,7 +186,7 @@ describe("branch workspaces", () => {
     const employee = await request(app)
       .post("/api/employees")
       .set(auth)
-      .send({ name: "Main employee", payType: "monthly", payRate: 1000 })
+      .send({ name: "Main employee", payRate: 1000 })
       .expect(201);
     const expenseCategory = await request(app)
       .post("/api/expenses/categories")

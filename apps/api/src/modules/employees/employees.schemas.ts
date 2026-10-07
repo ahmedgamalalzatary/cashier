@@ -39,39 +39,24 @@ const employeeFields = z.object({
     (value) => (value === "" ? null : value),
     calendarDate.nullish(),
   ),
-  payType: z.literal("monthly").nullish(),
-  payRate: payRate.nullish(),
+  /** monthly salary — absent or null means it was never set */
+  payRate: payRate.nullish().default(null),
+  /**
+   * Payroll is monthly only, so a pay type is a dead field. Rejecting it stops a
+   * stale client from silently storing a daily rate as a monthly salary.
+   */
+  payType: z.never({ message: "نوع الأجر غير مدعوم؛ الراتب شهري فقط" }).optional(),
   notes: optionalText(2000),
 });
 
-const pairedPayFields = (
-  data: { payType?: string | null; payRate?: number | null },
-  context: z.RefinementCtx,
-) => {
-  if ((data.payType == null) !== (data.payRate == null)) {
-    context.addIssue({
-      code: "custom",
-      path: data.payType == null ? ["payType"] : ["payRate"],
-      message: "نوع الأجر وقيمته مطلوبان معاً",
-    });
-  }
-};
-
-export const employeeInput = employeeFields.superRefine((data, context) => {
-  pairedPayFields(data, context);
-});
+export const employeeInput = employeeFields;
 
 export type EmployeeInput = z.infer<typeof employeeInput>;
 
-const employeeUpdateFields = employeeFields.extend({
-  payType: z.enum(["monthly", "daily", "hourly"]).nullish(),
-});
-
-export const employeeUpdateInput = employeeUpdateFields
+export const employeeUpdateInput = employeeFields
   .partial()
   .extend({ isActive: z.literal(true).optional() })
   .superRefine((data, context) => {
-    if ("payType" in data || "payRate" in data) pairedPayFields(data, context);
     if (Object.keys(data).length === 0) {
       context.addIssue({
         code: "custom",

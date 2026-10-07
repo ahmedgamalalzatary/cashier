@@ -62,7 +62,6 @@ export class SalariesRepository {
         id: employees.id,
         name: employees.name,
         isActive: employees.isActive,
-        payType: employees.payType,
         payRate: employees.payRate,
       })
       .from(employees)

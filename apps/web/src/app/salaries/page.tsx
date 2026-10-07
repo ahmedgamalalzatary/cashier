@@ -13,6 +13,10 @@ import { Table } from "@/components/ui/table";
 import { cairoCalendarDate } from "@/lib/cairo-date";
 import { formatMoney } from "@/lib/format";
 import {
+  payConfirmationText,
+  salaryBlockedLabel,
+} from "@/models/salary-model";
+import {
   createSalaryAdjustment,
   createSalaryAdvance,
   getSalaryMonth,
@@ -33,9 +37,7 @@ export default function SalariesPage() {
   const [loading, setLoading] = useState(true),
     [saving, setSaving] = useState(false),
     [error, setError] = useState("");
-  const [paying, setPaying] = useState<{ id: number; name: string } | null>(
-    null,
-  );
+  const [paying, setPaying] = useState<Row | null>(null);
   const [payingError, setPayingError] = useState("");
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,7 +80,7 @@ export default function SalariesPage() {
     setSaving(true);
     setPayingError("");
     try {
-      await paySalary(paying.id, month);
+      await paySalary(paying.employeeId, month);
       setPaying(null);
       await load();
     } catch (cause) {
@@ -99,7 +101,15 @@ export default function SalariesPage() {
       key: "base",
       header: "الراتب",
       numeric: true,
-      cell: (e) => (e.basePay === null ? "يلزم راتب شهري" : formatMoney(e.basePay)),
+      cell: (e) => {
+        if (e.basePay !== null) return formatMoney(e.basePay);
+        const reason = salaryBlockedLabel(e);
+        return reason ? (
+          <span className="text-muted">{reason}</span>
+        ) : (
+          "—"
+        );
+      },
     },
     {
       key: "bonuses",
@@ -138,7 +148,7 @@ export default function SalariesPage() {
         ) : (
           <Button
             size="sm"
-            onClick={() => setPaying({ id: e.employeeId, name: e.employeeName })}
+            onClick={() => setPaying(e)}
             disabled={saving || e.netPay === null}
           >
             <Banknote className="size-4" />
@@ -301,8 +311,13 @@ export default function SalariesPage() {
         open={paying !== null}
         title="صرف الراتب"
         description={
-          paying
-            ? `تأكيد صرف راتب ${paying.name} عن ${month}؟ لا يمكن تعديل الدفعة بعد ذلك.`
+          paying && paying.netPay !== null
+            ? payConfirmationText({
+                name: paying.employeeName,
+                month,
+                netPay: paying.netPay,
+                unpaidEarlierMonths: paying.unpaidEarlierMonths,
+              })
             : undefined
         }
         confirmLabel="صرف الراتب"

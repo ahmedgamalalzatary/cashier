@@ -72,7 +72,7 @@ describe("employee controller wiring", () => {
     return app;
   }
 
-  const validEmployee = { name: "أحمد", payType: "monthly", payRate: 5000 };
+  const validEmployee = { name: "أحمد", payRate: 5000 };
 
   it("uses 201 for creates and grants, 204 for revokes and deactivations", async () => {
     const service = {

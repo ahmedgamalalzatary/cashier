@@ -40,7 +40,6 @@ describe("employees", () => {
         phone: "01000000000",
         jobTitle: "كاشير",
         hireDate: "2026-07-01",
-        payType: "monthly",
         payRate: 6000,
         notes: "فترة مسائية",
       });
@@ -56,7 +55,6 @@ describe("employees", () => {
         phone: "01000000000",
         jobTitle: "كاشير",
         hireDate: "2026-07-01",
-        payType: "monthly",
         payRate: "6000.00",
         notes: "فترة مسائية",
         isActive: true,

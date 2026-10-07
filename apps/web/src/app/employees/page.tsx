@@ -21,12 +21,6 @@ import {
   updateEmployee,
 } from "@/services/employees-service";
 
-const payTypeLabel = {
-  monthly: "شهري",
-  daily: "يومي",
-  hourly: "بالساعة",
-} as const;
-
 type ConfirmAction = { kind: "deactivate" | "revoke"; employee: Employee };
 
 export default function EmployeesPage() {
@@ -107,11 +101,9 @@ export default function EmployeesPage() {
     },
     {
       key: "pay",
-      header: "الأجر",
+      header: "الراتب الشهري",
       cell: (employee) =>
-        employee.payType && employee.payRate
-          ? `${formatMoney(employee.payRate)} · ${payTypeLabel[employee.payType]}`
-          : "—",
+        employee.payRate ? formatMoney(employee.payRate) : "لم يُحدَّد بعد",
     },
     {
       key: "access",

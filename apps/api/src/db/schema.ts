@@ -54,7 +54,7 @@ export const employees = mysqlTable(
     phone: varchar("phone", { length: 50 }),
     jobTitle: varchar("job_title", { length: 100 }),
     hireDate: date("hire_date", { mode: "string" }),
-    payType: mysqlEnum("pay_type", ["monthly", "daily", "hourly"]),
+    /** monthly salary — null means the salary was never set */
     payRate: decimal("pay_rate", { precision: 12, scale: 2 }),
     notes: text("notes"),
     isActive: boolean("is_active").notNull().default(true),

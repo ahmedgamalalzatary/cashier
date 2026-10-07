@@ -31,8 +31,6 @@ export type ManagedUser = AuthUser & {
   createdAt: string;
 };
 
-export type EmployeePayType = "monthly" | "daily" | "hourly";
-
 export type CashierAccess = {
   userId: number;
   username: string;
@@ -45,7 +43,7 @@ export type Employee = {
   phone: string | null;
   jobTitle: string | null;
   hireDate: string | null;
-  payType: EmployeePayType | null;
+  /** monthly salary — null means the salary was never set */
   payRate: string | null;
   notes: string | null;
   isActive: boolean;
@@ -78,11 +76,13 @@ export type SalaryPayment = {
   paidByName: string;
   paidAt: string;
 };
+/** why a month row has no salary figure — null when the row is payable or paid */
+export type SalaryBlockedReason = "no_salary" | "month_closed" | "invalid_data";
 export type SalaryMonthEmployee = {
   employeeId: number;
   employeeName: string;
   isActive: boolean;
-  payType: EmployeePayType | null;
+  /** monthly salary — null means the salary was never set */
   payRate: string | null;
   basePay: string | null;
   bonuses: string;
@@ -90,6 +90,11 @@ export type SalaryMonthEmployee = {
   advances: string;
   netPay: string | null;
   payment: SalaryPayment | null;
+  blockedReason: SalaryBlockedReason | null;
+  /** only for `invalid_data`: what exactly is broken */
+  blockedMessage: string | null;
+  /** months left unpaid before this one that this payment would lock for good */
+  unpaidEarlierMonths: number;
 };
 export type SalaryMonth = {
   month: string;

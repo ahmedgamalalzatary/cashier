@@ -8,29 +8,26 @@ import {
 
 const base = {
   name: "أحمد",
-  payType: "monthly",
   payRate: 5000,
 };
 
 describe("employee schemas", () => {
-  it("requires pay type and rate together", () => {
-    expect(employeeInput.parse(base)).toMatchObject({ payType: "monthly" });
-    expect(employeeInput.safeParse({ name: "أحمد" }).success).toBe(true);
-    expect(
-      employeeInput.safeParse({ ...base, payType: undefined }).success,
-    ).toBe(false);
-    expect(
-      employeeInput.safeParse({ ...base, payRate: undefined }).success,
-    ).toBe(false);
+  it("stores the monthly salary on its own, with no pay type", () => {
+    const parsed = employeeInput.parse(base);
+    expect(parsed).toMatchObject({ name: "أحمد", payRate: 5000 });
+    expect(parsed.payType).toBeUndefined();
   });
 
-  it("accepts monthly salaries only", () => {
-    expect(employeeInput.safeParse({ ...base, payType: "daily" }).success).toBe(
-      false,
-    );
-    expect(
-      employeeInput.safeParse({ ...base, payType: "hourly" }).success,
-    ).toBe(false);
+  it("treats an absent salary as a salary that was never set", () => {
+    expect(employeeInput.parse({ name: "أحمد" }).payRate).toBeNull();
+    expect(employeeInput.parse({ name: "أحمد", payRate: null }).payRate).toBeNull();
+  });
+
+  it("rejects any pay type because payroll is monthly only", () => {
+    for (const payType of ["monthly", "daily", "hourly"]) {
+      expect(employeeInput.safeParse({ ...base, payType }).success).toBe(false);
+    }
+    expect(employeeUpdateInput.safeParse({ payType: null }).success).toBe(false);
   });
 
   it("validates hire dates and pay-rate cents", () => {
@@ -54,12 +51,13 @@ describe("employee schemas", () => {
     expect(employeeUpdateInput.parse({ isActive: true })).toEqual({
       isActive: true,
     });
-    expect(
-      employeeUpdateInput.parse({ payType: "daily", payRate: 200 }),
-    ).toEqual({ payType: "daily", payRate: 200 });
-    expect(
-      employeeUpdateInput.parse({ payType: "hourly", payRate: 30 }),
-    ).toEqual({ payType: "hourly", payRate: 30 });
+    expect(employeeUpdateInput.parse({ payRate: 200 })).toEqual({
+      payRate: 200,
+    });
+    // clearing the salary is a normal update, not an empty one
+    expect(employeeUpdateInput.parse({ payRate: null })).toEqual({
+      payRate: null,
+    });
   });
 
   it("validates cashier access and id params", () => {
