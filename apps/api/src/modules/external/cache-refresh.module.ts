@@ -18,8 +18,9 @@ export function createCacheRefreshService(
   config: ExternalOrdersConfig,
   owner: string,
   syncCatalog = true,
+  shutdownSignal?: AbortSignal,
 ) {
-  const backend = new ExternalBackendClient(config);
+  const backend = new ExternalBackendClient(config, fetch, shutdownSignal);
   return new CacheRefreshService(
     new CacheRefreshRepository(db),
     new ExternalCatalogClient(backend),

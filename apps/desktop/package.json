@@ -1,0 +1,24 @@
+{
+  "name": "@cashier/desktop",
+  "version": "0.2.1",
+  "private": true,
+  "scripts": {
+    "tauri": "tauri",
+    "dev:desktop": "tauri dev",
+    "build:desktop": "tauri build",
+    "prepare:desktop": "node scripts/prepare.mjs",
+    "configure:desktop": "node scripts/configure.mjs",
+    "version:desktop": "node scripts/version.mjs",
+    "smoke:desktop": "node scripts/smoke.mjs",
+    "typecheck": "cargo check --manifest-path src-tauri/Cargo.toml --all-targets --locked",
+    "lint": "eslint scripts tests eslint.config.mjs && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings",
+    "test": "node --test tests/*.test.mjs && cargo test --manifest-path src-tauri/Cargo.toml --all-targets --locked",
+    "format": "cargo fmt --manifest-path src-tauri/Cargo.toml",
+    "format:check": "prettier --check scripts tests eslint.config.mjs package.json src-tauri/tauri.conf.json && cargo fmt --manifest-path src-tauri/Cargo.toml --check"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.1",
+    "esbuild": "0.25.12",
+    "eslint": "9.39.5"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Cashier",
+  "version": "0.2.1",
+  "identifier": "com.cashier.desktop",
+  "build": {
+    "frontendDist": "../../web/out",
+    "devUrl": "http://localhost:3000",
+    "beforeDevCommand": "pnpm --filter @cashier/web dev"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Cashier",
+        "create": false,
+        "width": 1280,
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "nsis",
+    "externalBin": ["binaries/cashier-node"],
+    "resources": {
+      "runtime/api.mjs": "runtime/api.mjs",
+      "runtime/manifest.json": "runtime/manifest.json",
+      "runtime/settings.example.env": "runtime/settings.example.env",
+      "runtime/node-LICENSE.txt": "runtime/node-LICENSE.txt",
+      "runtime/dependency-LICENSES.txt": "runtime/dependency-LICENSES.txt"
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "android": { "debugApplicationIdSuffix": ".debug" }
+  }
+}

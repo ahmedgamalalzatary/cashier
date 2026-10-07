@@ -9,8 +9,8 @@ export const AUTH_CHANGED_EVENT = "cashier:auth-changed";
 // authenticate with the HttpOnly `cashier.token` cookie set by the API, so a
 // stored token would only give XSS a second copy to steal. Only the profile
 // (for route guards) and the expiry (to avoid rendering on a dead session)
-// are kept. The `token` field exists solely for non-http(s) shells
-// (Tauri file-protocol builds) where cookies are not sent.
+// are kept. Desktop shells retain a token because their requests to the API
+// cannot rely on the browser's HttpOnly cookie.
 export type PersistedSession = {
   user: AuthUser;
   exp: number;
@@ -21,10 +21,11 @@ export function normalizePath(pathname: string) {
   return pathname.replace(/\/+$/, "") || "/";
 }
 
-// Cookies are not sent from non-http(s) pages (Tauri file protocol), so
-// those shells fall back to a Bearer token like before.
+// Tauri on Windows serves packaged assets at http://tauri.localhost. Its HTTP
+// scheme does not make the API's cookie usable; detect the runtime as well.
 function usesTokenFallback() {
   if (typeof window === "undefined") return false;
+  if ("__TAURI_INTERNALS__" in window) return true;
   const protocol = window.location?.protocol;
   return !!protocol && protocol !== "http:" && protocol !== "https:";
 }

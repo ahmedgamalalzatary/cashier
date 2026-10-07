@@ -3,7 +3,41 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "out/**"]
+    },
+    "@cashier/desktop#build:desktop": {
+      "dependsOn": ["@cashier/web#build", "prepare:desktop"],
+      "cache": false,
+      "outputs": ["src-tauri/target/release/bundle/**"]
+    },
+    "@cashier/desktop#lint": {
+      "dependsOn": ["prepare:desktop"],
+      "cache": false
+    },
+    "@cashier/desktop#typecheck": {
+      "dependsOn": ["prepare:desktop"],
+      "cache": false
+    },
+    "@cashier/desktop#format:check": {
+      "cache": false
+    },
+    "@cashier/desktop#prepare:desktop": {
+      "dependsOn": ["@cashier/api#build"],
+      "cache": false,
+      "outputs": ["src-tauri/binaries/**", "src-tauri/runtime/**"]
+    },
+    "@cashier/desktop#dev:desktop": {
+      "dependsOn": ["prepare:desktop"],
+      "cache": false,
+      "persistent": true
+    },
+    "@cashier/desktop#test": {
+      "dependsOn": ["prepare:desktop"],
+      "cache": false
+    },
+    "@cashier/desktop#smoke:desktop": {
+      "dependsOn": ["prepare:desktop"],
+      "cache": false
     },
     "lint": {},
     "typecheck": {},

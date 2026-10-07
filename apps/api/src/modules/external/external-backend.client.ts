@@ -5,7 +5,8 @@ import { HttpError } from "../../middleware/error.js";
  * Failure kinds callers can branch on. Wording of the messages may change, so
  * callers must never classify a failure by matching its text.
  */
-export type ExternalBackendErrorKind = "transport" | "auth" | "invalid" | "upstream";
+export type ExternalBackendErrorKind =
+  "transport" | "auth" | "invalid" | "upstream";
 
 export class ExternalBackendError extends HttpError {
   constructor(
@@ -36,9 +37,11 @@ export class ExternalBackendClient {
   constructor(
     private readonly config: ExternalBackendConfig,
     private readonly fetcher: typeof fetch = fetch,
+    private readonly shutdownSignal?: AbortSignal,
   ) {}
 
   async get<T>(path: string, schema: z.ZodType<T>): Promise<T> {
+    this.shutdownSignal?.throwIfAborted();
     if (!this.accessToken) await this.ensureLogin();
     const attemptedToken = this.accessToken!;
     let response = await this.request(path, attemptedToken);
@@ -66,10 +69,14 @@ export class ExternalBackendClient {
     try {
       return await this.fetcher(`${this.config.baseUrl}${path}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
-        signal: AbortSignal.timeout(10_000),
+        signal: this.requestSignal(),
       });
     } catch {
-      throw new ExternalBackendError("transport", "تعذر الاتصال بالخدمة الخارجية");
+      this.shutdownSignal?.throwIfAborted();
+      throw new ExternalBackendError(
+        "transport",
+        "تعذر الاتصال بالخدمة الخارجية",
+      );
     }
   }
 
@@ -136,11 +143,22 @@ export class ExternalBackendClient {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(10_000),
+        signal: this.requestSignal(),
       });
     } catch {
-      throw new ExternalBackendError("transport", "تعذر الاتصال بالخدمة الخارجية");
+      this.shutdownSignal?.throwIfAborted();
+      throw new ExternalBackendError(
+        "transport",
+        "تعذر الاتصال بالخدمة الخارجية",
+      );
     }
+  }
+
+  private requestSignal() {
+    const timeout = AbortSignal.timeout(10_000);
+    return this.shutdownSignal
+      ? AbortSignal.any([this.shutdownSignal, timeout])
+      : timeout;
   }
 
   private async parseTokens(response: Response) {

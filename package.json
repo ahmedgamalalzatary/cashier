@@ -8,6 +8,14 @@
     "dev": "turbo run dev dev:worker",
     "dev:web": "pnpm --filter @cashier/web dev",
     "dev:api": "pnpm --filter @cashier/api dev",
+    "dev:desktop": "turbo run dev:desktop --filter=@cashier/desktop --concurrency=1",
+    "build:desktop": "turbo run build:desktop --filter=@cashier/desktop --concurrency=1",
+    "lint:desktop": "turbo run format:check lint --filter=@cashier/desktop --concurrency=1",
+    "typecheck:desktop": "turbo run typecheck --filter=@cashier/desktop --concurrency=1",
+    "test:desktop": "turbo run test --filter=@cashier/desktop --concurrency=1",
+    "smoke:desktop": "turbo run smoke:desktop --filter=@cashier/desktop --concurrency=1",
+    "configure:desktop": "pnpm --filter @cashier/desktop configure:desktop",
+    "version:desktop": "pnpm --filter @cashier/desktop version:desktop",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
@@ -20,6 +28,6 @@
     "turbo": "^2.5.3"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.11"
   }
 }

@@ -1,0 +1,115 @@
+import fs from "node:fs";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { build } from "esbuild";
+
+const desktop = path.resolve(import.meta.dirname, "..");
+const root = path.resolve(desktop, "../..");
+const native = path.join(desktop, "src-tauri");
+const runtime = path.join(native, "runtime");
+const binaryDirectory = path.join(native, "binaries");
+const rust = spawnSync("rustc", ["--print", "host-tuple"], {
+  encoding: "utf8",
+});
+if (rust.status !== 0)
+  throw new Error(
+    "Rust must be available on PATH before preparing the desktop runtime.",
+  );
+const target = rust.stdout.trim();
+if (process.platform === "win32" && process.arch !== "x64")
+  throw new Error("This Windows installer currently targets x64.");
+fs.mkdirSync(runtime, { recursive: true });
+fs.mkdirSync(binaryDirectory, { recursive: true });
+const binary = path.join(
+  binaryDirectory,
+  `cashier-node-${target}${process.platform === "win32" ? ".exe" : ""}`,
+);
+fs.copyFileSync(process.execPath, binary);
+const licenseFile = path.join(runtime, "node-LICENSE.txt");
+const existingManifest = path.join(runtime, "manifest.json");
+const sameNode =
+  fs.existsSync(existingManifest) &&
+  JSON.parse(fs.readFileSync(existingManifest, "utf8")).nodeVersion ===
+    process.version;
+if (!sameNode || !fs.existsSync(licenseFile)) {
+  const response = await fetch(
+    `https://raw.githubusercontent.com/nodejs/node/${process.version}/LICENSE`,
+    { signal: AbortSignal.timeout(30_000) },
+  );
+  if (!response.ok)
+    throw new Error(
+      "Cannot download the bundled Node license; retry runtime preparation when online.",
+    );
+  fs.writeFileSync(licenseFile, await response.text());
+}
+const bundled = await build({
+  absWorkingDir: root,
+  metafile: true,
+  entryPoints: [path.join(root, "apps/api/src/desktop/main.ts")],
+  outfile: path.join(runtime, "api.mjs"),
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  target: "node20",
+  sourcemap: false,
+  banner: {
+    js: "import { createRequire as __cashierCreateRequire } from 'node:module'; const require = __cashierCreateRequire(import.meta.url);",
+  },
+  logLevel: "warning",
+});
+const packages = new Map();
+for (const input of Object.keys(bundled.metafile.inputs)) {
+  let directory = path.dirname(path.resolve(root, input));
+  if (!directory.split(path.sep).includes("node_modules")) continue;
+  while (path.dirname(directory) !== directory) {
+    const packageFile = path.join(directory, "package.json");
+    if (fs.existsSync(packageFile)) {
+      const info = JSON.parse(fs.readFileSync(packageFile, "utf8"));
+      const license = fs
+        .readdirSync(directory)
+        .find((name) => /^licen[sc]e(?:\.(?:md|txt))?$/i.test(name));
+      if (license && fs.statSync(path.join(directory, license)).isFile()) {
+        packages.set(
+          `${info.name}@${info.version}`,
+          fs.readFileSync(path.join(directory, license), "utf8"),
+        );
+      }
+      break;
+    }
+    directory = path.dirname(directory);
+  }
+}
+fs.writeFileSync(
+  path.join(runtime, "dependency-LICENSES.txt"),
+  [...packages].map(([name, text]) => `--- ${name} ---\n${text}`).join("\n\n"),
+);
+const journal = JSON.parse(
+  fs.readFileSync(
+    path.join(root, "apps/api/drizzle/meta/_journal.json"),
+    "utf8",
+  ),
+);
+const version = JSON.parse(
+  fs.readFileSync(path.join(desktop, "package.json"), "utf8"),
+).version;
+fs.writeFileSync(
+  path.join(runtime, "manifest.json"),
+  JSON.stringify(
+    {
+      version,
+      nodeVersion: process.version,
+      target,
+      schemaCreatedAt: journal.entries.at(-1).when,
+      schemaMigration: journal.entries.at(-1).tag,
+    },
+    null,
+    2,
+  ) + "\n",
+);
+fs.copyFileSync(
+  path.join(desktop, "settings.example.env"),
+  path.join(runtime, "settings.example.env"),
+);
+console.log(
+  `Prepared desktop API and Node ${process.version} for ${target}. No local credentials included.`,
+);

@@ -1,10 +1,66 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, buildHeaders } from "../../src/lib/api";
-import { SESSION_KEY } from "../../src/lib/auth";
+import { SESSION_KEY, writeSession } from "../../src/lib/auth";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("buildHeaders", () => {
+  it("uses the API port supplied by the desktop runtime instead of the web deployment URL", async () => {
+    vi.stubGlobal("window", {
+      __TAURI_INTERNALS__: {},
+      __CASHIER_DESKTOP_API_URL__: "http://127.0.0.1:43210",
+      localStorage: { getItem: () => null, removeItem: () => undefined },
+    });
+    vi.stubGlobal(
+      "fetch",
+      async (url: string) =>
+        new Response(JSON.stringify({ requestedUrl: url })),
+    );
+    await expect(api("/api/auth/me")).resolves.toEqual({
+      requestedUrl: "http://127.0.0.1:43210/api/auth/me",
+    });
+  });
+  it.each(["http:", "https:", "tauri:"])(
+    "authenticates a Tauri %s shell after login without cookies",
+    async (protocol) => {
+      const storage = new Map<string, string>();
+      const user = {
+        id: 1,
+        name: "Admin",
+        role: "admin" as const,
+        isSuperAdmin: false,
+      };
+      const payload = Buffer.from(
+        JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 60 }),
+      ).toString("base64url");
+      const token = `header.${payload}.signature`;
+      vi.stubGlobal(
+        "window",
+        Object.assign(new EventTarget(), {
+          __TAURI_INTERNALS__: {},
+          location: { protocol },
+          localStorage: {
+            getItem: (key: string) => storage.get(key) ?? null,
+            setItem: (key: string, value: string) => storage.set(key, value),
+            removeItem: (key: string) => storage.delete(key),
+          },
+        }),
+      );
+      // Model the API boundary: requests without the login token are rejected.
+      vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+        const authenticated =
+          new Headers(init.headers).get("Authorization") === `Bearer ${token}`;
+        return new Response(
+          JSON.stringify(authenticated ? user : { error: "Missing token" }),
+          { status: authenticated ? 200 : 401 },
+        );
+      });
+
+      writeSession({ token, user });
+
+      await expect(api("/api/auth/me")).resolves.toEqual(user);
+    },
+  );
   it.each(["branch", "account"])(
     "rejects a response after the %s changes",
     async (change) => {

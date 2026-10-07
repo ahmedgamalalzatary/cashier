@@ -29,10 +29,15 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   else headers.delete("X-Branch-Id");
   let res: Response;
   try {
-    res = await fetch(`${BASE}${path}`, {
+    const desktopBase =
+      typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+        ? (window as Window & { __CASHIER_DESKTOP_API_URL__?: string })
+            .__CASHIER_DESKTOP_API_URL__
+        : undefined;
+    res = await fetch(`${desktopBase ?? BASE}${path}`, {
       ...init,
-      // the HttpOnly auth cookie travels with every call; the Authorization
-      // header is only attached by non-browser shells holding a fallback token
+      // Browsers use the HttpOnly cookie; desktop shells attach their fallback
+      // token through the Authorization header.
       credentials: "include",
       headers,
     });

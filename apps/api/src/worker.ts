@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import { closeDb, createDb } from "./db/index.js";
 import { loadRuntimeEnv } from "./env.js";
+import { runRefreshLoop } from "./modules/external/worker-loop.js";
 import {
   createCacheRefreshService,
   refreshActiveBranches,
@@ -9,6 +10,7 @@ import {
 
 const environment = loadRuntimeEnv();
 const db = createDb(environment.DATABASE_URL);
+const shutdown = new AbortController();
 const refresh = createCacheRefreshService(
   db,
   {
@@ -18,9 +20,9 @@ const refresh = createCacheRefreshService(
   },
   `${hostname()}:${process.pid}:${randomUUID()}`,
   environment.EXTERNAL_CATALOG_ENABLED,
+  shutdown.signal,
 );
 
-const shutdown = new AbortController();
 process.once("SIGTERM", () => {
   shutdown.abort();
 });
@@ -28,24 +30,8 @@ process.once("SIGINT", () => {
   shutdown.abort();
 });
 
-while (!shutdown.signal.aborted) {
-  try {
-    await refreshActiveBranches(db, refresh, shutdown.signal);
-  } catch (error) {
-    console.error("Cache refresh failed", error);
-  }
-  if (!shutdown.signal.aborted) {
-    await new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, 5_000);
-      shutdown.signal.addEventListener(
-        "abort",
-        () => {
-          clearTimeout(timer);
-          resolve();
-        },
-        { once: true },
-      );
-    });
-  }
-}
+await runRefreshLoop(
+  () => refreshActiveBranches(db, refresh, shutdown.signal),
+  shutdown.signal,
+);
 await closeDb(db);

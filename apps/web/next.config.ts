@@ -9,7 +9,7 @@ const isStandalone = process.env.NEXT_OUTPUT_MODE === "standalone";
 
 const nextConfig: NextConfig = {
   output: isStandalone ? "standalone" : "export",
-  // Tauri serves the bundle off the file protocol: directory-style paths resolve
+  // Tauri serves the static bundle: directory-style paths resolve
   // to index.html, and there is no server to optimize images.
   ...(!isStandalone && { trailingSlash: true }),
   outputFileTracingRoot: path.resolve(__dirname, "../.."),
