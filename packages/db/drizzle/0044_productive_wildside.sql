@@ -1,4 +1,0 @@
-ALTER TABLE `transfers` ADD `purchase_invoice_id` int;--> statement-breakpoint
-ALTER TABLE `transfers` ADD CONSTRAINT `transfers_purchase_invoice_id_purchase_invoices_id_fk` FOREIGN KEY (`purchase_invoice_id`) REFERENCES `purchase_invoices`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `transfers` ADD CONSTRAINT `transfers_purchaseInvoiceId_br_fk` FOREIGN KEY (`branch_id`,`purchase_invoice_id`) REFERENCES `purchase_invoices`(`branch_id`,`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX `transfers_purchase_invoice_id_idx` ON `transfers` (`purchase_invoice_id`);

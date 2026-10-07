@@ -1,2 +1,0 @@
-ALTER TABLE `shift_events` MODIFY COLUMN `action` enum('open','close','admin_close','auto_close','reopen','correction') NOT NULL;--> statement-breakpoint
-ALTER TABLE `shift_events` MODIFY COLUMN `actor_user_id` int;
