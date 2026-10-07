@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { describe, expect, it, vi } from 'vitest';
-import { readRequestToken, setAuthCookie, signToken } from '../../src/middleware/auth.js';
+import { readRequestToken, setAuthCookie, signToken } from '../src/middleware/auth.js';
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
