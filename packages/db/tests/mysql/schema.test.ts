@@ -1,12 +1,11 @@
-import { spawnSync } from "node:child_process";
-import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
+import { migrate } from "drizzle-orm/mysql2/migrator";
 import mysql, { type Connection, type RowDataPacket } from "mysql2/promise";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq, is } from "drizzle-orm";
 import { getTableConfig, MySqlTable } from "drizzle-orm/mysql-core";
 import { closeDb, createDb, type Db } from "../../src/client.js";
+import { syncConfiguredAdmin } from "../../src/seed-admin.js";
 import {
   branchTransaction,
   branchValues,
@@ -16,18 +15,17 @@ import * as schema from "../../src/schema.js";
 import { loadTestEnvironment } from "../support/test-env.js";
 
 const packageRoot = path.resolve(import.meta.dirname, "../..");
-const databaseName = `cashier_schema42_${process.pid}_test`;
+const databaseName = `cashier_schema43_${process.pid}_test`;
 const tables = Object.values(schema).filter((table) => is(table, MySqlTable));
 let connection: Connection | undefined;
 let db: Db | undefined;
-let generatedDirectory: string | undefined;
 let created = false;
 
 beforeAll(async () => {
   const url = new URL(loadTestEnvironment());
   if (!["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))
     throw new Error("Schema verification requires local test MySQL");
-  if (!/^cashier_schema42_\d+_test$/.test(databaseName))
+  if (!/^cashier_schema43_\d+_test$/.test(databaseName))
     throw new Error("Unexpected scratch database name");
   url.pathname = "/";
   connection = await mysql.createConnection(url.toString());
@@ -36,40 +34,9 @@ beforeAll(async () => {
   created = true;
   await connection.changeUser({ database: databaseName });
   await connection.query("SET time_zone = '+00:00'");
-  generatedDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "cashier-schema42-"),
-  );
-  const generated = spawnSync(
-    process.execPath,
-    [
-      path.join(packageRoot, "node_modules/drizzle-kit/bin.cjs"),
-      "generate",
-      "--dialect",
-      "mysql",
-      "--schema",
-      "./src/schema.ts",
-      "--out",
-      generatedDirectory,
-      "--name",
-      "schema_verification",
-    ],
-    { cwd: packageRoot, encoding: "utf8", windowsHide: true },
-  );
-  if (generated.status !== 0)
-    throw new Error(
-      `Schema SQL generation failed: ${generated.stderr || generated.stdout}`,
-    );
-  const sqlFile = fs
-    .readdirSync(generatedDirectory)
-    .find((name) => name.endsWith(".sql"));
-  if (!sqlFile) throw new Error("Schema generator did not produce SQL");
-  for (const statement of fs
-    .readFileSync(path.join(generatedDirectory, sqlFile), "utf8")
-    .split("--> statement-breakpoint")) {
-    if (statement.trim()) await connection.query(statement);
-  }
   url.pathname = `/${databaseName}`;
   db = createDb(url.toString());
+  await migrate(db, { migrationsFolder: path.join(packageRoot, "drizzle") });
 });
 
 beforeEach(async () => {
@@ -95,15 +62,6 @@ afterAll(async () => {
     } finally {
       await connection.end();
     }
-  }
-  if (generatedDirectory) {
-    const resolved = fs.realpathSync(generatedDirectory);
-    if (
-      path.dirname(resolved) !== fs.realpathSync(os.tmpdir()) ||
-      !path.basename(resolved).startsWith("cashier-schema42-")
-    )
-      throw new Error("Unexpected generated SQL directory");
-    fs.rmSync(resolved, { recursive: true });
   }
 });
 
@@ -148,7 +106,7 @@ const open = (branchId: string, actor: Awaited<ReturnType<typeof cashier>>) =>
 describe("fresh desktop schema", () => {
   it("installs every table and stores UUID columns as ASCII binary CHAR(36)", async () => {
     const [columns] = await connection!.query<RowDataPacket[]>(
-      "SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, CHARACTER_SET_NAME, COLLATION_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ?",
+      "SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, CHARACTER_SET_NAME, COLLATION_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME <> '__drizzle_migrations'",
       [databaseName],
     );
     expect(
@@ -171,6 +129,40 @@ describe("fresh desktop schema", () => {
         });
       }
     }
+  });
+
+  it("reapplying the baseline preserves rows and records only one migration", async () => {
+    const id = await branch("Keep this branch");
+    await migrate(db!, { migrationsFolder: path.join(packageRoot, "drizzle") });
+    expect(await db!.select().from(schema.branches)).toEqual([
+      expect.objectContaining({ id, name: "Keep this branch" }),
+    ]);
+    const [rows] = await connection!.query<RowDataPacket[]>(
+      "SELECT hash, created_at FROM __drizzle_migrations",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].hash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("bootstraps the configured admin on the baseline without inventing a branch or revoking unchanged sessions", async () => {
+    const admin = {
+      name: "Baseline admin",
+      username: "baseline-admin",
+      password: "baseline-test-password",
+    };
+    expect(await syncConfiguredAdmin(db!, admin)).toBe("created");
+    expect(await syncConfiguredAdmin(db!, admin)).toBe("unchanged");
+    const rows = await db!.select().from(schema.users);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: expect.stringMatching(/^[a-f0-9-]{14}7[a-f0-9-]{21}$/),
+      branchId: null,
+      role: "admin",
+      isSuperAdmin: true,
+      isActive: true,
+      tokenVersion: 0,
+    });
+    expect(await db!.select().from(schema.branches)).toHaveLength(0);
   });
 
   it("allows repeated cashier usernames across branches and an admin of the same name", async () => {
