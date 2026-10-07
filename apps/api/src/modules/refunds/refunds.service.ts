@@ -34,7 +34,7 @@ const fingerprint = (input: RefundInput) =>
     orderId: input.orderId,
     reason: input.reason,
     lines: [...input.lines].sort(
-      (left, right) => left.orderLineId - right.orderLineId,
+      (left, right) => (left.orderLineId).localeCompare(right.orderLineId),
     ),
   });
 
@@ -43,13 +43,13 @@ export function planExternalRefundQuantities(input: {
   priorQuantity: bigint;
   requestedQuantity: bigint;
   allocations: Array<{
-    id: number;
-    itemId: number;
+    id: string;
+    itemId: string;
     quantityMilli: bigint;
     alreadyReturnedMilli: bigint;
   }>;
 }) {
-  const remainingByItem = new Map<number, bigint>();
+  const remainingByItem = new Map<string, bigint>();
   const cumulativeQuantity = input.priorQuantity + input.requestedQuantity;
   for (const allocation of input.allocations) {
     if (remainingByItem.has(allocation.itemId)) continue;
@@ -103,13 +103,13 @@ export class RefundsService {
     return this.repo.list();
   }
 
-  async quantities(orderId: number) {
+  async quantities(orderId: string) {
     const order = await this.repo.findOrder(orderId);
     if (!order) throw new HttpError(404, "الطلب الأصلي غير موجود");
     return this.repo.refundedQuantitiesForOrder(orderId);
   }
 
-  async get(id: number) {
+  async get(id: string) {
     const refund = await this.repo.find(id);
     if (!refund) throw new HttpError(404, "المرتجع غير موجود");
     return { ...refund, lines: await this.repo.listLines(id) };
@@ -119,7 +119,7 @@ export class RefundsService {
     const cashierId = actor.id;
     const isAdminRefund = actor.role === "admin";
     const requestFingerprint = fingerprint(input);
-    let refundId: number;
+    let refundId: string;
     try {
       refundId = await transactionWithDeadlockRetry(() =>
         this.repo.transaction(async (repo, inventory) => {
@@ -128,7 +128,7 @@ export class RefundsService {
           this.assertReplay(replay, requestFingerprint, cashierId);
           return replay.id;
         }
-        let shiftId: number | null = null;
+        let shiftId: string | null = null;
         if (!isAdminRefund) {
           const shift = await repo.findOpenShiftForCashier(cashierId);
           if (!shift) throw new HttpError(409, "يجب فتح وردية قبل تسجيل المرتجع");
@@ -219,7 +219,7 @@ export class RefundsService {
               cash: 0n,
             };
           })
-          .sort((left, right) => left.line.id - right.line.id);
+          .sort((left, right) => (left.line.id).localeCompare(right.line.id));
 
         for (const entry of calculated) {
           const before =
@@ -469,9 +469,9 @@ export class RefundsService {
   }
 
   private assertReplay(
-    replay: { cashierId: number; requestFingerprint: string },
+    replay: { cashierId: string; requestFingerprint: string },
     requestFingerprint: string,
-    cashierId: number,
+    cashierId: string,
   ) {
     if (
       replay.cashierId !== cashierId ||

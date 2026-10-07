@@ -48,7 +48,7 @@ export class ExpensesRepository {
     ).orderBy(asc(expenseCategories.name));
   }
 
-  async category(id: number, lock = false) {
+  async category(id: string, lock = false) {
     let query = this.db
       .select()
       .from(expenseCategories)
@@ -61,12 +61,12 @@ export class ExpensesRepository {
   async createCategory(name: string) {
     const [result] = await this.db
       .insert(expenseCategories)
-      .values(branchValues({ name }));
-    return this.category(result.insertId);
+      .values(branchValues({ name })).$returningId();
+    return this.category(result.id);
   }
 
   async updateCategory(
-    id: number,
+    id: string,
     input: { name?: string; isActive?: boolean },
   ) {
     await this.db
@@ -76,7 +76,7 @@ export class ExpensesRepository {
     return this.category(id);
   }
 
-  async openShiftForCashier(userId: number) {
+  async openShiftForCashier(userId: string) {
     const [row] = await this.db
       .select({ id: shifts.id })
       .from(shifts)
@@ -107,12 +107,12 @@ export class ExpensesRepository {
     return row;
   }
 
-  async create(data: typeof expenses.$inferInsert) {
-    const [result] = await this.db.insert(expenses).values(branchValues(data));
-    return result.insertId;
+  async create(data: Omit<typeof expenses.$inferInsert, "branchId">) {
+    const [result] = await this.db.insert(expenses).values(branchValues(data)).$returningId();
+    return result.id;
   }
 
-  async get(id: number) {
+  async get(id: string) {
     const [row] = await this.db
       .select(expenseColumns)
       .from(expenses)
@@ -128,7 +128,7 @@ export class ExpensesRepository {
     return row;
   }
 
-  list(recordedBy?: number) {
+  list(recordedBy?: string) {
     const query = this.db
       .select(expenseColumns)
       .from(expenses)

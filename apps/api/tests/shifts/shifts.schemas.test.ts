@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import {
   adminCloseShiftInput,
@@ -61,10 +62,10 @@ describe("shift correction schema", () => {
 });
 
 describe("shift id param", () => {
-  it("rejects zero, negative, and non-numeric ids but coerces strings", () => {
-    for (const value of [0, -1, "abc"]) {
+  it("accepts UUID ids and rejects counter or malformed ids", () => {
+    for (const value of [0, -1, "5", "abc"]) {
       expect(shiftIdParam.safeParse(value).success).toBe(false);
     }
-    expect(shiftIdParam.parse("5")).toBe(5);
+    expect(shiftIdParam.parse(testId(5))).toBe(testId(5));
   });
 });

@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import {
   createExpenseCategoryInput,
@@ -7,7 +8,7 @@ import {
 
 const validExpense = {
   clientRequestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-  categoryId: 3,
+  categoryId: testId(3),
   amount: 12.5,
   expenseDate: "2026-07-20",
   note: "كهرباء",

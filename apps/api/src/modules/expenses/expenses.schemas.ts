@@ -9,7 +9,7 @@ export const updateExpenseCategoryInput = z
 
 export const createExpenseInput = z.object({
   clientRequestId: z.string().uuid(),
-  categoryId: z.number().int().positive(),
+  categoryId: z.string().uuid(),
   amount: z
     .number()
     .positive()

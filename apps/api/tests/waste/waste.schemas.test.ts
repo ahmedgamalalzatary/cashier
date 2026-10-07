@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import { wasteInput } from "../../src/modules/waste/waste.schemas.js";
 
@@ -5,14 +6,14 @@ describe("waste input", () => {
   const base = {
     clientRequestId: crypto.randomUUID(),
     warehouse: "cafe",
-    target: { type: "item", itemId: 1 },
+    target: { type: "item", itemId: testId(1) },
     quantity: 1,
     reason: "damaged",
     note: null,
   };
 
   it("accepts item and external-product waste targets", () => {
-    expect(wasteInput.parse(base).target).toEqual({ type: "item", itemId: 1 });
+    expect(wasteInput.parse(base).target).toEqual({ type: "item", itemId: testId(1) });
     expect(
       wasteInput.parse({
         ...base,
@@ -34,10 +35,10 @@ describe("waste input", () => {
     expect(
       wasteInput.parse({
         ...base,
-        target: { type: "recipe", recipeId: 3, recipeSizeId: 7 },
+        target: { type: "recipe", recipeId: testId(3), recipeSizeId: testId(7) },
         quantity: 2,
       }).target,
-    ).toEqual({ type: "recipe", recipeId: 3, recipeSizeId: 7 });
+    ).toEqual({ type: "recipe", recipeId: testId(3), recipeSizeId: testId(7) });
   });
 
   it("requires a note for the other reason", () => {
@@ -46,14 +47,14 @@ describe("waste input", () => {
     ).toThrow();
   });
 
-  it("coerces numeric strings like sibling modules", () => {
+  it("preserves UUID ids while coercing quantity strings", () => {
     const parsed = wasteInput.parse({
       ...base,
-      target: { type: "item", itemId: "1" },
+      target: { type: "item", itemId: testId(1) },
       quantity: "5",
     });
     expect(parsed.quantity).toBe(5);
-    expect(parsed.target).toEqual({ type: "item", itemId: 1 });
+    expect(parsed.target).toEqual({ type: "item", itemId: testId(1) });
   });
 
   it("rejects fractional external-product quantities", () => {
@@ -74,7 +75,7 @@ describe("waste input", () => {
     expect(() =>
       wasteInput.parse({
         ...base,
-        target: { type: "recipe", recipeId: 3, recipeSizeId: 7 },
+        target: { type: "recipe", recipeId: testId(3), recipeSizeId: testId(7) },
         quantity: 1.5,
       }),
     ).toThrow();
@@ -113,7 +114,7 @@ describe("waste input", () => {
     expect(() =>
       wasteInput.parse({
         ...base,
-        target: { type: "recipe", recipeId: true, recipeSizeId: 7 },
+        target: { type: "recipe", recipeId: true, recipeSizeId: testId(7) },
       }),
     ).toThrow();
   });

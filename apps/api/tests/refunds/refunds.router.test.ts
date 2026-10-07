@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -11,7 +12,7 @@ function appWithStubs(controller: RefundsController, role = "cashier") {
   const app = express();
   app.use((req, _res, next) => {
     req.user = {
-      id: 9,
+      id: testId(9),
       name: "Cashier",
       role: role as "admin" | "cashier",
       branchId: role === "cashier" ? 1 : null,
@@ -45,9 +46,9 @@ function stubController(
 
 const validBody = {
   clientRequestId: "8f345091-c497-4b8b-b4f3-a8ebdc47dd31",
-  orderId: 10,
+  orderId: testId(10),
   reason: "طلب العميل",
-  lines: [{ orderLineId: 1, quantity: 2, stockAction: null }],
+  lines: [{ orderLineId: testId(1), quantity: 2, stockAction: null }],
 };
 
 describe("refund route authorization", () => {
@@ -68,8 +69,8 @@ describe("refund route authorization", () => {
 
     const responses = await Promise.all([
       request(app).get("/"),
-      request(app).get("/55"),
-      request(app).get("/order/10/quantities"),
+      request(app).get("/00000000-0000-7000-8000-000000000037"),
+      request(app).get("/order/00000000-0000-7000-8000-00000000000a/quantities"),
       request(app).post("/").send(validBody),
     ]);
 
@@ -84,7 +85,7 @@ describe("refund route authorization", () => {
 describe("refund controller wiring", () => {
   it("returns 201 on create with the parsed input and cashier id", async () => {
     const service = {
-      create: vi.fn(async () => ({ id: 55 })),
+      create: vi.fn(async () => ({ id: testId(55) })),
     } as unknown as RefundsService;
 
     const response = await request(
@@ -94,16 +95,16 @@ describe("refund controller wiring", () => {
       .send(validBody);
 
     expect(response.status).toBe(201);
-    expect(response.body).toEqual({ id: 55 });
+    expect(response.body).toEqual({ id: testId(55) });
     expect(service.create).toHaveBeenCalledWith(
       validBody,
-      expect.objectContaining({ id: 9, role: "cashier" }),
+      expect.objectContaining({ id: testId(9), role: "cashier" }),
     );
   });
 
   it("maps duplicate lines to 400, bad ids to 400, and missing rows to 404", async () => {
     const service = {
-      create: vi.fn(async () => ({ id: 55 })),
+      create: vi.fn(async () => ({ id: testId(55) })),
       get: vi
         .fn()
         .mockRejectedValue(new HttpError(404, "المرتجع غير موجود")),
@@ -118,8 +119,8 @@ describe("refund controller wiring", () => {
       .send({
         ...validBody,
         lines: [
-          { orderLineId: 1, quantity: 1 },
-          { orderLineId: 1, quantity: 1 },
+          { orderLineId: testId(1), quantity: 1 },
+          { orderLineId: testId(1), quantity: 1 },
         ],
       });
     expect(duplicate.status).toBe(400);
@@ -130,11 +131,11 @@ describe("refund controller wiring", () => {
       400,
     );
 
-    const missing = await request(app).get("/999");
+    const missing = await request(app).get("/00000000-0000-7000-8000-0000000003e7");
     expect(missing.status).toBe(404);
     expect(missing.body).toEqual({ error: "المرتجع غير موجود" });
 
-    const missingOrder = await request(app).get("/order/999/quantities");
+    const missingOrder = await request(app).get("/order/00000000-0000-7000-8000-0000000003e7/quantities");
     expect(missingOrder.status).toBe(404);
   });
 });

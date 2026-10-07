@@ -10,7 +10,7 @@ const quantity = z.coerce
   });
 
 const refundLineInput = z.object({
-  orderLineId: z.coerce.number().int().positive(),
+  orderLineId: z.string().uuid(),
   quantity,
   stockAction: z
     .enum(["return_to_stock", "not_returnable"])
@@ -21,12 +21,12 @@ const refundLineInput = z.object({
 export const refundInput = z
   .object({
     clientRequestId: z.string().uuid(),
-    orderId: z.coerce.number().int().positive(),
+    orderId: z.string().uuid(),
     reason: z.string().trim().min(2).max(500),
     lines: z.array(refundLineInput).min(1).max(100),
   })
   .superRefine((value, context) => {
-    const seen = new Set<number>();
+    const seen = new Set<string>();
     value.lines.forEach((line, index) => {
       if (seen.has(line.orderLineId)) {
         context.addIssue({

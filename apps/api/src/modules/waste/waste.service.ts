@@ -54,7 +54,7 @@ export class WasteService {
           return prior.id;
         }
 
-        let shiftId: number | null = null;
+        let shiftId: string | null = null;
         if (actor.role === "cashier") {
           if (input.warehouse !== "cafe")
             throw new HttpError(403, "الكاشير يسجل هالك مخزن الكافيه فقط");
@@ -65,15 +65,15 @@ export class WasteService {
         }
 
         const occurredAt = new Date();
-        let itemId: number | null = null;
-        let recipeId: number | null = null;
-        let recipeSizeId: number | null = null;
+        let itemId: string | null = null;
+        let recipeId: string | null = null;
+        let recipeSizeId: string | null = null;
         let externalProductId: number | null = null;
         let externalSizeId: number | null = null;
         let targetName: string;
         let sizeName: string | null = null;
         let consumptions: Array<{
-          itemId: number;
+          itemId: string;
           itemName: string;
           quantity: string;
         }>;
@@ -170,7 +170,7 @@ export class WasteService {
           }));
         }
 
-        consumptions.sort((left, right) => left.itemId - right.itemId);
+        consumptions.sort((left, right) => (left.itemId).localeCompare(right.itemId));
         if (consumptions.length > 1) {
           await repo.lockStockItems(consumptions.map((row) => row.itemId));
         }
@@ -234,7 +234,7 @@ export class WasteService {
         );
         return id;
       });
-    let id: number;
+    let id: string;
     try {
       id = await transactionWithDeadlockRetry(transaction);
     } catch (error) {
@@ -257,7 +257,7 @@ export class WasteService {
     return this.repo.list(actor.role === "cashier" ? "cafe" : undefined);
   }
 
-  async get(id: number, actor?: AuthUser) {
+  async get(id: string, actor?: AuthUser) {
     const entry = await this.repo.find(id);
     if (!entry) throw new HttpError(404, "سجل الهالك غير موجود");
     if (actor?.role === "cashier" && entry.warehouse !== "cafe")

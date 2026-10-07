@@ -41,7 +41,7 @@ export class OrdersRepository {
     });
   }
 
-  lockStockItems(ids: number[]) {
+  lockStockItems(ids: string[]) {
     if (ids.length === 0) return Promise.resolve([]);
     return this.db
       .select({
@@ -57,7 +57,7 @@ export class OrdersRepository {
           items,
           inArray(
             items.id,
-            [...new Set(ids)].sort((a, b) => a - b),
+            [...new Set(ids)].sort((a, b) => (a).localeCompare(b)),
           ),
         ),
       )
@@ -245,12 +245,12 @@ export class OrdersRepository {
       .orderBy(asc(externalProducts.externalId));
   }
 
-  async createOrder(data: typeof orders.$inferInsert) {
-    const [result] = await this.db.insert(orders).values(branchValues(data));
-    return result.insertId;
+  async createOrder(data: Omit<typeof orders.$inferInsert, "branchId">) {
+    const [result] = await this.db.insert(orders).values(branchValues(data)).$returningId();
+    return result.id;
   }
 
-  async findOpenShiftForCashier(cashierUserId: number) {
+  async findOpenShiftForCashier(cashierUserId: string) {
     const [row] = await this.db
       .select({ id: shifts.id })
       .from(shifts)
@@ -278,19 +278,19 @@ export class OrdersRepository {
     return row;
   }
 
-  async createLine(data: typeof orderLines.$inferInsert) {
+  async createLine(data: Omit<typeof orderLines.$inferInsert, "branchId">) {
     const [result] = await this.db
       .insert(orderLines)
-      .values(branchValues(data));
-    return result.insertId;
+      .values(branchValues(data)).$returningId();
+    return result.id;
   }
 
-  async createLineModifier(data: typeof orderLineModifiers.$inferInsert) {
+  async createLineModifier(data: Omit<typeof orderLineModifiers.$inferInsert, "branchId">) {
     await this.db.insert(orderLineModifiers).values(branchValues(data));
   }
 
   async updateLine(
-    id: number,
+    id: string,
     data: Pick<typeof orderLines.$inferInsert, "totalCost" | "hasStockDeficit">,
   ) {
     await this.db
@@ -300,7 +300,7 @@ export class OrdersRepository {
   }
 
   async updateOrder(
-    id: number,
+    id: string,
     data: Pick<typeof orders.$inferInsert, "totalCost" | "isNegativeStock">,
   ) {
     await this.db
@@ -309,7 +309,7 @@ export class OrdersRepository {
       .where(branchCondition(orders, eq(orders.id, id)));
   }
 
-  async createAllocation(data: typeof orderLineAllocations.$inferInsert) {
+  async createAllocation(data: Omit<typeof orderLineAllocations.$inferInsert, "branchId">) {
     await this.db.insert(orderLineAllocations).values(branchValues(data));
   }
 
@@ -340,7 +340,7 @@ export class OrdersRepository {
       .limit(limit);
   }
 
-  async findOrder(id: number) {
+  async findOrder(id: string) {
     const [row] = await this.db
       .select({
         id: orders.id,
@@ -366,7 +366,7 @@ export class OrdersRepository {
     return row;
   }
 
-  listLines(orderId: number) {
+  listLines(orderId: string) {
     return this.db
       .select({
         id: orderLines.id,
@@ -389,7 +389,7 @@ export class OrdersRepository {
       .orderBy(asc(orderLines.id));
   }
 
-  listAllocations(orderLineIds: number[]) {
+  listAllocations(orderLineIds: string[]) {
     if (orderLineIds.length === 0) return Promise.resolve([]);
     return this.db
       .select({
@@ -436,7 +436,7 @@ export class OrdersRepository {
       .orderBy(asc(orderLineAllocations.id));
   }
 
-  listModifiers(orderLineIds: number[]) {
+  listModifiers(orderLineIds: string[]) {
     if (orderLineIds.length === 0) return Promise.resolve([]);
     return this.db
       .select()

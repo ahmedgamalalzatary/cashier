@@ -91,7 +91,7 @@ export class ShiftsService {
   /** The same drawer arithmetic every close path uses. */
   private async expectedCashFor(
     repo: ShiftsRepository,
-    id: number,
+    id: string,
     openingFloat: string,
   ) {
     const totals = await repo.totals(id);
@@ -103,8 +103,8 @@ export class ShiftsService {
     return fromCents(expected);
   }
 
-  async open(data: OpenShiftInput, cashierUserId: number) {
-    let id: number;
+  async open(data: OpenShiftInput, cashierUserId: string) {
+    let id: string;
     try {
       id = await this.repo.transaction(async (repo) => {
         const cashier = await repo.findCashierForUpdate(cashierUserId);
@@ -141,7 +141,7 @@ export class ShiftsService {
     return this.get(id);
   }
 
-  async get(id: number) {
+  async get(id: string) {
     const shift = await this.repo.findById(id);
     if (!shift) throw new HttpError(404, "الوردية غير موجودة");
     const [totals, events] = await Promise.all([
@@ -214,7 +214,7 @@ export class ShiftsService {
     return Promise.all(rows.map((row) => this.get(row.id)));
   }
 
-  async close(id: number, data: CloseShiftInput, cashierUserId: number) {
+  async close(id: string, data: CloseShiftInput, cashierUserId: string) {
     try {
       await this.closeOnce(id, data, cashierUserId);
     } catch (error) {
@@ -226,7 +226,7 @@ export class ShiftsService {
     return this.get(id);
   }
 
-  private closeOnce(id: number, data: CloseShiftInput, cashierUserId: number) {
+  private closeOnce(id: string, data: CloseShiftInput, cashierUserId: string) {
     return this.repo.transaction(async (repo) => {
       const shift = await repo.findByIdForUpdate(id);
       if (!shift) throw new HttpError(404, "الوردية غير موجودة");
@@ -268,9 +268,9 @@ export class ShiftsService {
   }
 
   async adminClose(
-    id: number,
+    id: string,
     data: AdminCloseShiftInput,
-    adminUserId: number,
+    adminUserId: string,
   ) {
     await this.repo.transaction(async (repo) => {
       const shift = await repo.findByIdForUpdate(id);
@@ -311,7 +311,7 @@ export class ShiftsService {
     return this.get(id);
   }
 
-  async reopen(id: number, data: ShiftAuditNoteInput, adminUserId: number) {
+  async reopen(id: string, data: ShiftAuditNoteInput, adminUserId: string) {
     try {
       await this.repo.transaction(async (repo) => {
         const preview = await repo.findById(id);
@@ -352,7 +352,7 @@ export class ShiftsService {
     return this.get(id);
   }
 
-  async correct(id: number, data: CorrectShiftInput, adminUserId: number) {
+  async correct(id: string, data: CorrectShiftInput, adminUserId: string) {
     await this.repo.transaction(async (repo) => {
       const shift = await repo.findByIdForUpdate(id);
       if (!shift) throw new HttpError(404, "الوردية غير موجودة");

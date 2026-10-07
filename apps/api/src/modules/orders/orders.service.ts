@@ -75,10 +75,6 @@ function orderNumber(now: Date) {
 function requestFingerprint(data: OrderInput) {
   const lines = [...normalizeLines(data.lines)].sort(
     (left, right) =>
-      (left.type === "item" ? left.itemId : left.externalProductId) -
-      (right.type === "item" ? right.itemId : right.externalProductId) ||
-      (left.type === "item" ? 0 : left.externalSizeId ?? 0) -
-      (right.type === "item" ? 0 : right.externalSizeId ?? 0) ||
       lineKey(left).localeCompare(lineKey(right)),
   );
   return hashRequest({
@@ -94,7 +90,7 @@ export class OrdersService {
   async create(data: OrderInput, actor: AuthUser) {
     const cashierId = actor.id;
     const isAdminSale = actor.role === "admin";
-    let orderId: number;
+    let orderId: string;
     const fingerprint = requestFingerprint(data);
     try {
       orderId = await transactionWithDeadlockRetry(() =>
@@ -105,7 +101,7 @@ export class OrdersService {
           return existing.id;
         }
 
-        let shiftId: number | null = null;
+        let shiftId: string | null = null;
         if (!isAdminSale) {
           const shift = await repo.findOpenShiftForCashier(cashierId);
           if (!shift) {
@@ -299,9 +295,9 @@ export class OrdersService {
   }
 
   private assertReplay(
-    existing: { cashierId: number; requestFingerprint: string },
+    existing: { cashierId: string; requestFingerprint: string },
     fingerprint: string,
-    cashierId: number,
+    cashierId: string,
   ) {
     if (existing.requestFingerprint !== fingerprint) {
       throw new HttpError(409, "معرّف الطلب مستخدم لبيانات بيع مختلفة");
@@ -313,8 +309,8 @@ export class OrdersService {
 
   private saveAllocation(
     repo: OrdersRepository,
-    orderLineId: number,
-    itemId: number,
+    orderLineId: string,
+    itemId: string,
     itemName: string,
     allocation: FifoAllocation,
   ) {
@@ -333,7 +329,7 @@ export class OrdersService {
     return this.repo.listRecent();
   }
 
-  async get(id: number) {
+  async get(id: string) {
     const order = await this.repo.findOrder(id);
     if (!order) throw new HttpError(404, "الطلب غير موجود");
     const lines = await this.repo.listLines(id);

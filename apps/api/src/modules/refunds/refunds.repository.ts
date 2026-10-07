@@ -38,7 +38,7 @@ export class RefundsRepository {
     });
   }
 
-  async findOpenShiftForCashier(cashierId: number) {
+  async findOpenShiftForCashier(cashierId: string) {
     const [row] = await this.db
       .select({ id: shifts.id })
       .from(shifts)
@@ -52,7 +52,7 @@ export class RefundsRepository {
     return row;
   }
 
-  async lockOrder(id: number) {
+  async lockOrder(id: string) {
     const [row] = await this.db
       .select({
         id: orders.id,
@@ -67,7 +67,7 @@ export class RefundsRepository {
     return row;
   }
 
-  async findOrder(id: number) {
+  async findOrder(id: string) {
     const [row] = await this.db
       .select({ id: orders.id })
       .from(orders)
@@ -75,7 +75,7 @@ export class RefundsRepository {
     return row;
   }
 
-  lockOrderLines(orderId: number, lineIds: number[]) {
+  lockOrderLines(orderId: string, lineIds: string[]) {
     if (lineIds.length === 0) return Promise.resolve([]);
     return this.db
       .select({
@@ -99,7 +99,7 @@ export class RefundsRepository {
             eq(orderLines.orderId, orderId),
             inArray(
               orderLines.id,
-              [...lineIds].sort((a, b) => a - b),
+              [...lineIds].sort((a, b) => (a).localeCompare(b)),
             ),
           ),
         ),
@@ -108,7 +108,7 @@ export class RefundsRepository {
       .for("update");
   }
 
-  refundedQuantities(lineIds: number[]) {
+  refundedQuantities(lineIds: string[]) {
     if (lineIds.length === 0) return Promise.resolve([]);
     return this.db
       .select({
@@ -124,7 +124,7 @@ export class RefundsRepository {
       .for("update");
   }
 
-  refundedQuantitiesForOrder(orderId: number) {
+  refundedQuantitiesForOrder(orderId: string) {
     return this.db
       .select({
         orderLineId: refundLines.orderLineId,
@@ -140,7 +140,7 @@ export class RefundsRepository {
       .orderBy(asc(refundLines.orderLineId));
   }
 
-  async financialTotals(orderId: number) {
+  async financialTotals(orderId: string) {
     const [row] = await this.db
       .select({
         gross: sql<string>`CAST(COALESCE(SUM(${refundLines.grossAmount}), 0) AS DECIMAL(12,2))`,
@@ -169,7 +169,7 @@ export class RefundsRepository {
     return row;
   }
 
-  allocations(orderLineId: number) {
+  allocations(orderLineId: string) {
     return this.db
       .select({
         id: orderLineAllocations.id,
@@ -188,7 +188,7 @@ export class RefundsRepository {
       .orderBy(asc(orderLineAllocations.id));
   }
 
-  returnedAllocationQuantities(orderLineAllocationIds: number[]) {
+  returnedAllocationQuantities(orderLineAllocationIds: string[]) {
     if (orderLineAllocationIds.length === 0) return Promise.resolve([]);
     return this.db
       .select({
@@ -208,27 +208,27 @@ export class RefundsRepository {
       .groupBy(refundLineAllocations.orderLineAllocationId);
   }
 
-  async createRefund(data: typeof refunds.$inferInsert) {
-    const [result] = await this.db.insert(refunds).values(branchValues(data));
-    return result.insertId;
+  async createRefund(data: Omit<typeof refunds.$inferInsert, "branchId">) {
+    const [result] = await this.db.insert(refunds).values(branchValues(data)).$returningId();
+    return result.id;
   }
 
-  async createLine(data: typeof refundLines.$inferInsert) {
+  async createLine(data: Omit<typeof refundLines.$inferInsert, "branchId">) {
     const [result] = await this.db
       .insert(refundLines)
-      .values(branchValues(data));
-    return result.insertId;
+      .values(branchValues(data)).$returningId();
+    return result.id;
   }
 
-  createReturnAllocation(data: typeof refundLineAllocations.$inferInsert) {
+  createReturnAllocation(data: Omit<typeof refundLineAllocations.$inferInsert, "branchId">) {
     return this.db.insert(refundLineAllocations).values(branchValues(data));
   }
 
-  createWaste(data: typeof wasteEntries.$inferInsert) {
+  createWaste(data: Omit<typeof wasteEntries.$inferInsert, "branchId">) {
     return this.db.insert(wasteEntries).values(branchValues(data));
   }
 
-  updateTotalCost(id: number, totalCostReturned: string) {
+  updateTotalCost(id: string, totalCostReturned: string) {
     return this.db
       .update(refunds)
       .set({ totalCostReturned })
@@ -261,7 +261,7 @@ export class RefundsRepository {
       .limit(limit);
   }
 
-  async find(id: number) {
+  async find(id: string) {
     const [row] = await this.db
       .select({
         id: refunds.id,
@@ -286,7 +286,7 @@ export class RefundsRepository {
     return row;
   }
 
-  listLines(refundId: number) {
+  listLines(refundId: string) {
     return (
       this.db
         .select({

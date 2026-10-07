@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -14,7 +15,7 @@ function appWithStubs(controller: ExpensesController, role: Role = "cashier") {
   const app = express();
   app.use((req, _res, next) => {
     req.user = {
-      id: role === "admin" ? 7 : 9,
+      id: role === "admin" ? testId(7) : testId(9),
       name: role === "admin" ? "Admin" : "Cashier",
       role,
     };
@@ -47,7 +48,7 @@ function stubController(
 
 const validExpense = {
   clientRequestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-  categoryId: 1,
+  categoryId: testId(1),
   amount: 12.5,
   expenseDate: "2026-07-20",
   note: null,
@@ -61,7 +62,7 @@ describe("expense route authorization", () => {
       request(appWithStubs(controller)).post("/categories").send({
         name: "x",
       }),
-      request(appWithStubs(controller)).patch("/categories/1").send({
+      request(appWithStubs(controller)).patch("/categories/00000000-0000-7000-8000-000000000001").send({
         name: "y",
       }),
     ]);
@@ -90,7 +91,7 @@ describe("expense route authorization", () => {
 describe("expense controller wiring", () => {
   it("returns 201 on create with the parsed input and actor", async () => {
     const service = {
-      create: vi.fn(async () => ({ id: 9 })),
+      create: vi.fn(async () => ({ id: testId(9) })),
     } as unknown as ExpensesService;
 
     const response = await request(
@@ -100,16 +101,16 @@ describe("expense controller wiring", () => {
       .send(validExpense);
 
     expect(response.status).toBe(201);
-    expect(response.body).toEqual({ id: 9 });
+    expect(response.body).toEqual({ id: testId(9) });
     expect(service.create).toHaveBeenCalledWith(
       validExpense,
-      expect.objectContaining({ id: 9, role: "cashier" }),
+      expect.objectContaining({ id: testId(9), role: "cashier" }),
     );
   });
 
   it("requires an expense date from admins", async () => {
     const service = {
-      create: vi.fn(async () => ({ id: 9 })),
+      create: vi.fn(async () => ({ id: testId(9) })),
     } as unknown as ExpensesService;
     const { expenseDate, ...withoutDate } = validExpense;
 
@@ -127,7 +128,7 @@ describe("expense controller wiring", () => {
 
   it("returns 201 on category create and maps bad ids and bodies", async () => {
     const service = {
-      createCategory: vi.fn(async () => ({ id: 2, name: "نظافة" })),
+      createCategory: vi.fn(async () => ({ id: testId(2), name: "نظافة" })),
     } as unknown as ExpensesService;
     const adminApp = appWithStubs(
       new RealExpensesController(service),

@@ -1,6 +1,7 @@
+import { it, testId, testBranchValues } from "../support/ids.js";
 import request from "supertest";
 import { and, eq } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 import { createApp } from "../../../../apps/api/src/app.js";
 import { ShiftsService } from "../../../../apps/api/src/modules/shifts/shifts.service.js";
 import { ShiftsRepository } from "../../../../apps/api/src/modules/shifts/shifts.repository.js";
@@ -34,7 +35,7 @@ async function createCashier(
   username = "shift-cashier",
   employeeName = "كاشير الوردية",
   existingAdminAuthorization?: { Authorization: string },
-  branchId = 1,
+  branchId = testId(1),
 ) {
   const adminAuthorization =
     existingAdminAuthorization ?? (await loginAs(app(), "admin"));
@@ -52,8 +53,8 @@ async function createCashier(
     .post("/api/auth/login")
     .send({ username, password: "secret123" });
   return {
-    employeeId: employee.body.id as number,
-    userId: access.body.userId as number,
+    employeeId: employee.body.id as string,
+    userId: access.body.userId as string,
     authorization: {
       Authorization: `Bearer ${login.body.token}`,
     },
@@ -72,7 +73,7 @@ describe("shifts", () => {
 
     expect(response.status).toBe(201);
     expect(response.body).toMatchObject({
-      id: expect.any(Number),
+      id: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
       status: "open",
       cashierUserId: cashier.userId,
       employeeId: cashier.employeeId,
@@ -103,7 +104,7 @@ describe("shifts", () => {
     expect(response.status).toBe(403);
   });
 
-  it("allows distinct cashiers to open shifts concurrently in the same branch", async () => {
+  it("allows exactly one cashier to win a concurrent branch shift opening", async () => {
     const firstCashier = await createCashier("first-cashier", "الكاشير الأول");
     const secondCashier = await createCashier(
       "second-cashier",
@@ -123,26 +124,30 @@ describe("shifts", () => {
     ]);
 
     expect(responses.map((response) => response.status).sort()).toEqual([
-      201, 201,
+      201, 409,
     ]);
     for (const [index, cashier] of [firstCashier, secondCashier].entries()) {
       const current = await request(app())
         .get("/api/shifts/current")
         .set(cashier.authorization);
-      expect(current.body.id).toBe(responses[index]!.body.id);
-      expect(current.body.cashierUserId).toBe(cashier.userId);
+      if (responses[index]!.status === 201) {
+        expect(current.body.id).toBe(responses[index]!.body.id);
+        expect(current.body.cashierUserId).toBe(cashier.userId);
+      } else {
+        expect(current.body).toBeNull();
+      }
     }
     const active = await request(app())
       .get("/api/shifts/active")
       .set(firstCashier.adminAuthorization);
     expect(active.status).toBe(200);
-    expect(active.body).toHaveLength(2);
+    expect(active.body).toHaveLength(1);
     const dashboard = await request(app())
       .get("/api/reports/dashboard")
       .set(firstCashier.adminAuthorization);
     expect(
-      dashboard.body.openShifts.map((shift: { id: number }) => shift.id).sort(),
-    ).toEqual(responses.map((response) => response.body.id).sort());
+      dashboard.body.openShifts.map((shift: { id: string }) => shift.id).sort(),
+    ).toEqual(responses.filter((response) => response.status === 201).map((response) => response.body.id));
   });
 
   it("rejects duplicate concurrent shifts for the same cashier account", async () => {
@@ -187,7 +192,7 @@ describe("shifts", () => {
       ),
     );
     expect(opened.map((response) => response.status)).toEqual([201, 201]);
-    for (const [index, branchId] of [1, branch.body.id].entries()) {
+    for (const [index, branchId] of [testId(1), branch.body.id].entries()) {
       for (const url of [
         "/api/shifts/active",
         "/api/shifts",
@@ -198,7 +203,7 @@ describe("shifts", () => {
           .set(first.adminAuthorization)
           .set("X-Branch-Id", String(branchId))
           .expect(200);
-        expect(result.body.map((shift: { id: number }) => shift.id)).toEqual([
+        expect(result.body.map((shift: { id: string }) => shift.id)).toEqual([
           opened[index]!.body.id,
         ]);
       }
@@ -208,7 +213,7 @@ describe("shifts", () => {
         .set("X-Branch-Id", String(branchId))
         .expect(200);
       expect(
-        dashboard.body.openShifts.map((shift: { id: number }) => shift.id),
+        dashboard.body.openShifts.map((shift: { id: string }) => shift.id),
       ).toEqual([opened[index]!.body.id]);
     }
     await request(app())
@@ -263,7 +268,7 @@ describe("shifts", () => {
     expect(response.body).toBeNull();
   });
 
-  it("reopens alongside another cashier but rejects a second shift for its owner", async () => {
+  it("rejects reopening while any cashier occupies the branch, then permits it after closing", async () => {
     const first = await createCashier("reopen-first");
     const other = await createCashier(
       "reopen-other",
@@ -279,11 +284,21 @@ describe("shifts", () => {
       .set(first.authorization)
       .send({ actualCash: 10 })
       .expect(200);
-    await request(app())
+    const otherOpened = await request(app())
       .post("/api/shifts/open")
       .set(other.authorization)
       .send({ openingFloat: 20 })
       .expect(201);
+    await request(app())
+      .post(`/api/shifts/${old.body.id}/reopen`)
+      .set(first.adminAuthorization)
+      .send({ note: "Branch occupied" })
+      .expect(409);
+    await request(app())
+      .post(`/api/shifts/${otherOpened.body.id}/close`)
+      .set(other.authorization)
+      .send({ actualCash: 20 })
+      .expect(200);
     await request(app())
       .post(`/api/shifts/${old.body.id}/reopen`)
       .set(first.adminAuthorization)
@@ -319,14 +334,14 @@ describe("shifts", () => {
       first.adminAuthorization,
     );
     await db.insert(shifts).values(
-      Array.from({ length: 105 }, (_, index) => ({
+      testBranchValues(Array.from({ length: 105 }, (_, index) => ({
         cashierUserId: first.userId,
         employeeId: first.employeeId,
         status: "closed" as const,
         openingFloat: "0.00",
         openedAt: new Date(Date.UTC(2026, 0, 1, 0, index)),
         closedAt: new Date(Date.UTC(2026, 0, 1, 0, index + 1)),
-      })),
+      }))),
     );
     await request(app())
       .post("/api/shifts/open")
@@ -346,7 +361,7 @@ describe("shifts", () => {
     ).toBe(105);
     expect(
       page2.body.every(
-        (shift: { cashierUserId: number }) =>
+        (shift: { cashierUserId: string }) =>
           shift.cashierUserId === first.userId,
       ),
     ).toBe(true);
@@ -367,14 +382,14 @@ describe("shifts", () => {
   it("returns all of today's shifts for Home even beyond the history page size", async () => {
     const cashier = await createCashier();
     await db.insert(shifts).values(
-      Array.from({ length: 105 }, () => ({
+      testBranchValues(Array.from({ length: 105 }, () => ({
         cashierUserId: cashier.userId,
         employeeId: cashier.employeeId,
         status: "closed" as const,
         openingFloat: "0.00",
         openedAt: new Date(),
         closedAt: new Date(),
-      })),
+      }))),
     );
     const today = await request(app())
       .get("/api/shifts/today")
@@ -383,49 +398,40 @@ describe("shifts", () => {
     expect(today.body).toHaveLength(105);
   });
 
-  it("keeps every transaction and cash total with its cashier while two shifts are open", async () => {
+  it("keeps every transaction and cash total with its cashier across consecutive branch shifts", async () => {
     const first = await createCashier("actions-first");
     const second = await createCashier(
       "actions-second",
       "Second",
       first.adminAuthorization,
     );
-    const opened = await Promise.all(
-      [first, second].map((cashier) =>
-        request(app())
-          .post("/api/shifts/open")
-          .set(cashier.authorization)
-          .send({ openingFloat: 100 }),
-      ),
-    );
-    expect(opened.map((response) => response.status)).toEqual([201, 201]);
-    const [category] = await db.insert(categories).values({ name: "Stock" });
-    const [item] = await db.insert(items).values({
+    const [category] = await db.insert(categories).values(testBranchValues({ name: "Stock" })).$returningId();
+    const [item] = await db.insert(items).values(testBranchValues({
       code: nextTestItemCode(),
       name: "Beans",
-      categoryId: category.insertId,
+      categoryId: category.id,
       type: "raw",
       stockUnit: "kg",
-    });
-    const [batch] = await db.insert(stockBatches).values({
-      itemId: item.insertId,
+    })).$returningId();
+    const [batch] = await db.insert(stockBatches).values(testBranchValues({
+      itemId: item.id,
       warehouse: "cafe",
       initialQuantity: "10.000",
       remainingQuantity: "10.000",
       unitCost: "2.000000",
       receivedAt: new Date(),
       sourceType: "transfer_in",
-    });
-    await db.insert(stockMovements).values({
-      itemId: item.insertId,
+    })).$returningId();
+    await db.insert(stockMovements).values(testBranchValues({
+      itemId: item.id,
       warehouse: "cafe",
-      batchId: batch.insertId,
+      batchId: batch.id,
       movementType: "transfer_in",
       quantity: "10.000",
       unitCost: "2.000000",
       occurredAt: new Date(),
-    });
-    await db.insert(externalCategories).values({
+    }));
+    await db.insert(externalCategories).values(testBranchValues({
       externalId: 3,
       nameAr: "Drinks",
       nameEn: "Drinks",
@@ -434,8 +440,8 @@ describe("shifts", () => {
       isVisible: true,
       isCurrent: true,
       syncedAt: new Date(),
-    });
-    await db.insert(externalProducts).values({
+    }));
+    await db.insert(externalProducts).values(testBranchValues({
       externalId: 9,
       externalCategoryId: 3,
       nameAr: "Coffee",
@@ -447,16 +453,21 @@ describe("shifts", () => {
       isVisible: true,
       isCurrent: true,
       syncedAt: new Date(),
-    });
-    await db.insert(externalProductIngredients).values({
+    }));
+    await db.insert(externalProductIngredients).values(testBranchValues({
       externalProductId: 9,
-      itemId: item.insertId,
+      itemId: item.id,
       quantity: "0.020",
-    });
+    }));
     const [expenseCategory] = await db
       .insert(expenseCategories)
-      .values({ name: "Cleaning" });
+      .values(testBranchValues({ name: "Cleaning" })).$returningId();
     for (const [index, cashier] of [first, second].entries()) {
+      const opened = await request(app())
+        .post("/api/shifts/open")
+        .set(cashier.authorization)
+        .send({ openingFloat: 100 })
+        .expect(201);
       const sale = await request(app())
         .post("/api/orders")
         .set(cashier.authorization)
@@ -496,7 +507,7 @@ describe("shifts", () => {
         .set(cashier.authorization)
         .send({
           clientRequestId: randomUUID(),
-          categoryId: expenseCategory.insertId,
+          categoryId: expenseCategory.id,
           amount: index + 2,
         })
         .expect(201);
@@ -506,7 +517,7 @@ describe("shifts", () => {
         .send({
           clientRequestId: randomUUID(),
           warehouse: "cafe",
-          target: { type: "item", itemId: item.insertId },
+          target: { type: "item", itemId: item.id },
           quantity: 0.01,
           reason: "damaged",
         })
@@ -516,7 +527,7 @@ describe("shifts", () => {
         .set(cashier.authorization)
         .send({
           clientRequestId: randomUUID(),
-          lines: [{ itemId: item.insertId, quantity: 1 }],
+          lines: [{ itemId: item.id, quantity: 1 }],
           notes: null,
         })
         .expect(201);
@@ -530,7 +541,7 @@ describe("shifts", () => {
         const documents = await db
           .select({ shiftId: table.shiftId })
           .from(table)
-          .where(eq(table.shiftId, opened[index]!.body.id));
+          .where(eq(table.shiftId, opened.body.id));
         expect(documents).toHaveLength(1);
       }
       const current = await request(app())
@@ -545,7 +556,7 @@ describe("shifts", () => {
         transferRequests: 1,
       });
       const closed = await request(app())
-        .post(`/api/shifts/${opened[index]!.body.id}/close`)
+        .post(`/api/shifts/${opened.body.id}/close`)
         .set(cashier.authorization)
         .send({ actualCash: index === 0 ? 98 : 117 })
         .expect(200);
@@ -622,7 +633,7 @@ describe("shifts", () => {
       .post("/api/shifts/open")
       .set(cashier.authorization)
       .send({ openingFloat: 500 });
-    await db.insert(orders).values({
+    await db.insert(orders).values(testBranchValues({
       orderNumber: "POS-SHIFT-TOTAL",
       clientRequestId: "39bd97c9-7d85-4408-a4f8-b0ae4b3328e8",
       requestFingerprint: "a".repeat(64),
@@ -635,7 +646,7 @@ describe("shifts", () => {
       total: "72.00",
       cashReceived: "100.00",
       changeAmount: "28.00",
-    });
+    }));
 
     const current = await request(app())
       .get("/api/shifts/current")
@@ -860,9 +871,9 @@ describe("shifts", () => {
 
     expect(cashierHistory.status).toBe(200);
     expect(
-      cashierHistory.body.map((shift: { id: number }) => shift.id),
+      cashierHistory.body.map((shift: { id: string }) => shift.id),
     ).toEqual([firstShift.body.id]);
-    expect(adminHistory.body.map((shift: { id: number }) => shift.id)).toEqual([
+    expect(adminHistory.body.map((shift: { id: string }) => shift.id)).toEqual([
       secondShift.body.id,
       firstShift.body.id,
     ]);
@@ -947,7 +958,7 @@ async function openShiftAt(
     .update(shiftEvents)
     .set({ occurredAt: openedAt })
     .where(eq(shiftEvents.shiftId, opened.body.id));
-  return { id: opened.body.id as number, openedAt };
+  return { id: opened.body.id as string, openedAt };
 }
 
 function service() {
@@ -1108,7 +1119,7 @@ describe("lazy auto-close on a cashier request", () => {
       .set(cashier.authorization)
       .send({
         clientRequestId: randomUUID(),
-        lines: [{ type: "item", itemId: 1, quantity: 1 }],
+        lines: [{ type: "item", itemId: testId(1), quantity: 1 }],
         discount: null,
         cashReceived: 100,
       });
@@ -1134,9 +1145,12 @@ describe("shift auto-close across branches", () => {
       branch.body.id,
     );
 
-    // Create the fresh shift first: cashier writes now enforce expiry, so a
-    // later open in the first branch would already close its expired fixture.
-    const fresh = await createCashier("worker-branch-fresh", undefined, admin);
+    const freshBranch = await request(app())
+      .post("/api/branches")
+      .set(admin)
+      .send({ name: "Fresh shift branch" })
+      .expect(201);
+    const fresh = await createCashier("worker-branch-fresh", "Fresh", admin, freshBranch.body.id);
     const freshShift = await openShiftAt(fresh, 1);
     const firstExpired = await openShiftAt(first, 17);
     const secondExpired = await openShiftAt(second, 18);
@@ -1159,13 +1173,13 @@ describe("shift auto-close across branches", () => {
   });
 
   it("visits every branch and keeps going when one of them fails", async () => {
-    const visited: number[] = [];
-    const failed: number[] = [];
+    const visited: string[] = [];
+    const failed: string[] = [];
     const fakeDb = {
       select: () => ({
         from: () => ({
           where: () => ({
-            orderBy: () => Promise.resolve([{ id: 1 }, { id: 2 }]),
+            orderBy: () => Promise.resolve([{ id: testId(1) }, { id: testId(2) }]),
           }),
         }),
       }),
@@ -1175,15 +1189,15 @@ describe("shift auto-close across branches", () => {
       fakeDb as never,
       async (branchId) => {
         visited.push(branchId);
-        if (branchId === 1) throw new Error("branch 1 is broken");
+        if (branchId === testId(1)) throw new Error("first branch is broken");
         return 1;
       },
       undefined,
       (branchId) => failed.push(branchId),
     );
 
-    expect(visited).toEqual([1, 2]);
-    expect(failed).toEqual([1]);
+    expect(visited).toEqual([testId(1), testId(2)]);
+    expect(failed).toEqual([testId(1)]);
     expect(closed).toBe(1);
   });
 });

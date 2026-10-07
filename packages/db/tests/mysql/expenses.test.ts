@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, it } from "../support/ids.js";
+import { describe, expect } from "vitest";
 import request from "supertest";
 import { createApp } from "../../../../apps/api/src/app.js";
 import { appOptions, db } from "../support/api-setup.js";
@@ -66,7 +67,7 @@ describe("expenses", () => {
       amount: "12.50",
       note: "من الدرج",
     });
-    expect(response.body.shiftId).toEqual(expect.any(Number));
+    expect(response.body.shiftId).toEqual(expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));
 
     const shift = await request(app())
       .get("/api/shifts/current")

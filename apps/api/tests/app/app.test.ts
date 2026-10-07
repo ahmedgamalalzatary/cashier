@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../src/app.js';
@@ -71,10 +72,11 @@ describe('health check', () => {
     const cashierDb = {
       select: () => ({
         from: () => ({
-          where: () => ({
+          where: () => Object.assign(Promise.resolve([{ id: testId(2), isActive: true }]), {
             limit: async () => [
               {
-                id: 1,
+                id: testId(1),
+                branchId: testId(2),
                 name: 'Cashier',
                 role: 'cashier',
                 isActive: true,
@@ -86,7 +88,7 @@ describe('health check', () => {
       }),
     } as unknown as Db;
     const token = signToken(
-      { id: 1, name: 'Cashier', role: 'cashier' },
+      { id: testId(1), name: 'Cashier', role: 'cashier' },
       0,
       options.jwtSecret,
     );

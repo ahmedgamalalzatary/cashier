@@ -1,7 +1,8 @@
+import { it, testId, testBranchValues } from "../support/ids.js";
 import { randomUUID } from "node:crypto";
 import request from "supertest";
 import { eq } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 import { createApp } from "../../../../apps/api/src/app.js";
 import {
   categories,
@@ -42,7 +43,7 @@ describe("reports", () => {
       .select()
       .from(users)
       .where(eq(users.username, "cashier"));
-    const [sale] = await db.insert(orders).values({
+    const [sale] = await db.insert(orders).values(testBranchValues({
       orderNumber: "snapshot",
       clientRequestId: randomUUID(),
       requestFingerprint: "fixture",
@@ -52,7 +53,7 @@ describe("reports", () => {
       cashReceived: "100.00",
       changeAmount: "0.00",
       createdAt: new Date("2026-09-11T08:00:00Z"),
-    });
+    })).$returningId();
     const repo = new ReportsRepository(db);
     await repo.snapshot(async (snapshot) => {
       const before = await snapshot.salesByDay(
@@ -62,7 +63,7 @@ describe("reports", () => {
       await db
         .update(orders)
         .set({ total: "200.00" })
-        .where(eq(orders.id, sale.insertId));
+        .where(eq(orders.id, sale.id));
       const after = await snapshot.salesByCashier(
         new Date("2026-09-11T00:00:00Z"),
         new Date("2026-09-12T00:00:00Z"),
@@ -115,7 +116,7 @@ describe("reports", () => {
       .select()
       .from(users)
       .where(eq(users.username, "admin"));
-    await db.insert(orders).values({
+    await db.insert(orders).values(testBranchValues({
       orderNumber: "admin-sale",
       clientRequestId: randomUUID(),
       requestFingerprint: "fixture",
@@ -128,7 +129,7 @@ describe("reports", () => {
       totalCost: "10.00",
       isAdminSale: true,
       createdAt: new Date("2026-09-11T08:00:00Z"),
-    });
+    }));
 
     const response = await request(app)
       .get("/api/reports?from=2026-09-11&to=2026-09-11")
@@ -151,18 +152,18 @@ describe("reports", () => {
       .where(eq(users.username, "admin"));
     const [supplier] = await db
       .insert(suppliers)
-      .values({ name: "Supplier", openingBalance: "10.00" });
-    const [category] = await db.insert(categories).values({ name: "Supplies" });
-    const [item] = await db.insert(items).values({
+      .values(testBranchValues({ name: "Supplier", openingBalance: "10.00" })).$returningId();
+    const [category] = await db.insert(categories).values(testBranchValues({ name: "Supplies" })).$returningId();
+    const [item] = await db.insert(items).values(testBranchValues({
       code: nextTestItemCode(),
       name: "Milk",
       type: "raw",
-      categoryId: category.insertId,
+      categoryId: category.id,
       stockUnit: "litre",
-    });
+    })).$returningId();
     for (const purchasedAt of ["2026-09-11", "2026-09-12"]) {
-      const [invoice] = await db.insert(purchaseInvoices).values({
-        supplierId: supplier.insertId,
+      const [invoice] = await db.insert(purchaseInvoices).values(testBranchValues({
+        supplierId: supplier.id,
         invoiceNumber: purchasedAt,
         purchasedAt,
         createdBy: admin.id,
@@ -170,23 +171,23 @@ describe("reports", () => {
         paidAmount: "5.00",
         clientRequestId: randomUUID(),
         requestFingerprint: "fixture",
-      });
-      await db.insert(purchaseLines).values({
-        invoiceId: invoice.insertId,
-        itemId: item.insertId,
+      })).$returningId();
+      await db.insert(purchaseLines).values(testBranchValues({
+        invoiceId: invoice.id,
+        itemId: item.id,
         quantity: "2.000",
         stockQuantity: "2.000",
         unitMode: "stock",
         unitPrice: "10.00",
         unitCost: "10.000000",
         lineTotal: "20.00",
-      });
-      await db.insert(supplierPayments).values({
-        supplierId: supplier.insertId,
-        purchaseInvoiceId: invoice.insertId,
+      }));
+      await db.insert(supplierPayments).values(testBranchValues({
+        supplierId: supplier.id,
+        purchaseInvoiceId: invoice.id,
         amount: "5.00",
         paidAt: purchasedAt,
-      });
+      }));
     }
     const report = await request(app)
       .get("/api/reports?from=2026-09-11&to=2026-09-11")
@@ -200,7 +201,7 @@ describe("reports", () => {
     expect(Number(report.body.suppliers.purchaseLines[0].stockQuantity)).toBe(
       2,
     );
-    expect(Number(report.body.suppliers.payments[0].purchaseInvoiceId)).toBe(
+    expect(report.body.suppliers.payments[0].purchaseInvoiceId).toBe(
       report.body.suppliers.purchases[0].id,
     );
     expect(report.body.range.generatedAt).toMatch(/Z$/);
@@ -214,7 +215,7 @@ describe("reports", () => {
       .select()
       .from(users)
       .where(eq(users.username, "cashier"));
-    const [shift] = await db.insert(shifts).values({
+    const [shift] = await db.insert(shifts).values(testBranchValues({
       cashierUserId: cashier.id,
       employeeId: cashier.employeeId!,
       status: "closed",
@@ -222,21 +223,21 @@ describe("reports", () => {
       openedAt: new Date("2026-09-10T18:00:00Z"),
       closedAt: new Date("2026-09-12T10:00:00Z"),
       overShort: "3.00",
-    });
+    })).$returningId();
     for (const [action, occurredAt] of [
       ["open", "2026-09-10T18:00:00Z"],
       ["close", "2026-09-10T23:00:00Z"],
       ["reopen", "2026-09-11T18:00:00Z"],
       ["close", "2026-09-12T10:00:00Z"],
     ] as const)
-      await db.insert(shiftEvents).values({
-        shiftId: shift.insertId,
+      await db.insert(shiftEvents).values(testBranchValues({
+        shiftId: shift.id,
         action,
         actorUserId: cashier.id,
         occurredAt: new Date(occurredAt),
         overShort: action === "close" ? "3.00" : null,
-      });
-    const saleIds: number[] = [];
+      }));
+    const saleIds: string[] = [];
     for (const [total, cost, discount, createdAt] of [
       [100, 20, 10, "2026-09-10T20:59:59Z"],
       [80, 16, 5, "2026-09-10T21:00:00Z"],
@@ -244,12 +245,12 @@ describe("reports", () => {
       [200, 40, 20, "2026-09-11T21:00:00Z"],
     ] as const) {
       const id = randomUUID();
-      const [sale] = await db.insert(orders).values({
+      const [sale] = await db.insert(orders).values(testBranchValues({
         orderNumber: id,
         clientRequestId: id,
         requestFingerprint: "fixture",
         cashierId: cashier.id,
-        shiftId: shift.insertId,
+        shiftId: shift.id,
         subtotal: String(total + discount),
         total: String(total),
         totalCost: String(cost),
@@ -257,24 +258,24 @@ describe("reports", () => {
         cashReceived: String(total),
         changeAmount: "0.00",
         createdAt: new Date(createdAt),
-      });
-      saleIds.push(sale.insertId);
+      })).$returningId();
+      saleIds.push(sale.id);
     }
     for (const [amount, returnedCost, createdAt] of [
       [15, 3, "2026-09-11T12:00:00Z"],
       [20, 4, "2026-09-12T12:00:00Z"],
     ] as const)
-      await db.insert(refunds).values({
+      await db.insert(refunds).values(testBranchValues({
         clientRequestId: randomUUID(),
         requestFingerprint: "fixture",
         orderId: saleIds[0]!,
         cashierId: cashier.id,
-        shiftId: shift.insertId,
+        shiftId: shift.id,
         reason: "fixture",
         amount: String(amount),
         totalCostReturned: String(returnedCost),
         createdAt: new Date(createdAt),
-      });
+      }));
     const report = await request(app)
       .get("/api/reports?from=2026-09-11&to=2026-09-11")
       .set(admin)
@@ -307,38 +308,38 @@ describe("reports", () => {
       .set(auth)
       .send({ name: "Other" })
       .expect(201);
-    for (const branchId of [1, other.body.id as number]) {
+    for (const branchId of [testId(1), other.body.id as string]) {
       const [category] = await db
         .insert(categories)
-        .values({ branchId, name: "Materials" });
+        .values({ branchId, name: "Materials" }).$returningId();
       const [item] = await db.insert(items).values({
         branchId,
         code: nextTestItemCode(),
         name: "Flour",
-        categoryId: category.insertId,
+        categoryId: category.id,
         type: "raw",
         stockUnit: "kg",
-      });
+      }).$returningId();
       const [batch] = await db.insert(stockBatches).values({
         branchId,
-        itemId: item.insertId,
+        itemId: item.id,
         warehouse: "main",
         initialQuantity: "10.000",
         remainingQuantity: "5.000",
         unitCost: "4.000000",
         receivedAt: new Date("2026-09-01T08:00:00Z"),
         sourceType: "purchase",
-      });
+      }).$returningId();
       const [recipe] = await db.insert(recipes).values({
         branchId,
         name: "Dough",
         type: "prepared",
-        categoryId: category.insertId,
-        outputItemId: item.insertId,
-      });
+        categoryId: category.id,
+        outputItemId: item.id,
+      }).$returningId();
       const [expenseCategory] = await db
         .insert(expenseCategories)
-        .values({ branchId, name: "Transport" });
+        .values({ branchId, name: "Transport" }).$returningId();
       for (const occurredAt of [
         new Date("2026-09-11T08:00:00Z"),
         new Date("2026-09-12T08:00:00Z"),
@@ -352,71 +353,71 @@ describe("reports", () => {
           requestFingerprint: "fixture",
           createdAt: occurredAt,
           reviewedAt: occurredAt,
-        });
+        }).$returningId();
         await db.insert(transferRequestLines).values({
           branchId,
-          requestId: tr.insertId,
-          itemId: item.insertId,
+          requestId: tr.id,
+          itemId: item.id,
           quantity: "3.000",
         });
         const [transfer] = await db.insert(transfers).values({
           branchId,
-          requestId: tr.insertId,
+          requestId: tr.id,
           createdBy: admin.id,
           approvedBy: admin.id,
           createdAt: occurredAt,
-        });
+        }).$returningId();
         for (const [quantity, unitCost] of [
           ["1.000", "4.000000"],
           ["2.000", "5.000000"],
         ]) {
           const [cafeBatch] = await db.insert(stockBatches).values({
             branchId,
-            itemId: item.insertId,
+            itemId: item.id,
             warehouse: "cafe",
             initialQuantity: quantity,
             remainingQuantity: quantity,
             unitCost,
             receivedAt: occurredAt,
             sourceType: "transfer_in",
-          });
+          }).$returningId();
           await db.insert(transferLines).values({
             branchId,
-            transferId: transfer.insertId,
-            itemId: item.insertId,
+            transferId: transfer.id,
+            itemId: item.id,
             quantity,
             unitCost,
-            sourceBatchId: batch.insertId,
-            cafeBatchId: cafeBatch.insertId,
+            sourceBatchId: batch.id,
+            cafeBatchId: cafeBatch.id,
           });
         }
         const [prep] = await db.insert(preparations).values({
           branchId,
-          recipeId: recipe.insertId,
+          recipeId: recipe.id,
           recipeName: "Dough",
-          outputItemId: item.insertId,
+          outputItemId: item.id,
           outputItemName: "Prepared dough",
           producedQuantity: "2.000",
           totalCost: "8.00",
           unitCost: "4.000000",
           preparedBy: admin.id,
           occurredAt,
-        });
+        }).$returningId();
         await db.insert(preparationAllocations).values({
           branchId,
-          preparationId: prep.insertId,
-          ingredientItemId: item.insertId,
+          preparationId: prep.id,
+          ingredientItemId: item.id,
           ingredientItemName: "Flour",
           quantity: "2.000",
           unitCost: "4.000000",
-          sourceBatchId: batch.insertId,
+          sourceBatchId: batch.id,
         });
         await db.insert(expenses).values({
           branchId,
           clientRequestId: randomUUID(),
           requestFingerprint: "fixture",
           type: "general",
-          categoryId: expenseCategory.insertId,
+          categoryId: expenseCategory.id,
           amount: "7.00",
           expenseDate: occurredAt.toISOString().slice(0, 10),
           recordedBy: admin.id,
@@ -513,7 +514,7 @@ describe("reports", () => {
     const auth = await loginAs(app, "admin");
     const [category] = await db
       .insert(categories)
-      .values({ name: "Stock alerts" });
+      .values(testBranchValues({ name: "Stock alerts" })).$returningId();
     for (const fixture of [
       {
         name: "negative",
@@ -536,24 +537,24 @@ describe("reports", () => {
         isActive: true,
       },
     ]) {
-      const [item] = await db.insert(items).values({
+      const [item] = await db.insert(items).values(testBranchValues({
         code: nextTestItemCode(),
         name: fixture.name,
-        categoryId: category.insertId,
+        categoryId: category.id,
         type: "raw",
         stockUnit: "kg",
         cafeMinimumLevel: fixture.minimum,
         isActive: fixture.isActive,
-      });
+      })).$returningId();
       if (fixture.quantity !== "0.000") {
-        await db.insert(stockMovements).values({
-          itemId: item.insertId,
+        await db.insert(stockMovements).values(testBranchValues({
+          itemId: item.id,
           warehouse: "cafe",
           movementType: "adjustment",
           quantity: fixture.quantity,
           unitCost: "0.000000",
           occurredAt: new Date("2026-09-01T10:00:00Z"),
-        });
+        }));
       }
     }
 
@@ -580,15 +581,15 @@ describe("reports", () => {
     const now = new Date();
     const [itemCategory] = await db
       .insert(categories)
-      .values({ name: "مخزون" });
-    const [ingredient] = await db.insert(items).values({
+      .values(testBranchValues({ name: "مخزون" })).$returningId();
+    const [ingredient] = await db.insert(items).values(testBranchValues({
       code: nextTestItemCode(),
       name: "بن",
-      categoryId: itemCategory.insertId,
+      categoryId: itemCategory.id,
       type: "raw",
       stockUnit: "كجم",
-    });
-    await db.insert(externalCategories).values({
+    })).$returningId();
+    await db.insert(externalCategories).values(testBranchValues({
       externalId: 3,
       nameAr: "مشروبات",
       nameEn: "Drinks",
@@ -599,8 +600,8 @@ describe("reports", () => {
       displayOrder: 1,
       isCurrent: true,
       syncedAt: now,
-    });
-    await db.insert(externalProducts).values({
+    }));
+    await db.insert(externalProducts).values(testBranchValues({
       externalId: 9,
       externalCategoryId: 3,
       nameAr: "لاتيه",
@@ -618,30 +619,30 @@ describe("reports", () => {
       isVisible: true,
       isCurrent: true,
       syncedAt: now,
-    });
-    await db.insert(externalProductIngredients).values({
+    }));
+    await db.insert(externalProductIngredients).values(testBranchValues({
       externalProductId: 9,
-      itemId: ingredient.insertId,
+      itemId: ingredient.id,
       quantity: "0.020",
-    });
-    const [batch] = await db.insert(stockBatches).values({
-      itemId: ingredient.insertId,
+    }));
+    const [batch] = await db.insert(stockBatches).values(testBranchValues({
+      itemId: ingredient.id,
       warehouse: "cafe",
       initialQuantity: "1.000",
       remainingQuantity: "1.000",
       unitCost: "10.000000",
       receivedAt: new Date("2026-08-18T08:00:00.000Z"),
       sourceType: "transfer_in",
-    });
-    await db.insert(stockMovements).values({
-      itemId: ingredient.insertId,
+    })).$returningId();
+    await db.insert(stockMovements).values(testBranchValues({
+      itemId: ingredient.id,
       warehouse: "cafe",
-      batchId: batch.insertId,
+      batchId: batch.id,
       movementType: "transfer_in",
       quantity: "1.000",
       unitCost: "10.000000",
       occurredAt: new Date("2026-08-18T08:00:00.000Z"),
-    });
+    }));
   }
 
   async function sellLatte(cashierAuthorization: {
@@ -665,7 +666,7 @@ describe("reports", () => {
         cashReceived: 300,
       });
     expect(sale.status).toBe(201);
-    return sale.body as { id: number; lines: { id: number }[] };
+    return sale.body as { id: string; lines: { id: string }[] };
   }
 
   it("counts an external-product sale under its external category", async () => {
@@ -775,40 +776,40 @@ describe("reports", () => {
       ]);
 
       // Closed gaps do not count, and sub-minute segments round only after summing.
-      const [shift] = await db.insert(shifts).values({
+      const [shift] = await db.insert(shifts).values(testBranchValues({
         cashierUserId: cashier.id,
         employeeId: cashier.employeeId!,
         status: "closed",
         openingFloat: "0.00",
         openedAt: new Date("2026-09-10T08:00:00.000Z"),
         closedAt: new Date(lastClose),
-      });
-      await db.insert(shiftEvents).values([
+      })).$returningId();
+      await db.insert(shiftEvents).values(testBranchValues([
         {
-          shiftId: shift.insertId,
+          shiftId: shift.id,
           action: "open",
           actorUserId: cashier.id,
           occurredAt: new Date("2026-09-10T08:00:00.000Z"),
         },
         {
-          shiftId: shift.insertId,
+          shiftId: shift.id,
           action: "close",
           actorUserId: cashier.id,
           occurredAt: new Date(firstClose),
         },
         {
-          shiftId: shift.insertId,
+          shiftId: shift.id,
           action: "reopen",
           actorUserId: admin.id,
           occurredAt: new Date(reopen),
         },
         {
-          shiftId: shift.insertId,
+          shiftId: shift.id,
           action: "close",
           actorUserId: admin.id,
           occurredAt: new Date(lastClose),
         },
-      ]);
+      ]));
 
       const report = await request(app)
         .get("/api/reports?from=2026-09-01&to=2026-09-30")
@@ -816,7 +817,7 @@ describe("reports", () => {
 
       expect(report.status).toBe(200);
       const row = report.body.employees.activity.find(
-        (entry: { id: number }) => entry.id === cashier.employeeId,
+        (entry: { id: string }) => entry.id === cashier.employeeId,
       );
       expect(Number(row.workedMinutes)).toBe(expectedMinutes);
       expect(Number(row.shiftsCount)).toBe(1);
@@ -828,7 +829,7 @@ describe("reports", () => {
         .set(adminAuthorization);
       expect(shiftList.status).toBe(200);
       const detail = shiftList.body.find(
-        (entry: { id: number }) => entry.id === shift.insertId,
+        (entry: { id: string }) => entry.id === shift.id,
       );
       expect(detail.workedMinutes).toBe(expectedMinutes);
       if (expectedMinutes === 180) {
@@ -847,7 +848,7 @@ describe("reports", () => {
         await db
           .update(shifts)
           .set({ closedAt: new Date("2026-09-12T09:00:00Z") })
-          .where(eq(shifts.id, shift.insertId));
+          .where(eq(shifts.id, shift.id));
         await db
           .update(shiftEvents)
           .set({ occurredAt: new Date("2026-09-12T08:00:00Z") })

@@ -1,18 +1,19 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthUser } from "@cashier/shared";
 import type { RefundsRepository } from "../../src/modules/refunds/refunds.repository.js";
 import { RefundsService } from "../../src/modules/refunds/refunds.service.js";
 
 const cashierActor: AuthUser = {
-  id: 9,
+  id: testId(9),
   name: "Cashier",
   role: "cashier",
-  branchId: 1,
+  branchId: testId(1),
   isSuperAdmin: false,
 };
 
 const adminActor: AuthUser = {
-  id: 11,
+  id: testId(11),
   name: "Admin",
   role: "admin",
   branchId: null,
@@ -20,7 +21,7 @@ const adminActor: AuthUser = {
 };
 
 const recipeLine = (overrides: Record<string, unknown> = {}) => ({
-  id: 1,
+  id: testId(1),
   quantity: "2.000",
   type: "recipe",
   productName: "كابتشينو",
@@ -33,17 +34,17 @@ const recipeLine = (overrides: Record<string, unknown> = {}) => ({
 function txForCreate(overrides: Record<string, unknown> = {}) {
   return {
     findByClientRequestId: vi.fn(async () => undefined),
-    findOpenShiftForCashier: vi.fn(async () => ({ id: 3 })),
+    findOpenShiftForCashier: vi.fn(async () => ({ id: testId(3) })),
     lockOrder: vi.fn(async () => ({
-      id: 10,
+      id: testId(10),
       subtotal: "100.00",
       total: "90.00",
     })),
     lockOrderLines: vi.fn(async () => [recipeLine()]),
     refundedQuantities: vi.fn(async () => []),
     financialTotals: vi.fn(async () => ({ gross: "0.00", refunded: "0.00" })),
-    createRefund: vi.fn(async () => 55),
-    createLine: vi.fn(async () => 100),
+    createRefund: vi.fn(async () => testId(55)),
+    createLine: vi.fn(async () => testId(100)),
     updateTotalCost: vi.fn(async () => undefined),
     allocations: vi.fn(async () => []),
     returnedAllocationQuantities: vi.fn(async () => []),
@@ -54,19 +55,19 @@ function txForCreate(overrides: Record<string, unknown> = {}) {
 function repoForCreate(tx: Record<string, unknown>) {
   return {
     transaction: vi.fn(async (run) =>
-      run(tx, { receive: vi.fn(async () => ({ batchId: 1 })) }),
+      run(tx, { receive: vi.fn(async () => ({ batchId: testId(1) })) }),
     ),
     findByClientRequestId: vi.fn(async () => undefined),
-    find: vi.fn(async () => ({ id: 55 })),
+    find: vi.fn(async () => ({ id: testId(55) })),
     listLines: vi.fn(async () => []),
   } as unknown as RefundsRepository;
 }
 
 const refundInput = {
   clientRequestId: "8f345091-c497-4b8b-b4f3-a8ebdc47dd31",
-  orderId: 10,
+  orderId: testId(10),
   reason: "طلب العميل",
-  lines: [{ orderLineId: 1, quantity: 2, stockAction: null }],
+  lines: [{ orderLineId: testId(1), quantity: 2, stockAction: null }],
 };
 
 describe("RefundsService.create discount-share math", () => {
@@ -75,7 +76,7 @@ describe("RefundsService.create discount-share math", () => {
       lockOrderLines: vi.fn(async () => [
         recipeLine(),
         recipeLine({
-          id: 2,
+          id: testId(2),
           quantity: "1.000",
           productName: "شاي",
           sizeName: "صغير",
@@ -90,14 +91,14 @@ describe("RefundsService.create discount-share math", () => {
       {
         ...refundInput,
         lines: [
-          { orderLineId: 2, quantity: 1, stockAction: null },
-          { orderLineId: 1, quantity: 2, stockAction: null },
+          { orderLineId: testId(2), quantity: 1, stockAction: null },
+          { orderLineId: testId(1), quantity: 2, stockAction: null },
         ],
       },
       cashierActor,
     );
 
-    expect(refund).toEqual({ id: 55, lines: [] });
+    expect(refund).toEqual({ id: testId(55), lines: [] });
     expect(tx.createRefund).toHaveBeenCalledWith(
       expect.objectContaining({ amount: "90.00" }),
     );
@@ -112,7 +113,7 @@ describe("RefundsService.create discount-share math", () => {
         refundAmount: "36.00",
       }),
     ]);
-    expect(tx.updateTotalCost).toHaveBeenCalledWith(55, "0.00");
+    expect(tx.updateTotalCost).toHaveBeenCalledWith(testId(55), "0.00");
   });
 
   it("409s when the refund exceeds the remaining cash balance", async () => {
@@ -133,7 +134,7 @@ describe("RefundsService.create discount-share math", () => {
   it("allows a zero-cash refund for a fully discounted order", async () => {
     const tx = txForCreate({
       lockOrder: vi.fn(async () => ({
-        id: 10,
+        id: testId(10),
         subtotal: "0.00",
         total: "0.00",
       })),
@@ -149,7 +150,7 @@ describe("RefundsService.create discount-share math", () => {
     );
 
     // the goods still come back; only the cash leg is zero
-    expect(refund).toEqual({ id: 55, lines: [] });
+    expect(refund).toEqual({ id: testId(55), lines: [] });
     expect(tx.createRefund).toHaveBeenCalledWith(
       expect.objectContaining({ amount: "0.00" }),
     );
@@ -187,7 +188,7 @@ describe("RefundsService.create guards", () => {
   it("409s a return beyond the sold quantity", async () => {
     const tx = txForCreate({
       refundedQuantities: vi.fn(async () => [
-        { orderLineId: 1, quantity: "1.500", grossAmount: "45.00" },
+        { orderLineId: testId(1), quantity: "1.500", grossAmount: "45.00" },
       ]),
     });
     const repo = repoForCreate(tx);
@@ -203,7 +204,7 @@ describe("RefundsService.create guards", () => {
       new RefundsService(fractional).create(
         {
           ...refundInput,
-          lines: [{ orderLineId: 1, quantity: 1.5, stockAction: null }],
+          lines: [{ orderLineId: testId(1), quantity: 1.5, stockAction: null }],
         },
         cashierActor,
       ),
@@ -227,7 +228,7 @@ describe("RefundsService.create guards", () => {
         {
           ...refundInput,
           lines: [
-            { orderLineId: 1, quantity: 2, stockAction: "return_to_stock" },
+            { orderLineId: testId(1), quantity: 2, stockAction: "return_to_stock" },
           ],
         },
         cashierActor,
@@ -246,7 +247,7 @@ describe("RefundsService admin refunds", () => {
     expect(tx.findOpenShiftForCashier).not.toHaveBeenCalled();
     expect(tx.createRefund).toHaveBeenCalledWith(
       expect.objectContaining({
-        cashierId: 11,
+        cashierId: testId(11),
         shiftId: null,
         isAdminRefund: true,
       }),
@@ -259,11 +260,11 @@ describe("RefundsService admin refunds", () => {
 
     await new RefundsService(repo).create(refundInput, cashierActor);
 
-    expect(tx.findOpenShiftForCashier).toHaveBeenCalledWith(9);
+    expect(tx.findOpenShiftForCashier).toHaveBeenCalledWith(testId(9));
     expect(tx.createRefund).toHaveBeenCalledWith(
       expect.objectContaining({
-        cashierId: 9,
-        shiftId: 3,
+        cashierId: testId(9),
+        shiftId: testId(3),
         isAdminRefund: false,
       }),
     );
@@ -275,14 +276,14 @@ describe("RefundsService lookups", () => {
     const repo = {
       find: vi.fn(async () => undefined),
       findOrder: vi.fn(async () => undefined),
-      list: vi.fn(async () => [{ id: 1 }]),
+      list: vi.fn(async () => [{ id: testId(1) }]),
     } as unknown as RefundsRepository;
     const service = new RefundsService(repo);
 
-    await expect(service.get(999)).rejects.toMatchObject({ status: 404 });
-    await expect(service.quantities(999)).rejects.toMatchObject({
+    await expect(service.get(testId(999))).rejects.toMatchObject({ status: 404 });
+    await expect(service.quantities(testId(999))).rejects.toMatchObject({
       status: 404,
     });
-    await expect(service.list()).resolves.toEqual([{ id: 1 }]);
+    await expect(service.list()).resolves.toEqual([{ id: testId(1) }]);
   });
 });

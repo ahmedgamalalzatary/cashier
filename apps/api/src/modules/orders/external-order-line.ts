@@ -1,7 +1,7 @@
 import { isExternalDiscountActive } from "@cashier/shared";
 import { HttpError } from "@cashier/server-core";
 
-type Ingredient = { itemId: number; itemName: string; quantity: string };
+type Ingredient = { itemId: string; itemName: string; quantity: string };
 type ExternalOrderProduct = {
   externalId: number;
   nameAr: string;
@@ -201,8 +201,8 @@ export function calculateExternalOrderLine(
   const lineSubtotal = unitPrice * BigInt(selection.quantity);
 
   const consumptionByItem = new Map<
-    number,
-    { itemId: number; itemName: string; quantity: bigint }
+    string,
+    { itemId: string; itemName: string; quantity: bigint }
   >();
   const addConsumption = (ingredient: Ingredient, multiplier: number) => {
     const existing = consumptionByItem.get(ingredient.itemId) ?? {
@@ -240,7 +240,7 @@ export function calculateExternalOrderLine(
         modifier,
     ),
     consumptions: [...consumptionByItem.values()]
-      .sort((left, right) => left.itemId - right.itemId)
+      .sort((left, right) => (left.itemId).localeCompare(right.itemId))
       .map((consumption) => ({
         itemId: consumption.itemId,
         itemName: consumption.itemName,

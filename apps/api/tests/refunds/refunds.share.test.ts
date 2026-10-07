@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import { planExternalRefundQuantities } from "../../src/modules/refunds/refunds.service.js";
 
@@ -8,9 +9,9 @@ describe("planExternalRefundQuantities", () => {
       priorQuantity: 0n,
       requestedQuantity: 1000n,
       allocations: [
-        { id: 1, itemId: 9, quantityMilli: 1n, alreadyReturnedMilli: 0n },
-        { id: 2, itemId: 9, quantityMilli: 1n, alreadyReturnedMilli: 0n },
-        { id: 3, itemId: 9, quantityMilli: 1n, alreadyReturnedMilli: 0n },
+        { id: testId(1), itemId: testId(9), quantityMilli: 1n, alreadyReturnedMilli: 0n },
+        { id: testId(2), itemId: testId(9), quantityMilli: 1n, alreadyReturnedMilli: 0n },
+        { id: testId(3), itemId: testId(9), quantityMilli: 1n, alreadyReturnedMilli: 0n },
       ],
     });
 
@@ -25,14 +26,14 @@ describe("planExternalRefundQuantities", () => {
       priorQuantity: 0n,
       requestedQuantity: 2000n,
       allocations: [
-        { id: 1, itemId: 9, quantityMilli: 3n, alreadyReturnedMilli: 0n },
-        { id: 2, itemId: 9, quantityMilli: 3n, alreadyReturnedMilli: 0n },
+        { id: testId(1), itemId: testId(9), quantityMilli: 3n, alreadyReturnedMilli: 0n },
+        { id: testId(2), itemId: testId(9), quantityMilli: 3n, alreadyReturnedMilli: 0n },
       ],
     });
 
     expect(planned).toEqual([
-      { id: 1, quantityMilli: 3n },
-      { id: 2, quantityMilli: 3n },
+      { id: testId(1), quantityMilli: 3n },
+      { id: testId(2), quantityMilli: 3n },
     ]);
   });
 
@@ -42,8 +43,8 @@ describe("planExternalRefundQuantities", () => {
       priorQuantity: 1000n,
       requestedQuantity: 1000n,
       allocations: [
-        { id: 1, itemId: 9, quantityMilli: 4n, alreadyReturnedMilli: 2n },
-        { id: 2, itemId: 9, quantityMilli: 4n, alreadyReturnedMilli: 0n },
+        { id: testId(1), itemId: testId(9), quantityMilli: 4n, alreadyReturnedMilli: 2n },
+        { id: testId(2), itemId: testId(9), quantityMilli: 4n, alreadyReturnedMilli: 0n },
       ],
     });
 
@@ -58,14 +59,14 @@ describe("planExternalRefundQuantities", () => {
       priorQuantity: 0n,
       requestedQuantity: 1000n,
       allocations: [
-        { id: 1, itemId: 9, quantityMilli: 5n, alreadyReturnedMilli: 5n },
-        { id: 2, itemId: 7, quantityMilli: 5n, alreadyReturnedMilli: 0n },
+        { id: testId(1), itemId: testId(9), quantityMilli: 5n, alreadyReturnedMilli: 5n },
+        { id: testId(2), itemId: testId(7), quantityMilli: 5n, alreadyReturnedMilli: 0n },
       ],
     });
 
     expect(planned).toEqual([
-      { id: 1, quantityMilli: 0n },
-      { id: 2, quantityMilli: 5n },
+      { id: testId(1), quantityMilli: 0n },
+      { id: testId(2), quantityMilli: 5n },
     ]);
   });
 });

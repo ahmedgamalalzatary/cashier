@@ -60,7 +60,7 @@ export const orderInput = z.object({
         z
           .object({
             type: z.literal("item"),
-            itemId: z.coerce.number().int().positive(),
+            itemId: z.string().uuid(),
             quantity: z.coerce.number().int().positive().max(999),
           })
           .strict(),

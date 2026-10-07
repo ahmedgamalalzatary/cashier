@@ -33,7 +33,7 @@ export class ExpensesService {
   }
 
   async updateCategory(
-    id: number,
+    id: string,
     input: { name?: string; isActive?: boolean },
   ) {
     if (!(await this.repo.category(id)))
@@ -54,7 +54,7 @@ export class ExpensesService {
       expenseDate: input.expenseDate ?? null,
       note: input.note ?? null,
     });
-    let id: number;
+    let id: string;
     try {
       id = await this.repo.transaction(async (repo) => {
         const prior = await repo.byRequestId(input.clientRequestId);

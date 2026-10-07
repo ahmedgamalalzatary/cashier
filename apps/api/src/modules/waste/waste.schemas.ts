@@ -25,7 +25,7 @@ export const wasteInput = z
     target: z.discriminatedUnion("type", [
       z.object({
         type: z.literal("item"),
-        itemId: z.preprocess(coerceStrictNumber, z.number().int().positive()),
+        itemId: z.string().uuid(),
       }),
       z.object({
         type: z.literal("external_product"),
@@ -40,11 +40,8 @@ export const wasteInput = z
       }),
       z.object({
         type: z.literal("recipe"),
-        recipeId: z.preprocess(coerceStrictNumber, z.number().int().positive()),
-        recipeSizeId: z.preprocess(
-          coerceStrictNumber,
-          z.number().int().positive(),
-        ),
+        recipeId: z.string().uuid(),
+        recipeSizeId: z.string().uuid(),
       }),
     ]),
     quantity,

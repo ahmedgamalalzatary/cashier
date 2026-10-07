@@ -1,10 +1,11 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthUser } from "@cashier/shared";
 import type { ShiftsRepository } from "../../src/modules/shifts/shifts.repository.js";
 import { ShiftsService } from "../../src/modules/shifts/shifts.service.js";
 
-const cashier = { id: 9, role: "cashier" } as AuthUser;
-const otherCashier = { id: 10, role: "cashier" } as AuthUser;
+const cashier = { id: testId(9), role: "cashier" } as AuthUser;
+const otherCashier = { id: testId(10), role: "cashier" } as AuthUser;
 
 const zeroTotals = {
   ordersCount: 0,
@@ -32,7 +33,7 @@ function repoWithTx(txRepo: Record<string, unknown>) {
 }
 
 const openShiftRow = (overrides: Record<string, unknown> = {}) => ({
-  id: 1,
+  id: testId(1),
   cashierUserId: cashier.id,
   status: "open",
   openingFloat: "100.00",
@@ -48,9 +49,9 @@ describe("ShiftsService.open guards", () => {
   it("409s when the cashier is not linked to an active employee", async () => {
     for (const cashierRow of [
       undefined,
-      { userIsActive: false, employeeId: 3, employeeIsActive: true },
+      { userIsActive: false, employeeId: testId(3), employeeIsActive: true },
       { userIsActive: true, employeeId: null, employeeIsActive: true },
-      { userIsActive: true, employeeId: 3, employeeIsActive: false },
+      { userIsActive: true, employeeId: testId(3), employeeIsActive: false },
     ]) {
       const repo = repoWithTx({
         findCashierForUpdate: vi.fn().mockResolvedValue(cashierRow),
@@ -71,7 +72,7 @@ describe("ShiftsService.open guards", () => {
     const repo = repoWithTx({
       findCashierForUpdate: vi.fn().mockResolvedValue({
         userIsActive: true,
-        employeeId: 3,
+        employeeId: testId(3),
         employeeIsActive: true,
       }),
       create: vi.fn().mockRejectedValue(duplicate),
@@ -95,7 +96,7 @@ describe("ShiftsService.close guards", () => {
     });
 
     const failure = await new ShiftsService(repo)
-      .close(999, { actualCash: 100 }, cashier.id)
+      .close(testId(999), { actualCash: 100 }, cashier.id)
       .catch((error: unknown) => error);
 
     expect(failure).toMatchObject({ status: 404 });
@@ -109,7 +110,7 @@ describe("ShiftsService.close guards", () => {
     });
 
     const failure = await new ShiftsService(repo)
-      .close(1, { actualCash: 100 }, cashier.id)
+      .close(testId(1), { actualCash: 100 }, cashier.id)
       .catch((error: unknown) => error);
 
     expect(failure).toMatchObject({ status: 409 });
@@ -121,7 +122,7 @@ describe("ShiftsService.close guards", () => {
     });
 
     const failure = await new ShiftsService(repo)
-      .close(1, { actualCash: 100 }, otherCashier.id)
+      .close(testId(1), { actualCash: 100 }, otherCashier.id)
       .catch((error: unknown) => error);
 
     expect(failure).toMatchObject({ status: 403 });
@@ -148,14 +149,14 @@ describe("ShiftsService.close guards", () => {
     } as unknown as ShiftsRepository;
 
     const closed = await new ShiftsService(repo).close(
-      1,
+      testId(1),
       { actualCash: 100 },
       cashier.id,
     );
 
     expect(repo.transaction).toHaveBeenCalledTimes(2);
     expect(txRepo.close).toHaveBeenCalledTimes(1);
-    expect(closed).toMatchObject({ id: 1 });
+    expect(closed).toMatchObject({ id: testId(1) });
   });
 });
 
@@ -166,9 +167,9 @@ describe("ShiftsService.adminClose guards", () => {
     });
     await expect(
       new ShiftsService(missing).adminClose(
-        999,
+        testId(999),
         { actualCash: 100, note: "إغلاق" },
-        1,
+        testId(1),
       ),
     ).rejects.toMatchObject({ status: 404 });
 
@@ -179,9 +180,9 @@ describe("ShiftsService.adminClose guards", () => {
     });
     await expect(
       new ShiftsService(closed).adminClose(
-        1,
+        testId(1),
         { actualCash: 100, note: "إغلاق" },
-        1,
+        testId(1),
       ),
     ).rejects.toMatchObject({ status: 409 });
   });
@@ -191,7 +192,7 @@ describe("ShiftsService.reopen guards", () => {
   const note = { note: "إعادة فتح" };
   const activeCashier = {
     userIsActive: true,
-    employeeId: 3,
+    employeeId: testId(3),
     employeeIsActive: true,
   };
 
@@ -201,7 +202,7 @@ describe("ShiftsService.reopen guards", () => {
     });
 
     await expect(
-      new ShiftsService(repo).reopen(999, note, 1),
+      new ShiftsService(repo).reopen(testId(999), note, testId(1)),
     ).rejects.toMatchObject({ status: 404 });
   });
 
@@ -214,7 +215,7 @@ describe("ShiftsService.reopen guards", () => {
     });
 
     await expect(
-      new ShiftsService(repo).reopen(1, note, 1),
+      new ShiftsService(repo).reopen(testId(1), note, testId(1)),
     ).rejects.toMatchObject({ status: 409 });
   });
 
@@ -226,7 +227,7 @@ describe("ShiftsService.reopen guards", () => {
     });
 
     await expect(
-      new ShiftsService(repo).reopen(1, note, 1),
+      new ShiftsService(repo).reopen(testId(1), note, testId(1)),
     ).rejects.toMatchObject({ status: 409 });
   });
 });
@@ -240,7 +241,7 @@ describe("ShiftsService.correct guards", () => {
     });
 
     await expect(
-      new ShiftsService(repo).correct(999, correction, 1),
+      new ShiftsService(repo).correct(testId(999), correction, testId(1)),
     ).rejects.toMatchObject({ status: 404 });
   });
 
@@ -249,7 +250,7 @@ describe("ShiftsService.correct guards", () => {
       findByIdForUpdate: vi.fn().mockResolvedValue(openShiftRow()),
     });
     await expect(
-      new ShiftsService(open).correct(1, correction, 1),
+      new ShiftsService(open).correct(testId(1), correction, testId(1)),
     ).rejects.toMatchObject({ status: 409 });
 
     // an auto-closed shift has no counted drawer: correcting it without
@@ -262,7 +263,7 @@ describe("ShiftsService.correct guards", () => {
         ),
     });
     await expect(
-      new ShiftsService(uncounted).correct(1, { note: "لا شيء" }, 1),
+      new ShiftsService(uncounted).correct(testId(1), { note: "لا شيء" }, testId(1)),
     ).rejects.toMatchObject({
       status: 409,
       message: "يجب إدخال النقد الفعلي لتصحيح وردية لم يُعدّ درجها",
@@ -287,7 +288,7 @@ describe("ShiftsService.correct guards", () => {
     vi.mocked(repo.totals).mockResolvedValue(zeroTotals);
     vi.mocked(repo.events).mockResolvedValue([]);
 
-    await new ShiftsService(repo).correct(1, correction, 1);
+    await new ShiftsService(repo).correct(testId(1), correction, testId(1));
 
     expect(correct).toHaveBeenCalledWith(
       expect.objectContaining({ actualCash: "120.00" }),
@@ -300,7 +301,7 @@ describe("ShiftsService visibility", () => {
     const repo = repoWithTx({});
     vi.mocked(repo.findById).mockResolvedValue(undefined);
 
-    await expect(new ShiftsService(repo).get(999)).rejects.toMatchObject({
+    await expect(new ShiftsService(repo).get(testId(999))).rejects.toMatchObject({
       status: 404,
     });
   });
@@ -308,7 +309,7 @@ describe("ShiftsService visibility", () => {
   it("returns no personal shift for an admin", async () => {
     const repo = repoWithTx({});
     await expect(
-      new ShiftsService(repo).current({ id: 1, role: "admin" } as AuthUser),
+      new ShiftsService(repo).current({ id: testId(1), role: "admin" } as AuthUser),
     ).resolves.toBeNull();
   });
 

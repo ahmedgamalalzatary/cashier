@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -13,9 +14,9 @@ describe("orders routes", () => {
     const controller = {
       catalog: vi.fn((_req, res) => res.status(200).json([])),
       list: vi.fn((_req, res) => res.status(200).json([])),
-      externalList: vi.fn((_req, res) => res.status(200).json([{ id: 7 }])),
+      externalList: vi.fn((_req, res) => res.status(200).json([{ id: testId(7) }])),
       create: vi.fn((_req, res) => res.status(201).end()),
-      get: vi.fn((_req, res) => res.status(200).json({ id: 1 })),
+      get: vi.fn((_req, res) => res.status(200).json({ id: testId(1) })),
     } as unknown as OrdersController;
     const app = express();
     app.use(express.json(), ordersRouter(controller));
@@ -23,7 +24,7 @@ describe("orders routes", () => {
     const response = await request(app).get("/external");
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual([{ id: 7 }]);
+    expect(response.body).toEqual([{ id: testId(7) }]);
     expect(controller.externalList).toHaveBeenCalledOnce();
     expect(controller.get).not.toHaveBeenCalled();
   });
@@ -33,7 +34,7 @@ function appWithStubs(controller: OrdersController, role = "cashier") {
   const app = express();
   app.use((req, _res, next) => {
     req.user = {
-      id: 7,
+      id: testId(7),
       name: "Cashier",
       role: role as "admin" | "cashier",
       branchId: role === "cashier" ? 1 : null,
@@ -84,7 +85,7 @@ describe("order route authorization", () => {
 describe("order controller wiring", () => {
   it("creates with the parsed input and the full actor for 201", async () => {
     const service = {
-      create: vi.fn(async () => ({ id: 5 })),
+      create: vi.fn(async () => ({ id: testId(5) })),
     } as unknown as OrdersService;
     const externalOrders = {} as ExternalOrdersRepository;
     const app = appWithStubs(
@@ -94,10 +95,10 @@ describe("order controller wiring", () => {
     const response = await request(app).post("/").send(validBody);
 
     expect(response.status).toBe(201);
-    expect(response.body).toEqual({ id: 5 });
+    expect(response.body).toEqual({ id: testId(5) });
     expect(service.create).toHaveBeenCalledWith(
       validBody,
-      expect.objectContaining({ id: 7, role: "cashier" }),
+      expect.objectContaining({ id: testId(7), role: "cashier" }),
     );
   });
 
@@ -129,7 +130,7 @@ describe("order controller wiring", () => {
 
   it("maps bad bodies and ids to 400 and missing orders to 404", async () => {
     const service = {
-      create: vi.fn(async () => ({ id: 5 })),
+      create: vi.fn(async () => ({ id: testId(5) })),
       get: vi.fn().mockRejectedValue(new HttpError(404, "الطلب غير موجود")),
     } as unknown as OrdersService;
     const externalOrders = {} as ExternalOrdersRepository;
@@ -141,7 +142,7 @@ describe("order controller wiring", () => {
     expect(service.create).not.toHaveBeenCalled();
     expect((await request(app).get("/abc")).status).toBe(400);
 
-    const missing = await request(app).get("/999");
+    const missing = await request(app).get("/00000000-0000-7000-8000-0000000003e7");
     expect(missing.status).toBe(404);
   });
 });

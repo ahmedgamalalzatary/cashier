@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -13,7 +14,7 @@ function appWithStubs(controller: ShiftsController, role: Role = "cashier") {
   const app = express();
   app.use((req, _res, next) => {
     req.user = {
-      id: role === "admin" ? 7 : 9,
+      id: role === "admin" ? testId(7) : testId(9),
       name: role === "admin" ? "Admin" : "Cashier",
       role,
     };
@@ -52,21 +53,21 @@ describe("shift route authorization", () => {
       request(appWithStubs(controller, "admin")).post("/open").send({
         openingFloat: 100,
       }),
-      request(appWithStubs(controller, "admin")).post("/1/close").send({
+      request(appWithStubs(controller, "admin")).post("/00000000-0000-7000-8000-000000000001/close").send({
         actualCash: 100,
       }),
     ]);
     expect(adminResponses.map(({ status }) => status)).toEqual([403, 403]);
 
     const cashierResponses = await Promise.all([
-      request(appWithStubs(controller)).post("/1/admin-close").send({
+      request(appWithStubs(controller)).post("/00000000-0000-7000-8000-000000000001/admin-close").send({
         actualCash: 100,
         note: "إغلاق",
       }),
-      request(appWithStubs(controller)).post("/1/reopen").send({
+      request(appWithStubs(controller)).post("/00000000-0000-7000-8000-000000000001/reopen").send({
         note: "فتح",
       }),
-      request(appWithStubs(controller)).put("/1/correction").send({
+      request(appWithStubs(controller)).put("/00000000-0000-7000-8000-000000000001/correction").send({
         note: "تصحيح",
         actualCash: 100,
       }),
@@ -95,7 +96,7 @@ describe("shift route authorization", () => {
       request(appWithStubs(controller)).post("/open").send({
         openingFloat: 100,
       }),
-      request(appWithStubs(controller)).post("/1/close").send({
+      request(appWithStubs(controller)).post("/00000000-0000-7000-8000-000000000001/close").send({
         actualCash: 100,
       }),
     ]);
@@ -111,7 +112,7 @@ describe("shift route authorization", () => {
 describe("shift controller wiring", () => {
   it("returns 201 on open with the parsed body and user id", async () => {
     const service = {
-      open: vi.fn(async () => ({ id: 5 })),
+      open: vi.fn(async () => ({ id: testId(5) })),
     } as unknown as ShiftsService;
     const response = await request(
       appWithStubs(new RealShiftsController(service)),
@@ -120,8 +121,8 @@ describe("shift controller wiring", () => {
       .send({ openingFloat: 100 });
 
     expect(response.status).toBe(201);
-    expect(response.body).toEqual({ id: 5 });
-    expect(service.open).toHaveBeenCalledWith({ openingFloat: 100 }, 9);
+    expect(response.body).toEqual({ id: testId(5) });
+    expect(service.open).toHaveBeenCalledWith({ openingFloat: 100 }, testId(9));
   });
 
   it("maps bad ids and bodies to 400", async () => {

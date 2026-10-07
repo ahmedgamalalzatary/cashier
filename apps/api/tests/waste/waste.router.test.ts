@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -10,7 +11,7 @@ import { wasteRouter } from "../../src/modules/waste/waste.router.js";
 function appWithStubs(controller: WasteController) {
   const app = express();
   app.use((req, _res, next) => {
-    req.user = { id: 9, name: "Cashier", role: "cashier" };
+    req.user = { id: testId(9), name: "Cashier", role: "cashier" };
     next();
   });
   app.use(express.json(), wasteRouter(controller));
@@ -37,7 +38,7 @@ function stubController() {
 const validBody = {
   clientRequestId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
   warehouse: "cafe",
-  target: { type: "item", itemId: 2 },
+  target: { type: "item", itemId: testId(2) },
   quantity: 1,
   reason: "spill",
   note: null,
@@ -51,7 +52,7 @@ describe("waste routes", () => {
     const responses = await Promise.all([
       request(app).get("/catalog"),
       request(app).get("/"),
-      request(app).get("/8"),
+      request(app).get("/00000000-0000-7000-8000-000000000008"),
       request(app).post("/").send(validBody),
     ]);
 
@@ -66,23 +67,23 @@ describe("waste routes", () => {
 describe("waste controller wiring", () => {
   it("creates with 201 and the parsed input plus actor", async () => {
     const service = {
-      create: vi.fn(async () => ({ id: 8 })),
+      create: vi.fn(async () => ({ id: testId(8) })),
     } as unknown as WasteService;
     const app = appWithStubs(new RealWasteController(service));
 
     const response = await request(app).post("/").send(validBody);
 
     expect(response.status).toBe(201);
-    expect(response.body).toEqual({ id: 8 });
+    expect(response.body).toEqual({ id: testId(8) });
     expect(service.create).toHaveBeenCalledWith(
       validBody,
-      expect.objectContaining({ id: 9, role: "cashier" }),
+      expect.objectContaining({ id: testId(9), role: "cashier" }),
     );
   });
 
   it("maps bad bodies and ids to 400, and service errors through", async () => {
     const service = {
-      create: vi.fn(async () => ({ id: 8 })),
+      create: vi.fn(async () => ({ id: testId(8) })),
       get: vi
         .fn()
         .mockRejectedValue(new HttpError(403, "لا تملك صلاحية عرض هالك المخزن الرئيسي")),
@@ -93,7 +94,7 @@ describe("waste controller wiring", () => {
     expect(service.create).not.toHaveBeenCalled();
     expect((await request(app).get("/abc")).status).toBe(400);
 
-    const forbidden = await request(app).get("/8");
+    const forbidden = await request(app).get("/00000000-0000-7000-8000-000000000008");
     expect(forbidden.status).toBe(403);
   });
 });

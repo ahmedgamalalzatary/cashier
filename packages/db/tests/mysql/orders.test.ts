@@ -1,5 +1,6 @@
+import { beforeEach, it, testBranchValues } from "../support/ids.js";
 import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 import request from "supertest";
 import { eq } from "drizzle-orm";
 import { createApp } from "../../../../apps/api/src/app.js";
@@ -35,15 +36,15 @@ beforeEach(async () => {
 
 async function createExternalProductFixture() {
   const now = new Date();
-  const [itemCategory] = await db.insert(categories).values({ name: "مخزون" });
-  const [ingredient] = await db.insert(items).values({
+  const [itemCategory] = await db.insert(categories).values(testBranchValues({ name: "مخزون" })).$returningId();
+  const [ingredient] = await db.insert(items).values(testBranchValues({
     code: nextTestItemCode(),
     name: "بن",
-    categoryId: itemCategory.insertId,
+    categoryId: itemCategory.id,
     type: "raw",
     stockUnit: "كجم",
-  });
-  await db.insert(externalCategories).values({
+  })).$returningId();
+  await db.insert(externalCategories).values(testBranchValues({
     externalId: 3,
     nameAr: "مشروبات",
     nameEn: "Drinks",
@@ -54,8 +55,8 @@ async function createExternalProductFixture() {
     displayOrder: 1,
     isCurrent: true,
     syncedAt: now,
-  });
-  await db.insert(externalProducts).values({
+  }));
+  await db.insert(externalProducts).values(testBranchValues({
     externalId: 9,
     externalCategoryId: 3,
     nameAr: "لاتيه",
@@ -73,8 +74,8 @@ async function createExternalProductFixture() {
     isVisible: true,
     isCurrent: true,
     syncedAt: now,
-  });
-  await db.insert(externalProductSizes).values({
+  }));
+  await db.insert(externalProductSizes).values(testBranchValues({
     externalId: 91,
     externalProductId: 9,
     nameAr: "كبير",
@@ -83,8 +84,8 @@ async function createExternalProductFixture() {
     isDefault: true,
     isCurrent: true,
     syncedAt: now,
-  });
-  await db.insert(externalModifierGroups).values({
+  }));
+  await db.insert(externalModifierGroups).values(testBranchValues({
     externalId: 92,
     externalProductId: 9,
     nameAr: "إضافات",
@@ -93,8 +94,8 @@ async function createExternalProductFixture() {
     maxSelections: 2,
     isCurrent: true,
     syncedAt: now,
-  });
-  await db.insert(externalModifierOptions).values({
+  }));
+  await db.insert(externalModifierOptions).values(testBranchValues({
     externalId: 93,
     externalModifierGroupId: 92,
     nameAr: "شوت إضافي",
@@ -103,36 +104,36 @@ async function createExternalProductFixture() {
     stockEffect: "mapped",
     isCurrent: true,
     syncedAt: now,
-  });
-  await db.insert(externalSizeIngredients).values({
+  }));
+  await db.insert(externalSizeIngredients).values(testBranchValues({
     externalSizeId: 91,
-    itemId: ingredient.insertId,
+    itemId: ingredient.id,
     quantity: "0.020",
-  });
-  await db.insert(externalModifierIngredients).values({
+  }));
+  await db.insert(externalModifierIngredients).values(testBranchValues({
     externalModifierOptionId: 93,
-    itemId: ingredient.insertId,
+    itemId: ingredient.id,
     quantity: "0.010",
-  });
-  const [batch] = await db.insert(stockBatches).values({
-    itemId: ingredient.insertId,
+  }));
+  const [batch] = await db.insert(stockBatches).values(testBranchValues({
+    itemId: ingredient.id,
     warehouse: "cafe",
     initialQuantity: "1.000",
     remainingQuantity: "1.000",
     unitCost: "10.000000",
     receivedAt: new Date("2026-08-18T08:00:00.000Z"),
     sourceType: "transfer_in",
-  });
-  await db.insert(stockMovements).values({
-    itemId: ingredient.insertId,
+  })).$returningId();
+  await db.insert(stockMovements).values(testBranchValues({
+    itemId: ingredient.id,
     warehouse: "cafe",
-    batchId: batch.insertId,
+    batchId: batch.id,
     movementType: "transfer_in",
     quantity: "1.000",
     unitCost: "10.000000",
     occurredAt: new Date("2026-08-18T08:00:00.000Z"),
-  });
-  return { itemId: ingredient.insertId, batchId: batch.insertId };
+  }));
+  return { itemId: ingredient.id, batchId: batch.id };
 }
 
 const saleBody = (clientRequestId = randomUUID()) => ({
@@ -201,7 +202,7 @@ describe("external-product POS orders", () => {
       total: "260.00",
       totalCost: "0.80",
       isAdminSale: false,
-      shiftId: expect.any(Number),
+      shiftId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
       lines: [
         {
           type: "external_product",

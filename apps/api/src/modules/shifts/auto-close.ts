@@ -12,9 +12,9 @@ export const AUTO_CLOSE_INTERVAL_MS = 60_000;
  */
 export async function autoCloseExpiredBranches(
   db: Db,
-  close: (branchId: number) => Promise<number>,
+  close: (branchId: string) => Promise<number>,
   signal?: AbortSignal,
-  onError: (branchId: number, error: unknown) => void = (id, error) =>
+  onError: (branchId: string, error: unknown) => void = (id, error) =>
     console.error(`Shift auto-close failed for branch ${id}`, error),
 ) {
   const active = await db
@@ -36,7 +36,7 @@ export async function autoCloseExpiredBranches(
 
 /** Closes expired shifts in one branch, inside that branch's context. */
 export function createAutoCloseForDb(db: Db) {
-  return (branchId: number) =>
+  return (branchId: string) =>
     withBranch(branchId, () =>
       new ShiftsService(new ShiftsRepository(db)).autoCloseExpired(),
     );
@@ -51,7 +51,7 @@ export async function runAutoCloseLoop(
   db: Db,
   signal: AbortSignal,
   intervalMs = AUTO_CLOSE_INTERVAL_MS,
-  onError: (branchId: number, error: unknown) => void = (id, error) =>
+  onError: (branchId: string, error: unknown) => void = (id, error) =>
     console.error(`Shift auto-close failed for branch ${id}`, error),
 ) {
   const close = createAutoCloseForDb(db);
@@ -59,7 +59,7 @@ export async function runAutoCloseLoop(
     try {
       await autoCloseExpiredBranches(db, close, signal, onError);
     } catch (error) {
-      if (!signal.aborted) onError(0, error);
+      if (!signal.aborted) onError("unknown", error);
     }
     if (signal.aborted) break;
     await new Promise<void>((resolve) => {

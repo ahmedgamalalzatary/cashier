@@ -1,5 +1,6 @@
+import { beforeEach, it, testId, testBranchValues } from "../support/ids.js";
 import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 import request from "supertest";
 import { eq } from "drizzle-orm";
 import { createApp } from "../../../../apps/api/src/app.js";
@@ -30,51 +31,51 @@ beforeEach(async () => {
 });
 
 async function fixture() {
-  const [main] = await db.insert(categories).values({ name: "مشروبات" });
+  const [main] = await db.insert(categories).values(testBranchValues({ name: "مشروبات" })).$returningId();
   const [sub] = await db
     .insert(categories)
-    .values({ name: "قهوة", parentId: main.insertId });
+    .values(testBranchValues({ name: "قهوة", parentId: main.id })).$returningId();
   const [item] = await db
     .insert(items)
-    .values({
+    .values(testBranchValues({
       code: nextTestItemCode(),
       name: "تركي سنجل",
-      categoryId: sub.insertId,
+      categoryId: sub.id,
       type: "resale",
       stockUnit: "فنجان",
       sellingPrice: "35.00",
-    });
+    })).$returningId();
   for (const [quantity, cost, date] of [
     [1, 3, "2026-09-01"],
     [10, 5, "2026-09-02"],
   ] as const) {
     const [batch] = await db
       .insert(stockBatches)
-      .values({
-        itemId: item.insertId,
+      .values(testBranchValues({
+        itemId: item.id,
         warehouse: "cafe",
         initialQuantity: quantity.toFixed(3),
         remainingQuantity: quantity.toFixed(3),
         unitCost: cost.toFixed(6),
         receivedAt: new Date(date),
         sourceType: "transfer_in",
-      });
+      })).$returningId();
     await db
       .insert(stockMovements)
-      .values({
-        itemId: item.insertId,
+      .values(testBranchValues({
+        itemId: item.id,
         warehouse: "cafe",
-        batchId: batch.insertId,
+        batchId: batch.id,
         movementType: "transfer_in",
         quantity: quantity.toFixed(3),
         unitCost: cost.toFixed(6),
         occurredAt: new Date(date),
-      });
+      }));
   }
-  return { id: item.insertId, mainId: main.insertId, subId: sub.insertId };
+  return { id: item.id, mainId: main.id, subId: sub.id };
 }
 
-const body = (itemId: number, quantity = 2) => ({
+const body = (itemId: string, quantity = 2) => ({
   clientRequestId: randomUUID(),
   lines: [{ type: "item", itemId, quantity }],
   discount: { type: "fixed", value: 5 },
@@ -84,30 +85,30 @@ const body = (itemId: number, quantity = 2) => ({
 describe("local resale POS", () => {
   it("lists priced resale items and their category tree for cashiers without an external cache", async () => {
     const f = await fixture();
-    const [other] = await db.insert(branches).values({ name: "Other" });
+    const [other] = await db.insert(branches).values({ name: "Other" }).$returningId();
     const [foreignCategory] = await db
       .insert(categories)
-      .values({ branchId: other.insertId, name: "Other" });
+      .values({ branchId: other.id, name: "Other" }).$returningId();
     await db
       .insert(items)
       .values({
-        branchId: other.insertId,
+        branchId: other.id,
         code: nextTestItemCode(),
         name: "Foreign",
-        categoryId: foreignCategory.insertId,
+        categoryId: foreignCategory.id,
         type: "resale",
         sellingPrice: "99.00",
         stockUnit: "قطعة",
       });
     await db
       .insert(items)
-      .values({
+      .values(testBranchValues({
         code: nextTestItemCode(),
         name: "Ingredient",
         categoryId: f.subId,
         type: "raw",
         stockUnit: "جم",
-      });
+      }));
     const response = await request(app)
       .get("/api/products/local")
       .set(cashier)
@@ -249,7 +250,7 @@ describe("local resale POS", () => {
     const now = new Date();
     await db
       .insert(externalCategories)
-      .values({
+      .values(testBranchValues({
         externalId: 1,
         nameAr: "خارجي",
         nameEn: "External",
@@ -260,11 +261,11 @@ describe("local resale POS", () => {
         displayOrder: 1,
         isCurrent: true,
         syncedAt: now,
-      });
+      }));
     await db
       .insert(externalProducts)
-      .values({
-        externalId: f.id,
+      .values(testBranchValues({
+        externalId: 1,
         externalCategoryId: 1,
         nameAr: "منتج خارجي",
         nameEn: "External product",
@@ -281,10 +282,10 @@ describe("local resale POS", () => {
         isVisible: true,
         isCurrent: true,
         syncedAt: now,
-      });
+      }));
     await db
       .insert(externalProductIngredients)
-      .values({ externalProductId: f.id, itemId: f.id, quantity: "1.000" });
+      .values(testBranchValues({ externalProductId: 1, itemId: f.id, quantity: "1.000" }));
     const response = await request(app)
       .post("/api/orders")
       .set(cashier)
@@ -294,7 +295,7 @@ describe("local resale POS", () => {
           { type: "item", itemId: f.id, quantity: 1 },
           {
             type: "external_product",
-            externalProductId: f.id,
+            externalProductId: 1,
             externalSizeId: null,
             quantity: 1,
             modifiers: [],
@@ -316,7 +317,7 @@ describe("local resale POS", () => {
         {
           type: "external_product",
           itemId: null,
-          externalProductId: f.id,
+          externalProductId: 1,
           unitPrice: "20.00",
         },
       ],
@@ -327,7 +328,7 @@ describe("local resale POS", () => {
     const f = await fixture();
     await db
       .insert(stockBatches)
-      .values({
+      .values(testBranchValues({
         itemId: f.id,
         warehouse: "main",
         initialQuantity: "100.000",
@@ -335,7 +336,7 @@ describe("local resale POS", () => {
         unitCost: "0.000000",
         receivedAt: new Date(),
         sourceType: "stocktake_surplus",
-      });
+      }));
     const response = await request(app)
       .post("/api/orders")
       .set(cashier)
@@ -386,27 +387,27 @@ describe("local resale POS", () => {
     await request(app)
       .post("/api/orders")
       .set(cashier)
-      .send(body(999999))
+      .send(body(testId(999999)))
       .expect(404);
-    const [other] = await db.insert(branches).values({ name: "Other" });
+    const [other] = await db.insert(branches).values({ name: "Other" }).$returningId();
     const [foreignCategory] = await db
       .insert(categories)
-      .values({ branchId: other.insertId, name: "Other" });
+      .values({ branchId: other.id, name: "Other" }).$returningId();
     const [foreign] = await db
       .insert(items)
       .values({
-        branchId: other.insertId,
+        branchId: other.id,
         code: nextTestItemCode(),
         name: "Foreign",
-        categoryId: foreignCategory.insertId,
+        categoryId: foreignCategory.id,
         type: "resale",
         sellingPrice: "99.00",
         stockUnit: "قطعة",
-      });
+      }).$returningId();
     await request(app)
       .post("/api/orders")
       .set(cashier)
-      .send(body(foreign.insertId))
+      .send(body(foreign.id))
       .expect(404);
     expect(await db.select().from(orders)).toHaveLength(0);
   });

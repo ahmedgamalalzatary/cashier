@@ -42,7 +42,7 @@ export const correctShiftInput = z
     },
   );
 
-export const shiftIdParam = z.coerce.number().int().positive();
+export const shiftIdParam = z.string().uuid();
 
 export const shiftListQuery = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(100),

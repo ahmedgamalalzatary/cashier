@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import { refundInput } from "../../src/modules/refunds/refunds.schemas.js";
 
@@ -6,20 +7,20 @@ describe("refundInput", () => {
     expect(
       refundInput.parse({
         clientRequestId: "8f345091-c497-4b8b-b4f3-a8ebdc47dd31",
-        orderId: 12,
+        orderId: testId(12),
         reason: "طلب العميل",
         lines: [
-          { orderLineId: 7, quantity: 1, stockAction: "return_to_stock" },
-          { orderLineId: 8, quantity: 2 },
+          { orderLineId: testId(7), quantity: 1, stockAction: "return_to_stock" },
+          { orderLineId: testId(8), quantity: 2 },
         ],
       }),
     ).toEqual({
       clientRequestId: "8f345091-c497-4b8b-b4f3-a8ebdc47dd31",
-      orderId: 12,
+      orderId: testId(12),
       reason: "طلب العميل",
       lines: [
-        { orderLineId: 7, quantity: 1, stockAction: "return_to_stock" },
-        { orderLineId: 8, quantity: 2, stockAction: null },
+        { orderLineId: testId(7), quantity: 1, stockAction: "return_to_stock" },
+        { orderLineId: testId(8), quantity: 2, stockAction: null },
       ],
     });
   });
@@ -28,11 +29,11 @@ describe("refundInput", () => {
     expect(() =>
       refundInput.parse({
         clientRequestId: "8f345091-c497-4b8b-b4f3-a8ebdc47dd31",
-        orderId: 12,
+        orderId: testId(12),
         reason: "سبب",
         lines: [
-          { orderLineId: 7, quantity: 1 },
-          { orderLineId: 7, quantity: 1 },
+          { orderLineId: testId(7), quantity: 1 },
+          { orderLineId: testId(7), quantity: 1 },
         ],
       }),
     ).toThrow();
@@ -42,9 +43,9 @@ describe("refundInput", () => {
     expect(() =>
       refundInput.parse({
         clientRequestId: "8f345091-c497-4b8b-b4f3-a8ebdc47dd31",
-        orderId: 12,
+        orderId: testId(12),
         reason: "سبب",
-        lines: [{ orderLineId: 7, quantity: 0.0001 }],
+        lines: [{ orderLineId: testId(7), quantity: 0.0001 }],
       }),
     ).toThrow();
   });
@@ -52,9 +53,9 @@ describe("refundInput", () => {
   it("rejects short or over-long reasons, empty lines, and bad ids", () => {
     const base = {
       clientRequestId: "8f345091-c497-4b8b-b4f3-a8ebdc47dd31",
-      orderId: 12,
+      orderId: testId(12),
       reason: "سبب كاف",
-      lines: [{ orderLineId: 7, quantity: 1 }],
+      lines: [{ orderLineId: testId(7), quantity: 1 }],
     };
 
     expect(
@@ -70,7 +71,7 @@ describe("refundInput", () => {
     expect(
       refundInput.safeParse({
         ...base,
-        lines: [{ orderLineId: 7, quantity: 1, stockAction: "resell" }],
+        lines: [{ orderLineId: testId(7), quantity: 1, stockAction: "resell" }],
       }).success,
     ).toBe(false);
   });

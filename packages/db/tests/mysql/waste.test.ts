@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, it, testBranchValues } from "../support/ids.js";
+import { describe, expect } from "vitest";
 import request from "supertest";
 import { eq } from "drizzle-orm";
 import { createApp } from "../../../../apps/api/src/app.js";
@@ -27,26 +28,26 @@ async function stockItem(
   warehouse: "main" | "cafe",
   quantities = ["2.000", "3.000"],
 ) {
-  const [category] = await db.insert(categories).values({ name: "خامات" });
-  const [item] = await db.insert(items).values({
+  const [category] = await db.insert(categories).values(testBranchValues({ name: "خامات" })).$returningId();
+  const [item] = await db.insert(items).values(testBranchValues({
     code: nextTestItemCode(),
     name: "لبن",
-    categoryId: category.insertId,
+    categoryId: category.id,
     type: "raw",
     stockUnit: "لتر",
-  });
+  })).$returningId();
   for (const [index, quantity] of quantities.entries()) {
-    await db.insert(stockBatches).values({
-      itemId: item.insertId,
+    await db.insert(stockBatches).values(testBranchValues({
+      itemId: item.id,
       warehouse,
       initialQuantity: quantity,
       remainingQuantity: quantity,
       unitCost: index === 0 ? "2.000000" : "3.000000",
       receivedAt: new Date(Date.now() + index),
       sourceType: "purchase",
-    });
+    }));
   }
-  return item.insertId;
+  return item.id;
 }
 
 beforeEach(async () => {
@@ -185,7 +186,7 @@ describe("waste", () => {
   it("records external-product waste by consuming its configured cafe ingredients", async () => {
     const itemId = await stockItem("cafe");
     const syncedAt = new Date();
-    await db.insert(externalCategories).values({
+    await db.insert(externalCategories).values(testBranchValues({
       externalId: 3,
       nameAr: "مشروبات",
       nameEn: "Drinks",
@@ -196,8 +197,8 @@ describe("waste", () => {
       displayOrder: 1,
       isCurrent: true,
       syncedAt,
-    });
-    await db.insert(externalProducts).values({
+    }));
+    await db.insert(externalProducts).values(testBranchValues({
       externalId: 9,
       externalCategoryId: 3,
       nameAr: "لاتيه",
@@ -215,8 +216,8 @@ describe("waste", () => {
       isVisible: true,
       isCurrent: true,
       syncedAt,
-    });
-    await db.insert(externalProductSizes).values({
+    }));
+    await db.insert(externalProductSizes).values(testBranchValues({
       externalId: 91,
       externalProductId: 9,
       nameAr: "كبير",
@@ -225,12 +226,12 @@ describe("waste", () => {
       isDefault: true,
       isCurrent: true,
       syncedAt,
-    });
-    await db.insert(externalSizeIngredients).values({
+    }));
+    await db.insert(externalSizeIngredients).values(testBranchValues({
       externalSizeId: 91,
       itemId,
       quantity: "0.500",
-    });
+    }));
 
     const response = await request(app())
       .post("/api/waste")
@@ -267,25 +268,25 @@ describe("waste", () => {
 
   it("records recipe waste by consuming its size ingredients", async () => {
     const itemId = await stockItem("cafe");
-    const [category] = await db.insert(categories).values({ name: "مشروبات" });
-    const [recipe] = await db.insert(recipes).values({
+    const [category] = await db.insert(categories).values(testBranchValues({ name: "مشروبات" })).$returningId();
+    const [recipe] = await db.insert(recipes).values(testBranchValues({
       name: "كابتشينو",
       type: "product",
-      categoryId: category.insertId,
+      categoryId: category.id,
       outputItemId: null,
-    });
-    const [size] = await db.insert(recipeSizes).values({
-      recipeId: recipe.insertId,
+    })).$returningId();
+    const [size] = await db.insert(recipeSizes).values(testBranchValues({
+      recipeId: recipe.id,
       name: "وسط",
       sellingPrice: "25.00",
       outputQuantity: null,
       sortOrder: 0,
-    });
-    await db.insert(recipeIngredients).values({
-      recipeSizeId: size.insertId,
+    })).$returningId();
+    await db.insert(recipeIngredients).values(testBranchValues({
+      recipeSizeId: size.id,
       itemId,
       quantity: "0.500",
-    });
+    }));
 
     const response = await request(app())
       .post("/api/waste")
@@ -295,8 +296,8 @@ describe("waste", () => {
         warehouse: "cafe",
         target: {
           type: "recipe",
-          recipeId: recipe.insertId,
-          recipeSizeId: size.insertId,
+          recipeId: recipe.id,
+          recipeSizeId: size.id,
         },
         quantity: 2,
         reason: "spill",
@@ -322,39 +323,39 @@ describe("waste", () => {
       .select()
       .from(wasteEntries)
       .where(eq(wasteEntries.targetType, "recipe"));
-    expect(stored.recipeId).toBe(recipe.insertId);
-    expect(stored.recipeSizeId).toBe(size.insertId);
+    expect(stored.recipeId).toBe(recipe.id);
+    expect(stored.recipeSizeId).toBe(size.id);
   });
 
   // Two recipes over the same stock items, inserted in opposite orders.
   async function opposingIngredientRecipes() {
-    const itemIds: number[] = [];
+    const itemIds: string[] = [];
     for (let index = 0; index < 15; index += 1) {
       itemIds.push(await stockItem("cafe", ["10.000"]));
     }
-    const [category] = await db.insert(categories).values({ name: "مشروبات" });
-    const makeRecipe = async (name: string, ingredientItemIds: number[]) => {
-      const [recipe] = await db.insert(recipes).values({
+    const [category] = await db.insert(categories).values(testBranchValues({ name: "مشروبات" })).$returningId();
+    const makeRecipe = async (name: string, ingredientItemIds: string[]) => {
+      const [recipe] = await db.insert(recipes).values(testBranchValues({
         name,
         type: "product",
-        categoryId: category.insertId,
+        categoryId: category.id,
         outputItemId: null,
-      });
-      const [size] = await db.insert(recipeSizes).values({
-        recipeId: recipe.insertId,
+      })).$returningId();
+      const [size] = await db.insert(recipeSizes).values(testBranchValues({
+        recipeId: recipe.id,
         name: "وسط",
         sellingPrice: "25.00",
         outputQuantity: null,
         sortOrder: 0,
-      });
+      })).$returningId();
       for (const itemId of ingredientItemIds) {
-        await db.insert(recipeIngredients).values({
-          recipeSizeId: size.insertId,
+        await db.insert(recipeIngredients).values(testBranchValues({
+          recipeSizeId: size.id,
           itemId,
           quantity: "0.100",
-        });
+        }));
       }
-      return { recipeId: recipe.insertId, recipeSizeId: size.insertId };
+      return { recipeId: recipe.id, recipeSizeId: size.id };
     };
     const reverse = await makeRecipe("هالك أ", [...itemIds].reverse());
     const forward = await makeRecipe("هالك ب", itemIds);
@@ -365,7 +366,7 @@ describe("waste", () => {
     const adminAuth = await loginAs(app(), "admin");
     const { itemIds, reverse, forward } = await opposingIngredientRecipes();
 
-    const waste = (target: { recipeId: number; recipeSizeId: number }) =>
+    const waste = (target: { recipeId: string; recipeSizeId: string }) =>
       request(app())
         .post("/api/waste")
         .set(adminAuth)
@@ -395,7 +396,7 @@ describe("waste", () => {
     const adminAuth = await loginAs(app(), "admin");
     const { itemIds, reverse } = await opposingIngredientRecipes();
     const syncedAt = new Date();
-    await db.insert(externalCategories).values({
+    await db.insert(externalCategories).values(testBranchValues({
       externalId: 3,
       nameAr: "مشروبات",
       nameEn: "Drinks",
@@ -406,8 +407,8 @@ describe("waste", () => {
       displayOrder: 1,
       isCurrent: true,
       syncedAt,
-    });
-    await db.insert(externalProducts).values({
+    }));
+    await db.insert(externalProducts).values(testBranchValues({
       externalId: 10,
       externalCategoryId: 3,
       nameAr: "لاتيه",
@@ -425,13 +426,13 @@ describe("waste", () => {
       isVisible: true,
       isCurrent: true,
       syncedAt,
-    });
+    }));
     for (const itemId of itemIds) {
-      await db.insert(externalProductIngredients).values({
+      await db.insert(externalProductIngredients).values(testBranchValues({
         externalProductId: 10,
         itemId,
         quantity: "0.100",
-      });
+      }));
     }
 
     const responses = await Promise.all([

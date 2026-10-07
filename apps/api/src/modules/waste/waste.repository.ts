@@ -34,7 +34,7 @@ export class WasteRepository {
     });
   }
 
-  async findOpenShiftForCashier(userId: number) {
+  async findOpenShiftForCashier(userId: string) {
     const [row] = await this.db
       .select({ id: shifts.id })
       .from(shifts)
@@ -48,7 +48,7 @@ export class WasteRepository {
     return row;
   }
 
-  async findItem(id: number) {
+  async findItem(id: string) {
     const [row] = await this.db
       .select({
         id: items.id,
@@ -79,18 +79,18 @@ export class WasteRepository {
     return row;
   }
 
-  async create(data: typeof wasteEntries.$inferInsert) {
+  async create(data: Omit<typeof wasteEntries.$inferInsert, "branchId">) {
     const [result] = await this.db
       .insert(wasteEntries)
-      .values(branchValues(data));
-    return result.insertId;
+      .values(branchValues(data)).$returningId();
+    return result.id;
   }
 
-  createAllocation(data: typeof wasteAllocations.$inferInsert) {
+  createAllocation(data: Omit<typeof wasteAllocations.$inferInsert, "branchId">) {
     return this.db.insert(wasteAllocations).values(branchValues(data));
   }
 
-  updateCost(id: number, totalCost: string) {
+  updateCost(id: string, totalCost: string) {
     return this.db
       .update(wasteEntries)
       .set({ totalCost })
@@ -112,11 +112,11 @@ export class WasteRepository {
     return product;
   }
 
-  lockStockItems(ids: number[]) {
+  lockStockItems(ids: string[]) {
     return new OrdersRepository(this.db).lockStockItems(ids);
   }
 
-  async loadRecipeProduct(recipeId: number, recipeSizeId: number) {
+  async loadRecipeProduct(recipeId: string, recipeSizeId: string) {
     const [recipe] = await this.db
       .select({
         recipeId: recipes.id,
@@ -226,8 +226,8 @@ export class WasteRepository {
       .orderBy(asc(recipes.name), asc(recipeSizes.sortOrder));
     const seen = new Set<string>();
     const result: Array<{
-      recipeId: number;
-      recipeSizeId: number;
+      recipeId: string;
+      recipeSizeId: string;
       recipeName: string;
       sizeName: string | null;
     }> = [];
@@ -275,7 +275,7 @@ export class WasteRepository {
       .limit(100);
   }
 
-  async find(id: number) {
+  async find(id: string) {
     const [row] = await this.db
       .select({
         id: wasteEntries.id,
@@ -298,7 +298,7 @@ export class WasteRepository {
     return row;
   }
 
-  allocations(id: number) {
+  allocations(id: string) {
     return this.db
       .select({
         id: wasteAllocations.id,

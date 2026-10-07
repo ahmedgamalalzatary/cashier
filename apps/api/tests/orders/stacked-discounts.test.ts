@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it, vi } from "vitest";
 import type { OrdersRepository } from "../../src/modules/orders/orders.repository.js";
 import { OrdersService } from "../../src/modules/orders/orders.service.js";
@@ -18,7 +19,7 @@ const product = (
   isAvailable: true,
   isVisible: true,
   isCurrent: true,
-  ingredients: [{ itemId: 1, itemName: "حليب", quantity: "0.010" }],
+  ingredients: [{ itemId: testId(1), itemName: "حليب", quantity: "0.010" }],
   sizes: [],
   modifierGroups:
     extraPrice === null
@@ -56,11 +57,11 @@ const lineInput = (
 const makeService = (productRow: ReturnType<typeof product>) => {
   const tx = {
     findByClientRequestId: vi.fn(async () => undefined),
-    findOpenShiftForCashier: vi.fn().mockResolvedValue({ id: 1 }),
+    findOpenShiftForCashier: vi.fn().mockResolvedValue({ id: testId(1) }),
     loadExternalProducts: vi.fn().mockResolvedValue([productRow]),
-    lockStockItems: vi.fn().mockResolvedValue([{ id: 1, isActive: true }]),
-    createOrder: vi.fn(async (_row: Record<string, unknown>) => 5),
-    createLine: vi.fn(async (_row: Record<string, unknown>) => 10),
+    lockStockItems: vi.fn().mockResolvedValue([{ id: testId(1), isActive: true }]),
+    createOrder: vi.fn(async (_row: Record<string, unknown>) => testId(5)),
+    createLine: vi.fn(async (_row: Record<string, unknown>) => testId(10)),
     createLineModifier: vi.fn().mockResolvedValue(undefined),
     createAllocation: vi.fn().mockResolvedValue(undefined),
     updateLine: vi.fn().mockResolvedValue(undefined),
@@ -73,13 +74,13 @@ const makeService = (productRow: ReturnType<typeof product>) => {
       run(tx, {
         consume: vi.fn().mockResolvedValue({
           allocations: [
-            { quantity: "0.010", unitCost: "1.000000", batchId: 1, movementId: 1 },
+            { quantity: "0.010", unitCost: "1.000000", batchId: testId(1), movementId: testId(1) },
           ],
         }),
       }),
     ),
     findByClientRequestId: vi.fn(async () => undefined),
-    findOrder: vi.fn().mockResolvedValue({ id: 5 }),
+    findOrder: vi.fn().mockResolvedValue({ id: testId(5) }),
     listLines: vi.fn().mockResolvedValue([]),
     listAllocations: vi.fn().mockResolvedValue([]),
     listModifiers: vi.fn().mockResolvedValue([]),

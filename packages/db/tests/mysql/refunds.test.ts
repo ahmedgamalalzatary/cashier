@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, it, testBranchValues } from "../support/ids.js";
+import { describe, expect } from "vitest";
 import request from "supertest";
 import { eq } from "drizzle-orm";
 import { createApp } from "../../../../apps/api/src/app.js";
@@ -36,19 +37,19 @@ async function soldResaleOrder() {
     .select({ id: users.id })
     .from(users)
     .where(eq(users.username, "cashier"));
-  const [category] = await db.insert(categories).values({ name: "مياه" });
-  const [item] = await db.insert(items).values({
+  const [category] = await db.insert(categories).values(testBranchValues({ name: "مياه" })).$returningId();
+  const [item] = await db.insert(items).values(testBranchValues({
     code: nextTestItemCode(),
     name: "مياه",
-    categoryId: category.insertId,
+    categoryId: category.id,
     type: "resale",
     stockUnit: "قطعة",
     sellingPrice: "10.00",
-  });
+  })).$returningId();
   const shift = (
     await request(app()).get("/api/shifts/current").set(authorization)
   ).body;
-  const [order] = await db.insert(orders).values({
+  const [order] = await db.insert(orders).values(testBranchValues({
     orderNumber: `TEST-${Date.now()}`,
     clientRequestId: crypto.randomUUID(),
     requestFingerprint: "a".repeat(64),
@@ -62,47 +63,47 @@ async function soldResaleOrder() {
     cashReceived: "20.00",
     changeAmount: "2.00",
     totalCost: "6.00",
-  });
-  const [line] = await db.insert(orderLines).values({
-    orderId: order.insertId,
+  })).$returningId();
+  const [line] = await db.insert(orderLines).values(testBranchValues({
+    orderId: order.id,
     type: "item",
-    itemId: item.insertId,
+    itemId: item.id,
     productName: "مياه",
     quantity: "2.000",
     unitPrice: "10.00",
     lineSubtotal: "20.00",
     totalCost: "6.00",
-  });
-  const [sourceBatch] = await db.insert(stockBatches).values({
-    itemId: item.insertId,
+  })).$returningId();
+  const [sourceBatch] = await db.insert(stockBatches).values(testBranchValues({
+    itemId: item.id,
     warehouse: "cafe",
     initialQuantity: "10.000",
     remainingQuantity: "8.000",
     unitCost: "3.000000",
     receivedAt: new Date(),
     sourceType: "transfer_in",
-  });
-  const [saleMovement] = await db.insert(stockMovements).values({
-    itemId: item.insertId,
+  })).$returningId();
+  const [saleMovement] = await db.insert(stockMovements).values(testBranchValues({
+    itemId: item.id,
     warehouse: "cafe",
-    batchId: sourceBatch.insertId,
+    batchId: sourceBatch.id,
     movementType: "sale",
     quantity: "-2.000",
     unitCost: "3.000000",
     referenceType: "order",
-    referenceId: order.insertId,
+    referenceId: order.id,
     occurredAt: new Date(),
-  });
-  await db.insert(orderLineAllocations).values({
-    orderLineId: line.insertId,
-    itemId: item.insertId,
+  })).$returningId();
+  await db.insert(orderLineAllocations).values(testBranchValues({
+    orderLineId: line.id,
+    itemId: item.id,
     itemName: "مياه",
-    batchId: sourceBatch.insertId,
-    stockMovementId: saleMovement.insertId,
+    batchId: sourceBatch.id,
+    stockMovementId: saleMovement.id,
     quantity: "2.000",
     unitCost: "3.000000",
-  });
-  return { orderId: order.insertId, lineId: line.insertId };
+  }));
+  return { orderId: order.id, lineId: line.id };
 }
 
 async function soldExternalOrder() {
@@ -112,7 +113,7 @@ async function soldExternalOrder() {
     .where(eq(users.username, "cashier"));
   await db
     .insert(externalCategories)
-    .values({
+    .values(testBranchValues({
       externalId: 9001,
       nameAr: "مشروبات",
       nameEn: "Drinks",
@@ -120,11 +121,11 @@ async function soldExternalOrder() {
       isVisible: true,
       displayOrder: 0,
       syncedAt: new Date(),
-    })
+    }))
     .onDuplicateKeyUpdate({ set: { nameAr: "مشروبات" } });
   await db
     .insert(externalProducts)
-    .values({
+    .values(testBranchValues({
       externalId: 9101,
       externalCategoryId: 9001,
       nameAr: "لاتيه",
@@ -135,22 +136,22 @@ async function soldExternalOrder() {
       isAvailable: true,
       isVisible: true,
       syncedAt: new Date(),
-    })
+    }))
     .onDuplicateKeyUpdate({ set: { nameAr: "لاتيه" } });
   const [ingredientCategory] = await db
     .insert(categories)
-    .values({ name: "خامات" });
-  const [ingredient] = await db.insert(items).values({
+    .values(testBranchValues({ name: "خامات" })).$returningId();
+  const [ingredient] = await db.insert(items).values(testBranchValues({
     code: nextTestItemCode(),
     name: "حليب",
-    categoryId: ingredientCategory.insertId,
+    categoryId: ingredientCategory.id,
     type: "raw",
     stockUnit: "لتر",
-  });
+  })).$returningId();
   const shift = (
     await request(app()).get("/api/shifts/current").set(authorization)
   ).body;
-  const [order] = await db.insert(orders).values({
+  const [order] = await db.insert(orders).values(testBranchValues({
     orderNumber: `TEST-${Date.now()}`,
     clientRequestId: crypto.randomUUID(),
     requestFingerprint: "b".repeat(64),
@@ -162,9 +163,9 @@ async function soldExternalOrder() {
     cashReceived: "20.00",
     changeAmount: "0.00",
     totalCost: "1.00",
-  });
-  const [line] = await db.insert(orderLines).values({
-    orderId: order.insertId,
+  })).$returningId();
+  const [line] = await db.insert(orderLines).values(testBranchValues({
+    orderId: order.id,
     type: "external_product",
     externalProductId: 9101,
     productName: "لاتيه",
@@ -172,41 +173,41 @@ async function soldExternalOrder() {
     unitPrice: "20.00",
     lineSubtotal: "20.00",
     totalCost: "1.00",
-  });
-  const [sourceBatch] = await db.insert(stockBatches).values({
-    itemId: ingredient.insertId,
+  })).$returningId();
+  const [sourceBatch] = await db.insert(stockBatches).values(testBranchValues({
+    itemId: ingredient.id,
     warehouse: "cafe",
     initialQuantity: "5.000",
     remainingQuantity: "4.900",
     unitCost: "10.000000",
     receivedAt: new Date(),
     sourceType: "transfer_in",
-  });
-  const [saleMovement] = await db.insert(stockMovements).values({
-    itemId: ingredient.insertId,
+  })).$returningId();
+  const [saleMovement] = await db.insert(stockMovements).values(testBranchValues({
+    itemId: ingredient.id,
     warehouse: "cafe",
-    batchId: sourceBatch.insertId,
+    batchId: sourceBatch.id,
     movementType: "sale",
     quantity: "-0.100",
     unitCost: "10.000000",
     referenceType: "order",
-    referenceId: order.insertId,
+    referenceId: order.id,
     occurredAt: new Date(),
-  });
-  await db.insert(orderLineAllocations).values({
-    orderLineId: line.insertId,
-    itemId: ingredient.insertId,
+  })).$returningId();
+  await db.insert(orderLineAllocations).values(testBranchValues({
+    orderLineId: line.id,
+    itemId: ingredient.id,
     itemName: "حليب",
-    batchId: sourceBatch.insertId,
-    stockMovementId: saleMovement.insertId,
+    batchId: sourceBatch.id,
+    stockMovementId: saleMovement.id,
     quantity: "0.100",
     unitCost: "10.000000",
-  });
+  }));
   return {
-    orderId: order.insertId,
-    lineId: line.insertId,
-    ingredientId: ingredient.insertId,
-    batchId: sourceBatch.insertId,
+    orderId: order.id,
+    lineId: line.id,
+    ingredientId: ingredient.id,
+    batchId: sourceBatch.id,
   };
 }
 
@@ -607,7 +608,7 @@ describe("refunds", () => {
       .update(orderLineAllocations)
       .set({ quantity: "2.000" })
       .where(eq(orderLineAllocations.id, first.id));
-    const [secondMovement] = await db.insert(stockMovements).values({
+    const [secondMovement] = await db.insert(stockMovements).values(testBranchValues({
       itemId: first.itemId,
       warehouse: "cafe",
       batchId: first.batchId,
@@ -617,16 +618,16 @@ describe("refunds", () => {
       referenceType: "order",
       referenceId: fixture.orderId,
       occurredAt: new Date(),
-    });
-    const [second] = await db.insert(orderLineAllocations).values({
+    })).$returningId();
+    const [second] = await db.insert(orderLineAllocations).values(testBranchValues({
       orderLineId: fixture.lineId,
       itemId: first.itemId,
       itemName: first.itemName,
       batchId: first.batchId,
-      stockMovementId: secondMovement.insertId,
+      stockMovementId: secondMovement.id,
       quantity: "1.000",
       unitCost: "3.000000",
-    });
+    })).$returningId();
 
     for (let index = 0; index < 3; index += 1) {
       const response = await request(app())
@@ -647,12 +648,12 @@ describe("refunds", () => {
       expect(response.status).toBe(201);
     }
     const allocations = await db.select().from(refundLineAllocations);
-    const quantityFor = (id: number) =>
+    const quantityFor = (id: string) =>
       allocations
         .filter((row) => row.orderLineAllocationId === id)
         .reduce((sum, row) => sum + Number(row.quantity), 0);
     expect(quantityFor(first.id)).toBe(2);
-    expect(quantityFor(second.insertId)).toBe(1);
+    expect(quantityFor(second.id)).toBe(1);
   });
 
   it("rejects fractional recipe-product refunds", async () => {

@@ -41,7 +41,7 @@ export class ShiftsRepository {
     );
   }
 
-  async findCashierForUpdate(userId: number) {
+  async findCashierForUpdate(userId: string) {
     const [link] = await this.db
       .select({
         userId: users.id,
@@ -70,8 +70,8 @@ export class ShiftsRepository {
   }
 
   async create(input: {
-    cashierUserId: number;
-    employeeId: number;
+    cashierUserId: string;
+    employeeId: string;
     openingFloat: string;
     openedAt: Date;
   }) {
@@ -81,11 +81,11 @@ export class ShiftsRepository {
         status: "open",
         openSlot: 1,
       }),
-    );
-    return result.insertId;
+    ).$returningId();
+    return result.id;
   }
 
-  async findById(id: number) {
+  async findById(id: string) {
     const [row] = await this.db
       .select(shiftColumns)
       .from(shifts)
@@ -97,7 +97,7 @@ export class ShiftsRepository {
     return row;
   }
 
-  async findByIdForUpdate(id: number) {
+  async findByIdForUpdate(id: string) {
     const [row] = await this.db
       .select()
       .from(shifts)
@@ -107,9 +107,9 @@ export class ShiftsRepository {
   }
 
   async close(input: {
-    id: number;
+    id: string;
     // An auto-close has no human actor and no counted drawer: all three stay NULL.
-    closedByUserId: number | null;
+    closedByUserId: string | null;
     closedAt: Date;
     actualCash: string | null;
     expectedCash: string;
@@ -129,7 +129,7 @@ export class ShiftsRepository {
       .where(branchCondition(shifts, eq(shifts.id, input.id)));
   }
 
-  async reopen(id: number) {
+  async reopen(id: string) {
     await this.db
       .update(shifts)
       .set({
@@ -144,7 +144,7 @@ export class ShiftsRepository {
       .where(branchCondition(shifts, eq(shifts.id, id)));
   }
 
-  async findCurrent(cashierUserId: number) {
+  async findCurrent(cashierUserId: string) {
     const [row] = await this.db
       .select({ id: shifts.id, cashierUserId: shifts.cashierUserId })
       .from(shifts)
@@ -179,7 +179,7 @@ export class ShiftsRepository {
       .orderBy(desc(shifts.openedAt), desc(shifts.id));
   }
 
-  dayIds(start: Date, end: Date, cashierUserId?: number) {
+  dayIds(start: Date, end: Date, cashierUserId?: string) {
     return this.db
       .select({ id: shifts.id })
       .from(shifts)
@@ -198,7 +198,7 @@ export class ShiftsRepository {
       .orderBy(desc(shifts.openedAt), desc(shifts.id));
   }
 
-  listIds(cashierUserId?: number, pagination = { limit: 100, offset: 0 }) {
+  listIds(cashierUserId?: string, pagination = { limit: 100, offset: 0 }) {
     const query = this.db
       .select({ id: shifts.id })
       .from(shifts)
@@ -216,7 +216,7 @@ export class ShiftsRepository {
       .offset(pagination.offset);
   }
 
-  async totals(id: number) {
+  async totals(id: string) {
     const [
       [orderTotals],
       [requestTotals],
@@ -268,7 +268,7 @@ export class ShiftsRepository {
     };
   }
 
-  events(shiftId: number) {
+  events(shiftId: string) {
     return this.db
       .select({
         id: shiftEvents.id,
@@ -286,12 +286,12 @@ export class ShiftsRepository {
       .orderBy(shiftEvents.occurredAt, shiftEvents.id);
   }
 
-  async createEvent(data: typeof shiftEvents.$inferInsert) {
+  async createEvent(data: Omit<typeof shiftEvents.$inferInsert, "branchId">) {
     await this.db.insert(shiftEvents).values(branchValues(data));
   }
 
   async correct(input: {
-    id: number;
+    id: string;
     openingFloat: string;
     actualCash: string;
     expectedCash: string;

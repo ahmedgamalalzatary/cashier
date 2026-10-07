@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import { calculateExternalOrderLine } from "../../src/modules/orders/external-order-line.js";
 
@@ -18,7 +19,7 @@ const product = {
       externalProductId: 9,
       nameAr: "كبير",
       price: "100.00",
-      ingredients: [{ itemId: 1, itemName: "بن", quantity: "0.020" }],
+      ingredients: [{ itemId: testId(1), itemName: "بن", quantity: "0.020" }],
     },
   ],
   modifierGroups: [
@@ -33,7 +34,7 @@ const product = {
           nameAr: "شوت إضافي",
           extraPrice: "15.00",
           stockEffect: "mapped" as const,
-          ingredients: [{ itemId: 1, itemName: "بن", quantity: "0.010" }],
+          ingredients: [{ itemId: testId(1), itemName: "بن", quantity: "0.010" }],
         },
       ],
     },
@@ -60,7 +61,7 @@ describe("calculateExternalOrderLine", () => {
     expect(line.unitPrice).toBe("120.00");
     expect(line.lineSubtotal).toBe("240.00");
     expect(line.consumptions).toEqual([
-      { itemId: 1, itemName: "بن", quantity: "0.080" },
+      { itemId: testId(1), itemName: "بن", quantity: "0.080" },
     ]);
     expect(line.modifiers).toEqual([
       expect.objectContaining({ externalModifierOptionId: 93, quantity: 2 }),
@@ -108,7 +109,7 @@ describe("calculateExternalOrderLine", () => {
         {
           ...product,
           sizes: [],
-          ingredients: [{ itemId: 1, itemName: "بن", quantity: "0.020" }],
+          ingredients: [{ itemId: testId(1), itemName: "بن", quantity: "0.020" }],
         },
         { ...selection, externalSizeId: 91 },
         nowMs,

@@ -1,25 +1,26 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthUser } from "@cashier/shared";
 import type { WasteRepository } from "../../src/modules/waste/waste.repository.js";
 import { WasteService } from "../../src/modules/waste/waste.service.js";
 
-const actor = { id: 4, role: "admin" } as AuthUser;
+const actor = { id: testId(4), role: "admin" } as AuthUser;
 
 describe("WasteService idempotency fingerprint", () => {
   it("replays the same waste entry when JSON field order differs", async () => {
     let stored:
-      | { id: number; recordedBy: number; requestFingerprint: string }
+      | { id: string; recordedBy: string; requestFingerprint: string }
       | undefined;
     const tx = {
       findByClientRequestId: vi.fn(async () => stored),
       findItem: vi.fn().mockResolvedValue({
-        id: 2,
+        id: testId(2),
         name: "حليب",
         isActive: true,
       }),
       create: vi.fn(async (row: { requestFingerprint: string }) => {
         stored = {
-          id: 8,
+          id: testId(8),
           recordedBy: actor.id,
           requestFingerprint: row.requestFingerprint,
         };
@@ -37,15 +38,15 @@ describe("WasteService idempotency fingerprint", () => {
                 {
                   quantity: "1.000",
                   unitCost: "2.000000",
-                  batchId: 1,
-                  movementId: 1,
+                  batchId: testId(1),
+                  movementId: testId(1),
                 },
               ],
             }),
           }),
       ),
       findByClientRequestId: vi.fn(async () => stored),
-      find: vi.fn().mockResolvedValue({ id: 8, warehouse: "main" }),
+      find: vi.fn().mockResolvedValue({ id: testId(8), warehouse: "main" }),
       allocations: vi.fn().mockResolvedValue([]),
     } as unknown as WasteRepository;
     const service = new WasteService(repo);
@@ -55,7 +56,7 @@ describe("WasteService idempotency fingerprint", () => {
       {
         clientRequestId,
         warehouse: "main",
-        target: { type: "item", itemId: 2 },
+        target: { type: "item", itemId: testId(2) },
         quantity: 1,
         reason: "spill",
         note: null,
@@ -67,14 +68,14 @@ describe("WasteService idempotency fingerprint", () => {
         note: null,
         reason: "spill",
         quantity: 1,
-        target: { itemId: 2, type: "item" },
+        target: { itemId: testId(2), type: "item" },
         warehouse: "main",
         clientRequestId,
       },
       actor,
     );
 
-    expect(replay.id).toBe(8);
+    expect(replay.id).toBe(testId(8));
     expect(tx.create).toHaveBeenCalledTimes(1);
   });
 });
@@ -86,8 +87,8 @@ describe("WasteService recipe target", () => {
         {
           quantity: "1.000",
           unitCost: "2.000000",
-          batchId: 1,
-          movementId: 11,
+          batchId: testId(1),
+          movementId: testId(11),
         },
       ],
     });
@@ -95,19 +96,19 @@ describe("WasteService recipe target", () => {
     const tx = {
       findByClientRequestId: vi.fn(async () => undefined),
       loadRecipeProduct: vi.fn().mockResolvedValue({
-        recipeId: 3,
+        recipeId: testId(3),
         recipeName: "كابتشينو",
         isActive: true,
-        sizeId: 7,
+        sizeId: testId(7),
         sizeName: "وسط",
         ingredients: [
-          { itemId: 21, itemName: "حليب", quantity: "0.200" },
-          { itemId: 22, itemName: "قهوة", quantity: "0.050" },
+          { itemId: testId(21), itemName: "حليب", quantity: "0.200" },
+          { itemId: testId(22), itemName: "قهوة", quantity: "0.050" },
         ],
       }),
       lockStockItems: vi.fn().mockResolvedValue([
-        { id: 21, name: "حليب", isActive: true },
-        { id: 22, name: "قهوة", isActive: true },
+        { id: testId(21), name: "حليب", isActive: true },
+        { id: testId(22), name: "قهوة", isActive: true },
       ]),
       create: vi.fn(async (row: Record<string, unknown>) => {
         createdRow = row;
@@ -122,7 +123,7 @@ describe("WasteService recipe target", () => {
           run(tx, { consume }),
       ),
       findByClientRequestId: vi.fn(async () => undefined),
-      find: vi.fn().mockResolvedValue({ id: 9, warehouse: "cafe" }),
+      find: vi.fn().mockResolvedValue({ id: testId(9), warehouse: "cafe" }),
       allocations: vi.fn().mockResolvedValue([]),
     } as unknown as WasteRepository;
     const service = new WasteService(repo);
@@ -131,7 +132,7 @@ describe("WasteService recipe target", () => {
       {
         clientRequestId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
         warehouse: "cafe",
-        target: { type: "recipe", recipeId: 3, recipeSizeId: 7 },
+        target: { type: "recipe", recipeId: testId(3), recipeSizeId: testId(7) },
         quantity: 2,
         reason: "spill",
         note: null,
@@ -139,25 +140,25 @@ describe("WasteService recipe target", () => {
       actor,
     );
 
-    expect(tx.loadRecipeProduct).toHaveBeenCalledWith(3, 7);
+    expect(tx.loadRecipeProduct).toHaveBeenCalledWith(testId(3), testId(7));
     expect(createdRow).toMatchObject({
       targetType: "recipe",
-      recipeId: 3,
-      recipeSizeId: 7,
+      recipeId: testId(3),
+      recipeSizeId: testId(7),
       targetName: "كابتشينو",
       sizeName: "وسط",
     });
     expect(consume).toHaveBeenCalledTimes(2);
     expect(consume).toHaveBeenCalledWith(
       expect.objectContaining({
-        itemId: 21,
+        itemId: testId(21),
         warehouse: "cafe",
         quantity: 0.4,
         movementType: "waste",
       }),
     );
     expect(consume).toHaveBeenCalledWith(
-      expect.objectContaining({ itemId: 22, quantity: 0.1 }),
+      expect.objectContaining({ itemId: testId(22), quantity: 0.1 }),
     );
   });
 
@@ -166,21 +167,21 @@ describe("WasteService recipe target", () => {
     const tx = {
       findByClientRequestId: vi.fn(async () => undefined),
       loadRecipeProduct: vi.fn(async () => ({
-        recipeId: 3,
+        recipeId: testId(3),
         recipeName: "Coffee",
         isActive: true,
-        sizeId: 7,
+        sizeId: testId(7),
         sizeName: "Large",
         ingredients: [
-          { itemId: 22, itemName: "Milk", quantity: "0.100" },
-          { itemId: 21, itemName: "Beans", quantity: "0.100" },
+          { itemId: testId(22), itemName: "Milk", quantity: "0.100" },
+          { itemId: testId(21), itemName: "Beans", quantity: "0.100" },
         ],
       })),
-      lockStockItems: vi.fn(async (ids: number[]) => {
+      lockStockItems: vi.fn(async (ids: string[]) => {
         events.push(`lock:${ids.join(",")}`);
         return ids.map((id) => ({ id, name: `Item ${id}`, isActive: true }));
       }),
-      create: vi.fn(async () => 9),
+      create: vi.fn(async () => testId(9)),
       createAllocation: vi.fn(),
       updateCost: vi.fn(),
     };
@@ -188,13 +189,13 @@ describe("WasteService recipe target", () => {
       transaction: vi.fn(
         async (run: (r: typeof tx, inv: object) => Promise<number>) =>
           run(tx, {
-            consume: vi.fn(async ({ itemId }: { itemId: number }) => {
+            consume: vi.fn(async ({ itemId }: { itemId: string }) => {
               events.push(`consume:${itemId}`);
               return { allocations: [] };
             }),
           }),
       ),
-      find: vi.fn(async () => ({ id: 9, warehouse: "cafe" })),
+      find: vi.fn(async () => ({ id: testId(9), warehouse: "cafe" })),
       allocations: vi.fn(async () => []),
     } as unknown as WasteRepository;
 
@@ -202,7 +203,7 @@ describe("WasteService recipe target", () => {
       {
         clientRequestId: "dddddddd-dddd-4ddd-8ddd-dddddddddd01",
         warehouse: "cafe",
-        target: { type: "recipe", recipeId: 3, recipeSizeId: 7 },
+        target: { type: "recipe", recipeId: testId(3), recipeSizeId: testId(7) },
         quantity: 1,
         reason: "spill",
         note: null,
@@ -210,7 +211,7 @@ describe("WasteService recipe target", () => {
       actor,
     );
 
-    expect(events).toEqual(["lock:21,22", "consume:21", "consume:22"]);
+    expect(events).toEqual([`lock:${testId(21)},${testId(22)}`, `consume:${testId(21)}`, `consume:${testId(22)}`]);
   });
 
   it("rejects recipe waste outside cafe with 400", async () => {
@@ -234,7 +235,7 @@ describe("WasteService recipe target", () => {
         {
           clientRequestId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
           warehouse: "main",
-          target: { type: "recipe", recipeId: 3, recipeSizeId: 7 },
+          target: { type: "recipe", recipeId: testId(3), recipeSizeId: testId(7) },
           quantity: 1,
           reason: "spill",
           note: null,
@@ -266,7 +267,7 @@ describe("WasteService recipe target", () => {
         {
           clientRequestId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeee01",
           warehouse: "cafe",
-          target: { type: "recipe", recipeId: 3, recipeSizeId: 7 },
+          target: { type: "recipe", recipeId: testId(3), recipeSizeId: testId(7) },
           quantity: 1,
           reason: "spill",
           note: null,
@@ -298,7 +299,7 @@ describe("WasteService recipe target", () => {
         {
           clientRequestId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeee02",
           warehouse: "cafe",
-          target: { type: "recipe", recipeId: 3, recipeSizeId: 7 },
+          target: { type: "recipe", recipeId: testId(3), recipeSizeId: testId(7) },
           quantity: 1,
           reason: "spill",
           note: null,
@@ -309,12 +310,12 @@ describe("WasteService recipe target", () => {
   });
 });
 
-const cashier = { id: 9, role: "cashier" } as AuthUser;
+const cashier = { id: testId(9), role: "cashier" } as AuthUser;
 
 const wasteInput = {
   clientRequestId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
   warehouse: "cafe",
-  target: { type: "item", itemId: 2 },
+  target: { type: "item", itemId: testId(2) },
   quantity: 1,
   reason: "spill",
   note: null,
@@ -323,9 +324,9 @@ const wasteInput = {
 function txForWaste(overrides: Record<string, unknown> = {}) {
   return {
     findByClientRequestId: vi.fn(async () => undefined),
-    findOpenShiftForCashier: vi.fn(async () => ({ id: 3 })),
-    findItem: vi.fn(async () => ({ id: 2, name: "حليب", isActive: true })),
-    create: vi.fn(async () => 8),
+    findOpenShiftForCashier: vi.fn(async () => ({ id: testId(3) })),
+    findItem: vi.fn(async () => ({ id: testId(2), name: "حليب", isActive: true })),
+    create: vi.fn(async () => testId(8)),
     createAllocation: vi.fn(async () => undefined),
     updateCost: vi.fn(async () => undefined),
     ...overrides,
@@ -338,16 +339,16 @@ function repoForWaste(tx: Record<string, unknown>) {
       run(tx, {
         consume: vi.fn(async () => ({
           allocations: [
-            { quantity: "1.000", unitCost: "2.000000", batchId: 1, movementId: 1 },
+            { quantity: "1.000", unitCost: "2.000000", batchId: testId(1), movementId: testId(1) },
           ],
         })),
       }),
     ),
     findByClientRequestId: vi.fn(async () => undefined),
-    find: vi.fn(async () => ({ id: 8, warehouse: "cafe" })),
+    find: vi.fn(async () => ({ id: testId(8), warehouse: "cafe" })),
     allocations: vi.fn(async () => []),
     list: vi.fn(async () => []),
-    listCatalogItems: vi.fn(async () => [{ id: 2 }]),
+    listCatalogItems: vi.fn(async () => [{ id: testId(2) }]),
     listCatalogExternalProducts: vi.fn(async () => []),
     listCatalogRecipes: vi.fn(async () => []),
   } as unknown as WasteRepository;
@@ -377,8 +378,8 @@ describe("WasteService shift and replay guards", () => {
     const otherUser = repoForWaste(
       txForWaste({
         findByClientRequestId: vi.fn(async () => ({
-          id: 8,
-          recordedBy: 555,
+          id: testId(8),
+          recordedBy: testId(555),
           requestFingerprint: "whatever",
         })),
       }),
@@ -390,7 +391,7 @@ describe("WasteService shift and replay guards", () => {
     const changedPayload = repoForWaste(
       txForWaste({
         findByClientRequestId: vi.fn(async () => ({
-          id: 8,
+          id: testId(8),
           recordedBy: cashier.id,
           requestFingerprint: "different",
         })),
@@ -407,7 +408,7 @@ describe("WasteService catalog, list, and get", () => {
     const repo = repoForWaste(txForWaste());
 
     await expect(new WasteService(repo).catalog()).resolves.toEqual({
-      items: [{ id: 2 }],
+      items: [{ id: testId(2) }],
       products: [],
       recipes: [],
     });
@@ -429,16 +430,16 @@ describe("WasteService catalog, list, and get", () => {
       undefined,
     );
     await expect(
-      new WasteService(missing).get(999, cashier),
+      new WasteService(missing).get(testId(999), cashier),
     ).rejects.toMatchObject({ status: 404 });
 
     const mainEntry = repoForWaste(txForWaste());
     (mainEntry.find as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-      id: 8,
+      id: testId(8),
       warehouse: "main",
     });
     await expect(
-      new WasteService(mainEntry).get(8, cashier),
+      new WasteService(mainEntry).get(testId(8), cashier),
     ).rejects.toMatchObject({ status: 403 });
   });
 });

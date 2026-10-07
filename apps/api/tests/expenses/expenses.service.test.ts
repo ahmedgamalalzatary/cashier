@@ -1,11 +1,12 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthUser } from "@cashier/shared";
 import { HttpError } from "@cashier/server-core";
 import type { ExpensesRepository } from "../../src/modules/expenses/expenses.repository.js";
 import { ExpensesService } from "../../src/modules/expenses/expenses.service.js";
 
-const actor = { id: 3, role: "admin" } as AuthUser;
-const cashierActor = { id: 9, role: "cashier" } as AuthUser;
+const actor = { id: testId(3), role: "admin" } as AuthUser;
+const cashierActor = { id: testId(9), role: "cashier" } as AuthUser;
 
 const cairoToday = () =>
   new Intl.DateTimeFormat("en-CA", {
@@ -18,33 +19,33 @@ const cairoToday = () =>
 describe("ExpensesService idempotency fingerprint", () => {
   it("replays the same expense when JSON field order differs", async () => {
     let stored:
-      | { id: number; recordedBy: number; requestFingerprint: string }
+      | { id: string; recordedBy: string; requestFingerprint: string }
       | undefined;
     const tx = {
       byRequestId: vi.fn(async () => stored),
-      category: vi.fn().mockResolvedValue({ id: 1, isActive: true }),
+      category: vi.fn().mockResolvedValue({ id: testId(1), isActive: true }),
       create: vi.fn(async (row: { requestFingerprint: string }) => {
         stored = {
-          id: 9,
+          id: testId(9),
           recordedBy: actor.id,
           requestFingerprint: row.requestFingerprint,
         };
-        return 9;
+        return testId(9);
       }),
     };
     const repo = {
-      transaction: vi.fn(async (run: (r: typeof tx) => Promise<number>) =>
+      transaction: vi.fn(async (run: (r: typeof tx) => Promise<string>) =>
         run(tx),
       ),
       byRequestId: vi.fn(async () => stored),
-      get: vi.fn(async (id: number) => ({ id })),
+      get: vi.fn(async (id: string) => ({ id })),
     } as unknown as ExpensesRepository;
     const service = new ExpensesService(repo);
 
     const first = await service.create(
       {
         clientRequestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        categoryId: 1,
+        categoryId: testId(1),
         amount: 12.5,
         expenseDate: "2026-07-20",
         note: "كهرباء",
@@ -56,23 +57,23 @@ describe("ExpensesService idempotency fingerprint", () => {
         note: "كهرباء",
         expenseDate: "2026-07-20",
         amount: 12.5,
-        categoryId: 1,
+        categoryId: testId(1),
         clientRequestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       },
       actor,
     );
 
-    expect(first).toEqual({ id: 9 });
-    expect(replay).toEqual({ id: 9 });
+    expect(first).toEqual({ id: testId(9) });
+    expect(replay).toEqual({ id: testId(9) });
     expect(tx.create).toHaveBeenCalledTimes(1);
   });
 
   it("still 409s when the payload actually changed", async () => {
     const repo = {
-      transaction: vi.fn(async (run: (r: { byRequestId: () => Promise<unknown> }) => Promise<number>) =>
+      transaction: vi.fn(async (run: (r: { byRequestId: () => Promise<unknown> }) => Promise<string>) =>
         run({
           byRequestId: async () => ({
-            id: 9,
+            id: testId(9),
             recordedBy: actor.id,
             requestFingerprint: "other",
           }),
@@ -84,7 +85,7 @@ describe("ExpensesService idempotency fingerprint", () => {
       new ExpensesService(repo).create(
         {
           clientRequestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-          categoryId: 1,
+          categoryId: testId(1),
           amount: 12.5,
           expenseDate: "2026-07-20",
           note: "كهرباء",
@@ -106,14 +107,14 @@ function repoForCreate(
       run(txRepo),
     ),
     byRequestId: vi.fn(async () => undefined),
-    get: vi.fn(async (id: number) => ({ id })),
+    get: vi.fn(async (id: string) => ({ id })),
     ...outer,
   } as unknown as ExpensesRepository;
 }
 
 const expenseInput = {
   clientRequestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-  categoryId: 1,
+  categoryId: testId(1),
   amount: 12.5,
   expenseDate: "2026-07-20",
   note: "كهرباء",
@@ -132,11 +133,11 @@ describe("ExpensesService categories", () => {
     ).rejects.toMatchObject({ status: 409 });
 
     const updateRepo = {
-      category: vi.fn(async () => ({ id: 1 })),
+      category: vi.fn(async () => ({ id: testId(1) })),
       updateCategory: vi.fn().mockRejectedValue(duplicate),
     } as unknown as ExpensesRepository;
     await expect(
-      new ExpensesService(updateRepo).updateCategory(1, { name: "نظافة" }),
+      new ExpensesService(updateRepo).updateCategory(testId(1), { name: "نظافة" }),
     ).rejects.toMatchObject({ status: 409 });
   });
 
@@ -146,7 +147,7 @@ describe("ExpensesService categories", () => {
     } as unknown as ExpensesRepository;
 
     await expect(
-      new ExpensesService(repo).updateCategory(999, { name: "x" }),
+      new ExpensesService(repo).updateCategory(testId(999), { name: "x" }),
     ).rejects.toMatchObject({ status: 404 });
   });
 
@@ -181,7 +182,7 @@ describe("ExpensesService.create guards", () => {
 
     const inactive = repoForCreate({
       byRequestId: vi.fn(async () => undefined),
-      category: vi.fn(async () => ({ id: 1, isActive: false })),
+      category: vi.fn(async () => ({ id: testId(1), isActive: false })),
     });
     await expect(
       new ExpensesService(inactive).create(expenseInput, actor),
@@ -191,7 +192,7 @@ describe("ExpensesService.create guards", () => {
   it("409s when a cashier has no open shift", async () => {
     const repo = repoForCreate({
       byRequestId: vi.fn(async () => undefined),
-      category: vi.fn(async () => ({ id: 1, isActive: true })),
+      category: vi.fn(async () => ({ id: testId(1), isActive: true })),
       openShiftForCashier: vi.fn(async () => undefined),
     });
 
@@ -203,8 +204,8 @@ describe("ExpensesService.create guards", () => {
   it("409s when the same key was recorded by another user", async () => {
     const repo = repoForCreate({
       byRequestId: vi.fn(async () => ({
-        id: 9,
-        recordedBy: 555,
+        id: testId(9),
+        recordedBy: testId(555),
         requestFingerprint: "whatever",
       })),
     });
@@ -218,16 +219,16 @@ describe("ExpensesService.create guards", () => {
     const duplicate = Object.assign(new Error("duplicate"), {
       code: "ER_DUP_ENTRY",
     });
-    const stored = { id: 9, categoryName: "نظافة" };
+    const stored = { id: testId(9), categoryName: "نظافة" };
     const repo = repoForCreate(
       {
         byRequestId: vi.fn(async () => undefined),
-        category: vi.fn(async () => ({ id: 1, isActive: true })),
+        category: vi.fn(async () => ({ id: testId(1), isActive: true })),
         create: vi.fn().mockRejectedValue(duplicate),
       },
       {
         byRequestId: vi.fn(async () => ({
-          id: 9,
+          id: testId(9),
           recordedBy: actor.id,
           requestFingerprint: (
             await import("../../src/lib/request-fingerprint.js")
@@ -253,11 +254,11 @@ describe("ExpensesService.create date and type split", () => {
     let stored: Record<string, unknown> = {};
     const repo = repoForCreate({
       byRequestId: vi.fn(async () => undefined),
-      category: vi.fn(async () => ({ id: 1, isActive: true })),
-      openShiftForCashier: vi.fn(async () => ({ id: 4 })),
+      category: vi.fn(async () => ({ id: testId(1), isActive: true })),
+      openShiftForCashier: vi.fn(async () => ({ id: testId(4) })),
       create: vi.fn(async (row: Record<string, unknown>) => {
         stored = row;
-        return 9;
+        return testId(9);
       }),
     });
 
@@ -268,7 +269,7 @@ describe("ExpensesService.create date and type split", () => {
 
     expect(stored).toMatchObject({
       type: "shift",
-      shiftId: 4,
+      shiftId: testId(4),
       amount: "12.50",
       recordedBy: cashierActor.id,
     });
@@ -279,10 +280,10 @@ describe("ExpensesService.create date and type split", () => {
     let stored: Record<string, unknown> = {};
     const repo = repoForCreate({
       byRequestId: vi.fn(async () => undefined),
-      category: vi.fn(async () => ({ id: 1, isActive: true })),
+      category: vi.fn(async () => ({ id: testId(1), isActive: true })),
       create: vi.fn(async (row: Record<string, unknown>) => {
         stored = row;
-        return 9;
+        return testId(9);
       }),
     });
 
