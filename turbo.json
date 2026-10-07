@@ -6,6 +6,11 @@
       "outputs": [".next/**", "!.next/cache/**", "dist/**", "out/**"]
     },
     "@cashier/db#test": {
+      "dependsOn": [
+        "@cashier/db#build",
+        "@cashier/shared#build",
+        "@cashier/server-core#build"
+      ],
       "cache": false
     },
     "@cashier/desktop#build:desktop": {
@@ -56,6 +61,18 @@
       "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
+    },
+    "@cashier/db#test:mysql:api": {
+      "dependsOn": [
+        "@cashier/db#build",
+        "@cashier/shared#build",
+        "@cashier/server-core#build"
+      ],
+      "cache": false
+    },
+    "@cashier/api#test": {
+      "dependsOn": ["^build"],
+      "cache": false
     }
   }
 }

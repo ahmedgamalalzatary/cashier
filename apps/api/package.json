@@ -5,16 +5,18 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "dev:worker": "tsx watch src/worker.ts",
+    "dev": "tsx watch --conditions=development src/index.ts",
+    "dev:worker": "tsx watch --conditions=development src/worker.ts",
     "build": "pnpm --filter @cashier/shared build && pnpm --filter @cashier/db build && pnpm --filter @cashier/server-core build && tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "start:worker": "node dist/worker.js",
-    "test": "vitest run",
+    "test": "pnpm --filter @cashier/server-core... build && pnpm run test:unit && pnpm run test:mysql",
     "test:watch": "vitest",
     "lint": "eslint src tests",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "db:seed": "tsx src/db/seed.ts"
+    "db:seed": "tsx src/db/seed.ts",
+    "test:unit": "vitest run",
+    "test:mysql": "turbo run test:mysql:api --filter=@cashier/db"
   },
   "dependencies": {
     "@cashier/db": "workspace:*",

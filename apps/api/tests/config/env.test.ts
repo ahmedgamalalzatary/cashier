@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parse as parseDotenv } from "dotenv";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { loadRuntimeEnv, parseRuntimeEnv, rootDir } from "../../src/env.js";
 
@@ -75,10 +75,23 @@ describe("runtime environment", () => {
     ).toEqual(["https://cashier.bittech.site", "http://localhost:3000"]);
   });
 
-  it("accepts the checked-in .env.test as a complete configuration", () => {
-    const raw = readFileSync(path.join(rootDir, ".env.test"), "utf8");
+  it("loads and accepts a complete .env file from disk", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "cashier-env-"));
+    const envFile = path.join(dir, ".env");
+    try {
+      writeFileSync(
+        envFile,
+        Object.entries(valid)
+          .map(([k, v]) => `${k}=${v}`)
+          .join("\n"),
+      );
+      const loaded = loadRuntimeEnv({ envFile, environment: {} });
 
-    expect(() => parseRuntimeEnv(parseDotenv(raw))).not.toThrow();
+      expect(loaded.DATABASE_URL).toBe(valid.DATABASE_URL);
+      expect(loaded.CORS_ORIGIN).toEqual([valid.CORS_ORIGIN]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it.each([

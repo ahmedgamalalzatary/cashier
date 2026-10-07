@@ -10,8 +10,8 @@ export const migrationsFolder = path.resolve(
 );
 
 /** Applies every pending migration to the test database. */
-export async function migrateTestDatabase() {
-  const db = createDb(loadTestEnvironment());
+export async function migrateTestDatabase(databaseName?: string) {
+  const db = createDb(loadTestEnvironment({ databaseName }));
   try {
     await migrate(db, { migrationsFolder });
   } finally {
@@ -19,9 +19,12 @@ export async function migrateTestDatabase() {
   }
 }
 
-export function loadTestEnvironment() {
+export function loadTestEnvironment({
+  envFile = path.resolve(import.meta.dirname, "../../../../.env.test"),
+  databaseName = process.env.CASHIER_TEST_DATABASE_NAME,
+}: { envFile?: string; databaseName?: string } = {}) {
   const loaded = config({
-    path: path.resolve(import.meta.dirname, "../../../../.env.test"),
+    path: envFile,
     override: true,
   });
   if (loaded.error) {
@@ -38,5 +41,14 @@ export function loadTestEnvironment() {
     );
   }
 
-  return testUrl!;
+  if (!databaseName) return testUrl!;
+  if (
+    !/^[a-z0-9_]+$/i.test(databaseName) ||
+    !/(^test_|_test$)/i.test(databaseName)
+  ) {
+    throw new Error("Test database override must be named test_* or *_test");
+  }
+  const url = new URL(testUrl!);
+  url.pathname = `/${databaseName}`;
+  return url.toString();
 }

@@ -8,6 +8,7 @@
   "exports": {
     ".": {
       "types": "./src/index.ts",
+      "development": "./src/index.ts",
       "default": "./dist/index.js"
     },
     "./test-support": {
@@ -27,7 +28,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "test:mysql:api": "vitest run --config vitest.api-mysql.config.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
@@ -46,6 +48,7 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.32.0",
     "vitest": "^3.1.4",
-    "zod": "^3.25.0"
+    "zod": "^3.25.0",
+    "@cashier/shared": "workspace:*"
   }
 }

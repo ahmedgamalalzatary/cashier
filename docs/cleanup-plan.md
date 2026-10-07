@@ -19,7 +19,7 @@ Reviewer: Claude (reviews every phase before it is accepted).
 - "Done" for a phase = targeted green (typecheck + lint + tests of touched area) **and** the
   phase's acceptance checks pass. Phase 9 runs the full suite.
 - Commands:
-  - API unit: `pnpm --filter @cashier/api test` · API DB tests: `pnpm --filter @cashier/api exec vitest run -c vitest.mysql.config.ts`
+  - API (unit + MySQL): `pnpm --filter @cashier/api test` ? API MySQL only: `pnpm --filter @cashier/api test:mysql` ? DB: `pnpm --filter @cashier/db test`
   - Web: `pnpm --filter @cashier/web test` · typecheck: `pnpm typecheck` · lint: `pnpm lint` · build: `pnpm build`
 - New migrations: edit `packages/db/src/schema.ts`, then `pnpm --filter @cashier/db db:generate`. Never hand-edit old migrations.
 - Shared types live in `packages/shared/src/types.ts` (rebuild shared before web/api typecheck).

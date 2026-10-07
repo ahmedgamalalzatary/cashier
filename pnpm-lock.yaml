@@ -167,6 +167,9 @@ importers:
         specifier: ^3.14.1
         version: 3.23.0(@types/node@22.20.1)
     devDependencies:
+      '@cashier/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@types/express':
         specifier: ^5.0.1
         version: 5.0.6

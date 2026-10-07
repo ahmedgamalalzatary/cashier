@@ -51,7 +51,7 @@ services:
       test:
         - CMD
         - node
-        - scripts/process-liveness.cjs
+        - /app/apps/api/scripts/process-liveness.cjs
         - drizzle-kit
       interval: 10s
       timeout: 5s

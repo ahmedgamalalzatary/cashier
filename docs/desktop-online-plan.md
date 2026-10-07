@@ -545,26 +545,43 @@ reports (shared), admins page + branches page + link code generation + devices/l
 
 ### 7.7 Tests and commands
 
-| Area                       | Command                                                                                         | Where tests live                                           |
-| -------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| DB package (after Phase 1) | `pnpm --filter @cashier/db test` (unit + MySQL config), `pnpm --filter @cashier/db db:generate` | `packages/db/tests/**` (every MySQL test, incl. the API's) |
-| API                        | `pnpm --filter @cashier/api test` (unit only; MySQL tests moved to `@cashier/db`)               | `apps/api/tests/**`                                        |
-| Server core (after Phase 2) | `pnpm --filter @cashier/server-core test` (unit only)                                            | `packages/server-core/tests/**`                            |
-| Online API                 | `pnpm --filter @cashier/online-api test`                                                        | `apps/online-api/tests/**`                                 |
-| Web / online-web           | `pnpm --filter @cashier/web test`, `pnpm --filter @cashier/online-web test`                     | `*/tests/**`                                               |
-| Desktop                    | `pnpm test:desktop`, `pnpm lint:desktop`, `pnpm typecheck:desktop`, `pnpm smoke:desktop`        | `apps/desktop/tests`, Rust `#[cfg(test)]`                  |
+| Area | Command | Where tests live |
+| --- | --- | --- |
+| DB package (after Phase 1) | `pnpm --filter @cashier/db test` (DB unit + DB MySQL tests), `pnpm --filter @cashier/db db:generate` | `packages/db/tests/**` |
+| API | `pnpm --filter @cashier/api test` (API unit + API-facing MySQL tests) | `apps/api/tests/**` and the 24 API-facing files in `packages/db/tests/mysql` |
+| Server core (after Phase 2) | `pnpm --filter @cashier/server-core test` | `packages/server-core/tests/**` |
+| Online API | `pnpm --filter @cashier/online-api test` | `apps/online-api/tests/**` |
+| Web / online-web | `pnpm --filter @cashier/web test`, `pnpm --filter @cashier/online-web test` | `*/tests/**` |
+| Desktop | `pnpm test:desktop`, `pnpm lint:desktop`, `pnpm typecheck:desktop`, `pnpm smoke:desktop` | `apps/desktop/tests`, Rust `#[cfg(test)]` |
 
-MySQL tests use the `*_test` database from `.env.test` and all of them live in
-`packages/db/tests/mysql` (they exercise the API through a real database, and one
-package now owns the schema, its migrations, and its test database lifecycle).
-`packages/db/tests/support` holds the shared fixtures: `database.ts` (connection +
-table cleanup), `test-env.ts` (`.env.test` loading + migrations), and
-`api-setup.ts` / `api-helpers.ts` (Express app options and user fixtures).
+All MySQL test files stay in `packages/db/tests/mysql`. DB's `vitest.mysql.config.ts`
+runs `seed-admin.test.ts` and `timezone.test.ts`; `vitest.api-mysql.config.ts` runs
+all the other files, which exercise API behavior. API's `test:mysql` delegates to
+DB's `test:mysql:api` through Turbo, so filtered API testing includes this coverage.
+For API unit tests alone, use `pnpm --filter @cashier/api test:unit` after building
+`@cashier/server-core` and its dependencies.
 
-Both `@cashier/db` and `@cashier/server-core` publish compiled `dist` but type
-from `src`, so they must be built before another package's tests run. Root `pnpm test`
-does that automatically (`test` depends on `^build`); a filtered run like
-`pnpm --filter @cashier/api test` needs the dependency builds to have happened.
+The DB suite uses the test database configured by the root `.env.test`. The API suite
+uses the same connection credentials with the database name `cashier_api_test`.
+Provision that database and give the `.env.test` account access before running API
+MySQL tests. Both names must satisfy the existing `test_*` or `*_test` guard;
+`cashier_test_api` does not. Separate databases allow root Turbo testing to run both
+suites without one suite migrating or clearing the other's tables.
+
+`packages/db/tests/support` owns migration and cleanup fixtures, plus the shared
+Express options and user fixtures. Keeping these fixtures in DB does not require
+excluding API-facing tests from the API test command.
+
+Production resolves `@cashier/db`, `@cashier/server-core`, and `@cashier/shared` to
+compiled `dist`. The DB test tasks declare explicit build prerequisites in
+`turbo.json`; the API `test` command also builds server-core and its dependencies,
+so a filtered API run works in a clean checkout.
+
+API and worker development scripts enable the `development` export condition.
+It resolves all three packages directly to `src`, so `tsx watch` reloads moved
+code when it changes. Both `pnpm dev` and direct `pnpm dev:api` use this resolution;
+no initial dependency compilation or separate compilation watchers are required.
+
 Sync tests need two databases at once:
 `cashier_test` (PC) and `cashier_online_test` (online). Add the second one to `.env.test` and
 `packages/db/tests/mysql-setup.ts` in Phase 10.
