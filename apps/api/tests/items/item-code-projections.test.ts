@@ -1,5 +1,7 @@
+import { repositoryIt as it } from "@cashier/db/test-support/ids";
+import { testId } from "@cashier/shared/test-support";
 import { drizzle } from "drizzle-orm/mysql-proxy";
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 import type { Db } from "@cashier/db";
 import * as schema from "@cashier/db";
 import { ItemsRepository } from "../../src/modules/items/items.repository.js";
@@ -25,27 +27,27 @@ describe("item code projections", () => {
   it.each([
     [
       "purchase invoice lines",
-      (db: Db) => new PurchasesRepository(db).listLines(1),
+      (db: Db) => new PurchasesRepository(db).listLines(testId(1)),
     ],
     [
       "transfer request lines",
-      (db: Db) => new TransfersRepository(db).listRequestLines(1),
+      (db: Db) => new TransfersRepository(db).listRequestLines(testId(1)),
     ],
     [
       "transfer lines",
-      (db: Db) => new TransfersRepository(db).listTransferLines(1),
+      (db: Db) => new TransfersRepository(db).listTransferLines(testId(1)),
     ],
     [
       "recipe ingredients",
-      (db: Db) => new RecipesRepository(db).listIngredients(1),
+      (db: Db) => new RecipesRepository(db).listIngredients(testId(1)),
     ],
     [
       "preparation allocations",
-      (db: Db) => new RecipesRepository(db).listPreparationAllocations(1),
+      (db: Db) => new RecipesRepository(db).listPreparationAllocations(testId(1)),
     ],
     [
       "order line allocations",
-      (db: Db) => new OrdersRepository(db).listAllocations([1]),
+      (db: Db) => new OrdersRepository(db).listAllocations([testId(1)]),
     ],
     ["the item list", (db: Db) => new ItemsRepository(db).list()],
   ])("selects the item code for %s", async (_label, run) => {

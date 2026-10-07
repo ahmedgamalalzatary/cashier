@@ -1,5 +1,7 @@
+import { beforeEach, it } from "../support/ids.js";
 import { sql } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
+import { currentBranchId, uuidv7 } from "@cashier/db";
+import { describe, expect } from "vitest";
 import request from "supertest";
 import { createApp } from "../../../../apps/api/src/app.js";
 import { appOptions, db } from "../support/api-setup.js";
@@ -21,10 +23,10 @@ beforeEach(async () => {
 async function createCategory(name = "خامات") {
   const response = await api().post("/api/categories").send({ name });
   expect(response.status).toBe(201);
-  return response.body.id as number;
+  return response.body.id as string;
 }
 
-async function createItem(categoryId: number, overrides = {}) {
+async function createItem(categoryId: string, overrides = {}) {
   return api()
     .post("/api/items")
     .send({
@@ -205,19 +207,19 @@ describe("main warehouse stock view", () => {
     const created = await createItem(categoryId, { mainMinimumLevel: 4 });
     expect(created.status).toBe(201);
 
-    const [batchResult] = await db.execute(sql`
+    const batchId = uuidv7();
+    await db.execute(sql`
       INSERT INTO stock_batches
-        (item_id, warehouse, initial_quantity, remaining_quantity, unit_cost, received_at, source_type)
+        (id, branch_id, item_id, warehouse, initial_quantity, remaining_quantity, unit_cost, received_at, source_type)
       VALUES
-        (${created.body.id}, 'main', 5, 3, 2.5, '2026-07-19 09:00:00', 'purchase')
+        (${batchId}, ${currentBranchId()}, ${created.body.id}, 'main', 5, 3, 2.5, '2026-07-19 09:00:00', 'purchase')
     `);
-    const batchId = batchResult.insertId;
     await db.execute(sql`
       INSERT INTO stock_movements
-        (item_id, warehouse, batch_id, movement_type, quantity, unit_cost, occurred_at)
+        (id, branch_id, item_id, warehouse, batch_id, movement_type, quantity, unit_cost, occurred_at)
       VALUES
-        (${created.body.id}, 'main', ${batchId}, 'purchase', 5, 2.5, '2026-07-19 09:00:00'),
-        (${created.body.id}, 'main', ${batchId}, 'transfer_out', -2, 2.5, '2026-07-19 10:00:00')
+        (${uuidv7()}, ${currentBranchId()}, ${created.body.id}, 'main', ${batchId}, 'purchase', 5, 2.5, '2026-07-19 09:00:00'),
+        (${uuidv7()}, ${currentBranchId()}, ${created.body.id}, 'main', ${batchId}, 'transfer_out', -2, 2.5, '2026-07-19 10:00:00')
     `);
 
     const response = await api().get("/api/inventory/main/stock");
@@ -248,9 +250,9 @@ describe("main warehouse stock view", () => {
 
     await db.execute(sql`
       INSERT INTO stock_movements
-        (item_id, warehouse, movement_type, quantity, unit_cost, occurred_at)
+        (id, branch_id, item_id, warehouse, movement_type, quantity, unit_cost, occurred_at)
       VALUES
-        (${created.body.id}, 'main', 'adjustment_shortage', -1, 0, '2026-07-19 11:00:00')
+        (${uuidv7()}, ${currentBranchId()}, ${created.body.id}, 'main', 'adjustment_shortage', -1, 0, '2026-07-19 11:00:00')
     `);
     const negative = await api().get("/api/inventory/main/stock");
     expect(negative.body[0]).toMatchObject({
@@ -270,9 +272,9 @@ describe("main warehouse stock view", () => {
 
     await db.execute(sql`
       INSERT INTO stock_movements
-        (item_id, warehouse, movement_type, quantity, unit_cost, occurred_at)
+        (id, branch_id, item_id, warehouse, movement_type, quantity, unit_cost, occurred_at)
       VALUES
-        (${created.body.id}, 'main', 'adjustment', 1, 0, '2026-07-19 11:00:00')
+        (${uuidv7()}, ${currentBranchId()}, ${created.body.id}, 'main', 'adjustment', 1, 0, '2026-07-19 11:00:00')
     `);
 
     const afterMovement = await api().get("/api/items");

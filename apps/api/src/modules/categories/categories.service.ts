@@ -31,7 +31,7 @@ export class CategoriesService {
 
   private async assertValidParent(
     repo: CategoriesRepository,
-    parentId: number,
+    parentId: string,
   ) {
     return this.validateParent(await repo.findByIdForUpdate(parentId));
   }
@@ -56,7 +56,7 @@ export class CategoriesService {
     );
   }
 
-  update(id: number, data: CategoryUpdateInput) {
+  update(id: string, data: CategoryUpdateInput) {
     return transactionWithDeadlockRetry(() =>
       this.repo.transaction(async (repo) => {
       const requestedParentId = data.parentId;
@@ -101,7 +101,7 @@ export class CategoriesService {
   }
 
   // soft delete; a main category takes its sub-categories with it
-  deactivate(id: number) {
+  deactivate(id: string) {
     return transactionWithDeadlockRetry(() =>
       this.repo.transaction(async (repo) => {
       const lockedRows = await repo.lockForUpdate(id);

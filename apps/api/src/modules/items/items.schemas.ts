@@ -42,7 +42,7 @@ const optionalText = (maximum: number) =>
 
 const itemFields = z.object({
   name: z.string().trim().min(1).max(191),
-  categoryId: z.coerce.number().int().positive(),
+  categoryId: z.string().uuid(),
   type: z.enum(ITEM_TYPES),
   sellingPrice: sellingPrice.nullish(),
   stockUnit: z.string().trim().min(1).max(50),

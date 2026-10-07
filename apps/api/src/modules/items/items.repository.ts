@@ -92,7 +92,7 @@ export class ItemsRepository {
     }));
   }
 
-  async findById(id: number) {
+  async findById(id: string) {
     const [row] = await this.db
       .select()
       .from(items)
@@ -100,7 +100,7 @@ export class ItemsRepository {
     return row;
   }
 
-  async findByIdForUpdate(id: number) {
+  async findByIdForUpdate(id: string) {
     const [row] = await this.db
       .select()
       .from(items)
@@ -109,7 +109,7 @@ export class ItemsRepository {
     return row;
   }
 
-  lockCategories(ids: number[]) {
+  lockCategories(ids: string[]) {
     return this.db
       .select()
       .from(categories)
@@ -118,7 +118,7 @@ export class ItemsRepository {
           categories,
           inArray(
             categories.id,
-            [...new Set(ids)].sort((a, b) => a - b),
+            [...new Set(ids)].sort((a, b) => (a).localeCompare(b)),
           ),
         ),
       )
@@ -126,7 +126,7 @@ export class ItemsRepository {
       .for("update");
   }
 
-  async categoryHasChildren(categoryId: number) {
+  async categoryHasChildren(categoryId: string) {
     const [row] = await this.db
       .select({ id: categories.id })
       .from(categories)
@@ -135,7 +135,7 @@ export class ItemsRepository {
     return Boolean(row);
   }
 
-  async hasStockHistory(itemId: number) {
+  async hasStockHistory(itemId: string) {
     const [row] = await this.db
       .select({ id: stockMovements.id })
       .from(stockMovements)
@@ -144,7 +144,7 @@ export class ItemsRepository {
     return Boolean(row);
   }
 
-  async hasActiveRecipeReferences(itemId: number) {
+  async hasActiveRecipeReferences(itemId: string) {
     const [row] = await this.db
       .select({ id: recipes.id })
       .from(recipes)
@@ -207,11 +207,11 @@ export class ItemsRepository {
         mainMinimumLevel: data.mainMinimumLevel.toFixed(3),
         cafeMinimumLevel: data.cafeMinimumLevel.toFixed(3),
       }),
-    );
-    return result.insertId;
+    ).$returningId();
+    return result.id;
   }
 
-  async update(id: number, data: ItemUpdateInput) {
+  async update(id: string, data: ItemUpdateInput) {
     const [result] = await this.db
       .update(items)
       .set(toDatabaseValues(data))
@@ -219,7 +219,7 @@ export class ItemsRepository {
     return result.affectedRows > 0;
   }
 
-  async deactivate(id: number) {
+  async deactivate(id: string) {
     const [result] = await this.db
       .update(items)
       .set({ isActive: false })

@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import {
   itemInput,
@@ -6,7 +7,7 @@ import {
 
 const validItem = {
   name: "بن برازيلي",
-  categoryId: 1,
+  categoryId: testId(1),
   type: "raw",
   stockUnit: "كجم",
   mainMinimumLevel: 2,

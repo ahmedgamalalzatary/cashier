@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -46,7 +47,7 @@ function controllerWith(
 function appWith(controller: ProductsController, role = "cashier") {
   const app = express();
   app.use((req, _res, next) => {
-    req.user = { id: 9, name: "Cashier", role };
+    req.user = { id: testId(9), name: "Cashier", role };
     next();
   });
   app.use(express.json(), productsRouter(controller, requireRole("admin")));

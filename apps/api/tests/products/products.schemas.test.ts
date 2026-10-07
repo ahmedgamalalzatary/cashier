@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import { productStockSetupInput } from "../../src/modules/products/products.schemas.js";
 
@@ -5,14 +6,14 @@ describe("productStockSetupInput", () => {
   it("accepts mapped targets and explicit no-stock-effect modifiers", () => {
     expect(
       productStockSetupInput.parse({
-        baseIngredients: [{ itemId: 1, quantity: 0.25 }],
+        baseIngredients: [{ itemId: testId(1), quantity: 0.25 }],
         sizes: [],
         modifiers: [
           { externalModifierOptionId: 10, stockEffect: "none" },
           {
             externalModifierOptionId: 11,
             stockEffect: "mapped",
-            ingredients: [{ itemId: 2, quantity: 1 }],
+            ingredients: [{ itemId: testId(2), quantity: 1 }],
           },
         ],
       }),
@@ -39,21 +40,21 @@ describe("productStockSetupInput", () => {
     expect(() =>
       productStockSetupInput.parse({
         baseIngredients: [
-          { itemId: 1, quantity: 1 },
-          { itemId: 1, quantity: 2 },
+          { itemId: testId(1), quantity: 1 },
+          { itemId: testId(1), quantity: 2 },
         ],
         sizes: [
-          { externalSizeId: 4, ingredients: [{ itemId: 2, quantity: 1 }] },
+          { externalSizeId: 4, ingredients: [{ itemId: testId(2), quantity: 1 }] },
         ],
         modifiers: [],
       }),
     ).toThrow();
     expect(() =>
       productStockSetupInput.parse({
-        baseIngredients: [{ itemId: 1, quantity: 1 }],
+        baseIngredients: [{ itemId: testId(1), quantity: 1 }],
         sizes: [
-          { externalSizeId: 4, ingredients: [{ itemId: 2, quantity: 1 }] },
-          { externalSizeId: 4, ingredients: [{ itemId: 3, quantity: 1 }] },
+          { externalSizeId: 4, ingredients: [{ itemId: testId(2), quantity: 1 }] },
+          { externalSizeId: 4, ingredients: [{ itemId: testId(3), quantity: 1 }] },
         ],
         modifiers: [],
       }),

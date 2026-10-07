@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, it } from "../support/ids.js";
+import { describe, expect } from "vitest";
 import request from "supertest";
 import { createApp } from "../../../../apps/api/src/app.js";
 import { appOptions, db } from "../support/api-setup.js";
@@ -17,7 +18,7 @@ beforeEach(async () => {
   authorization = await loginAs(app(), "admin");
 });
 
-async function createCategory(name: string, parentId?: number) {
+async function createCategory(name: string, parentId?: string) {
   return api().post("/api/categories").send({ name, parentId });
 }
 
@@ -85,7 +86,7 @@ describe("categories", () => {
     ]);
 
     expect(results.map((result) => result.status).sort()).toEqual([200, 400]);
-    const rows: Array<{ id: number; parentId: number | null }> = (
+    const rows: Array<{ id: string; parentId: string | null }> = (
       await api().get("/api/categories")
     ).body;
     const rowA = rows.find((row) => row.id === a.body.id);
@@ -121,8 +122,8 @@ describe("categories", () => {
     expect([200, 400]).toContain(update.status);
     expect(deactivate.status).toBe(200);
     const rows: Array<{
-      id: number;
-      parentId: number | null;
+      id: string;
+      parentId: string | null;
       isActive: boolean;
     }> = (await api().get("/api/categories")).body;
     const childRow = rows.find((row) => row.id === child.body.id);
@@ -140,7 +141,7 @@ describe("categories", () => {
     const res = await api().delete(`/api/categories/${main.body.id}`);
     expect(res.status).toBe(200);
     const list = await api().get("/api/categories");
-    const rows: Array<{ id: number; isActive: boolean }> = list.body;
+    const rows: Array<{ id: string; isActive: boolean }> = list.body;
     const mainRow = rows.find((c) => c.id === main.body.id);
     const subRow = rows.find((c) => c.id === sub.body.id);
     expect(mainRow?.isActive).toBeFalsy();
@@ -176,10 +177,10 @@ describe("categories", () => {
 
     const rows = (await api().get("/api/categories")).body;
     expect(
-      rows.find((row: { id: number }) => row.id === main.body.id).isActive,
+      rows.find((row: { id: string }) => row.id === main.body.id).isActive,
     ).toBe(true);
     expect(
-      rows.find((row: { id: number }) => row.id === sub.body.id).isActive,
+      rows.find((row: { id: string }) => row.id === sub.body.id).isActive,
     ).toBe(true);
   });
 
@@ -191,7 +192,7 @@ describe("categories", () => {
   });
 
   it("404s on a missing category", async () => {
-    const res = await api().delete("/api/categories/999");
+    const res = await api().delete("/api/categories/00000000-0000-7000-8000-0000000003e7");
     expect(res.status).toBe(404);
   });
 });

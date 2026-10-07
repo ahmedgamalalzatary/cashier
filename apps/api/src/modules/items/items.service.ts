@@ -13,7 +13,7 @@ export class ItemsService {
     return this.repo.list();
   }
 
-  private async validateCategory(repo: ItemsRepository, categoryId: number) {
+  private async validateCategory(repo: ItemsRepository, categoryId: string) {
     const categories = await repo.lockCategories([categoryId]);
     const category = categories.find((row) => row.id === categoryId);
     if (!category) throw new HttpError(400, "التصنيف غير موجود");
@@ -38,7 +38,7 @@ export class ItemsService {
     });
   }
 
-  update(id: number, data: ItemUpdateInput) {
+  update(id: string, data: ItemUpdateInput) {
     return this.repo.transaction(async (repo) => {
       const item = await repo.findByIdForUpdate(id);
       if (!item) throw new HttpError(404, "الصنف غير موجود");
@@ -108,7 +108,7 @@ export class ItemsService {
     });
   }
 
-  deactivate(id: number) {
+  deactivate(id: string) {
     return this.repo.transaction(async (repo) => {
       const item = await repo.findByIdForUpdate(id);
       if (!item) throw new HttpError(404, "الصنف غير موجود");

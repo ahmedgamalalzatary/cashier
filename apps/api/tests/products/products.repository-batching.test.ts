@@ -1,5 +1,7 @@
+import { repositoryIt as it } from "@cashier/db/test-support/ids";
+import { testId } from "@cashier/shared/test-support";
 import { drizzle } from "drizzle-orm/mysql-proxy";
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 import type { Db } from "@cashier/db";
 import * as schema from "@cashier/db";
 import { ProductsRepository } from "../../src/modules/products/products.repository.js";
@@ -12,7 +14,7 @@ function recordingDb() {
     async (sql, params, mode) => {
       statements.push(sql);
       if (mode === "execute") {
-        return { rows: [{ insertId: 0, affectedRows: 1 }] };
+        return { rows: [{ insertId: testId(0), affectedRows: 1 }] };
       }
       const text = sql.toLowerCase();
       if (
@@ -42,7 +44,7 @@ function recordingDb() {
       if (text.includes("from `items`")) {
         return {
           rows: Array.from({ length: INSERT_CHUNK_SIZE + 1 }, (_, index) => [
-            index + 1,
+            testId(index + 1),
             1,
           ]),
         };
@@ -97,7 +99,7 @@ describe("ProductsRepository batching boundaries", () => {
       baseIngredients: Array.from(
         { length: INSERT_CHUNK_SIZE + 1 },
         (_, index) => ({
-          itemId: index + 1,
+          itemId: testId(index + 1),
           quantity: 1,
         }),
       ),

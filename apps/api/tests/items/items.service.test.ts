@@ -1,10 +1,11 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it, vi } from "vitest";
 import type { ItemsRepository } from "../../src/modules/items/items.repository.js";
 import { ItemsService } from "../../src/modules/items/items.service.js";
 
 const newItem = {
   name: "بن برازيلي",
-  categoryId: 3,
+  categoryId: testId(3),
   type: "raw",
   stockUnit: "كجم",
   mainMinimumLevel: 0,
@@ -15,7 +16,7 @@ function repoWithCategory(overrides: Record<string, unknown>) {
   const transactionRepo = {
     lockCategories: vi
       .fn()
-      .mockResolvedValue([{ id: 3, isActive: true, parentId: 1 }]),
+      .mockResolvedValue([{ id: testId(3), isActive: true, parentId: testId(1) }]),
     categoryHasChildren: vi.fn().mockResolvedValue(false),
     ...overrides,
   };
@@ -29,7 +30,7 @@ describe("ItemsService code assignment", () => {
   it("stamps the next sequential code, ignoring any client-supplied code", async () => {
     const { repo, transactionRepo } = repoWithCategory({
       nextItemCode: vi.fn().mockResolvedValue(43),
-      create: vi.fn().mockResolvedValue(9),
+      create: vi.fn().mockResolvedValue(testId(9)),
     });
 
     await new ItemsService(repo).create({ ...newItem, code: 999 } as never);
@@ -43,14 +44,14 @@ describe("ItemsService code assignment", () => {
   it("reads the next code once, inside the same transaction as the insert", async () => {
     const { repo, transactionRepo } = repoWithCategory({
       nextItemCode: vi.fn().mockResolvedValue(43),
-      create: vi.fn().mockResolvedValue(9),
+      create: vi.fn().mockResolvedValue(testId(9)),
     });
 
     const id = await new ItemsService(repo).create(newItem as never);
 
     // the code comes from a locking read, so a second attempt would only ever
     // re-read the same number; correctness has to come from the lock, not a retry
-    expect(id).toBe(9);
+    expect(id).toBe(testId(9));
     expect(transactionRepo.nextItemCode).toHaveBeenCalledOnce();
     expect(transactionRepo.create).toHaveBeenCalledOnce();
     expect(repo.transaction).toHaveBeenCalledOnce();
@@ -75,7 +76,7 @@ describe("ItemsService code assignment", () => {
 describe("ItemsService deactivation", () => {
   it("locks and deactivates the item inside one transaction", async () => {
     const transactionRepo = {
-      findByIdForUpdate: vi.fn().mockResolvedValue({ id: 7, isActive: true }),
+      findByIdForUpdate: vi.fn().mockResolvedValue({ id: testId(7), isActive: true }),
       hasActiveRecipeReferences: vi.fn().mockResolvedValue(false),
       deactivate: vi.fn().mockResolvedValue(true),
     };
@@ -85,11 +86,11 @@ describe("ItemsService deactivation", () => {
       deactivate: vi.fn(),
     } as unknown as ItemsRepository;
 
-    await new ItemsService(repo).deactivate(7);
+    await new ItemsService(repo).deactivate(testId(7));
 
     expect(repo.transaction).toHaveBeenCalledOnce();
-    expect(transactionRepo.findByIdForUpdate).toHaveBeenCalledWith(7);
-    expect(transactionRepo.deactivate).toHaveBeenCalledWith(7);
+    expect(transactionRepo.findByIdForUpdate).toHaveBeenCalledWith(testId(7));
+    expect(transactionRepo.deactivate).toHaveBeenCalledWith(testId(7));
     expect(repo.findById).not.toHaveBeenCalled();
     expect(repo.deactivate).not.toHaveBeenCalled();
   });
@@ -102,7 +103,7 @@ function txWithItem(
   return {
     lockCategories: vi
       .fn()
-      .mockResolvedValue([{ id: 3, isActive: true, parentId: 1 }]),
+      .mockResolvedValue([{ id: testId(3), isActive: true, parentId: testId(1) }]),
     categoryHasChildren: vi.fn().mockResolvedValue(false),
     findByIdForUpdate: vi.fn(async () => item),
     hasStockHistory: vi.fn(async () => false),
@@ -125,8 +126,8 @@ function serviceWithItem(
 }
 
 const storedRaw = () => ({
-  id: 5,
-  categoryId: 3,
+  id: testId(5),
+  categoryId: testId(3),
   type: "raw",
   stockUnit: "كجم",
   purchaseUnit: "شكارة",
@@ -149,7 +150,7 @@ describe("ItemsService category validation", () => {
     const inactive = repoWithCategory({
       lockCategories: vi
         .fn()
-        .mockResolvedValue([{ id: 3, isActive: false, parentId: 1 }]),
+        .mockResolvedValue([{ id: testId(3), isActive: false, parentId: testId(1) }]),
       nextItemCode: vi.fn(),
       create: vi.fn(),
     });
@@ -160,7 +161,7 @@ describe("ItemsService category validation", () => {
     const mainWithChildren = repoWithCategory({
       lockCategories: vi
         .fn()
-        .mockResolvedValue([{ id: 3, isActive: true, parentId: null }]),
+        .mockResolvedValue([{ id: testId(3), isActive: true, parentId: null }]),
       categoryHasChildren: vi.fn().mockResolvedValue(true),
       nextItemCode: vi.fn(),
       create: vi.fn(),
@@ -175,26 +176,26 @@ describe("ItemsService update guards", () => {
   it("404s a missing item", async () => {
     const { service } = serviceWithItem(undefined);
     await expect(
-      service.update(999, { name: "x" } as never),
+      service.update(testId(999), { name: "x" } as never),
     ).rejects.toMatchObject({ status: 404 });
   });
 
   it("requires a price when flipping to resale and forbids it elsewhere", async () => {
     const flip = serviceWithItem(storedRaw());
     await expect(
-      flip.service.update(5, { type: "resale" } as never),
+      flip.service.update(testId(5), { type: "resale" } as never),
     ).rejects.toMatchObject({ status: 400 });
 
     const pricedElsewhere = serviceWithItem(storedRaw());
     await expect(
-      pricedElsewhere.service.update(5, { sellingPrice: 9 } as never),
+      pricedElsewhere.service.update(testId(5), { sellingPrice: 9 } as never),
     ).rejects.toMatchObject({ status: 400 });
   });
 
   it("rejects a half-cleared purchase-unit pair", async () => {
     const { service } = serviceWithItem(storedRaw());
     await expect(
-      service.update(5, { purchaseUnit: null } as never),
+      service.update(testId(5), { purchaseUnit: null } as never),
     ).rejects.toMatchObject({ status: 400 });
   });
 
@@ -204,7 +205,7 @@ describe("ItemsService update guards", () => {
         [flag]: vi.fn(async () => true),
       });
       await expect(
-        service.update(5, { stockUnit: "جم" } as never),
+        service.update(testId(5), { stockUnit: "جم" } as never),
       ).rejects.toMatchObject({ status: 409 });
     }
   });
@@ -216,28 +217,28 @@ describe("ItemsService update guards", () => {
       sellingPrice: "12.50",
     };
     const { service, tx } = serviceWithItem(resale);
-    await service.update(5, { type: "raw" } as never);
-    expect(tx.update).toHaveBeenCalledWith(5, { type: "raw", sellingPrice: null });
+    await service.update(testId(5), { type: "raw" } as never);
+    expect(tx.update).toHaveBeenCalledWith(testId(5), { type: "raw", sellingPrice: null });
   });
 });
 
 describe("ItemsService deactivation guards", () => {
   it("404s a missing item and skips an inactive one", async () => {
     const { service } = serviceWithItem(undefined);
-    await expect(service.deactivate(999)).rejects.toMatchObject({
+    await expect(service.deactivate(testId(999))).rejects.toMatchObject({
       status: 404,
     });
 
-    const quiet = serviceWithItem({ id: 7, isActive: false });
-    await quiet.service.deactivate(7);
+    const quiet = serviceWithItem({ id: testId(7), isActive: false });
+    await quiet.service.deactivate(testId(7));
     expect(quiet.tx.deactivate).not.toHaveBeenCalled();
   });
 
   it("409s deactivation of a recipe-linked item", async () => {
     const { service } = serviceWithItem(
-      { id: 7, isActive: true },
+      { id: testId(7), isActive: true },
       { hasActiveRecipeReferences: vi.fn(async () => true) },
     );
-    await expect(service.deactivate(7)).rejects.toMatchObject({ status: 409 });
+    await expect(service.deactivate(testId(7))).rejects.toMatchObject({ status: 409 });
   });
 });

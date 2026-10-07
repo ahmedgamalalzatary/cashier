@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -10,7 +11,7 @@ import { categoriesRouter } from "../../src/modules/categories/categories.router
 function appWithStubs(controller: CategoriesController) {
   const app = express();
   app.use((req, _res, next) => {
-    req.user = { id: 7, name: "Admin", role: "admin" };
+    req.user = { id: testId(7), name: "Admin", role: "admin" };
     next();
   });
   app.use(express.json(), categoriesRouter(controller));
@@ -22,7 +23,7 @@ describe("category routes", () => {
   it("dispatches list, create, update, and deactivate", async () => {
     const controller = {
       list: vi.fn((_req, res) => res.json([])),
-      create: vi.fn((_req, res) => res.status(201).json({ id: 9 })),
+      create: vi.fn((_req, res) => res.status(201).json({ id: testId(9) })),
       update: vi.fn((_req, res) => res.json({ ok: true })),
       deactivate: vi.fn((_req, res) => res.json({ ok: true })),
     } as unknown as CategoriesController;
@@ -31,8 +32,8 @@ describe("category routes", () => {
     const [list, created, updated, deactivated] = await Promise.all([
       request(app).get("/"),
       request(app).post("/").send({ name: "خامات" }),
-      request(app).put("/9").send({ name: "جديد" }),
-      request(app).delete("/9"),
+      request(app).put("/00000000-0000-7000-8000-000000000009").send({ name: "جديد" }),
+      request(app).delete("/00000000-0000-7000-8000-000000000009"),
     ]);
 
     expect([list.status, created.status, updated.status, deactivated.status]).toEqual([
@@ -48,19 +49,19 @@ describe("category routes", () => {
 describe("category controller wiring", () => {
   it("creates with the parsed body and updates with id plus changes", async () => {
     const service = {
-      create: vi.fn(async () => 9),
+      create: vi.fn(async () => testId(9)),
       update: vi.fn(async () => undefined),
     } as unknown as CategoriesService;
     const app = appWithStubs(new RealCategoriesController(service));
 
     const created = await request(app).post("/").send({ name: "خامات" });
     expect(created.status).toBe(201);
-    expect(created.body).toEqual({ id: 9 });
+    expect(created.body).toEqual({ id: testId(9) });
     expect(service.create).toHaveBeenCalledWith({ name: "خامات" });
 
-    const updated = await request(app).put("/9").send({ name: "جديد" });
+    const updated = await request(app).put("/00000000-0000-7000-8000-000000000009").send({ name: "جديد" });
     expect(updated.status).toBe(200);
-    expect(service.update).toHaveBeenCalledWith(9, { name: "جديد" });
+    expect(service.update).toHaveBeenCalledWith(testId(9), { name: "جديد" });
   });
 
   it("maps blank names, empty updates, and bad ids to 400", async () => {
@@ -74,12 +75,12 @@ describe("category controller wiring", () => {
     expect((await request(app).post("/").send({ name: "   " })).status).toBe(
       400,
     );
-    expect((await request(app).put("/9").send({})).status).toBe(400);
+    expect((await request(app).put("/00000000-0000-7000-8000-000000000009").send({})).status).toBe(400);
     expect((await request(app).put("/abc").send({ name: "x" })).status).toBe(
       400,
     );
 
-    const missing = await request(app).delete("/999");
+    const missing = await request(app).delete("/00000000-0000-7000-8000-0000000003e7");
     expect(missing.status).toBe(404);
   });
 });

@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import express, { type RequestHandler } from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -24,8 +25,8 @@ describe("items route authorization", () => {
     const responses = await Promise.all([
       request(app).get("/"),
       request(app).post("/").send({}),
-      request(app).put("/1").send({}),
-      request(app).delete("/1"),
+      request(app).put("/00000000-0000-7000-8000-000000000001").send({}),
+      request(app).delete("/00000000-0000-7000-8000-000000000001"),
     ]);
 
     expect(responses.map(({ status }) => status)).toEqual([403, 403, 403, 403]);
@@ -40,7 +41,7 @@ describe("items controller wiring", () => {
   const pass: RequestHandler = (_req, _res, next) => next();
   const validBody = {
     name: "بن",
-    categoryId: 3,
+    categoryId: testId(3),
     type: "raw",
     stockUnit: "كجم",
     mainMinimumLevel: 0,
@@ -56,7 +57,7 @@ describe("items controller wiring", () => {
 
   it("creates with the parsed body and updates with id plus changes", async () => {
     const service = {
-      create: vi.fn(async () => 9),
+      create: vi.fn(async () => testId(9)),
       update: vi.fn(async () => undefined),
       deactivate: vi.fn(async () => undefined),
     } as unknown as ItemsService;
@@ -64,21 +65,21 @@ describe("items controller wiring", () => {
 
     const created = await request(app).post("/").send(validBody);
     expect(created.status).toBe(201);
-    expect(created.body).toEqual({ id: 9 });
+    expect(created.body).toEqual({ id: testId(9) });
     expect(service.create).toHaveBeenCalledWith(validBody);
 
-    const updated = await request(app).put("/9").send({ name: "جديد" });
+    const updated = await request(app).put("/00000000-0000-7000-8000-000000000009").send({ name: "جديد" });
     expect(updated.status).toBe(200);
-    expect(service.update).toHaveBeenCalledWith(9, { name: "جديد" });
+    expect(service.update).toHaveBeenCalledWith(testId(9), { name: "جديد" });
 
-    const deactivated = await request(app).delete("/9");
+    const deactivated = await request(app).delete("/00000000-0000-7000-8000-000000000009");
     expect(deactivated.status).toBe(200);
-    expect(service.deactivate).toHaveBeenCalledWith(9);
+    expect(service.deactivate).toHaveBeenCalledWith(testId(9));
   });
 
   it("maps bad bodies and ids to 400 and missing items to 404", async () => {
     const service = {
-      create: vi.fn(async () => 9),
+      create: vi.fn(async () => testId(9)),
       deactivate: vi
         .fn()
         .mockRejectedValue(new HttpError(404, "الصنف غير موجود")),
@@ -90,7 +91,7 @@ describe("items controller wiring", () => {
       400,
     );
 
-    const missing = await request(app).delete("/999");
+    const missing = await request(app).delete("/00000000-0000-7000-8000-0000000003e7");
     expect(missing.status).toBe(404);
   });
 });

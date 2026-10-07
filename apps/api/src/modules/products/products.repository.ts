@@ -621,7 +621,7 @@ export class ProductsRepository implements ProductsRepositoryContract {
         ),
       ]
         .map((ingredient) => ingredient.itemId)
-        .sort((a, b) => a - b);
+        .sort((a, b) => (a).localeCompare(b));
       const uniqueItemIds = [...new Set(itemIds)];
       if (uniqueItemIds.length > 0) {
         const [existingBase, existingSizes, existingModifiers] =

@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from 'vitest';
 import {
   categoryInput,
@@ -20,9 +21,9 @@ describe('category input schema', () => {
     );
   });
 
-  it('coerces parent ids and rejects empty updates', () => {
-    expect(categoryInput.parse({ name: 'فرعي', parentId: '3' }).parentId).toBe(
-      3,
+  it('accepts UUID parent ids and rejects empty updates', () => {
+    expect(categoryInput.parse({ name: 'فرعي', parentId: testId(3) }).parentId).toBe(
+      testId(3),
     );
     expect(
       categoryInput.safeParse({ name: 'فرعي', parentId: 0 }).success,

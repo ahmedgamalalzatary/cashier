@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it, vi } from "vitest";
 import { ProductsService } from "../../src/modules/products/products.service.js";
 
@@ -64,7 +65,7 @@ describe("ProductsService", () => {
         sizes: [
           {
             externalSizeId: 91,
-            ingredients: [{ itemId: 1, quantity: 1 }],
+            ingredients: [{ itemId: testId(1), quantity: 1 }],
           },
         ],
         modifiers: [{ externalModifierOptionId: 101, stockEffect: "none" }],
@@ -93,7 +94,7 @@ describe("ProductsService", () => {
         sizes: [
           {
             externalSizeId: 999,
-            ingredients: [{ itemId: 1, quantity: 1 }],
+            ingredients: [{ itemId: testId(1), quantity: 1 }],
           },
         ],
         modifiers: [],
@@ -137,7 +138,7 @@ describe("ProductsService", () => {
         sizes: [
           {
             externalSizeId: 91,
-            ingredients: [{ itemId: 1, quantity: 1 }],
+            ingredients: [{ itemId: testId(1), quantity: 1 }],
           },
         ],
         modifiers: [{ externalModifierOptionId: 101, stockEffect: "none" }],
@@ -147,11 +148,11 @@ describe("ProductsService", () => {
     // sized products must not carry base ingredients
     await expect(
       new ProductsService(sized).configureStock(9, {
-        baseIngredients: [{ itemId: 1, quantity: 1 }],
+        baseIngredients: [{ itemId: testId(1), quantity: 1 }],
         sizes: [
           {
             externalSizeId: 91,
-            ingredients: [{ itemId: 1, quantity: 1 }],
+            ingredients: [{ itemId: testId(1), quantity: 1 }],
           },
         ],
         modifiers: [
@@ -192,8 +193,8 @@ describe("ProductsService", () => {
     const data = {
       baseIngredients: [],
       sizes: [
-        { externalSizeId: 92, ingredients: [{ itemId: 2, quantity: 1 }] },
-        { externalSizeId: 91, ingredients: [{ itemId: 1, quantity: 1 }] },
+        { externalSizeId: 92, ingredients: [{ itemId: testId(2), quantity: 1 }] },
+        { externalSizeId: 91, ingredients: [{ itemId: testId(1), quantity: 1 }] },
       ],
       modifiers: [{ externalModifierOptionId: 101, stockEffect: "none" as const }],
     };

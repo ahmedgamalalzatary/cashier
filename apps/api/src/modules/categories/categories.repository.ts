@@ -27,7 +27,7 @@ export class CategoriesRepository {
       .orderBy(categories.name);
   }
 
-  async findById(id: number) {
+  async findById(id: string) {
     const [row] = await this.db
       .select()
       .from(categories)
@@ -35,7 +35,7 @@ export class CategoriesRepository {
     return row;
   }
 
-  async findByIdForUpdate(id: number) {
+  async findByIdForUpdate(id: string) {
     const [row] = await this.db
       .select()
       .from(categories)
@@ -44,7 +44,7 @@ export class CategoriesRepository {
     return row;
   }
 
-  lockForUpdate(id: number, requestedParentId?: number) {
+  lockForUpdate(id: string, requestedParentId?: string) {
     const directIds =
       requestedParentId === undefined ? [id] : [id, requestedParentId];
     return this.db
@@ -68,14 +68,14 @@ export class CategoriesRepository {
       .for("update");
   }
 
-  children(parentId: number) {
+  children(parentId: string) {
     return this.db
       .select()
       .from(categories)
       .where(branchCondition(categories, eq(categories.parentId, parentId)));
   }
 
-  async hasActiveItems(categoryIds: number[]) {
+  async hasActiveItems(categoryIds: string[]) {
     const [row] = await this.db
       .select({ id: items.id })
       .from(items)
@@ -89,7 +89,7 @@ export class CategoriesRepository {
     return Boolean(row);
   }
 
-  async hasActiveRecipes(categoryIds: number[]) {
+  async hasActiveRecipes(categoryIds: string[]) {
     const [row] = await this.db
       .select({ id: recipes.id })
       .from(recipes)
@@ -106,16 +106,16 @@ export class CategoriesRepository {
     return Boolean(row);
   }
 
-  async create(data: { name: string; parentId?: number | null }) {
+  async create(data: { name: string; parentId?: string | null }) {
     const [result] = await this.db
       .insert(categories)
-      .values(branchValues(data));
-    return result.insertId;
+      .values(branchValues(data)).$returningId();
+    return result.id;
   }
 
   async update(
-    id: number,
-    data: { name?: string; parentId?: number | null; isActive?: boolean },
+    id: string,
+    data: { name?: string; parentId?: string | null; isActive?: boolean },
   ) {
     const [result] = await this.db
       .update(categories)
@@ -124,7 +124,7 @@ export class CategoriesRepository {
     return result.affectedRows > 0;
   }
 
-  async deactivateMany(ids: number[]) {
+  async deactivateMany(ids: string[]) {
     await this.db
       .update(categories)
       .set({ isActive: false })

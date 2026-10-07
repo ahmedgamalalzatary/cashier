@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { it, testBranchValues } from "../support/ids.js";
+import { describe, expect } from "vitest";
 import { eq } from "drizzle-orm";
 import { categories, items } from "@cashier/db";
 import type { ExternalCatalog } from "../../../../apps/api/src/modules/external/external-catalog.client.js";
@@ -59,18 +60,18 @@ const catalog = (nameAr = "قهوة"): ExternalCatalog => ({
 
 describe("ProductsRepository catalog reconciliation", () => {
   it("preserves local stock setup across refreshes and hides missing upstream products", async () => {
-    const [category] = await db.insert(categories).values({ name: "مخزون" });
-    const [ingredient] = await db.insert(items).values({
+    const [category] = await db.insert(categories).values(testBranchValues({ name: "مخزون" })).$returningId();
+    const [ingredient] = await db.insert(items).values(testBranchValues({
       code: nextTestItemCode(),
       name: "بن",
-      categoryId: category.insertId,
+      categoryId: category.id,
       type: "raw",
       stockUnit: "كجم",
-    });
+    })).$returningId();
     const repository = new ProductsRepository(db);
     await repository.applyCatalog(catalog());
     await repository.saveStockSetup(9, {
-      baseIngredients: [{ itemId: ingredient.insertId, quantity: 0.02 }],
+      baseIngredients: [{ itemId: ingredient.id, quantity: 0.02 }],
       sizes: [],
       modifiers: [{ externalModifierOptionId: 93, stockEffect: "none" }],
     });
@@ -85,7 +86,7 @@ describe("ProductsRepository catalog reconciliation", () => {
         sellable: true,
         ingredients: [
           expect.objectContaining({
-            itemId: ingredient.insertId,
+            itemId: ingredient.id,
             quantity: "0.020",
           }),
         ],
@@ -100,7 +101,7 @@ describe("ProductsRepository catalog reconciliation", () => {
     await repository.applyCatalog({ ...catalog(), products: [] });
     expect((await repository.getCatalog())?.products).toEqual([]);
     expect(
-      await db.select().from(items).where(eq(items.id, ingredient.insertId)),
+      await db.select().from(items).where(eq(items.id, ingredient.id)),
     ).toHaveLength(1);
   });
 
@@ -119,18 +120,18 @@ describe("ProductsRepository catalog reconciliation", () => {
   });
 
   it("preserves an unchanged mapping when its item was later deactivated", async () => {
-    const [category] = await db.insert(categories).values({ name: "مخزون" });
-    const [ingredient] = await db.insert(items).values({
+    const [category] = await db.insert(categories).values(testBranchValues({ name: "مخزون" })).$returningId();
+    const [ingredient] = await db.insert(items).values(testBranchValues({
       code: nextTestItemCode(),
       name: "بن قديم",
-      categoryId: category.insertId,
+      categoryId: category.id,
       type: "raw",
       stockUnit: "كجم",
-    });
+    })).$returningId();
     const repository = new ProductsRepository(db);
     await repository.applyCatalog(catalog());
     const setup = {
-      baseIngredients: [{ itemId: ingredient.insertId, quantity: 0.02 }],
+      baseIngredients: [{ itemId: ingredient.id, quantity: 0.02 }],
       sizes: [],
       modifiers: [
         { externalModifierOptionId: 93, stockEffect: "none" as const },
@@ -140,20 +141,20 @@ describe("ProductsRepository catalog reconciliation", () => {
     await db
       .update(items)
       .set({ isActive: false })
-      .where(eq(items.id, ingredient.insertId));
+      .where(eq(items.id, ingredient.id));
 
     await expect(repository.saveStockSetup(9, setup)).resolves.toBeUndefined();
   });
 
   it("caches a product with unnamed modifiers but keeps it out of sale", async () => {
-    const [category] = await db.insert(categories).values({ name: "مخزون" });
-    const [ingredient] = await db.insert(items).values({
+    const [category] = await db.insert(categories).values(testBranchValues({ name: "مخزون" })).$returningId();
+    const [ingredient] = await db.insert(items).values(testBranchValues({
       code: nextTestItemCode(),
       name: "بن",
-      categoryId: category.insertId,
+      categoryId: category.id,
       type: "raw",
       stockUnit: "كجم",
-    });
+    })).$returningId();
     const repository = new ProductsRepository(db);
     const unnamed = catalog();
     unnamed.products[0]!.modifierGroups[0]!.nameAr = null;
@@ -163,7 +164,7 @@ describe("ProductsRepository catalog reconciliation", () => {
 
     await repository.applyCatalog(unnamed);
     await repository.saveStockSetup(9, {
-      baseIngredients: [{ itemId: ingredient.insertId, quantity: 0.02 }],
+      baseIngredients: [{ itemId: ingredient.id, quantity: 0.02 }],
       sizes: [],
       modifiers: [{ externalModifierOptionId: 93, stockEffect: "none" }],
     });

@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { idParam } from "@cashier/server-core";
+import { externalIdParam } from "@cashier/server-core";
 import type { ProductsService } from "./products.service.js";
 import { productStockSetupInput } from "./products.schemas.js";
 import type { CacheRefreshRepository } from "../external/cache-refresh.repository.js";
@@ -94,7 +94,7 @@ export class ProductsController {
 
   configureStock = async (req: Request, res: Response) => {
     await this.service.configureStock(
-      idParam.parse(req.params.id),
+      externalIdParam.parse(req.params.id),
       productStockSetupInput.parse(req.body),
     );
     res.json({ ok: true });

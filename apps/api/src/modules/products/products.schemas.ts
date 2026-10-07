@@ -10,7 +10,7 @@ const quantity = z.coerce
   });
 
 const ingredient = z.object({
-  itemId: z.coerce.number().int().positive(),
+  itemId: z.string().uuid(),
   quantity,
 });
 
