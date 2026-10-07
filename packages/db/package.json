@@ -18,6 +18,10 @@
     "./test-support/env": {
       "types": "./tests/support/test-env.ts",
       "default": "./tests/support/test-env.ts"
+    },
+    "./test-support/ids": {
+      "types": "./tests/support/ids.ts",
+      "default": "./tests/support/ids.ts"
     }
   },
   "scripts": {

@@ -2,12 +2,18 @@ import mysql, { type Connection } from "mysql2/promise";
 import { afterAll, beforeAll, beforeEach } from "vitest";
 import { closeDb, createDb } from "../../src/client.js";
 import { loadTestEnvironment } from "./test-env.js";
+import { TEST_BRANCH_ID } from "./ids.js";
 
 const testUrl = loadTestEnvironment();
 
 export const db = createDb(testUrl);
 
 const tables = [
+  "admin_branches",
+  "devices",
+  "link_codes",
+  "sync_outbox",
+  "sync_state",
   "stocktake_lines",
   "stocktakes",
   "expenses",
@@ -63,9 +69,10 @@ export async function cleanupTables() {
   await cleanupConnection.query("SET FOREIGN_KEY_CHECKS = 0");
   try {
     await cleanupConnection.query(deletes);
-    await cleanupConnection.query("DELETE FROM branches WHERE id <> 1");
+    await cleanupConnection.query("DELETE FROM branches");
     await cleanupConnection.query(
-      "UPDATE branches SET name = 'الفرع الرئيسي', is_active = true WHERE id = 1",
+      "INSERT INTO branches (id, name, is_active) VALUES (?, 'الفرع الرئيسي', true)",
+      [TEST_BRANCH_ID],
     );
   } finally {
     await cleanupConnection.query("SET FOREIGN_KEY_CHECKS = 1");

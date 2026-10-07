@@ -1,6 +1,7 @@
+import { it, testBranchValues } from "../support/ids.js";
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
-import { describe, expect, it } from 'vitest';
+import { describe, expect } from "vitest";
 import { db } from '../support/database.js';
 import { users } from '../../src/schema.js';
 import {
@@ -36,14 +37,14 @@ describe('seedAdmin', () => {
   });
 
   it('updates the existing admin from the configured environment values', async () => {
-    await db.insert(users).values({
+    await db.insert(users).values(testBranchValues({
       name: 'Old admin',
       username: 'old-admin',
       passwordHash: await bcrypt.hash('old-password', 4),
       tokenVersion: 3,
       role: 'admin',
       isActive: false,
-    });
+    }));
 
     const result = await seedAdmin(db, configuredAdmin);
     const rows = await admins();
@@ -63,7 +64,7 @@ describe('seedAdmin', () => {
   });
 
   it('reports a clear error when another user owns the configured username', async () => {
-    await db.insert(users).values([
+    await db.insert(users).values(testBranchValues([
       {
         name: 'Existing admin',
         username: 'old-admin',
@@ -76,7 +77,7 @@ describe('seedAdmin', () => {
         passwordHash: await bcrypt.hash('cashier-password', 4),
         role: 'cashier',
       },
-    ]);
+    ]));
 
     await expect(seedAdmin(db, configuredAdmin)).rejects.toThrow(
       `Cannot seed admin: username "${configuredAdmin.username}" belongs to another user`,
@@ -84,7 +85,7 @@ describe('seedAdmin', () => {
   });
 
   it('updates the admin matching the configured username when several admins exist', async () => {
-    await db.insert(users).values([
+    await db.insert(users).values(testBranchValues([
       {
         name: 'First admin',
         username: 'first-admin',
@@ -97,7 +98,7 @@ describe('seedAdmin', () => {
         passwordHash: await bcrypt.hash('old-password', 4),
         role: 'admin',
       },
-    ]);
+    ]));
 
     await expect(seedAdmin(db, configuredAdmin)).resolves.toBe('updated');
     const rows = await admins();
@@ -111,7 +112,7 @@ describe('seedAdmin', () => {
   });
 
   it('creates a flagged super-admin when no admin matches the configured username', async () => {
-    await db.insert(users).values([
+    await db.insert(users).values(testBranchValues([
       {
         name: 'First admin',
         username: 'first-admin',
@@ -124,7 +125,7 @@ describe('seedAdmin', () => {
         passwordHash: await bcrypt.hash('second-password', 4),
         role: 'admin',
       },
-    ]);
+    ]));
 
     await expect(seedAdmin(db, configuredAdmin)).resolves.toBe('created');
     const rows = await admins();
@@ -153,14 +154,14 @@ describe('syncConfiguredAdmin', () => {
   });
 
   it('does nothing when the stored admin already matches', async () => {
-    await db.insert(users).values({
+    await db.insert(users).values(testBranchValues({
       name: configuredAdmin.name,
       username: configuredAdmin.username,
       passwordHash: await bcrypt.hash(configuredAdmin.password, 4),
       tokenVersion: 7,
       role: 'admin',
       isSuperAdmin: true,
-    });
+    }));
 
     const result = await syncConfiguredAdmin(db, configuredAdmin);
     const [row] = await db.select().from(users);
@@ -173,14 +174,14 @@ describe('syncConfiguredAdmin', () => {
   });
 
   it('updates the name without revoking sessions', async () => {
-    await db.insert(users).values({
+    await db.insert(users).values(testBranchValues({
       name: 'Old name',
       username: configuredAdmin.username,
       passwordHash: await bcrypt.hash(configuredAdmin.password, 4),
       tokenVersion: 7,
       role: 'admin',
       isSuperAdmin: true,
-    });
+    }));
 
     const result = await syncConfiguredAdmin(db, {
       ...configuredAdmin,
@@ -194,14 +195,14 @@ describe('syncConfiguredAdmin', () => {
   });
 
   it('updates the password and revokes sessions only when it changed', async () => {
-    await db.insert(users).values({
+    await db.insert(users).values(testBranchValues({
       name: configuredAdmin.name,
       username: configuredAdmin.username,
       passwordHash: await bcrypt.hash('old-password', 4),
       tokenVersion: 7,
       role: 'admin',
       isSuperAdmin: true,
-    });
+    }));
 
     const result = await syncConfiguredAdmin(db, configuredAdmin);
     const [row] = await db.select().from(users);
@@ -214,14 +215,14 @@ describe('syncConfiguredAdmin', () => {
   });
 
   it('restores a flagged super-admin renamed and deactivated in the database', async () => {
-    await db.insert(users).values({
+    await db.insert(users).values(testBranchValues({
       name: 'Renamed directly',
       username: 'renamed-in-db',
       passwordHash: await bcrypt.hash(configuredAdmin.password, 4),
       role: 'admin',
       isActive: false,
       isSuperAdmin: true,
-    });
+    }));
 
     const result = await syncConfiguredAdmin(db, configuredAdmin);
     const [row] = await db.select().from(users);
@@ -236,14 +237,14 @@ describe('syncConfiguredAdmin', () => {
   });
 
   it('adopts and flags the matching admin when the flag was lost', async () => {
-    await db.insert(users).values({
+    await db.insert(users).values(testBranchValues({
       name: 'Configured admin before seed',
       username: configuredAdmin.username,
       passwordHash: await bcrypt.hash(configuredAdmin.password, 4),
       role: 'admin',
       isActive: false,
       isSuperAdmin: false,
-    });
+    }));
 
     const result = await syncConfiguredAdmin(db, configuredAdmin);
     const [row] = await db.select().from(users);
@@ -253,7 +254,7 @@ describe('syncConfiguredAdmin', () => {
   });
 
   it('renames the flagged admin even when other admins exist (regression)', async () => {
-    await db.insert(users).values([
+    await db.insert(users).values(testBranchValues([
       {
         name: 'Other admin',
         username: 'other-admin',
@@ -267,7 +268,7 @@ describe('syncConfiguredAdmin', () => {
         role: 'admin',
         isSuperAdmin: true,
       },
-    ]);
+    ]));
 
     const result = await syncConfiguredAdmin(db, configuredAdmin);
     const rows = await admins();
@@ -284,13 +285,13 @@ describe('syncConfiguredAdmin', () => {
   });
 
   it('keeps exactly one flagged super-admin across repeated syncs', async () => {
-    await db.insert(users).values({
+    await db.insert(users).values(testBranchValues({
       name: configuredAdmin.name,
       username: configuredAdmin.username,
       passwordHash: await bcrypt.hash(configuredAdmin.password, 4),
       role: 'admin',
       isSuperAdmin: true,
-    });
+    }));
 
     await syncConfiguredAdmin(db, configuredAdmin);
     await syncConfiguredAdmin(db, configuredAdmin);

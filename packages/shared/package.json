@@ -19,6 +19,10 @@
       "types": "./src/index.ts",
       "development": "./src/index.ts",
       "default": "./dist/index.js"
+    },
+    "./test-support": {
+      "types": "./tests/support/ids.ts",
+      "default": "./tests/support/ids.ts"
     }
   }
 }

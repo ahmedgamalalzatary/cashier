@@ -16,17 +16,17 @@ export const SHIFT_WARNING_MINUTES = 60;
 export type Role = "admin" | "cashier";
 
 export type AuthUser = {
-  id: number;
+  id: string;
   name: string;
   role: Role;
   /** Cashiers belong to one branch; admins can select any branch. */
-  branchId?: number | null;
+  branchId?: string | null;
   /** Only the configured admin from server settings can manage admin accounts. */
   isSuperAdmin: boolean;
 };
 
 export type Branch = {
-  id: number;
+  id: string;
   name: string;
   isActive: boolean;
   createdAt: string;
@@ -45,13 +45,13 @@ export type ManagedUser = AuthUser & {
 };
 
 export type CashierAccess = {
-  userId: number;
+  userId: string;
   username: string;
   isActive: boolean;
 };
 
 export type Employee = {
-  id: number;
+  id: string;
   name: string;
   phone: string | null;
   jobTitle: string | null;
@@ -66,8 +66,8 @@ export type Employee = {
 
 export type SalaryAdjustmentType = "bonus" | "deduction";
 export type SalaryAdvance = {
-  id: number;
-  employeeId: number;
+  id: string;
+  employeeId: string;
   employeeName: string;
   amount: string;
   entryDate: string;
@@ -77,8 +77,8 @@ export type SalaryAdvance = {
 };
 export type SalaryAdjustment = SalaryAdvance & { type: SalaryAdjustmentType };
 export type SalaryPayment = {
-  id: number;
-  employeeId: number;
+  id: string;
+  employeeId: string;
   employeeName: string;
   periodMonth: string;
   basePay: string;
@@ -92,7 +92,7 @@ export type SalaryPayment = {
 /** why a month row has no salary figure — null when the row is payable or paid */
 export type SalaryBlockedReason = "no_salary" | "month_closed" | "invalid_data";
 export type SalaryMonthEmployee = {
-  employeeId: number;
+  employeeId: string;
   employeeName: string;
   isActive: boolean;
   /** monthly salary — null means the salary was never set */
@@ -136,9 +136,9 @@ export type ShiftEventAction =
   | "correction";
 
 export type ShiftEvent = {
-  id: number;
+  id: string;
   action: ShiftEventAction;
-  actorUserId: number | null;
+  actorUserId: string | null;
   note: string | null;
   openingFloat: string | null;
   actualCash: string | null;
@@ -148,15 +148,15 @@ export type ShiftEvent = {
 };
 
 export type Shift = {
-  id: number;
+  id: string;
   status: "open" | "closed";
-  cashierUserId: number;
-  employeeId: number;
+  cashierUserId: string;
+  employeeId: string;
   cashierName: string;
   openingFloat: string;
   openedAt: string;
   closedAt: string | null;
-  closedByUserId: number | null;
+  closedByUserId: string | null;
   actualCash: string | null;
   expectedCash: string | null;
   overShort: string | null;
@@ -170,7 +170,7 @@ export type Shift = {
 export type CurrentShift = Shift;
 
 export type Supplier = {
-  id: number;
+  id: string;
   name: string;
   phone: string | null;
   address: string | null;
@@ -181,8 +181,8 @@ export type Supplier = {
 };
 
 export type SupplierPayment = {
-  id: number;
-  supplierId: number;
+  id: string;
+  supplierId: string;
   amount: string;
   paidAt: string;
   notes: string | null;
@@ -191,7 +191,7 @@ export type SupplierPayment = {
 export type SupplierStatementMovement = {
   id: string;
   type: "purchase" | "payment";
-  referenceId: number;
+  referenceId: string;
   date: string;
   description: string;
   /** Signed amount: purchases increase debt, payments reduce it. */
@@ -200,9 +200,9 @@ export type SupplierStatementMovement = {
 };
 
 export type Category = {
-  id: number;
+  id: string;
   name: string;
-  parentId: number | null;
+  parentId: string | null;
   isActive: boolean;
   /** ISO timestamp — Date on the server, serialized to string over JSON */
   createdAt: string;
@@ -212,11 +212,11 @@ export const ITEM_TYPES = ["raw", "resale", "prepared"] as const;
 export type ItemType = (typeof ITEM_TYPES)[number];
 
 export type Item = {
-  id: number;
+  id: string;
   /** system-assigned sequential code; display with formatItemCode */
   code: number;
   name: string;
-  categoryId: number;
+  categoryId: string;
   categoryName: string;
   type: ItemType;
   sellingPrice: string | null;
@@ -235,10 +235,10 @@ export const WAREHOUSES = ["main", "cafe"] as const;
 export type Warehouse = (typeof WAREHOUSES)[number];
 
 export type InventoryStockRow = {
-  itemId: number;
+  itemId: string;
   code: number;
   name: string;
-  categoryId: number;
+  categoryId: string;
   categoryName: string;
   type: ItemType;
   stockUnit: string;
@@ -253,8 +253,8 @@ export type InventoryStockRow = {
 export type StocktakeStatus = "draft" | "confirmed";
 export type StocktakeKind = "stocktake" | "manual";
 export type StocktakeLine = {
-  id: number;
-  itemId: number;
+  id: string;
+  itemId: string;
   itemCode: number;
   itemName: string;
   stockUnit: string;
@@ -263,13 +263,13 @@ export type StocktakeLine = {
   difference: string | null;
 };
 export type StocktakeSummary = {
-  id: number;
+  id: string;
   kind: StocktakeKind;
   warehouse: Warehouse;
-  categoryId: number | null;
+  categoryId: string | null;
   status: StocktakeStatus;
   note: string | null;
-  createdBy: number;
+  createdBy: string;
   createdByName: string;
   createdAt: string;
   confirmedAt: string | null;
@@ -282,8 +282,8 @@ export type StocktakeDetail = Omit<StocktakeSummary, "lineCount"> & {
 export type PurchaseUnitMode = "stock" | "purchase";
 
 export type PurchaseInvoiceSummary = {
-  id: number;
-  supplierId: number;
+  id: string;
+  supplierId: string;
   supplierName: string;
   invoiceNumber: string | null;
   purchasedAt: string;
@@ -291,15 +291,15 @@ export type PurchaseInvoiceSummary = {
   totalAmount: string;
   paidAmount: string;
   dueAmount: string;
-  createdBy: number;
+  createdBy: string;
   createdByName: string;
   /** ISO timestamp — Date on the server, serialized to string over JSON */
   createdAt: string;
 };
 
 export type PurchaseInvoiceLine = {
-  id: number;
-  itemId: number;
+  id: string;
+  itemId: string;
   itemCode: number;
   itemName: string;
   quantity: string;
@@ -315,7 +315,7 @@ export type PurchaseInvoiceLine = {
 };
 
 export type PurchaseInvoiceTransferLink = {
-  id: number;
+  id: string;
   notes: string | null;
   /** ISO timestamp. */
   createdAt: string;
@@ -329,13 +329,13 @@ export type PurchaseInvoiceDetail = PurchaseInvoiceSummary & {
 export type TransferRequestStatus = "pending" | "approved" | "rejected";
 
 export type TransferRequestSummary = {
-  id: number;
-  requestedBy: number;
-  shiftId: number | null;
+  id: string;
+  requestedBy: string;
+  shiftId: string | null;
   requestedByName: string;
   notes: string | null;
   status: TransferRequestStatus;
-  reviewedBy: number | null;
+  reviewedBy: string | null;
   reviewedByName: string | null;
   rejectionReason: string | null;
   /** ISO timestamp, or null while pending. */
@@ -346,8 +346,8 @@ export type TransferRequestSummary = {
 };
 
 export type TransferRequestLine = {
-  id: number;
-  itemId: number;
+  id: string;
+  itemId: string;
   itemCode: number;
   itemName: string;
   stockUnit: string;
@@ -362,11 +362,11 @@ export type TransferRequestDetail = Omit<
 };
 
 export type TransferSummary = {
-  id: number;
-  requestId: number | null;
-  createdBy: number;
+  id: string;
+  requestId: string | null;
+  createdBy: string;
   createdByName: string;
-  approvedBy: number;
+  approvedBy: string;
   approvedByName: string;
   notes: string | null;
   totalCost: string;
@@ -375,16 +375,16 @@ export type TransferSummary = {
 };
 
 export type TransferLine = {
-  id: number;
-  itemId: number;
+  id: string;
+  itemId: string;
   itemCode: number;
   itemName: string;
   stockUnit: string;
   quantity: string;
   unitCost: string;
   lineCost: string;
-  sourceBatchId: number;
-  cafeBatchId: number;
+  sourceBatchId: string;
+  cafeBatchId: string;
 };
 
 export type TransferDetail = TransferSummary & {
@@ -394,8 +394,8 @@ export type TransferDetail = TransferSummary & {
 export type RecipeType = "product" | "prepared";
 
 export type RecipeIngredientCost = {
-  id: number;
-  itemId: number;
+  id: string;
+  itemId: string;
   itemCode: number;
   itemName: string;
   itemType: ItemType;
@@ -408,9 +408,9 @@ export type RecipeIngredientCost = {
 };
 
 type RecipeCommon = {
-  id: number;
+  id: string;
   name: string;
-  categoryId: number;
+  categoryId: string;
   categoryName: string;
   isActive: boolean;
   createdAt: string;
@@ -419,7 +419,7 @@ type RecipeCommon = {
 
 export type PreparedRecipe = RecipeCommon & {
   type: "prepared";
-  outputItemId: number;
+  outputItemId: string;
   outputItemName: string;
   outputStockUnit: string;
   baseYield: string;
@@ -432,17 +432,17 @@ export type PreparedRecipe = RecipeCommon & {
 export type Recipe = PreparedRecipe;
 
 export type PreparationSummary = {
-  id: number;
-  recipeId: number;
+  id: string;
+  recipeId: string;
   recipeName: string;
-  outputItemId: number;
+  outputItemId: string;
   outputItemName: string;
   outputStockUnit: string;
   producedQuantity: string;
   totalCost: string;
   unitCost: string;
-  outputBatchId: number;
-  preparedBy: number;
+  outputBatchId: string;
+  preparedBy: string;
   preparedByName: string;
   notes: string | null;
   occurredAt: string;
@@ -450,15 +450,15 @@ export type PreparationSummary = {
 };
 
 export type PreparationAllocation = {
-  id: number;
-  ingredientItemId: number;
+  id: string;
+  ingredientItemId: string;
   ingredientItemCode: number;
   ingredientItemName: string;
   stockUnit: string;
   quantity: string;
   unitCost: string;
   lineCost: string;
-  sourceBatchId: number;
+  sourceBatchId: string;
 };
 
 export type PreparationDetail = PreparationSummary & {
@@ -466,7 +466,7 @@ export type PreparationDetail = PreparationSummary & {
 };
 
 export type ExternalIngredientMapping = {
-  itemId: number;
+  itemId: string;
   quantity: string;
 };
 
@@ -543,9 +543,9 @@ export type ExternalProductCatalog = {
 };
 
 export type LocalSaleProduct = {
-  id: number;
+  id: string;
   name: string;
-  categoryId: number;
+  categoryId: string;
   sellingPrice: string;
   stockUnit: string;
 };
@@ -565,17 +565,17 @@ export type ExternalCacheRefreshStatus = {
 };
 
 export type ProductStockSetupBody = {
-  baseIngredients: Array<{ itemId: number; quantity: number }>;
+  baseIngredients: Array<{ itemId: string; quantity: number }>;
   sizes: Array<{
     externalSizeId: number;
-    ingredients: Array<{ itemId: number; quantity: number }>;
+    ingredients: Array<{ itemId: string; quantity: number }>;
   }>;
   modifiers: Array<
     | { externalModifierOptionId: number; stockEffect: "none" }
     | {
         externalModifierOptionId: number;
         stockEffect: "mapped";
-        ingredients: Array<{ itemId: number; quantity: number }>;
+        ingredients: Array<{ itemId: string; quantity: number }>;
       }
   >;
 };
@@ -583,11 +583,11 @@ export type ProductStockSetupBody = {
 export type OrderDiscountType = "percent" | "fixed";
 
 export type OrderSummary = {
-  id: number;
+  id: string;
   orderNumber: string;
-  cashierId: number;
+  cashierId: string;
   cashierName: string;
-  shiftId: number | null;
+  shiftId: string | null;
   subtotal: string;
   discountType: OrderDiscountType | null;
   discountValue: string | null;
@@ -603,23 +603,23 @@ export type OrderSummary = {
 };
 
 export type OrderLineAllocation = {
-  id: number;
-  itemId: number;
+  id: string;
+  itemId: string;
   itemCode: number;
   itemName: string;
-  batchId: number | null;
-  stockMovementId: number;
+  batchId: string | null;
+  stockMovementId: string;
   quantity: string;
   unitCost: string;
   lineCost: string;
 };
 
 export type OrderLine = {
-  id: number;
+  id: string;
   type: "recipe" | "item" | "external_product";
-  recipeId: number | null;
-  recipeSizeId: number | null;
-  itemId: number | null;
+  recipeId: string | null;
+  recipeSizeId: string | null;
+  itemId: string | null;
   externalProductId: number | null;
   externalSizeId: number | null;
   productName: string;
@@ -630,7 +630,7 @@ export type OrderLine = {
   totalCost: string;
   hasStockDeficit: boolean;
   modifiers: Array<{
-    id: number;
+    id: string;
     externalModifierGroupId: number;
     externalModifierOptionId: number;
     groupName: string;
@@ -690,11 +690,11 @@ export type ExternalOrdersPage = {
 export type RefundStockAction = "return_to_stock" | "not_returnable";
 
 export type RefundSummary = {
-  id: number;
-  orderId: number;
+  id: string;
+  orderId: string;
   orderNumber: string;
-  shiftId: number | null;
-  cashierId: number;
+  shiftId: string | null;
+  cashierId: string;
   cashierName: string;
   reason: string;
   amount: string;
@@ -705,8 +705,8 @@ export type RefundSummary = {
 };
 
 export type RefundLine = {
-  id: number;
-  orderLineId: number;
+  id: string;
+  orderLineId: string;
   type: "recipe" | "item" | "external_product";
   itemCode: number | null;
   productName: string;
@@ -727,8 +727,8 @@ export type WasteReason =
   "expired" | "damaged" | "preparation_mistake" | "spill" | "other";
 
 export type WasteSummary = {
-  id: number;
-  shiftId: number | null;
+  id: string;
+  shiftId: string | null;
   warehouse: "main" | "cafe";
   targetType: "item" | "recipe" | "external_product";
   targetName: string;
@@ -737,16 +737,16 @@ export type WasteSummary = {
   reason: WasteReason;
   note: string | null;
   totalCost: string;
-  recordedBy: number;
+  recordedBy: string;
   recordedByName: string;
   occurredAt: string;
 };
 
 export type WasteAllocation = {
-  id: number;
-  itemId: number;
+  id: string;
+  itemId: string;
   itemName: string;
-  batchId: number | null;
+  batchId: string | null;
   quantity: string;
   unitCost: string;
 };
@@ -756,7 +756,7 @@ export type WasteDetail = WasteSummary & {
 };
 
 export type WasteCatalog = {
-  items: Array<{ id: number; name: string; stockUnit: string }>;
+  items: Array<{ id: string; name: string; stockUnit: string }>;
   products: Array<{
     externalProductId: number;
     externalSizeId: number | null;
@@ -764,30 +764,30 @@ export type WasteCatalog = {
     sizeName: string | null;
   }>;
   recipes: Array<{
-    recipeId: number;
-    recipeSizeId: number;
+    recipeId: string;
+    recipeSizeId: string;
     recipeName: string;
     sizeName: string | null;
   }>;
 };
 
 export type ExpenseCategory = {
-  id: number;
+  id: string;
   name: string;
   isActive: boolean;
   createdAt: string;
 };
 
 export type ExpenseSummary = {
-  id: number;
+  id: string;
   type: "shift" | "general";
-  categoryId: number;
+  categoryId: string;
   categoryName: string;
-  shiftId: number | null;
+  shiftId: string | null;
   amount: string;
   expenseDate: string;
   note: string | null;
-  recordedBy: number;
+  recordedBy: string;
   recordedByName: string;
   createdAt: string;
 };
