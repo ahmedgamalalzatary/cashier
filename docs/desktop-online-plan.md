@@ -248,6 +248,12 @@ Verified against the committed baseline plus only these fixes: API lint/typechec
 411 API unit tests, and all 39 shift/desktop MySQL tests passed. The regression tests
 first failed without the fixes. UUID/schema/login changes are not part of this patch.
 
+**Completed Docker prerequisite (2026-10-07):** `dockerfile.web` now copies
+`packages/web-core/package.json` into dependency installation and the package source
+into the build stage. An isolated context matching the old COPY inputs failed with
+unresolved web-core imports; adding these inputs produced a green standalone build.
+No UUID/schema/login changes were included in this verification.
+
 **4.1 UUID.** Add `uuidv7()` in `packages/db` and a Drizzle column helper `id()` =
 `char(36)` ascii_bin with `$defaultFn(uuidv7)`. Unit-test ordering and format.
 
