@@ -241,6 +241,13 @@ resolve against the *consuming* app and silently point at the wrong directory.
 
 ### Phase 4: Schema reset (largest phase, touches everything)
 
+**Completed shift prerequisites (2026-10-07):** cashier writes now close expired shifts
+before their business transaction; the desktop runs its 60-second auto-close worker
+independently of external-order synchronization and stops it with the owned API.
+Verified against the committed baseline plus only these fixes: API lint/typecheck/build,
+411 API unit tests, and all 39 shift/desktop MySQL tests passed. The regression tests
+first failed without the fixes. UUID/schema/login changes are not part of this patch.
+
 **4.1 UUID.** Add `uuidv7()` in `packages/db` and a Drizzle column helper `id()` =
 `char(36)` ascii_bin with `$defaultFn(uuidv7)`. Unit-test ordering and format.
 

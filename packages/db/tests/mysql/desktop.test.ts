@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { db } from "../support/api-setup.js";
 import { loadTestEnvironment } from "../support/index.js";
 import { startDesktopApi } from "../../../../apps/api/src/desktop/runtime.js";
+import { employees, users, shifts } from "@cashier/db";
+import { eq } from "drizzle-orm";
 
 const directories: string[] = [];
 const running: Awaited<ReturnType<typeof startDesktopApi>>[] = [];
@@ -59,6 +61,23 @@ async function start(sync = false) {
 }
 
 describe("owned desktop API", () => {
+  it("closes expired shifts without any UI request when external sync is disabled", async () => {
+    const [employee] = await db.insert(employees).values({ name: "Expired desktop shift" });
+    const [cashier] = await db.insert(users).values({
+      employeeId: employee.insertId, name: "Desktop cashier", username: "desktop-expired",
+      passwordHash: "unused", role: "cashier",
+    });
+    const [shift] = await db.insert(shifts).values({
+      cashierUserId: cashier.insertId, employeeId: employee.insertId,
+      openedAt: new Date(Date.now() - 17 * 3_600_000), openingFloat: "100.00", openSlot: 1,
+    });
+    await start(false);
+    await vi.waitFor(async () => {
+      const [row] = await db.select().from(shifts).where(eq(shifts.id, shift.insertId));
+      expect(row.status).toBe("closed");
+      expect(row.actualCash).toBeNull();
+    }, { timeout: 1_000 });
+  });
   it("starts independently, logs in without cookies, and stops its local listener", async () => {
     const runtime = await start();
     expect(runtime.apiUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);

@@ -11,6 +11,7 @@ import {
 } from "../modules/external/cache-refresh.module.js";
 import { runRefreshLoop } from "../modules/external/worker-loop.js";
 import { loadDesktopSettings } from "./settings.js";
+import { runAutoCloseLoop } from "../modules/shifts/auto-close.js";
 
 export async function verifyDesktopSchema(db: Db, expected: number) {
   if (!Number.isSafeInteger(expected) || expected < 1)
@@ -44,6 +45,7 @@ export async function startDesktopApi(
   const db = createDb(environment.DATABASE_URL);
   let server: Server | undefined;
   let worker = Promise.resolve();
+  let shiftWorker = Promise.resolve();
   const workerShutdown = new AbortController();
   const stopWorker = () => workerShutdown.abort();
   signal.addEventListener("abort", stopWorker, { once: true });
@@ -60,6 +62,7 @@ export async function startDesktopApi(
       const listener = app.listen(0, "127.0.0.1", () => resolve(listener));
       listener.once("error", reject);
     });
+    shiftWorker = runAutoCloseLoop(db, workerShutdown.signal);
     if (syncEnabled) {
       const refresh = createCacheRefreshService(
         db,
@@ -91,7 +94,7 @@ export async function startDesktopApi(
         const closing = new Promise<void>((resolve) =>
           server!.close(() => resolve()),
         );
-        await Promise.all([closing, worker]);
+        await Promise.all([closing, worker, shiftWorker]);
         await closeDb(db);
       },
     };
@@ -100,7 +103,7 @@ export async function startDesktopApi(
     signal.removeEventListener("abort", stopWorker);
     if (server)
       await new Promise<void>((resolve) => server!.close(() => resolve()));
-    await worker;
+    await Promise.all([worker, shiftWorker]);
     await closeDb(db);
     throw error;
   }

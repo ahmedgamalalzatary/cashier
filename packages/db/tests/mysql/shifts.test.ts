@@ -958,11 +958,7 @@ describe("shift auto-close", () => {
   it("gives a reopened shift a full new 16-hour segment", async () => {
     const cashier = await createCashier("auto-close-reopened");
     const { id } = await openShiftAt(cashier, 17);
-    await request(app())
-      .post(`/api/shifts/${id}/close`)
-      .set(cashier.authorization)
-      .send({ actualCash: 500 })
-      .expect(200);
+    await service().autoCloseExpired();
     const reopened = await request(app())
       .post(`/api/shifts/${id}/reopen`)
       .set(cashier.adminAuthorization)
@@ -1094,8 +1090,6 @@ describe("lazy auto-close on a cashier request", () => {
     const cashier = await createCashier("lazy-auto-close-reopen-cashier");
     await openShiftAt(cashier, 17);
 
-    await request(app()).get("/api/shifts/current").set(cashier.authorization);
-
     const reopened = await request(app())
       .post("/api/shifts/open")
       .set(cashier.authorization)
@@ -1106,8 +1100,6 @@ describe("lazy auto-close on a cashier request", () => {
   it("refuses a sale on the expired shift until a new one is opened", async () => {
     const cashier = await createCashier("lazy-auto-close-sale-cashier");
     const { id } = await openShiftAt(cashier, 17);
-
-    await request(app()).get("/api/shifts/current").set(cashier.authorization);
 
     // any well-formed order proves the point: the shift check rejects it with
     // 409 before stock or price matters
@@ -1142,12 +1134,12 @@ describe("shift auto-close across branches", () => {
       branch.body.id,
     );
 
-    // one expired shift per branch
-    const firstExpired = await openShiftAt(first, 17);
-    const secondExpired = await openShiftAt(second, 18);
-    // and one fresh shift that must survive the sweep
+    // Create the fresh shift first: cashier writes now enforce expiry, so a
+    // later open in the first branch would already close its expired fixture.
     const fresh = await createCashier("worker-branch-fresh", undefined, admin);
     const freshShift = await openShiftAt(fresh, 1);
+    const firstExpired = await openShiftAt(first, 17);
+    const secondExpired = await openShiftAt(second, 18);
 
     const closed = await autoCloseExpiredBranches(db, createAutoCloseForDb(db));
 

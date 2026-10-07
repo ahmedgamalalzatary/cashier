@@ -27,6 +27,8 @@ import { createExpensesModule } from "./modules/expenses/expenses.module.js";
 import { createProductsModule } from "./modules/products/products.module.js";
 import { createStocktakesModule } from "./modules/stocktakes/stocktakes.module.js";
 import { createSalariesModule } from "./modules/salaries/salaries.module.js";
+import { ShiftsRepository } from "./modules/shifts/shifts.repository.js";
+import { ShiftsService } from "./modules/shifts/shifts.service.js";
 
 export type AppOptions = {
   jwtSecret: string;
@@ -60,6 +62,15 @@ export function createApp(
     createBranchesModule(db),
   );
   app.use("/api", authenticate(db, jwtSecret), selectBranch(db));
+  // Commit expiry before a cashier write enters its own transaction. A rejected
+  // sale/refund/etc. must not roll the system's shift close back with it.
+  const shiftExpiry = new ShiftsService(new ShiftsRepository(db));
+  app.use("/api", async (req, _res, next) => {
+    if (req.user?.role === "cashier" && req.method !== "GET") {
+      await shiftExpiry.autoCloseExpired();
+    }
+    next();
+  });
   app.use("/api/orders", authenticate(db, jwtSecret), createOrdersModule(db));
   app.use("/api/shifts", authenticate(db, jwtSecret), createShiftsModule(db));
   app.use("/api/refunds", authenticate(db, jwtSecret), createRefundsModule(db));
