@@ -22,7 +22,7 @@ const monthsBetween = (from: string, to: string) => {
 export class SalariesService {
   constructor(private repo: SalariesRepository) {}
   private async calculation(
-    employeeId: number,
+    employeeId: string,
     month: string,
     locked = false,
     repo = this.repo,
@@ -59,7 +59,7 @@ export class SalariesService {
       netPay: money(netPay),
     };
   }
-  preview(employeeId: number, month: string) {
+  preview(employeeId: string, month: string) {
     return this.calculation(employeeId, month);
   }
   async month(month: string) {
@@ -154,7 +154,7 @@ export class SalariesService {
     };
   }
   private async validateEntry(
-    employeeId: number,
+    employeeId: string,
     entryDate: string,
     repo = this.repo,
   ) {
@@ -164,19 +164,19 @@ export class SalariesService {
     if (latest && entryDate.slice(0, 7) <= latest.periodMonth.slice(0, 7))
       throw new HttpError(409, "لا يمكن إضافة حركة في شهر تم صرف راتبه");
   }
-  async advance(input: AdvanceInput, actor: number) {
+  async advance(input: AdvanceInput, actor: string) {
     return this.repo.transaction(async (repo) => {
       await this.validateEntry(input.employeeId, input.entryDate, repo);
       return repo.createAdvance({ ...input, recordedBy: actor });
     });
   }
-  async adjustment(input: AdjustmentInput, actor: number) {
+  async adjustment(input: AdjustmentInput, actor: string) {
     return this.repo.transaction(async (repo) => {
       await this.validateEntry(input.employeeId, input.entryDate, repo);
       return repo.createAdjustment({ ...input, recordedBy: actor });
     });
   }
-  pay(employeeId: number, month: string, actor: number) {
+  pay(employeeId: string, month: string, actor: string) {
     return this.repo.transaction(async (repo) => {
       const periodMonth = `${month}-01`;
       const c = await this.calculation(employeeId, month, true, repo);

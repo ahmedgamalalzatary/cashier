@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it, vi } from "vitest";
 import type { SalariesRepository } from "../../src/modules/salaries/salaries.repository.js";
 import { SalariesService } from "../../src/modules/salaries/salaries.service.js";
@@ -5,7 +6,7 @@ import { SalariesService } from "../../src/modules/salaries/salaries.service.js"
 function repository(overrides: Record<string, unknown> = {}) {
   const tx = {
     employeeForUpdate: vi.fn(async () => ({
-      id: 1,
+      id: testId(1),
       name: "أحمد",
       payRate: "5000.00",
     })),
@@ -18,11 +19,11 @@ function repository(overrides: Record<string, unknown> = {}) {
       ],
     })),
     paymentForMonth: vi.fn(async () => undefined),
-    createPayment: vi.fn(async () => 8),
-    payment: vi.fn(async () => ({ id: 8 })),
+    createPayment: vi.fn(async () => testId(8)),
+    payment: vi.fn(async () => ({ id: testId(8) })),
     latestPaymentForEmployee: vi.fn(async () => undefined),
-    createAdvance: vi.fn(async () => ({ id: 1 })),
-    createAdjustment: vi.fn(async () => ({ id: 2 })),
+    createAdvance: vi.fn(async () => ({ id: testId(1) })),
+    createAdjustment: vi.fn(async () => ({ id: testId(2) })),
     ...overrides,
   };
   const repo = {
@@ -33,8 +34,8 @@ function repository(overrides: Record<string, unknown> = {}) {
     listAdvances: vi.fn(async () => []),
     listAdjustments: vi.fn(async () => []),
     listPayments: vi.fn(async () => []),
-    createAdvance: vi.fn(async () => ({ id: 1 })),
-    createAdjustment: vi.fn(async () => ({ id: 2 })),
+    createAdvance: vi.fn(async () => ({ id: testId(1) })),
+    createAdjustment: vi.fn(async () => ({ id: testId(2) })),
     latestPaymentForEmployee: vi.fn(async () => undefined),
   } as unknown as SalariesRepository;
   return { repo, tx, service: new SalariesService(repo) };
@@ -43,7 +44,7 @@ function repository(overrides: Record<string, unknown> = {}) {
 describe("SalariesService", () => {
   it("calculates a monthly payday from salary, bonuses, deductions, and advances", async () => {
     const { service } = repository();
-    await expect(service.preview(1, "2026-09")).resolves.toMatchObject({
+    await expect(service.preview(testId(1), "2026-09")).resolves.toMatchObject({
       basePay: "5000.00",
       bonuses: "300.00",
       deductions: "100.00",
@@ -60,7 +61,7 @@ describe("SalariesService", () => {
         adjustments: [],
       })),
     });
-    await expect(service.preview(1, "2026-09")).resolves.toMatchObject({
+    await expect(service.preview(testId(1), "2026-09")).resolves.toMatchObject({
       advances: "450.00",
       netPay: "4550.00",
     });
@@ -69,33 +70,33 @@ describe("SalariesService", () => {
   it("rejects payday when no salary has been set", async () => {
     const missing = repository({
       employeeForUpdate: vi.fn(async () => ({
-        id: 1,
+        id: testId(1),
         payRate: null,
       })),
     });
-    await expect(missing.service.pay(1, "2026-09", 9)).rejects.toMatchObject({
+    await expect(missing.service.pay(testId(1), "2026-09", testId(9))).rejects.toMatchObject({
       status: 409,
     });
   });
 
   it("records one immutable payment snapshot per employee and month", async () => {
     const { service, tx } = repository();
-    await expect(service.pay(1, "2026-09", 9)).resolves.toEqual({ id: 8 });
+    await expect(service.pay(testId(1), "2026-09", testId(9))).resolves.toEqual({ id: testId(8) });
     expect(tx.createPayment).toHaveBeenCalledWith({
-      employeeId: 1,
+      employeeId: testId(1),
       periodMonth: "2026-09-01",
       basePay: "5000.00",
       bonuses: "300.00",
       deductions: "100.00",
       advances: "500.00",
       netPay: "4700.00",
-      paidBy: 9,
+      paidBy: testId(9),
     });
 
     const duplicate = repository({
-      paymentForMonth: vi.fn(async () => ({ id: 7 })),
+      paymentForMonth: vi.fn(async () => ({ id: testId(7) })),
     });
-    await expect(duplicate.service.pay(1, "2026-09", 9)).rejects.toMatchObject({
+    await expect(duplicate.service.pay(testId(1), "2026-09", testId(9))).rejects.toMatchObject({
       status: 409,
     });
   });
@@ -108,8 +109,8 @@ describe("SalariesService", () => {
     });
     await expect(
       service.advance(
-        { employeeId: 1, amount: 100, entryDate: "2026-09-20", note: null },
-        9,
+        { employeeId: testId(1), amount: 100, entryDate: "2026-09-20", note: null },
+        testId(9),
       ),
     ).rejects.toMatchObject({ status: 409 });
   });
@@ -117,12 +118,12 @@ describe("SalariesService", () => {
   it("explains a blocked row with the real reason instead of blaming the salary", async () => {
     const noSalary = repository();
     vi.mocked(noSalary.repo.listEmployees).mockResolvedValue([
-      { id: 1, name: "أحمد", isActive: true, payRate: null },
+      { id: testId(1), name: "أحمد", isActive: true, payRate: null },
     ]);
 
     // nothing to calculate: the admin has to set a monthly salary first
     await expect(noSalary.service.month("2026-09")).resolves.toMatchObject({
-      employees: [{ employeeId: 1, blockedReason: "no_salary" }],
+      employees: [{ employeeId: testId(1), blockedReason: "no_salary" }],
     });
 
     // a later month was already paid, so this month is closed for good
@@ -131,11 +132,11 @@ describe("SalariesService", () => {
       periodMonth: "2026-09-01",
     });
     vi.mocked(closed.repo.listEmployees).mockResolvedValue([
-      { id: 1, name: "أحمد", isActive: true, payRate: "5000.00" },
+      { id: testId(1), name: "أحمد", isActive: true, payRate: "5000.00" },
     ]);
 
     await expect(closed.service.month("2026-08")).resolves.toMatchObject({
-      employees: [{ employeeId: 1, blockedReason: "month_closed" }],
+      employees: [{ employeeId: testId(1), blockedReason: "month_closed" }],
     });
 
     // the numbers themselves are broken: carry the message so the admin can fix it
@@ -147,13 +148,13 @@ describe("SalariesService", () => {
       })),
     });
     vi.mocked(broken.repo.listEmployees).mockResolvedValue([
-      { id: 1, name: "أحمد", isActive: true, payRate: "5000.00" },
+      { id: testId(1), name: "أحمد", isActive: true, payRate: "5000.00" },
     ]);
 
     await expect(broken.service.month("2026-09")).resolves.toMatchObject({
       employees: [
         {
-          employeeId: 1,
+          employeeId: testId(1),
           blockedReason: "invalid_data",
           blockedMessage: "بيانات السلف السابقة غير متسقة مع الدفعات",
         },
@@ -164,13 +165,13 @@ describe("SalariesService", () => {
   it("reports no blocked reason for a paid or payable row", async () => {
     const { repo, service } = repository();
     vi.mocked(repo.listEmployees).mockResolvedValue([
-      { id: 1, name: "أحمد", isActive: true, payRate: "5000.00" },
+      { id: testId(1), name: "أحمد", isActive: true, payRate: "5000.00" },
     ]);
 
     await expect(service.month("2026-09")).resolves.toMatchObject({
       employees: [
         {
-          employeeId: 1,
+          employeeId: testId(1),
           netPay: "4700.00",
           blockedReason: null,
           blockedMessage: null,
@@ -181,8 +182,8 @@ describe("SalariesService", () => {
     const paid = repository();
     vi.mocked(paid.repo.listPayments).mockResolvedValue([
       {
-        id: 3,
-        employeeId: 1,
+        id: testId(3),
+        employeeId: testId(1),
         basePay: "5000.00",
         bonuses: "0.00",
         deductions: "0.00",
@@ -191,11 +192,11 @@ describe("SalariesService", () => {
       },
     ]);
     vi.mocked(paid.repo.listEmployees).mockResolvedValue([
-      { id: 1, name: "أحمد", isActive: true, payRate: "5000.00" },
+      { id: testId(1), name: "أحمد", isActive: true, payRate: "5000.00" },
     ]);
 
     await expect(paid.service.month("2026-09")).resolves.toMatchObject({
-      employees: [{ employeeId: 1, blockedReason: null }],
+      employees: [{ employeeId: testId(1), blockedReason: null }],
     });
   });
 
@@ -205,12 +206,12 @@ describe("SalariesService", () => {
       periodMonth: "2026-07-01",
     });
     vi.mocked(gap.repo.listEmployees).mockResolvedValue([
-      { id: 1, name: "أحمد", isActive: true, payRate: "5000.00" },
+      { id: testId(1), name: "أحمد", isActive: true, payRate: "5000.00" },
     ]);
 
     // paying September locks August: one unpaid month sits between them
     await expect(gap.service.month("2026-09")).resolves.toMatchObject({
-      employees: [{ employeeId: 1, unpaidEarlierMonths: 1 }],
+      employees: [{ employeeId: testId(1), unpaidEarlierMonths: 1 }],
     });
 
     const history = repository();
@@ -218,12 +219,12 @@ describe("SalariesService", () => {
       periodMonth: "2026-07-01",
     });
     vi.mocked(history.repo.listEmployees).mockResolvedValue([
-      { id: 1, name: "أحمد", isActive: true, payRate: "5000.00" },
+      { id: testId(1), name: "أحمد", isActive: true, payRate: "5000.00" },
     ]);
 
     // August and September both sit unpaid behind October
     await expect(history.service.month("2026-10")).resolves.toMatchObject({
-      employees: [{ employeeId: 1, unpaidEarlierMonths: 2 }],
+      employees: [{ employeeId: testId(1), unpaidEarlierMonths: 2 }],
     });
 
     // a consecutive history leaves nothing behind this payment
@@ -232,21 +233,21 @@ describe("SalariesService", () => {
       periodMonth: "2026-08-01",
     });
     vi.mocked(consecutive.repo.listEmployees).mockResolvedValue([
-      { id: 1, name: "أحمد", isActive: true, payRate: "5000.00" },
+      { id: testId(1), name: "أحمد", isActive: true, payRate: "5000.00" },
     ]);
 
     await expect(consecutive.service.month("2026-09")).resolves.toMatchObject({
-      employees: [{ employeeId: 1, unpaidEarlierMonths: 0 }],
+      employees: [{ employeeId: testId(1), unpaidEarlierMonths: 0 }],
     });
 
     // no payment history at all: nothing is being locked behind this one
     const none = repository();
     vi.mocked(none.repo.listEmployees).mockResolvedValue([
-      { id: 1, name: "أحمد", isActive: true, payRate: "5000.00" },
+      { id: testId(1), name: "أحمد", isActive: true, payRate: "5000.00" },
     ]);
 
     await expect(none.service.month("2026-09")).resolves.toMatchObject({
-      employees: [{ employeeId: 1, unpaidEarlierMonths: 0 }],
+      employees: [{ employeeId: testId(1), unpaidEarlierMonths: 0 }],
     });
   });
 
@@ -254,7 +255,7 @@ describe("SalariesService", () => {
     const { repo, service } = repository();
     vi.mocked(repo.listEmployees).mockResolvedValue([
       {
-        id: 1,
+        id: testId(1),
         name: "أحمد",
         isActive: true,
         payRate: "5000.00",
@@ -264,14 +265,14 @@ describe("SalariesService", () => {
 
     // paying September for someone hired in July locks July and August
     await expect(service.month("2026-09")).resolves.toMatchObject({
-      employees: [{ employeeId: 1, unpaidEarlierMonths: 2 }],
+      employees: [{ employeeId: testId(1), unpaidEarlierMonths: 2 }],
     });
 
     // the hire month itself leaves nothing behind
     const firstMonth = repository();
     vi.mocked(firstMonth.repo.listEmployees).mockResolvedValue([
       {
-        id: 1,
+        id: testId(1),
         name: "أحمد",
         isActive: true,
         payRate: "5000.00",
@@ -282,14 +283,14 @@ describe("SalariesService", () => {
     await expect(
       firstMonth.service.month("2026-09"),
     ).resolves.toMatchObject({
-      employees: [{ employeeId: 1, unpaidEarlierMonths: 0 }],
+      employees: [{ employeeId: testId(1), unpaidEarlierMonths: 0 }],
     });
 
     // hired after the shown month: nothing to lock
     const futureHire = repository();
     vi.mocked(futureHire.repo.listEmployees).mockResolvedValue([
       {
-        id: 1,
+        id: testId(1),
         name: "أحمد",
         isActive: true,
         payRate: "5000.00",
@@ -300,14 +301,14 @@ describe("SalariesService", () => {
     await expect(
       futureHire.service.month("2026-09"),
     ).resolves.toMatchObject({
-      employees: [{ employeeId: 1, unpaidEarlierMonths: 0 }],
+      employees: [{ employeeId: testId(1), unpaidEarlierMonths: 0 }],
     });
 
     // a hire month inside the target month still counts nothing
     const midMonth = repository();
     vi.mocked(midMonth.repo.listEmployees).mockResolvedValue([
       {
-        id: 1,
+        id: testId(1),
         name: "أحمد",
         isActive: true,
         payRate: "5000.00",
@@ -318,7 +319,7 @@ describe("SalariesService", () => {
     await expect(
       midMonth.service.month("2026-09"),
     ).resolves.toMatchObject({
-      employees: [{ employeeId: 1, unpaidEarlierMonths: 0 }],
+      employees: [{ employeeId: testId(1), unpaidEarlierMonths: 0 }],
     });
   });
 
@@ -332,7 +333,7 @@ describe("SalariesService", () => {
     });
     vi.mocked(repo.listEmployees).mockResolvedValue([
       {
-        id: 1,
+        id: testId(1),
         name: "أحمد",
         isActive: true,
         payRate: "5000.00",
@@ -342,7 +343,7 @@ describe("SalariesService", () => {
     await expect(service.month("2026-09")).resolves.toMatchObject({
       employees: [
         {
-          employeeId: 1,
+          employeeId: testId(1),
           employeeName: "أحمد",
           isActive: true,
           payRate: "5000.00",
@@ -360,7 +361,7 @@ describe("SalariesService", () => {
   it("keeps payday arithmetic on integer cents so 0.30 minus 0.10 minus 0.20 stays payable", async () => {
     const { service } = repository({
       employeeForUpdate: vi.fn(async () => ({
-        id: 1,
+        id: testId(1),
         name: "أحمد",
         payRate: "0.30",
       })),
@@ -373,7 +374,7 @@ describe("SalariesService", () => {
         ],
       })),
     });
-    await expect(service.preview(1, "2026-09")).resolves.toMatchObject({
+    await expect(service.preview(testId(1), "2026-09")).resolves.toMatchObject({
       basePay: "0.30",
       deductions: "0.30",
       advances: "0.00",
@@ -387,7 +388,7 @@ describe("SalariesService", () => {
         periodMonth: "2026-09-01",
       })),
     });
-    await expect(service.pay(1, "2026-08", 9)).rejects.toMatchObject({
+    await expect(service.pay(testId(1), "2026-08", testId(9))).rejects.toMatchObject({
       status: 409,
     });
     expect(tx.createPayment).not.toHaveBeenCalled();
@@ -400,7 +401,7 @@ describe("SalariesService", () => {
     });
     vi.mocked(repo.listEmployees).mockResolvedValue([
       {
-        id: 1,
+        id: testId(1),
         name: "أحمد",
         isActive: true,
         payRate: "5000.00",
@@ -410,7 +411,7 @@ describe("SalariesService", () => {
     await expect(service.month("2026-08")).resolves.toMatchObject({
       employees: [
         {
-          employeeId: 1,
+          employeeId: testId(1),
           employeeName: "أحمد",
           basePay: null,
           netPay: null,
@@ -428,7 +429,7 @@ describe("SalariesService", () => {
     });
     vi.mocked(repo.listEmployees).mockResolvedValue([
       {
-        id: 1,
+        id: testId(1),
         name: "أحمد",
         isActive: true,
         payRate: "5000.00",

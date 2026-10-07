@@ -1,13 +1,14 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it, vi } from "vitest";
 import type { EmployeesRepository } from "../../src/modules/employees/employees.repository.js";
 import { EmployeesService } from "../../src/modules/employees/employees.service.js";
 
 function txRepo(overrides: Record<string, unknown> = {}) {
   return {
-    findByIdForUpdate: vi.fn(async () => ({ id: 1, name: "أحمد", isActive: true })),
+    findByIdForUpdate: vi.fn(async () => ({ id: testId(1), name: "أحمد", isActive: true })),
     findCashierAccessForUpdate: vi.fn(async () => undefined),
     hasOpenShift: vi.fn(async () => false),
-    createCashierAccess: vi.fn(async () => 11),
+    createCashierAccess: vi.fn(async () => testId(11)),
     restoreCashierAccess: vi.fn(async () => undefined),
     revokeCashierAccess: vi.fn(async () => undefined),
     deactivate: vi.fn(async () => undefined),
@@ -21,7 +22,7 @@ function serviceWith(tx: Record<string, unknown>) {
   const repository = {
     transaction: vi.fn(async (run) => run(tx)),
     list: vi.fn(async () => []),
-    create: vi.fn(async () => 1),
+    create: vi.fn(async () => testId(1)),
   } as unknown as EmployeesRepository;
   return { service: new EmployeesService(repository), repository };
 }
@@ -32,7 +33,7 @@ describe("EmployeesService.grantCashierAccess", () => {
       txRepo({ findByIdForUpdate: vi.fn(async () => undefined) }),
     );
     await expect(
-      missing.service.grantCashierAccess(999, {
+      missing.service.grantCashierAccess(testId(999), {
         username: "c1",
         password: "secret-123",
       }),
@@ -41,14 +42,14 @@ describe("EmployeesService.grantCashierAccess", () => {
     const inactive = serviceWith(
       txRepo({
         findByIdForUpdate: vi.fn(async () => ({
-          id: 1,
+          id: testId(1),
           name: "أحمد",
           isActive: false,
         })),
       }),
     );
     await expect(
-      inactive.service.grantCashierAccess(1, {
+      inactive.service.grantCashierAccess(testId(1), {
         username: "c1",
         password: "secret-123",
       }),
@@ -59,29 +60,29 @@ describe("EmployeesService.grantCashierAccess", () => {
     const { service } = serviceWith(
       txRepo({
         findCashierAccessForUpdate: vi.fn(async () => ({
-          id: 11,
+          id: testId(11),
           isActive: true,
         })),
       }),
     );
 
     await expect(
-      service.grantCashierAccess(1, { username: "c1", password: "secret-123" }),
+      service.grantCashierAccess(testId(1), { username: "c1", password: "secret-123" }),
     ).rejects.toMatchObject({ status: 409 });
   });
 
   it("restores dormant access instead of creating a duplicate", async () => {
     const tx = txRepo({
       findCashierAccessForUpdate: vi.fn(async () => ({
-        id: 11,
+        id: testId(11),
         isActive: false,
       })),
     });
     const { service } = serviceWith(tx);
 
     await expect(
-      service.grantCashierAccess(1, { username: "c1", password: "secret-123" }),
-    ).resolves.toEqual({ userId: 11, created: false });
+      service.grantCashierAccess(testId(1), { username: "c1", password: "secret-123" }),
+    ).resolves.toEqual({ userId: testId(11), created: false });
     expect(tx.restoreCashierAccess).toHaveBeenCalledTimes(1);
     expect(tx.createCashierAccess).not.toHaveBeenCalled();
   });
@@ -91,8 +92,8 @@ describe("EmployeesService.grantCashierAccess", () => {
     const { service } = serviceWith(tx);
 
     await expect(
-      service.grantCashierAccess(1, { username: "c1", password: "secret-123" }),
-    ).resolves.toEqual({ userId: 11, created: true });
+      service.grantCashierAccess(testId(1), { username: "c1", password: "secret-123" }),
+    ).resolves.toEqual({ userId: testId(11), created: true });
 
     const duplicate = Object.assign(new Error("duplicate"), {
       code: "ER_DUP_ENTRY",
@@ -105,7 +106,7 @@ describe("EmployeesService.grantCashierAccess", () => {
       }),
     );
     await expect(
-      racing.service.grantCashierAccess(1, {
+      racing.service.grantCashierAccess(testId(1), {
         username: "taken",
         password: "secret-123",
       }),
@@ -119,25 +120,25 @@ describe("EmployeesService.revokeCashierAccess", () => {
       txRepo({ findByIdForUpdate: vi.fn(async () => undefined) }),
     );
     await expect(
-      missingEmployee.service.revokeCashierAccess(999),
+      missingEmployee.service.revokeCashierAccess(testId(999)),
     ).rejects.toMatchObject({ status: 404 });
 
     const missingAccess = serviceWith(txRepo());
     await expect(
-      missingAccess.service.revokeCashierAccess(1),
+      missingAccess.service.revokeCashierAccess(testId(1)),
     ).rejects.toMatchObject({ status: 404 });
   });
 
   it("treats already-revoked access as successful", async () => {
     const tx = txRepo({
       findCashierAccessForUpdate: vi.fn(async () => ({
-        id: 11,
+        id: testId(11),
         isActive: false,
       })),
     });
     const { service } = serviceWith(tx);
 
-    await expect(service.revokeCashierAccess(1)).resolves.toBeUndefined();
+    await expect(service.revokeCashierAccess(testId(1))).resolves.toBeUndefined();
     expect(tx.revokeCashierAccess).not.toHaveBeenCalled();
   });
 
@@ -145,14 +146,14 @@ describe("EmployeesService.revokeCashierAccess", () => {
     const { service } = serviceWith(
       txRepo({
         findCashierAccessForUpdate: vi.fn(async () => ({
-          id: 11,
+          id: testId(11),
           isActive: true,
         })),
         hasOpenShift: vi.fn(async () => true),
       }),
     );
 
-    await expect(service.revokeCashierAccess(1)).rejects.toMatchObject({
+    await expect(service.revokeCashierAccess(testId(1))).rejects.toMatchObject({
       status: 409,
     });
   });
@@ -163,19 +164,19 @@ describe("EmployeesService.deactivate", () => {
     const missing = serviceWith(
       txRepo({ findByIdForUpdate: vi.fn(async () => undefined) }),
     );
-    await expect(missing.service.deactivate(999)).rejects.toMatchObject({
+    await expect(missing.service.deactivate(testId(999))).rejects.toMatchObject({
       status: 404,
     });
 
     const tx = txRepo({
       findByIdForUpdate: vi.fn(async () => ({
-        id: 1,
+        id: testId(1),
         name: "أحمد",
         isActive: false,
       })),
     });
     const { service } = serviceWith(tx);
-    await expect(service.deactivate(1)).resolves.toBeUndefined();
+    await expect(service.deactivate(testId(1))).resolves.toBeUndefined();
     expect(tx.deactivate).not.toHaveBeenCalled();
   });
 
@@ -184,7 +185,7 @@ describe("EmployeesService.deactivate", () => {
       txRepo({ hasOpenShift: vi.fn(async () => true) }),
     );
 
-    await expect(service.deactivate(1)).rejects.toMatchObject({ status: 409 });
+    await expect(service.deactivate(testId(1))).rejects.toMatchObject({ status: 409 });
   });
 });
 
@@ -194,16 +195,16 @@ describe("EmployeesService update and list", () => {
       txRepo({ findByIdForUpdate: vi.fn(async () => undefined) }),
     );
     await expect(
-      missing.service.update(999, { name: "x" }),
+      missing.service.update(testId(999), { name: "x" }),
     ).rejects.toMatchObject({ status: 404 });
 
     const tx = txRepo();
     const { service } = serviceWith(tx);
-    await service.update(1, { name: "محمد" });
-    expect(tx.syncCashierName).toHaveBeenCalledWith(1, "محمد");
+    await service.update(testId(1), { name: "محمد" });
+    expect(tx.syncCashierName).toHaveBeenCalledWith(testId(1), "محمد");
 
     const sameName = txRepo();
-    await serviceWith(sameName).service.update(1, { name: "أحمد" });
+    await serviceWith(sameName).service.update(testId(1), { name: "أحمد" });
     expect(sameName.syncCashierName).not.toHaveBeenCalled();
   });
 
@@ -211,16 +212,16 @@ describe("EmployeesService update and list", () => {
     const repository = {
       list: vi.fn(async () => [
         {
-          id: 1,
+          id: testId(1),
           name: "أحمد",
           cashierUserId: null,
           cashierUsername: null,
           cashierIsActive: null,
         },
         {
-          id: 2,
+          id: testId(2),
           name: "محمد",
-          cashierUserId: 11,
+          cashierUserId: testId(11),
           cashierUsername: "c1",
           cashierIsActive: true,
         },
@@ -228,10 +229,10 @@ describe("EmployeesService update and list", () => {
     } as unknown as EmployeesRepository;
 
     await expect(new EmployeesService(repository).list()).resolves.toEqual([
-      expect.objectContaining({ id: 1, cashierAccess: null }),
+      expect.objectContaining({ id: testId(1), cashierAccess: null }),
       expect.objectContaining({
-        id: 2,
-        cashierAccess: { userId: 11, username: "c1", isActive: true },
+        id: testId(2),
+        cashierAccess: { userId: testId(11), username: "c1", isActive: true },
       }),
     ]);
   });

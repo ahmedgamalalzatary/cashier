@@ -51,11 +51,11 @@ export class EmployeesRepository {
             ? null
             : data.payRate.toFixed(2),
       }),
-    );
-    return result.insertId;
+    ).$returningId();
+    return result.id;
   }
 
-  async update(id: number, data: EmployeeUpdateInput) {
+  async update(id: string, data: EmployeeUpdateInput) {
     const { payRate, ...rest } = data;
     await this.db
       .update(employees)
@@ -68,14 +68,14 @@ export class EmployeesRepository {
       .where(branchCondition(employees, eq(employees.id, id)));
   }
 
-  async syncCashierName(employeeId: number, name: string) {
+  async syncCashierName(employeeId: string, name: string) {
     await this.db
       .update(users)
       .set({ name })
       .where(branchCondition(users, eq(users.employeeId, employeeId)));
   }
 
-  async findByIdForUpdate(id: number) {
+  async findByIdForUpdate(id: string) {
     const [row] = await this.db
       .select()
       .from(employees)
@@ -84,7 +84,7 @@ export class EmployeesRepository {
     return row;
   }
 
-  async findCashierAccessForUpdate(employeeId: number) {
+  async findCashierAccessForUpdate(employeeId: string) {
     const [row] = await this.db
       .select()
       .from(users)
@@ -94,7 +94,7 @@ export class EmployeesRepository {
   }
 
   async createCashierAccess(input: {
-    employeeId: number;
+    employeeId: string;
     name: string;
     username: string;
     passwordHash: string;
@@ -104,11 +104,11 @@ export class EmployeesRepository {
         ...input,
         role: "cashier",
       }),
-    );
-    return result.insertId;
+    ).$returningId();
+    return result.id;
   }
 
-  async revokeCashierAccess(userId: number) {
+  async revokeCashierAccess(userId: string) {
     await this.db
       .update(users)
       .set({
@@ -118,7 +118,7 @@ export class EmployeesRepository {
       .where(branchCondition(users, eq(users.id, userId)));
   }
 
-  async hasOpenShift(employeeId: number) {
+  async hasOpenShift(employeeId: string) {
     const [row] = await this.db
       .select({ id: shifts.id })
       .from(shifts)
@@ -133,7 +133,7 @@ export class EmployeesRepository {
   }
 
   async restoreCashierAccess(input: {
-    userId: number;
+    userId: string;
     username: string;
     passwordHash: string;
   }) {
@@ -148,7 +148,7 @@ export class EmployeesRepository {
       .where(branchCondition(users, eq(users.id, input.userId)));
   }
 
-  async setCashierPassword(userId: number, passwordHash: string) {
+  async setCashierPassword(userId: string, passwordHash: string) {
     await this.db
       .update(users)
       .set({
@@ -158,7 +158,7 @@ export class EmployeesRepository {
       .where(branchCondition(users, eq(users.id, userId)));
   }
 
-  async deactivate(employeeId: number) {
+  async deactivate(employeeId: string) {
     await this.db
       .update(employees)
       .set({ isActive: false })

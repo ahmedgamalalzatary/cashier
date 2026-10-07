@@ -1,5 +1,6 @@
+import { it } from "../support/ids.js";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 import { createApp } from "../../../../apps/api/src/app.js";
 import { appOptions, db } from "../support/api-setup.js";
 import { loginAs } from "../support/api-helpers.js";
@@ -11,7 +12,7 @@ describe("employees", () => {
     const authorization = await loginAs(app(), "cashier");
 
     const response = await request(app())
-      .post("/api/employees/1/cashier-access")
+      .post("/api/employees/00000000-0000-7000-8000-000000000001/cashier-access")
       .set(authorization)
       .send({ username: "forbidden", password: "secret123" });
 

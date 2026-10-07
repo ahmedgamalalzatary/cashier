@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import {
   cashierAccessInput,
@@ -73,6 +74,6 @@ describe("employee schemas", () => {
     ).toBe("cashier-1");
     expect(employeeIdParam.safeParse(0).success).toBe(false);
     expect(employeeIdParam.safeParse("abc").success).toBe(false);
-    expect(employeeIdParam.parse("5")).toBe(5);
+    expect(employeeIdParam.parse(testId(5))).toBe(testId(5));
   });
 });

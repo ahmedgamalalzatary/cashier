@@ -41,7 +41,7 @@ export class EmployeesService {
     return this.repo.create(data);
   }
 
-  update(employeeId: number, data: EmployeeUpdateInput) {
+  update(employeeId: string, data: EmployeeUpdateInput) {
     return this.repo.transaction(async (repo) => {
       const employee = await repo.findByIdForUpdate(employeeId);
       if (!employee) throw new HttpError(404, "الموظف غير موجود");
@@ -52,7 +52,7 @@ export class EmployeesService {
     });
   }
 
-  async grantCashierAccess(employeeId: number, data: CashierAccessInput) {
+  async grantCashierAccess(employeeId: string, data: CashierAccessInput) {
     try {
       return await this.repo.transaction(async (repo) => {
         const employee = await repo.findByIdForUpdate(employeeId);
@@ -85,7 +85,7 @@ export class EmployeesService {
     }
   }
 
-  revokeCashierAccess(employeeId: number) {
+  revokeCashierAccess(employeeId: string) {
     return this.repo.transaction(async (repo) => {
       const employee = await repo.findByIdForUpdate(employeeId);
       if (!employee) throw new HttpError(404, "الموظف غير موجود");
@@ -101,7 +101,7 @@ export class EmployeesService {
     });
   }
 
-  resetCashierPassword(employeeId: number, password: string) {
+  resetCashierPassword(employeeId: string, password: string) {
     return this.repo.transaction(async (repo) => {
       const employee = await repo.findByIdForUpdate(employeeId);
       if (!employee) throw new HttpError(404, "الموظف غير موجود");
@@ -115,7 +115,7 @@ export class EmployeesService {
     });
   }
 
-  deactivate(employeeId: number) {
+  deactivate(employeeId: string) {
     return this.repo.transaction(async (repo) => {
       const employee = await repo.findByIdForUpdate(employeeId);
       if (!employee) throw new HttpError(404, "الموظف غير موجود");

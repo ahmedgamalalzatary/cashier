@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -21,10 +22,10 @@ describe("employee route authorization", () => {
     const app = express();
     app.use((req, _res, next) => {
       req.user = {
-        id: 1,
+        id: testId(1),
         name: "Cashier",
         role: "cashier",
-        branchId: 1,
+        branchId: testId(1),
         isSuperAdmin: false,
       };
       next();
@@ -34,11 +35,11 @@ describe("employee route authorization", () => {
     const responses = await Promise.all([
       request(app).get("/"),
       request(app).post("/").send({}),
-      request(app).put("/1").send({}),
-      request(app).post("/1/cashier-access").send({}),
-      request(app).put("/1/cashier-password").send({}),
-      request(app).delete("/1/cashier-access"),
-      request(app).delete("/1"),
+      request(app).put("/00000000-0000-7000-8000-000000000001").send({}),
+      request(app).post("/00000000-0000-7000-8000-000000000001/cashier-access").send({}),
+      request(app).put("/00000000-0000-7000-8000-000000000001/cashier-password").send({}),
+      request(app).delete("/00000000-0000-7000-8000-000000000001/cashier-access"),
+      request(app).delete("/00000000-0000-7000-8000-000000000001"),
     ]);
 
     expect(responses.map(({ status }) => status)).toEqual([
@@ -59,7 +60,7 @@ describe("employee controller wiring", () => {
     const app = express();
     app.use((req, _res, next) => {
       req.user = {
-        id: 1,
+        id: testId(1),
         name: "Admin",
         role: "admin",
         branchId: null,
@@ -76,8 +77,8 @@ describe("employee controller wiring", () => {
 
   it("uses 201 for creates and grants, 204 for revokes and deactivations", async () => {
     const service = {
-      create: vi.fn(async () => 1),
-      grantCashierAccess: vi.fn(async () => ({ userId: 11, created: true })),
+      create: vi.fn(async () => testId(1)),
+      grantCashierAccess: vi.fn(async () => ({ userId: testId(11), created: true })),
       revokeCashierAccess: vi.fn(async () => undefined),
       resetCashierPassword: vi.fn(async () => undefined),
       deactivate: vi.fn(async () => undefined),
@@ -88,30 +89,30 @@ describe("employee controller wiring", () => {
     expect(created.status).toBe(201);
     expect(service.create).toHaveBeenCalledWith(validEmployee);
 
-    const granted = await request(app).post("/1/cashier-access").send({
+    const granted = await request(app).post("/00000000-0000-7000-8000-000000000001/cashier-access").send({
       username: "c1",
       password: "secret-123",
     });
     expect(granted.status).toBe(201);
-    expect(granted.body).toEqual({ userId: 11 });
+    expect(granted.body).toEqual({ userId: testId(11) });
 
     const restoredService = {
-      grantCashierAccess: vi.fn(async () => ({ userId: 11, created: false })),
+      grantCashierAccess: vi.fn(async () => ({ userId: testId(11), created: false })),
     } as unknown as EmployeesService;
     const restored = await request(appWithService(restoredService))
-      .post("/1/cashier-access")
+      .post("/00000000-0000-7000-8000-000000000001/cashier-access")
       .send({ username: "c1", password: "secret-123" });
     expect(restored.status).toBe(200);
 
-    expect((await request(app).delete("/1/cashier-access")).status).toBe(204);
-    expect((await request(app).delete("/1")).status).toBe(204);
+    expect((await request(app).delete("/00000000-0000-7000-8000-000000000001/cashier-access")).status).toBe(204);
+    expect((await request(app).delete("/00000000-0000-7000-8000-000000000001")).status).toBe(204);
 
     const reset = await request(app)
-      .put("/1/cashier-password")
+      .put("/00000000-0000-7000-8000-000000000001/cashier-password")
       .send({ password: "new-secret-456" });
     expect(reset.status).toBe(200);
     expect(service.resetCashierPassword).toHaveBeenCalledWith(
-      1,
+      testId(1),
       "new-secret-456",
     );
   });
@@ -125,11 +126,11 @@ describe("employee controller wiring", () => {
     const app = appWithService(service);
 
     expect((await request(app).post("/").send({})).status).toBe(400);
-    expect((await request(app).put("/1").send({})).status).toBe(400);
+    expect((await request(app).put("/00000000-0000-7000-8000-000000000001").send({})).status).toBe(400);
     expect(
       (
         await request(app)
-          .post("/1/cashier-access")
+          .post("/00000000-0000-7000-8000-000000000001/cashier-access")
           .send({ username: "c1", password: "short" })
       ).status,
     ).toBe(400);
@@ -137,7 +138,7 @@ describe("employee controller wiring", () => {
       400,
     );
 
-    const missing = await request(app).put("/999").send({ name: "x" });
+    const missing = await request(app).put("/00000000-0000-7000-8000-0000000003e7").send({ name: "x" });
     expect(missing.status).toBe(404);
   });
 });

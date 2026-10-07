@@ -69,14 +69,14 @@ export class SalariesRepository {
       .where(branchCondition(employees))
       .orderBy(asc(employees.name));
   }
-  async employee(id: number) {
+  async employee(id: string) {
     const [row] = await this.db
       .select()
       .from(employees)
       .where(branchCondition(employees, eq(employees.id, id)));
     return row;
   }
-  async employeeForUpdate(id: number) {
+  async employeeForUpdate(id: string) {
     const [row] = await this.db
       .select()
       .from(employees)
@@ -147,7 +147,7 @@ export class SalariesRepository {
       )
       .orderBy(desc(salaryPayments.paidAt));
   }
-  async monthEntries(employeeId: number, start: string, end: string) {
+  async monthEntries(employeeId: string, start: string, end: string) {
     const [advances, adjustments, settled] = await Promise.all([
       this.db
         .select({ amount: salaryAdvances.amount })
@@ -198,7 +198,7 @@ export class SalariesRepository {
       settledAdvances: settled[0]?.amount ?? "0.00",
     };
   }
-  async paymentForMonth(employeeId: number, month: string) {
+  async paymentForMonth(employeeId: string, month: string) {
     const [row] = await this.db
       .select()
       .from(salaryPayments)
@@ -214,7 +214,7 @@ export class SalariesRepository {
       .for("update");
     return row;
   }
-  async latestPaymentForEmployee(employeeId: number, forUpdate = false) {
+  async latestPaymentForEmployee(employeeId: string, forUpdate = false) {
     const query = () =>
       this.db
         .select({ periodMonth: salaryPayments.periodMonth })
@@ -230,25 +230,25 @@ export class SalariesRepository {
     const [row] = forUpdate ? await query().for("update") : await query();
     return row;
   }
-  async createAdvance(input: AdvanceInput & { recordedBy: number }) {
+  async createAdvance(input: AdvanceInput & { recordedBy: string }) {
     const [result] = await this.db
       .insert(salaryAdvances)
-      .values(branchValues({ ...input, amount: input.amount.toFixed(2) }));
-    return { id: result.insertId };
+      .values(branchValues({ ...input, amount: input.amount.toFixed(2) })).$returningId();
+    return { id: result.id };
   }
-  async createAdjustment(input: AdjustmentInput & { recordedBy: number }) {
+  async createAdjustment(input: AdjustmentInput & { recordedBy: string }) {
     const [result] = await this.db
       .insert(salaryAdjustments)
-      .values(branchValues({ ...input, amount: input.amount.toFixed(2) }));
-    return { id: result.insertId };
+      .values(branchValues({ ...input, amount: input.amount.toFixed(2) })).$returningId();
+    return { id: result.id };
   }
-  async createPayment(input: typeof salaryPayments.$inferInsert) {
+  async createPayment(input: Omit<typeof salaryPayments.$inferInsert, "branchId">) {
     const [result] = await this.db
       .insert(salaryPayments)
-      .values(branchValues(input));
-    return result.insertId;
+      .values(branchValues(input)).$returningId();
+    return result.id;
   }
-  async payment(id: number) {
+  async payment(id: string) {
     const [row] = await this.db
       .select(paymentColumns)
       .from(salaryPayments)
