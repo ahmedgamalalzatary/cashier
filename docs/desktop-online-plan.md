@@ -145,7 +145,7 @@ Status: ☐ todo · ◐ in progress · ☑ done. Write the date when done.
 | 3 Web core           | 3.1 `packages/web-core`: api client, auth/session, ui primitives  | ☑      | 2026-10-07 | `navigation.ts` moved too (`canOpenPath` needs `ADMIN_PATHS`) |
 |                      | 3.2 move reports page/components/model/service                    | ☑      | 2026-10-07 | page body → `features/reports-page.tsx`; route is thin     |
 |                      | 3.3 move login + users/branches management UI                     | ☑      | 2026-10-07 | merged with 3.2: reports needs `branch-provider`            |
-| 4 Schema reset       | 4.1 UUID helper + custom column type + tests                      | ☐      |            |                                                           |
+| 4 Schema reset       | 4.1 UUID helper + custom column type + tests                      | ?      | 2026-10-07 | UUIDv7 + ASCII column; isolated lint/typecheck/build and 19 unit tests green |
 |                      | 4.2 schema: all ids → UUID, new tables, one shift per branch      | ☐      |            |                                                           |
 |                      | 4.3 baseline migration reset                                      | ☐      |            |                                                           |
 |                      | 4.4 api modules + zod schemas + shared types → string ids         | ☐      |            |                                                           |

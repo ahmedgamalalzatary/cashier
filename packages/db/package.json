@@ -35,7 +35,8 @@
     "bcryptjs": "^3.0.2",
     "dotenv": "^16.5.0",
     "drizzle-orm": "^0.43.1",
-    "mysql2": "^3.14.1"
+    "mysql2": "^3.14.1",
+    "uuid": "^14.0.2"
   },
   "devDependencies": {
     "@types/express": "^5.0.1",
