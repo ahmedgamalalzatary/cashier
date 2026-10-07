@@ -270,8 +270,9 @@ close records the expected cash only; an admin later enters the counted cash wit
 
 ### Closing logic — one function, used everywhere
 - `modules/shifts/shifts.service.ts`: `autoCloseExpired(now = new Date())` — in a branch transaction, lock open shifts
-  with `opened_at <= now - 16h`; for each: compute `expectedCash` with the **same formula as normal close** (reuse the
-  existing helper, ~L196), then set `status=closed`, `openSlot=NULL`, `closedAt = openedAt + 16h` (not "now" — caps worked time),
+  with `opened_at <= now - 16h`, then use the latest reopen event (or `openedAt`) as the current segment start.
+  Skip segments younger than 16h; otherwise compute `expectedCash` with the **same formula as normal close** (reuse the
+  existing helper, ~L196), then set `status=closed`, `openSlot=NULL`, `closedAt = segmentStart + 16h` (not "now" — caps worked time),
   `closedByUserId=NULL`, `actualCash=NULL`, `overShort=NULL`; insert event `auto_close`, actor `NULL`,
   note "أُغلقت تلقائياً بعد 16 ساعة دون عدّ الدرج".
 - Repository: `findExpiredOpen(cutoff)` + reuse `close()` (allow null actual/overShort) in `shifts.repository.ts`.
@@ -316,7 +317,7 @@ cashier warning. What landed where:
   not the Phase 4 baseline reset, so existing databases keep their data.
 - `ShiftsService.autoCloseExpired(now)` locks expired shifts with `findExpiredOpen(cutoff)`,
   reuses one `expectedCashFor()` helper for every close path, caps `closedAt` at
-  `openedAt + 16h`, and inserts an `auto_close` event with no actor and no counted cash.
+  the current open segment's start + 16h, and inserts an `auto_close` event with no actor and no counted cash.
 - `modules/shifts/auto-close.ts`: `autoCloseExpiredBranches()` walks every active branch and
   keeps going when one fails; `runAutoCloseLoop()` sweeps every 60 s and runs alongside the
   cache refresh loop in `apps/api/src/worker.ts`.
@@ -452,7 +453,7 @@ Form lives in a Modal (components/<area>/<x>-modal.tsx), opened by the header bu
 6. Walk: cashier open shift → sell → refund → waste → drawer expense → transfer request; admin approve → purchase with
    send-to-cafe → stocktake → expense → advance → salary pay; admin sale/refund without shift; super-admin vs regular admin on Users.
 7. Auto-close: in the e2e DB set an open shift's `opened_at` to 17 h ago → within 60 s (worker) or on the cashier's next
-   sale attempt it is closed (`auto_close` event, closedAt = opened + 16 h); admin enters the count via correction.
+   sale attempt it is closed (`auto_close` event, closedAt = current segment start + 16 h); admin enters the count via correction.
    Only shifts with `status='open' AND open_slot=1` are real open shifts (the half-open demo shift #3 is not).
 
 ## 12. Audit evidence summary (what was verified working)

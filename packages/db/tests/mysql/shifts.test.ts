@@ -4,7 +4,10 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "../../../../apps/api/src/app.js";
 import { ShiftsService } from "../../../../apps/api/src/modules/shifts/shifts.service.js";
 import { ShiftsRepository } from "../../../../apps/api/src/modules/shifts/shifts.repository.js";
-import { autoCloseExpiredBranches, createAutoCloseForDb } from "../../../../apps/api/src/modules/shifts/auto-close.js";
+import {
+  autoCloseExpiredBranches,
+  createAutoCloseForDb,
+} from "../../../../apps/api/src/modules/shifts/auto-close.js";
 import { MAX_SHIFT_HOURS } from "@cashier/shared";
 import { orders, shiftEvents, shifts } from "@cashier/db";
 import { appOptions, db, nextTestItemCode } from "../support/api-setup.js";
@@ -927,7 +930,10 @@ describe("shifts", () => {
 });
 // --- Phase 5A: a shift open for MAX_SHIFT_HOURS is closed by the system ---
 
-async function openShiftAt(cashier: Awaited<ReturnType<typeof createCashier>>, hoursOpen: number) {
+async function openShiftAt(
+  cashier: Awaited<ReturnType<typeof createCashier>>,
+  hoursOpen: number,
+) {
   const opened = await request(app())
     .post("/api/shifts/open")
     .set(cashier.authorization)
@@ -949,6 +955,51 @@ function service() {
 }
 
 describe("shift auto-close", () => {
+  it("gives a reopened shift a full new 16-hour segment", async () => {
+    const cashier = await createCashier("auto-close-reopened");
+    const { id } = await openShiftAt(cashier, 17);
+    await request(app())
+      .post(`/api/shifts/${id}/close`)
+      .set(cashier.authorization)
+      .send({ actualCash: 500 })
+      .expect(200);
+    const reopened = await request(app())
+      .post(`/api/shifts/${id}/reopen`)
+      .set(cashier.adminAuthorization)
+      .send({ note: "استكمال العمل" })
+      .expect(200);
+    const segmentStart = new Date(
+      reopened.body.events.find(
+        (event: { action: string }) => event.action === "reopen",
+      ).occurredAt,
+    );
+
+    expect(
+      await service().autoCloseExpired(
+        new Date(segmentStart.getTime() + 15 * 3_600_000),
+      ),
+    ).toBe(0);
+    const current = await request(app())
+      .get("/api/shifts/current")
+      .set(cashier.authorization)
+      .expect(200);
+    expect(current.body).toMatchObject({
+      id,
+      status: "open",
+      currentSegmentMinutes: 0,
+    });
+
+    expect(
+      await service().autoCloseExpired(
+        new Date(segmentStart.getTime() + 17 * 3_600_000),
+      ),
+    ).toBe(1);
+    const [row] = await db.select().from(shifts).where(eq(shifts.id, id));
+    expect(row.closedAt!.getTime()).toBe(
+      segmentStart.getTime() + 16 * 3_600_000,
+    );
+  });
+
   it("closes a shift that has been open for 16 hours with expected cash only", async () => {
     const cashier = await createCashier("auto-close-cashier");
     const { id, openedAt } = await openShiftAt(cashier, 16.5);
@@ -998,7 +1049,7 @@ describe("shift auto-close", () => {
   });
 
   it("closes only expired shifts in the branch", async () => {
-const expiredCashier = await createCashier("auto-close-expired-cashier");
+    const expiredCashier = await createCashier("auto-close-expired-cashier");
     // a second cashier: one open shift per cashier is the rule, so the fresh
     // shift needs its own
     const freshCashier = await createCashier(
@@ -1011,8 +1062,14 @@ const expiredCashier = await createCashier("auto-close-expired-cashier");
 
     await service().autoCloseExpired();
 
-    const [expiredRow] = await db.select().from(shifts).where(eq(shifts.id, expired.id));
-    const [freshRow] = await db.select().from(shifts).where(eq(shifts.id, fresh.id));
+    const [expiredRow] = await db
+      .select()
+      .from(shifts)
+      .where(eq(shifts.id, expired.id));
+    const [freshRow] = await db
+      .select()
+      .from(shifts)
+      .where(eq(shifts.id, fresh.id));
     expect(expiredRow.status).toBe("closed");
     expect(freshRow.status).toBe("open");
   });
@@ -1052,7 +1109,7 @@ describe("lazy auto-close on a cashier request", () => {
 
     await request(app()).get("/api/shifts/current").set(cashier.authorization);
 
-// any well-formed order proves the point: the shift check rejects it with
+    // any well-formed order proves the point: the shift check rejects it with
     // 409 before stock or price matters
     const blocked = await request(app())
       .post("/api/orders")
@@ -1070,7 +1127,7 @@ describe("lazy auto-close on a cashier request", () => {
 });
 describe("shift auto-close across branches", () => {
   it("closes expired shifts in every active branch and leaves fresh ones open", async () => {
-const first = await createCashier("worker-branch-first");
+    const first = await createCashier("worker-branch-first");
     // createCashier already logged in as admin; a second login would collide
     const admin = first.adminAuthorization;
     const branch = await request(app())
@@ -1086,23 +1143,30 @@ const first = await createCashier("worker-branch-first");
     );
 
     // one expired shift per branch
-    await openShiftAt(first, 17);
-    await openShiftAt(second, 18);
+    const firstExpired = await openShiftAt(first, 17);
+    const secondExpired = await openShiftAt(second, 18);
     // and one fresh shift that must survive the sweep
     const fresh = await createCashier("worker-branch-fresh", undefined, admin);
+    const freshShift = await openShiftAt(fresh, 1);
 
     const closed = await autoCloseExpiredBranches(db, createAutoCloseForDb(db));
 
     expect(closed).toBeGreaterThanOrEqual(2);
-    const remaining = await db
-      .select({ id: shifts.id, status: shifts.status })
+    for (const expired of [firstExpired, secondExpired]) {
+      const [row] = await db
+        .select()
+        .from(shifts)
+        .where(eq(shifts.id, expired.id));
+      expect(row.status).toBe("closed");
+    }
+    const [remaining] = await db
+      .select()
       .from(shifts)
-      .where(eq(shifts.openSlot, 1));
-    expect(remaining.map((row) => row.id)).not.toContain(fresh.userId);
-    expect(remaining.every((row) => row.status === "open")).toBe(true);
+      .where(eq(shifts.id, freshShift.id));
+    expect(remaining.status).toBe("open");
   });
 
-it("visits every branch and keeps going when one of them fails", async () => {
+  it("visits every branch and keeps going when one of them fails", async () => {
     const visited: number[] = [];
     const failed: number[] = [];
     const fakeDb = {

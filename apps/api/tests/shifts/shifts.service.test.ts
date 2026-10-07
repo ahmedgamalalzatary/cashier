@@ -263,7 +263,10 @@ describe("ShiftsService.correct guards", () => {
     });
     await expect(
       new ShiftsService(uncounted).correct(1, { note: "لا شيء" }, 1),
-    ).rejects.toMatchObject({ status: 409 });
+    ).rejects.toMatchObject({
+      status: 409,
+      message: "يجب إدخال النقد الفعلي لتصحيح وردية لم يُعدّ درجها",
+    });
   });
 
   it("accepts a count for an auto-closed shift that has none", async () => {

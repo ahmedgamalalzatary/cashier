@@ -286,8 +286,8 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
           money("lifetimeRefunds", "كل المرتجعات"),
           money("lifetimeExpenses", "كل المصروفات"),
           money("expectedCash", "النقد المتوقع عند التسوية"),
-          money("actualCash", "النقد الفعلي عند التسوية"),
-          money("overShort", "آخر زيادة / عجز"),
+          uncountedMoney("actualCash", "النقد الفعلي عند التسوية"),
+          uncountedMoney("overShort", "آخر زيادة / عجز"),
         ],
       },
       {

@@ -5,7 +5,7 @@ import { ReportsPage } from "../../../src/features/reports-page";
 import { Button } from "../../../src/components/ui/button";
 import { PageHeader } from "../../../src/components/ui/page-header";
 import { Tabs } from "../../../src/components/ui/tabs";
-import { getReports } from '../../../src/services/reports-service';
+import { getReports } from "../../../src/services/reports-service";
 import { reportsFixture } from "../../fixtures/reports";
 import { cairoCalendarDate } from "../../../src/lib/cairo-date";
 
@@ -56,11 +56,17 @@ vi.mock(
   "../../../src/components/ui/page-header",
   async () => import("../../../src/components/ui/page-header"),
 );
-vi.mock("../../../src/lib/cairo-date", async () => import("../../../src/lib/cairo-date"));
+vi.mock(
+  "../../../src/lib/cairo-date",
+  async () => import("../../../src/lib/cairo-date"),
+);
 vi.mock("../../../src/lib/cairo-date", () => ({
   cairoCalendarDate: vi.fn(() => "2026-09-27"),
 }));
-vi.mock("../../../src/lib/format", async () => import("../../../src/lib/format"));
+vi.mock(
+  "../../../src/lib/format",
+  async () => import("../../../src/lib/format"),
+);
 vi.mock(
   "../../../src/models/reports-model",
   async () => import("../../../src/models/reports-model"),
@@ -186,6 +192,25 @@ describe("report loading and printing", () => {
     expect(html).toContain("Transfer Staff");
     expect(html).toContain("Prep Staff");
     expect(html).toContain("Dough");
+  });
+  it("shows uncounted cash in the complete shift table", async () => {
+    const data = reportsFixture();
+    data.sales.byShift = [
+      {
+        shiftId: 1,
+        cashierName: "Cashier",
+        status: "closed",
+        actualCash: null,
+        overShort: null,
+      },
+    ];
+    vi.mocked(getReports).mockResolvedValueOnce(data);
+    render();
+    hooks.effect!();
+    await settle();
+    openTab(render(), "employees");
+    const html = renderToStaticMarkup(render());
+    expect(html.match(/لم يُعدّ/g)).toHaveLength(2);
   });
   it("discards a late response from an obsolete request", async () => {
     let resolve!: (value: ReturnType<typeof reportsFixture>) => void;

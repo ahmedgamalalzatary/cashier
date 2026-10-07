@@ -170,7 +170,9 @@ export function ShiftHistory({
                           <li key={event.id}>
                             <b>{actions[event.action]}</b> ·{" "}
                             {dateTime.format(new Date(event.occurredAt))} ·
-                            المستخدم #{event.actorUserId}
+                            {event.actorUserId === null
+                              ? "النظام"
+                              : `المستخدم #${event.actorUserId}`}
                             {event.note && <p>{event.note}</p>}
                             {event.openingFloat !== null && (
                               <p>العهدة: {formatMoney(event.openingFloat)}</p>
@@ -183,6 +185,12 @@ export function ShiftHistory({
                                 {formatMoney(event.overShort ?? 0)}
                               </p>
                             )}
+                            {event.actualCash === null &&
+                              event.expectedCash !== null && (
+                                <p>
+                                  المتوقع: {formatMoney(event.expectedCash)}
+                                </p>
+                              )}
                           </li>
                         ))}
                       </ol>

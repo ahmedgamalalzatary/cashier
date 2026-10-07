@@ -138,7 +138,7 @@ export type ShiftEventAction =
 export type ShiftEvent = {
   id: number;
   action: ShiftEventAction;
-  actorUserId: number;
+  actorUserId: number | null;
   note: string | null;
   openingFloat: string | null;
   actualCash: string | null;
@@ -161,6 +161,8 @@ export type Shift = {
   expectedCash: string | null;
   overShort: string | null;
   workedMinutes: number;
+  /** Current continuous open segment; absent on older API responses. */
+  currentSegmentMinutes?: number;
   totals: ShiftTotals;
   events: ShiftEvent[];
 };

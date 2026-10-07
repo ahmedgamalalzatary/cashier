@@ -28,7 +28,13 @@ export function ConfirmDialog({
   onCancel: () => void;
 }) {
   return (
-    <Modal open={open} title={title} onClose={onCancel}>
+    <Modal
+      open={open}
+      title={title}
+      onClose={() => {
+        if (!busy) onCancel();
+      }}
+    >
       {description && (
         <p className="text-sm leading-6 text-muted">{description}</p>
       )}

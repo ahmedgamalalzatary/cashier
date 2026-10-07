@@ -45,7 +45,10 @@ vi.mock(
   "@cashier/web-core/components/ui/icon-button",
   async () => import("@cashier/web-core/components/ui/icon-button"),
 );
-vi.mock("@cashier/web-core/lib/format", async () => import("@cashier/web-core/lib/format"));
+vi.mock(
+  "@cashier/web-core/lib/format",
+  async () => import("@cashier/web-core/lib/format"),
+);
 vi.mock(
   "@/services/shifts-service",
   async () => import("../../../src/services/shifts-service"),
@@ -54,7 +57,10 @@ vi.mock(
   "@cashier/web-core/services/reports-service",
   async () => import("@cashier/web-core/services/reports-service"),
 );
-vi.mock("@cashier/web-core/lib/api", async () => import("@cashier/web-core/lib/api"));
+vi.mock(
+  "@cashier/web-core/lib/api",
+  async () => import("@cashier/web-core/lib/api"),
+);
 
 function stateValues(values: unknown[]) {
   useStateMock.mockImplementation((initial: unknown) => [
@@ -64,6 +70,38 @@ function stateValues(values: unknown[]) {
 }
 describe("shift administration and history", () => {
   beforeEach(() => useStateMock.mockReset());
+  it("shows the system actor and expected cash for an uncounted auto-close event", () => {
+    stateValues([
+      0,
+      [
+        shiftFixture({
+          status: "closed",
+          events: [
+            {
+              id: 1,
+              action: "auto_close",
+              actorUserId: null,
+              note: null,
+              openingFloat: null,
+              actualCash: null,
+              expectedCash: "137.00",
+              overShort: null,
+              occurredAt: "2026-09-27T09:00:00Z",
+            },
+          ],
+        }),
+      ],
+      false,
+      "",
+      0,
+    ]);
+    const html = renderToStaticMarkup(<ShiftHistory />);
+    const event = html.slice(html.indexOf("<ol"), html.indexOf("</ol>"));
+    expect(event).toContain("النظام");
+    expect(event).toContain("المتوقع:");
+    expect(event).toContain("١٣٧٫٠٠");
+    expect(event).not.toContain("المستخدم #");
+  });
   it("shows both concurrent shifts with separate admin closing actions", () => {
     stateValues([
       [

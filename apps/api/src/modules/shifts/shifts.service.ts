@@ -28,8 +28,7 @@ function isDeadlock(error: unknown) {
   );
 }
 
-export const AUTO_CLOSE_NOTE =
-  "أُغلقت تلقائياً بعد 16 ساعة دون عدّ الدرج";
+export const AUTO_CLOSE_NOTE = "أُغلقت تلقائياً بعد 16 ساعة دون عدّ الدرج";
 
 const MAX_SHIFT_MS = MAX_SHIFT_HOURS * 3_600_000;
 
@@ -39,7 +38,7 @@ export class ShiftsService {
   /**
    * Closes every shift in this branch that has been open for MAX_SHIFT_HOURS.
    * The drawer was never counted, so the close records the expected cash only and
-   * `closedAt` is capped at openedAt + MAX_SHIFT_HOURS: a shift left open for
+   * `closedAt` is capped at the current segment's start + MAX_SHIFT_HOURS: a shift left open for
    * three days must still report 16 worked hours, not 72. An admin enters the
    * counted cash later through the existing correction flow.
    */
@@ -51,9 +50,18 @@ export class ShiftsService {
       for (const row of expired) {
         const shift = await repo.findByIdForUpdate(row.id);
         if (!shift || shift.status !== "open") continue;
-        const expectedCash = await this.expectedCashFor(repo, shift.id, shift.openingFloat);
+        const segmentStart = currentSegmentStart(
+          shift.openedAt,
+          await repo.events(shift.id),
+        );
+        if (segmentStart.getTime() > cutoff.getTime()) continue;
+        const expectedCash = await this.expectedCashFor(
+          repo,
+          shift.id,
+          shift.openingFloat,
+        );
         const closedAt = new Date(
-          Math.min(now.getTime(), shift.openedAt.getTime() + MAX_SHIFT_MS),
+          Math.min(now.getTime(), segmentStart.getTime() + MAX_SHIFT_MS),
         );
         await repo.close({
           id: row.id,
@@ -143,6 +151,16 @@ export class ShiftsService {
     return {
       ...shift,
       workedMinutes: workedMinutes(shift.openedAt, shift.closedAt, events),
+      currentSegmentMinutes:
+        shift.status === "open"
+          ? Math.floor(
+              Math.max(
+                0,
+                Date.now() -
+                  currentSegmentStart(shift.openedAt, events).getTime(),
+              ) / 60_000,
+            )
+          : 0,
       totals: {
         ordersCount: Number(totals.ordersCount),
         sales: totals.sales,
@@ -343,7 +361,10 @@ export class ShiftsService {
       if (shift.status !== "closed")
         throw new HttpError(409, "يمكن تصحيح وردية مغلقة فقط");
       if (shift.actualCash === null && data.actualCash === undefined)
-        throw new HttpError(409, "يمكن تصحيح وردية مغلقة فقط");
+        throw new HttpError(
+          409,
+          "يجب إدخال النقد الفعلي لتصحيح وردية لم يُعدّ درجها",
+        );
       const totals = await repo.totals(id);
       const openingFloat =
         data.openingFloat === undefined
@@ -403,6 +424,16 @@ function fromCents(value: bigint) {
   return `${negative ? "-" : ""}${absolute / 100n}.${(absolute % 100n)
     .toString()
     .padStart(2, "0")}`;
+}
+
+function currentSegmentStart(
+  openedAt: Date,
+  events: Array<{ action: string; occurredAt: Date }>,
+) {
+  return events.reduce(
+    (start, event) => (event.action === "reopen" ? event.occurredAt : start),
+    openedAt,
+  );
 }
 
 function workedMinutes(
