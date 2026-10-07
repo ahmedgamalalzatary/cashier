@@ -5,7 +5,7 @@ import { CashierShiftControls } from "../shifts/cashier-shift-controls";
 import Link from "next/link";
 import { LockKeyhole } from "lucide-react";
 import type { CurrentShift, Role, Shift } from "@cashier/shared";
-import { cairoClock } from "@/lib/cairo-date";
+import { cairoClock } from "@cashier/web-core/lib/cairo-date";
 import {
   countPhrase,
   dayTape,

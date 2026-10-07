@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../../src/lib/api";
+import { api } from "@cashier/web-core/lib/api";
 import {
   createPurchase,
   getPurchase,
@@ -7,7 +7,7 @@ import {
   type PurchaseCreateBody,
 } from "../../src/services/purchases-service";
 
-vi.mock("../../src/lib/api", () => ({ api: vi.fn() }));
+vi.mock("@cashier/web-core/lib/api", () => ({ api: vi.fn() }));
 
 describe("purchases service", () => {
   const request = vi.mocked(api);

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createRefund, getRefund, listRefunds } from "../../src/services/refunds-service";
-import { api } from "../../src/lib/api";
+import { api } from "@cashier/web-core/lib/api";
 
-vi.mock("../../src/lib/api", () => ({ api: vi.fn() }));
+vi.mock("@cashier/web-core/lib/api", () => ({ api: vi.fn() }));
 
 describe("refunds service", () => {
   beforeEach(() => vi.mocked(api).mockReset());

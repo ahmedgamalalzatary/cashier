@@ -2,22 +2,22 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ShiftTape } from "../../../src/components/home/shift-tape";
 
-vi.mock("@/lib/cairo-date", async () => import("../../../src/lib/cairo-date"));
+vi.mock("@cashier/web-core/lib/cairo-date", async () => import("@cashier/web-core/lib/cairo-date"));
 vi.mock(
   "@/models/home-model",
   async () => import("../../../src/models/home-model"),
 );
 vi.mock(
-  "@/components/ui/button",
-  async () => import("../../../src/components/ui/button"),
+  "@cashier/web-core/components/ui/button",
+  async () => import("@cashier/web-core/components/ui/button"),
 );
 vi.mock(
-  "@/components/ui/field",
-  async () => import("../../../src/components/ui/field"),
+  "@cashier/web-core/components/ui/field",
+  async () => import("@cashier/web-core/components/ui/field"),
 );
 vi.mock(
-  "@/components/ui/modal",
-  async () => import("../../../src/components/ui/modal"),
+  "@cashier/web-core/components/ui/modal",
+  async () => import("@cashier/web-core/components/ui/modal"),
 );
 
 describe("cashier controls on Home", () => {

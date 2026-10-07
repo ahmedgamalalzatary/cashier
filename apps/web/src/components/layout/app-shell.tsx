@@ -3,9 +3,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { Coffee, Menu } from "lucide-react";
-import { normalizePath } from "@/lib/auth";
+import { normalizePath } from "@cashier/web-core/lib/auth";
 import { Sidebar } from "./sidebar";
-import { WorkspaceBar } from "../branches/workspace-bar";
+import { WorkspaceBar } from "@cashier/web-core/components/branches/workspace-bar";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = normalizePath(usePathname());

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Button } from "@/components/ui/button";
-import { Field } from "@/components/ui/field";
-import { Modal } from "@/components/ui/modal";
-import { SelectField } from "@/components/ui/select-field";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { Field } from "@cashier/web-core/components/ui/field";
+import { Modal } from "@cashier/web-core/components/ui/modal";
+import { SelectField } from "@cashier/web-core/components/ui/select-field";
 import { categoryParentOptions, categoryUpdateBody } from "@/models/category-model";
 import { createCategory, updateCategory } from "@/services/categories-service";
 

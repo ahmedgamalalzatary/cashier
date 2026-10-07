@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans_Arabic } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/components/auth/auth-provider";
+import { AuthProvider } from "@cashier/web-core/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
-import { BranchProvider } from "@/components/branches/branch-provider";
+import { BranchProvider } from "@cashier/web-core/components/branches/branch-provider";
 
 const plexArabic = IBM_Plex_Sans_Arabic({
   variable: "--font-plex-arabic",

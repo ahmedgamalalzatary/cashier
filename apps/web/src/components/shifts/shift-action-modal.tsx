@@ -2,9 +2,9 @@
 
 import { useState, type FormEvent } from "react";
 import type { Shift } from "@cashier/shared";
-import { Button } from "@/components/ui/button";
-import { Field, TextAreaField } from "@/components/ui/field";
-import { Modal } from "@/components/ui/modal";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { Field, TextAreaField } from "@cashier/web-core/components/ui/field";
+import { Modal } from "@cashier/web-core/components/ui/modal";
 
 export type ShiftActionMode =
   "open" | "close" | "admin-close" | "reopen" | "correction";

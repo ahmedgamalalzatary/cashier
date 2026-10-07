@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import type { ExpenseCategory, ExpenseSummary } from "@cashier/shared";
 import { Plus, Receipt } from "lucide-react";
-import { useAuth } from "@/components/auth/auth-provider";
+import { useAuth } from "@cashier/web-core/components/auth/auth-provider";
 import { ExpenseEntryForm } from "@/components/expenses/expense-entry-form";
-import { Button } from "@/components/ui/button";
-import { DataTable, type DataColumn } from "@/components/ui/data-table";
-import { PageHeader } from "@/components/ui/page-header";
-import { Section } from "@/components/ui/section";
-import { EmptyState, ErrorBanner } from "@/components/ui/states";
-import { formatMoney } from "@/lib/format";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
+import { Section } from "@cashier/web-core/components/ui/section";
+import { EmptyState, ErrorBanner } from "@cashier/web-core/components/ui/states";
+import { formatMoney } from "@cashier/web-core/lib/format";
 import {
   createExpenseCategory,
   listExpenseCategories,

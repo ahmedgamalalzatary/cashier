@@ -3,7 +3,7 @@ import type {
   StocktakeSummary,
   Warehouse,
 } from "@cashier/shared";
-import { api } from "../lib/api";
+import { api } from "@cashier/web-core/lib/api";
 
 const json = (body: unknown, method: string) => ({
   method,

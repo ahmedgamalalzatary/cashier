@@ -12,16 +12,16 @@ import {
   TriangleAlert,
   User,
 } from "lucide-react";
-import { useAuth } from "@/components/auth/auth-provider";
+import { useAuth } from "@cashier/web-core/components/auth/auth-provider";
 import { OrderReceipt } from "@/components/pos/order-receipt";
 import { RefundOrderModal } from "@/components/refunds/refund-order-modal";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
-import { Stat, StatStrip } from "@/components/ui/stat";
-import { Table } from "@/components/ui/table";
-import { ErrorBanner, LoadingState } from "@/components/ui/states";
-import { formatMoney, itemLabel } from "@/lib/format";
+import { Badge } from "@cashier/web-core/components/ui/badge";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
+import { Stat, StatStrip } from "@cashier/web-core/components/ui/stat";
+import { Table } from "@cashier/web-core/components/ui/table";
+import { ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
+import { formatMoney, itemLabel } from "@cashier/web-core/lib/format";
 import { orderMargin } from "@/models/orders-model";
 import { getOrder } from "@/services/orders-service";
 

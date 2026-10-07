@@ -3,11 +3,11 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { TransferDetail } from "@cashier/shared";
-import { PageHeader } from "@/components/ui/page-header";
-import { Stat, StatStrip } from "@/components/ui/stat";
-import { Table } from "@/components/ui/table";
-import { ErrorBanner, LoadingState } from "@/components/ui/states";
-import { formatMoney, itemLabel } from "@/lib/format";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
+import { Stat, StatStrip } from "@cashier/web-core/components/ui/stat";
+import { Table } from "@cashier/web-core/components/ui/table";
+import { ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
+import { formatMoney, itemLabel } from "@cashier/web-core/lib/format";
 import { getTransfer } from "@/services/transfers-service";
 
 export default function TransferDetailPage() {

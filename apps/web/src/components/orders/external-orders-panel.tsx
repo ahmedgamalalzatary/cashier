@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import type { ExternalOrderSummary, ExternalOrdersPage } from "@cashier/shared";
 import { Clock3, Coins, ReceiptText, Scissors, Search } from "lucide-react";
-import { Badge } from "../ui/badge";
-import { DataTable, type DataColumn } from "../ui/data-table";
-import { Stat, StatStrip } from "../ui/stat";
-import { EmptyState, ErrorBanner, LoadingState } from "../ui/states";
-import { cairoCalendarDate } from "../../lib/cairo-date";
-import { formatMoney } from "../../lib/format";
+import { Badge } from "@cashier/web-core/components/ui/badge";
+import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
+import { Stat, StatStrip } from "@cashier/web-core/components/ui/stat";
+import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
+import { cairoCalendarDate } from "@cashier/web-core/lib/cairo-date";
+import { formatMoney } from "@cashier/web-core/lib/format";
 import {
   externalOrderStatus,
   externalOrderTypeLabel,

@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import type { Shift } from "@cashier/shared";
-import { Button } from "../ui/button";
-import { Modal } from "../ui/modal";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { Modal } from "@cashier/web-core/components/ui/modal";
 import { ShiftActionModal } from "./shift-action-modal";
 import { ShiftHistory } from "./shift-history";
 import { closeShift, openShift } from "../../services/shifts-service";

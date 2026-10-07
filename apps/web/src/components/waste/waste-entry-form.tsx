@@ -7,11 +7,11 @@ import type {
   WasteDetail,
   WasteReason,
 } from "@cashier/shared";
-import { useAuth } from "@/components/auth/auth-provider";
-import { Button } from "@/components/ui/button";
-import { SearchSelect } from "@/components/ui/search-select";
-import { SelectField } from "@/components/ui/select-field";
-import { ErrorBanner, LoadingState } from "@/components/ui/states";
+import { useAuth } from "@cashier/web-core/components/auth/auth-provider";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { SearchSelect } from "@cashier/web-core/components/ui/search-select";
+import { SelectField } from "@cashier/web-core/components/ui/select-field";
+import { ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
 import { warehouseForWasteTarget } from "@/lib/waste-target";
 import {
   createWaste,

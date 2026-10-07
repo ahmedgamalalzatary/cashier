@@ -4,13 +4,13 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Box, CalendarClock, ChefHat, User } from "lucide-react";
 import type { PreparationDetail } from "@cashier/shared";
-import { Badge } from "@/components/ui/badge";
-import { PageHeader } from "@/components/ui/page-header";
+import { Badge } from "@cashier/web-core/components/ui/badge";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
 import { PreparationMark } from "@/components/recipes/recipe-controls";
-import { Stat, StatStrip } from "@/components/ui/stat";
-import { Table } from "@/components/ui/table";
-import { ErrorBanner, LoadingState } from "@/components/ui/states";
-import { formatMoney, itemLabel } from "@/lib/format";
+import { Stat, StatStrip } from "@cashier/web-core/components/ui/stat";
+import { Table } from "@cashier/web-core/components/ui/table";
+import { ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
+import { formatMoney, itemLabel } from "@cashier/web-core/lib/format";
 import { getPreparation } from "@/services/recipes-service";
 
 export default function PreparationDetailPage() {

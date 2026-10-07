@@ -1,5 +1,5 @@
 import type { CurrentShift, Shift } from "@cashier/shared";
-import { api } from "../lib/api";
+import { api } from "@cashier/web-core/lib/api";
 
 export const listShifts = (pagination?: { limit: number; offset: number }) =>
   api<Shift[]>(

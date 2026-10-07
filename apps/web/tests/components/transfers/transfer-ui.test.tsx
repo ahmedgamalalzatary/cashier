@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Modal } from "../../../src/components/ui/modal";
+import { Modal } from "@cashier/web-core/components/ui/modal";
 
 describe("transfer UI accessibility", () => {
   it("shows direct transfers only to admins", () => {

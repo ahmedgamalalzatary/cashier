@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import PosPage from "../../../src/app/pos/page";
 
-vi.mock("@/components/auth/auth-provider", () => ({
+vi.mock("@cashier/web-core/components/auth/auth-provider", () => ({
   useAuth: () => ({ user: { id: 9, role: "cashier", name: "Cashier" } }),
 }));
 vi.mock(
@@ -14,18 +14,18 @@ vi.mock(
   async () => import("../../../src/components/pos/order-receipt"),
 );
 vi.mock(
-  "@/components/ui/button",
-  async () => import("../../../src/components/ui/button"),
+  "@cashier/web-core/components/ui/button",
+  async () => import("@cashier/web-core/components/ui/button"),
 );
 vi.mock(
-  "@/components/ui/modal",
-  async () => import("../../../src/components/ui/modal"),
+  "@cashier/web-core/components/ui/modal",
+  async () => import("@cashier/web-core/components/ui/modal"),
 );
 vi.mock(
-  "@/components/ui/field",
-  async () => import("../../../src/components/ui/field"),
+  "@cashier/web-core/components/ui/field",
+  async () => import("@cashier/web-core/components/ui/field"),
 );
-vi.mock("@/lib/format", async () => import("../../../src/lib/format"));
+vi.mock("@cashier/web-core/lib/format", async () => import("@cashier/web-core/lib/format"));
 vi.mock(
   "@/models/catalog-refresh",
   async () => import("../../../src/models/catalog-refresh"),

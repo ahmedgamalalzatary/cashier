@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
 import type { Category, Item, ItemType } from "@cashier/shared";
-import { Button } from "@/components/ui/button";
-import { Field } from "@/components/ui/field";
-import { Modal } from "@/components/ui/modal";
-import { SelectField } from "@/components/ui/select-field";
-import { ErrorBanner, LoadingState } from "@/components/ui/states";
-import { formatItemCode } from "@/lib/format";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { Field } from "@cashier/web-core/components/ui/field";
+import { Modal } from "@cashier/web-core/components/ui/modal";
+import { SelectField } from "@cashier/web-core/components/ui/select-field";
+import { ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
+import { formatItemCode } from "@cashier/web-core/lib/format";
 import { createItem, updateItem } from "@/services/items-service";
 import { createCategory, listCategories } from "@/services/categories-service";
 import {

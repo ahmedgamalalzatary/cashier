@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../../src/lib/api";
+import { api } from "@cashier/web-core/lib/api";
 import {
   type CategoryUpdateBody,
   createCategory,
@@ -15,7 +15,7 @@ const invalidPutDeactivation: CategoryUpdateBody = { isActive: false };
 void validReactivation;
 void invalidPutDeactivation;
 
-vi.mock("../../src/lib/api", () => ({ api: vi.fn() }));
+vi.mock("@cashier/web-core/lib/api", () => ({ api: vi.fn() }));
 
 describe("categories service", () => {
   const request = vi.mocked(api);

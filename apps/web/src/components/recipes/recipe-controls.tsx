@@ -1,8 +1,8 @@
 "use client";
 
 import { ArrowLeft, Beaker, ChefHat, RefreshCw } from "lucide-react";
-import { Button } from "../ui/button";
-import { cn } from "@/lib/cn";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { cn } from "@cashier/web-core/lib/cn";
 
 export function RecipeHeaderActions({
   onPrepared,

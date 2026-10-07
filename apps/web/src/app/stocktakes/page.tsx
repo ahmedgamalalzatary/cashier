@@ -8,16 +8,16 @@ import type {
   Warehouse,
 } from "@cashier/shared";
 import { ClipboardCheck, Plus, Scale } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { DataTable, type DataColumn } from "@/components/ui/data-table";
-import { Field, TextAreaField } from "@/components/ui/field";
-import { PageHeader } from "@/components/ui/page-header";
-import { Section } from "@/components/ui/section";
-import { Badge } from "@/components/ui/badge";
-import { SelectField } from "@/components/ui/select-field";
-import { SearchSelect } from "@/components/ui/search-select";
-import { EmptyState, ErrorBanner } from "@/components/ui/states";
-import { Table } from "@/components/ui/table";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
+import { Field, TextAreaField } from "@cashier/web-core/components/ui/field";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
+import { Section } from "@cashier/web-core/components/ui/section";
+import { Badge } from "@cashier/web-core/components/ui/badge";
+import { SelectField } from "@cashier/web-core/components/ui/select-field";
+import { SearchSelect } from "@cashier/web-core/components/ui/search-select";
+import { EmptyState, ErrorBanner } from "@cashier/web-core/components/ui/states";
+import { Table } from "@cashier/web-core/components/ui/table";
 import {
   confirmReasonFor,
   countedLinesFromDraft,

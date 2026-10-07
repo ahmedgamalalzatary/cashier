@@ -4,12 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Eye, Plus, ShoppingCart } from "lucide-react";
 import type { PurchaseInvoiceSummary } from "@cashier/shared";
-import { Badge } from "@/components/ui/badge";
-import { DataTable, type DataColumn } from "@/components/ui/data-table";
-import { PageHeader } from "@/components/ui/page-header";
-import { Stat, StatStrip } from "@/components/ui/stat";
-import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
-import { formatMoney, sumDecimalValues } from "@/lib/format";
+import { Badge } from "@cashier/web-core/components/ui/badge";
+import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
+import { Stat, StatStrip } from "@cashier/web-core/components/ui/stat";
+import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
+import { formatMoney, sumDecimalValues } from "@cashier/web-core/lib/format";
 import { listPurchases } from "@/services/purchases-service";
 
 export default function PurchasesPage() {

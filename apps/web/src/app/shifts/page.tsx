@@ -17,20 +17,20 @@ import {
   WalletCards,
 } from "lucide-react";
 import type { Shift } from "@cashier/shared";
-import { useAuth } from "@/components/auth/auth-provider";
+import { useAuth } from "@cashier/web-core/components/auth/auth-provider";
 import {
   ShiftActionModal,
   type ShiftActionMode,
 } from "@/components/shifts/shift-action-modal";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { IconButton } from "@/components/ui/icon-button";
-import { PageHeader } from "@/components/ui/page-header";
-import { Section } from "@/components/ui/section";
-import { Stat, StatStrip } from "@/components/ui/stat";
-import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
+import { Badge } from "@cashier/web-core/components/ui/badge";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { IconButton } from "@cashier/web-core/components/ui/icon-button";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
+import { Section } from "@cashier/web-core/components/ui/section";
+import { Stat, StatStrip } from "@cashier/web-core/components/ui/stat";
+import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
 import { ShiftHistory } from "@/components/shifts/shift-history";
-import { formatMoney } from "@/lib/format";
+import { formatMoney } from "@cashier/web-core/lib/format";
 import {
   adminCloseShift,
   correctShift,

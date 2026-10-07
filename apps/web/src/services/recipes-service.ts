@@ -3,7 +3,7 @@ import type {
   PreparationSummary,
   Recipe,
 } from "@cashier/shared";
-import { api } from "../lib/api";
+import { api } from "@cashier/web-core/lib/api";
 
 export type RecipeIngredientBody = { itemId: number; quantity: number };
 export type RecipeBody = {

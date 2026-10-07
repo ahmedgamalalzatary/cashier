@@ -27,9 +27,9 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useAuth } from "@/components/auth/auth-provider";
-import { NAV_GROUPS, NAV_ITEMS } from "@/lib/navigation";
-import { normalizePath } from "@/lib/auth";
+import { useAuth } from "@cashier/web-core/components/auth/auth-provider";
+import { NAV_GROUPS, NAV_ITEMS } from "@cashier/web-core/lib/navigation";
+import { normalizePath } from "@cashier/web-core/lib/auth";
 
 type NavHref = (typeof NAV_ITEMS)[number]["href"];
 

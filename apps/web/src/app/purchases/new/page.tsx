@@ -1,7 +1,7 @@
 import { Suspense } from "react";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
 import { PurchaseInvoiceForm } from "@/components/purchases/purchase-invoice-form";
-import { LoadingState } from "@/components/ui/states";
+import { LoadingState } from "@cashier/web-core/components/ui/states";
 
 export default function NewPurchasePage() {
   return (

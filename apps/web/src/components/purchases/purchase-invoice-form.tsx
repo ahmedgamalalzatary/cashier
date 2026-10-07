@@ -4,13 +4,13 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ReceiptText, Trash2 } from "lucide-react";
 import type { Category, Item, Supplier } from "@cashier/shared";
-import { Button } from "@/components/ui/button";
-import { EntityPicker } from "@/components/ui/entity-picker";
-import { Field, TextAreaField } from "@/components/ui/field";
-import { Section } from "@/components/ui/section";
-import { SelectField } from "@/components/ui/select-field";
-import { ErrorBanner } from "@/components/ui/states";
-import { formatMoney, itemLabel } from "@/lib/format";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { EntityPicker } from "@cashier/web-core/components/ui/entity-picker";
+import { Field, TextAreaField } from "@cashier/web-core/components/ui/field";
+import { Section } from "@cashier/web-core/components/ui/section";
+import { SelectField } from "@cashier/web-core/components/ui/select-field";
+import { ErrorBanner } from "@cashier/web-core/components/ui/states";
+import { formatMoney, itemLabel } from "@cashier/web-core/lib/format";
 import {
   newPurchaseLine,
   purchaseLineAmounts,

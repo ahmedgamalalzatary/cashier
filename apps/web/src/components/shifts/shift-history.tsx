@@ -2,10 +2,10 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import type { Shift, ShiftEventAction } from "@cashier/shared";
-import { Button } from "../ui/button";
-import { Table } from "../ui/table";
-import { Badge } from "../ui/badge";
-import { formatMoney } from "../../lib/format";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { Table } from "@cashier/web-core/components/ui/table";
+import { Badge } from "@cashier/web-core/components/ui/badge";
+import { formatMoney } from "@cashier/web-core/lib/format";
 import { listShifts } from "../../services/shifts-service";
 import { workedLabel } from "../../models/home-model";
 

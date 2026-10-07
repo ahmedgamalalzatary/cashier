@@ -88,9 +88,9 @@ cashier = as today, BUT cannot change his own password (only an admin sets it)
 - `packages/shared/src/types.ts` → `AuthUser` add `isSuperAdmin: boolean` (ManagedUser inherits it).
 
 ### 2.3 Session building (dedupe 3 copies)
-- Add one helper `toAuthUser(user)` (e.g. `apps/api/src/modules/auth/auth-user.ts`) returning
+- Add one helper `toAuthUser(user)` (e.g. `packages/server-core/src/modules/auth/auth-user.ts`) returning
   `{ id, name, role, branchId: role === "cashier" ? branchId : null, isSuperAdmin }`.
-- Use it in: `middleware/auth.ts` (`authenticate`), `modules/auth/auth.service.ts` (`login`, `changePassword` — see 2.6).
+- Use it in: `packages/server-core/src/middleware/auth.ts` (`authenticate`), `modules/auth/auth.service.ts` (`login`, `changePassword` — see 2.6).
 
 ### 2.4 Boot sync — fixes B2 (crash after rename) and B3 (locked out forever)
 File: `apps/api/src/db/seed-admin.ts`.
@@ -113,7 +113,7 @@ File: `apps/api/src/db/seed-admin.ts`.
   - new: sync sets `isSuperAdmin = true` on adoption; only one flagged row after repeated syncs.
 
 ### 2.5 Users API
-Files: `modules/users/users.controller.ts`, `users.service.ts`, `users.repository.ts`, `users.router.ts`.
+Files: `packages/server-core/src/modules/users/users.{controller,service,repository,router}.ts`.
 - Pass the full actor (`req.user`) to service methods instead of `actorId`.
 - `create(actor, data)`: `403 "إدارة المديرين متاحة للمدير الرئيسي فقط"` unless `actor.isSuperAdmin`.
 - `update(actor, id, data)`:
@@ -127,7 +127,7 @@ Files: `modules/users/users.controller.ts`, `users.service.ts`, `users.repositor
 
 ### 2.6 Own-password change
 - Owner rule: nobody changes his own password in the app (super → server settings; regular admin → super-admin; cashier → admin).
-- Remove `PUT /api/auth/password` (`modules/auth/auth.router.ts`, controller, service `changePassword`, schema) and its tests;
+- Remove `PUT /api/auth/password` (`packages/server-core/src/modules/auth/auth.{router,controller,service,schemas}.ts`, service `changePassword`) and its tests;
   or keep the route returning 403 — **prefer removal** (no dead code).
 - Verify an admin can reset an **active** cashier's password from the employee record
   (`apps/web/src/components/employees/cashier-access-modal.tsx` + employees API). If only
@@ -174,7 +174,7 @@ restart API → boots, account restored and active.
 - `refunds.service.ts` `create(input, actor)`: same split; admin → `shiftId = null`, `isAdminRefund = true`.
 - Repositories: write the new columns; include them in list/detail selects (`orders.repository.ts` ~L323/349, `refunds.repository.ts` ~L244/269).
 - Shift totals & expected cash already filter by `shift_id` → admin money correctly stays **out** of cashier drawers. Do not change.
-- Reports (`modules/reports/reports.repository.ts`):
+- Reports (`packages/server-core/src/modules/reports/reports.repository.ts`):
   - "حسب الكاشير" (≈L193) joins `users → employees` → admin sales vanish. Change to `users LEFT JOIN employees`,
     name = `COALESCE(e.name, u.name)`, and include admins (mark them "إدارة").
   - Shift-based reports (≈L60, L147–161) stay shift-only (admin sales have no shift) — correct.

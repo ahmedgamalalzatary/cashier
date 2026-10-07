@@ -9,12 +9,12 @@ vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react")>();
   return { ...actual, useState: useStateMock };
 });
-vi.mock("@/components/ui/button", () => ({ Button: () => null }));
-vi.mock("@/components/ui/field", () => ({
+vi.mock("@cashier/web-core/components/ui/button", () => ({ Button: () => null }));
+vi.mock("@cashier/web-core/components/ui/field", () => ({
   Field: () => null,
   TextAreaField: () => null,
 }));
-vi.mock("@/components/ui/modal", () => ({ Modal: () => null }));
+vi.mock("@cashier/web-core/components/ui/modal", () => ({ Modal: () => null }));
 
 import { ShiftActionModal } from "../../../src/components/shifts/shift-action-modal";
 

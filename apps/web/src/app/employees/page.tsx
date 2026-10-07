@@ -6,14 +6,14 @@ import type { Employee } from "@cashier/shared";
 import { CashierAccessModal } from "@/components/employees/cashier-access-modal";
 import { CashierPasswordModal } from "@/components/employees/cashier-password-modal";
 import { EmployeeModal } from "@/components/employees/employee-modal";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { DataTable, type DataColumn } from "@/components/ui/data-table";
-import { IconButton } from "@/components/ui/icon-button";
-import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
-import { formatMoney } from "@/lib/format";
+import { Badge } from "@cashier/web-core/components/ui/badge";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { ConfirmDialog } from "@cashier/web-core/components/ui/confirm-dialog";
+import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
+import { IconButton } from "@cashier/web-core/components/ui/icon-button";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
+import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
+import { formatMoney } from "@cashier/web-core/lib/format";
 import {
   deactivateEmployee,
   listEmployees,

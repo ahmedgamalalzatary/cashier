@@ -6,7 +6,7 @@ import {
   RecipeHeaderActions,
 } from "../../../src/components/recipes/recipe-controls";
 import { CatalogSyncStatus } from "../../../src/components/recipes/catalog-sync-status";
-import { Modal } from "../../../src/components/ui/modal";
+import { Modal } from "@cashier/web-core/components/ui/modal";
 
 describe("recipe UI controls", () => {
   it("renders the never-synchronized catalog message", () => {

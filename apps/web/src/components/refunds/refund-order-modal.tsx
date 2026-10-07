@@ -7,9 +7,9 @@ import type {
   RefundDetail,
   RefundStockAction,
 } from "@cashier/shared";
-import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/modal";
-import { ErrorBanner, LoadingState } from "@/components/ui/states";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { Modal } from "@cashier/web-core/components/ui/modal";
+import { ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
 import {
   refundDraftEntry,
   type RefundDraftLine,

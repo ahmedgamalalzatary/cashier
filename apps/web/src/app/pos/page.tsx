@@ -36,13 +36,13 @@ import type {
   OrderDiscountType,
   OrderSummary,
 } from "@cashier/shared";
-import { useAuth } from "@/components/auth/auth-provider";
+import { useAuth } from "@cashier/web-core/components/auth/auth-provider";
 import { OrderReceipt } from "@/components/pos/order-receipt";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Modal } from "@/components/ui/modal";
-import { TabPanel, Tabs } from "@/components/ui/tabs";
-import { formatMoney } from "@/lib/format";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { Badge } from "@cashier/web-core/components/ui/badge";
+import { Modal } from "@cashier/web-core/components/ui/modal";
+import { TabPanel, Tabs } from "@cashier/web-core/components/ui/tabs";
+import { formatMoney } from "@cashier/web-core/lib/format";
 import { catalogRefreshOutcome } from "@/models/catalog-refresh";
 import {
   addCatalogSelection,

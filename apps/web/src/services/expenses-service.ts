@@ -1,5 +1,5 @@
 import type { ExpenseCategory, ExpenseSummary } from "@cashier/shared";
-import { api } from "../lib/api";
+import { api } from "@cashier/web-core/lib/api";
 
 export const listExpenseCategories = () =>
   api<ExpenseCategory[]>("/api/expenses/categories");

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SalaryMonthEmployee } from "@cashier/shared";
-import { formatMoney } from "../../src/lib/format";
+import { formatMoney } from "@cashier/web-core/lib/format";
 import {
   payConfirmationText,
   salaryBlockedLabel,

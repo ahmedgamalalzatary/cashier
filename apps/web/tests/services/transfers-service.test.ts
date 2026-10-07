@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.fn();
-vi.mock("../../src/lib/api", () => ({ api }));
+vi.mock("@cashier/web-core/lib/api", () => ({ api }));
 
 describe("transfers service", () => {
   beforeEach(() => api.mockReset());

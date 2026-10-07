@@ -1,5 +1,5 @@
 import type { SalaryMonth, SalaryPayment } from "@cashier/shared";
-import { api } from "../lib/api";
+import { api } from "@cashier/web-core/lib/api";
 export const getSalaryMonth = (month: string) =>
   api<SalaryMonth>(`/api/salaries?month=${encodeURIComponent(month)}`);
 export const createSalaryAdvance = (body: {

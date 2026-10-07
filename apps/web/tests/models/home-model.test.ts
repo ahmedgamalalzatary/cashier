@@ -5,7 +5,7 @@ import type {
   Supplier,
   TransferRequestSummary,
 } from "@cashier/shared";
-import { formatMoney } from "../../src/lib/format";
+import { formatMoney } from "@cashier/web-core/lib/format";
 import {
   attentionItems,
   countPhrase,

@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
   // to index.html, and there is no server to optimize images.
   ...(!isStandalone && { trailingSlash: true }),
   outputFileTracingRoot: path.resolve(__dirname, "../.."),
+  // Shared React code for the desktop and online apps ships as TypeScript
+  // source, so Next has to compile it instead of treating it as a dependency.
+  transpilePackages: ["@cashier/web-core"],
   images: {
     unoptimized: true,
     remotePatterns: [

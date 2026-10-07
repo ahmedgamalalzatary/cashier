@@ -2,16 +2,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { Banknote, Plus } from "lucide-react";
 import type { SalaryMonth } from "@cashier/shared";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { DataTable, type DataColumn } from "@/components/ui/data-table";
-import { PageHeader } from "@/components/ui/page-header";
-import { Section } from "@/components/ui/section";
-import { SelectField } from "@/components/ui/select-field";
-import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
-import { Table } from "@/components/ui/table";
-import { cairoCalendarDate } from "@/lib/cairo-date";
-import { formatMoney } from "@/lib/format";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { ConfirmDialog } from "@cashier/web-core/components/ui/confirm-dialog";
+import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
+import { Section } from "@cashier/web-core/components/ui/section";
+import { SelectField } from "@cashier/web-core/components/ui/select-field";
+import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
+import { Table } from "@cashier/web-core/components/ui/table";
+import { cairoCalendarDate } from "@cashier/web-core/lib/cairo-date";
+import { formatMoney } from "@cashier/web-core/lib/format";
 import {
   payConfirmationText,
   salaryBlockedLabel,

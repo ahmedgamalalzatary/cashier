@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import type { WasteDetail, WasteSummary } from "@cashier/shared";
 import { Trash2 } from "lucide-react";
 import { WasteEntryForm, wasteReasonLabels } from "@/components/waste/waste-entry-form";
-import { DataTable, type DataColumn } from "@/components/ui/data-table";
-import { Modal } from "@/components/ui/modal";
-import { PageHeader } from "@/components/ui/page-header";
-import { Section } from "@/components/ui/section";
-import { EmptyState, ErrorBanner } from "@/components/ui/states";
-import { formatMoney } from "@/lib/format";
+import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
+import { Modal } from "@cashier/web-core/components/ui/modal";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
+import { Section } from "@cashier/web-core/components/ui/section";
+import { EmptyState, ErrorBanner } from "@cashier/web-core/components/ui/states";
+import { formatMoney } from "@cashier/web-core/lib/format";
 import { getWaste, listWaste } from "@/services/waste-service";
 
 const reasonLabels = wasteReasonLabels;

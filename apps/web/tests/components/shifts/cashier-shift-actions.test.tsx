@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import type { Shift } from "@cashier/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../../../src/lib/api";
+import { api } from "@cashier/web-core/lib/api";
 import { CashierShiftControls } from "../../../src/components/shifts/cashier-shift-controls";
 import { ShiftActionModal } from "../../../src/components/shifts/shift-action-modal";
 import { shiftFixture } from "../../fixtures/shift";
@@ -23,18 +23,18 @@ vi.mock("react", async (original) => ({
     ];
   },
 }));
-vi.mock("../../../src/lib/api", () => ({ api: vi.fn() }));
+vi.mock("@cashier/web-core/lib/api", () => ({ api: vi.fn() }));
 vi.mock(
-  "@/components/ui/button",
-  async () => import("../../../src/components/ui/button"),
+  "@cashier/web-core/components/ui/button",
+  async () => import("@cashier/web-core/components/ui/button"),
 );
 vi.mock(
-  "@/components/ui/field",
-  async () => import("../../../src/components/ui/field"),
+  "@cashier/web-core/components/ui/field",
+  async () => import("@cashier/web-core/components/ui/field"),
 );
 vi.mock(
-  "@/components/ui/modal",
-  async () => import("../../../src/components/ui/modal"),
+  "@cashier/web-core/components/ui/modal",
+  async () => import("@cashier/web-core/components/ui/modal"),
 );
 
 function render(

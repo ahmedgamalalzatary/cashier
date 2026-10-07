@@ -1,5 +1,5 @@
 import type { SalaryMonthEmployee } from "@cashier/shared";
-import { formatMoney } from "@/lib/format";
+import { formatMoney } from "@cashier/web-core/lib/format";
 
 /**
  * The month sheet used to print "يلزم راتب شهري" for every blocked row, so an

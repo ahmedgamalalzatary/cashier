@@ -125,7 +125,7 @@ Shift: lives in the database, so closing, crashing or updating never ends it.
 | Q4  | MySQL is GPL. Is bundling it OK?                                                                                                                                                     | Yes, owner accepts.                                                                                                                                                             |
 | Q5  | Owner proposed "same username, password must differ". That leaks passwords: a branch admin who gets "password already used" when creating cashier "ali" learns admin ali's password. | **Answered 2026-10-07:** same username allowed; login screen has an **Admin / Cashier** choice. No password rule. Needed by Phase 4.                                            |
 | Q6  | `docs/cleanup-plan.md` phases 5A (shift auto-close), 6, 7, 8, 9 have no matching commits yet. Finish them before Phase 1 here, or after Phase 11?                                    | **Answered 2026-10-07:** finish 5A before Phase 4 (it changes shift rules that Phase 4 also changes); 6–9 (web restyle) after Phase 3 so they land in the shared packages once. |
-| Q7  | `seed-admin.ts` bumps the super-admin `tokenVersion` on **every** start, so every online-api restart logs the super-admin out online and (after the next accounts pull) on every PC. | **Answered 2026-10-07:** bump only when the configured username or password actually changed. Needed by Phase 7.                                                                |
+| Q7  | `seed-admin.ts` bumps the super-admin `tokenVersion` on **every** start, so every online-api restart logs the super-admin out online and (after the next accounts pull) on every PC. | **Already fixed** in `eec7eed`. Boot paths (`apps/api/src/index.ts`, `desktop/runtime.ts`) call `syncConfiguredAdmin`, which revokes sessions only when the password actually changed; a name/flag/active fix keeps sessions. `seedAdmin` (unconditional bump) is only reached by the manual `db:seed` full reset. Covered by `packages/db/tests/mysql/seed-admin.test.ts`. Needed by Phase 7. |
 
 ---
 
@@ -142,9 +142,9 @@ Status: ☐ todo · ◐ in progress · ☑ done. Write the date when done.
 |                      | 2.2 move auth module                                              | ☑      | 2026-10-07 | 4 unit tests moved with the code                        |
 |                      | 2.3 move reports module                                           | ☑      | 2026-10-07 | `cairoMidnight` is shared with the shifts module        |
 |                      | 2.4 move users/branches modules whole                             | ☑      | 2026-10-07 | 3 unit tests moved with the code                        |
-| 3 Web core           | 3.1 `packages/web-core`: api client, auth/session, ui primitives  | ☐      |            |                                                           |
-|                      | 3.2 move reports page/components/model/service                    | ☐      |            |                                                           |
-|                      | 3.3 move login + users/branches management UI                     | ☐      |            |                                                           |
+| 3 Web core           | 3.1 `packages/web-core`: api client, auth/session, ui primitives  | ☑      | 2026-10-07 | `navigation.ts` moved too (`canOpenPath` needs `ADMIN_PATHS`) |
+|                      | 3.2 move reports page/components/model/service                    | ☑      | 2026-10-07 | page body → `features/reports-page.tsx`; route is thin     |
+|                      | 3.3 move login + users/branches management UI                     | ☑      | 2026-10-07 | merged with 3.2: reports needs `branch-provider`            |
 | 4 Schema reset       | 4.1 UUID helper + custom column type + tests                      | ☐      |            |                                                           |
 |                      | 4.2 schema: all ids → UUID, new tables, one shift per branch      | ☐      |            |                                                           |
 |                      | 4.3 baseline migration reset                                      | ☐      |            |                                                           |
@@ -220,10 +220,19 @@ Move the parts both APIs need, as Express module factories (same shape as today'
 
 Move to a React package consumed by both Next apps:
 
-- `apps/web/src/lib/{api,auth,branch-session,format,cairo-date,cn}.ts`
+- `apps/web/src/lib/{api,auth,branch-session,format,cairo-date,cn}.ts` — plus `navigation.ts`
+  and `search.ts`: `canOpenPath` reads `ADMIN_PATHS` from navigation, and `search-select`
+  reads `matchesQuery`, so splitting either file would duplicate shared logic.
 - `components/ui`, `components/reports`, `models/reports-model.ts`, `services/reports-service.ts`,
   the body of `app/reports/page.tsx` (703 lines; keep the route file thin)
-- `app/login`, `components/auth`, `components/users`, `components/branches`, their services/models
+- `app/login`, `components/auth`, `components/users`, `components/branches`, their services/models.
+  3.2 and 3.3 were done together: the reports page reads `useBranch`, which needs the branch
+  provider, which needs the auth provider.
+
+Route files (`app/*/page.tsx`) stay as thin wrappers that render a component from
+`packages/web-core/src/features`. The package ships TypeScript source, has no build step, and
+is listed in `transpilePackages`. Imports inside the package are relative: a `@/` alias would
+resolve against the *consuming* app and silently point at the wrong directory.
 
 **Trap:** Next must transpile the package (`transpilePackages`). Desktop is a static export
 (`output: "export"`), so moved code must stay client-only (no server actions, no route handlers).

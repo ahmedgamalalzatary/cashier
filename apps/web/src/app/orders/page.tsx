@@ -10,16 +10,16 @@ import {
   Search,
   TriangleAlert,
 } from "lucide-react";
-import { useAuth } from "@/components/auth/auth-provider";
+import { useAuth } from "@cashier/web-core/components/auth/auth-provider";
 import { ExternalOrdersPanel } from "@/components/orders/external-orders-panel";
-import { Badge } from "@/components/ui/badge";
-import { DataTable, type DataColumn } from "@/components/ui/data-table";
-import { PageHeader } from "@/components/ui/page-header";
-import { Stat, StatStrip } from "@/components/ui/stat";
-import { TabPanel, Tabs } from "@/components/ui/tabs";
-import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
-import { cairoCalendarDate } from "@/lib/cairo-date";
-import { formatMoney } from "@/lib/format";
+import { Badge } from "@cashier/web-core/components/ui/badge";
+import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
+import { Stat, StatStrip } from "@cashier/web-core/components/ui/stat";
+import { TabPanel, Tabs } from "@cashier/web-core/components/ui/tabs";
+import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
+import { cairoCalendarDate } from "@cashier/web-core/lib/cairo-date";
+import { formatMoney } from "@cashier/web-core/lib/format";
 import {
   filterOrders,
   orderCashiers,

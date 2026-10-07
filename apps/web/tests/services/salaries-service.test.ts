@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("../../src/lib/api", () => ({ api: vi.fn() }));
-import { api } from "../../src/lib/api";
+vi.mock("@cashier/web-core/lib/api", () => ({ api: vi.fn() }));
+import { api } from "@cashier/web-core/lib/api";
 import { getSalaryMonth, paySalary } from "../../src/services/salaries-service";
 
 describe("salaries service", () => {

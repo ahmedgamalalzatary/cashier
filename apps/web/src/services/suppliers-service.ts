@@ -3,7 +3,7 @@ import type {
   SupplierPayment,
   SupplierStatementMovement,
 } from "@cashier/shared";
-import { api } from "../lib/api";
+import { api } from "@cashier/web-core/lib/api";
 
 type IdResponse = { id: number };
 type OkResponse = { ok: true };

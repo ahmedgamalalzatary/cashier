@@ -1,5 +1,5 @@
 import type { OrderDetail } from "@cashier/shared";
-import { formatMoney } from "../../lib/format";
+import { formatMoney } from "@cashier/web-core/lib/format";
 
 const dateTime = new Intl.DateTimeFormat("ar-EG", {
   dateStyle: "medium",

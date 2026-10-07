@@ -1,9 +1,9 @@
 import Image from "next/image";
 import { Boxes, CircleCheck, CircleX, Settings2 } from "lucide-react";
 import type { ExternalProduct } from "@cashier/shared";
-import { formatMoney } from "../../lib/format";
-import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
+import { formatMoney } from "@cashier/web-core/lib/format";
+import { Badge } from "@cashier/web-core/components/ui/badge";
+import { Button } from "@cashier/web-core/components/ui/button";
 
 export function ExternalProductCard({
   product,

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { api } from "../../src/lib/api";
+import { api } from "@cashier/web-core/lib/api";
 import {
   confirmStocktake,
   createManualAdjustment,
@@ -7,7 +7,7 @@ import {
   updateStocktakeCounts,
 } from "../../src/services/stocktakes-service";
 
-vi.mock("../../src/lib/api", () => ({ api: vi.fn() }));
+vi.mock("@cashier/web-core/lib/api", () => ({ api: vi.fn() }));
 
 describe("stocktakes service", () => {
   it("sends the stocktake lifecycle to its API endpoints", async () => {

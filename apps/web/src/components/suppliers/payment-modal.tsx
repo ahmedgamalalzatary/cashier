@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import type { Supplier } from "@cashier/shared";
-import { Button } from "@/components/ui/button";
-import { Field } from "@/components/ui/field";
-import { Modal } from "@/components/ui/modal";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { Field } from "@cashier/web-core/components/ui/field";
+import { Modal } from "@cashier/web-core/components/ui/modal";
 import { recordSupplierPayment } from "@/services/suppliers-service";
 
 // mounted only while a supplier is selected, so state initializes fresh each time

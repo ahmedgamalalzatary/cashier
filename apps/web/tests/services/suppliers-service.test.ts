@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../../src/lib/api";
+import { api } from "@cashier/web-core/lib/api";
 import {
   createSupplier,
   deactivateSupplier,
@@ -10,7 +10,7 @@ import {
   updateSupplier,
 } from "../../src/services/suppliers-service";
 
-vi.mock("../../src/lib/api", () => ({ api: vi.fn() }));
+vi.mock("@cashier/web-core/lib/api", () => ({ api: vi.fn() }));
 
 describe("suppliers service", () => {
   const request = vi.mocked(api);

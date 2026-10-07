@@ -8,13 +8,13 @@ import type {
   SupplierPayment,
   SupplierStatementMovement,
 } from "@cashier/shared";
-import { formatMoney } from "@/lib/format";
-import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
+import { formatMoney } from "@cashier/web-core/lib/format";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
 import { PaymentModal } from "@/components/suppliers/payment-modal";
-import { Stat, StatStrip } from "@/components/ui/stat";
-import { Table } from "@/components/ui/table";
-import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
+import { Stat, StatStrip } from "@cashier/web-core/components/ui/stat";
+import { Table } from "@cashier/web-core/components/ui/table";
+import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
 import { getSupplierStatement } from "@/services/suppliers-service";
 
 export default function SupplierStatementPage() {

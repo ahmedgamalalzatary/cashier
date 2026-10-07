@@ -5,11 +5,11 @@ import type {
   InventoryStockRow,
   TransferRequestDetail,
 } from "@cashier/shared";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Field, TextAreaField } from "@/components/ui/field";
-import { Modal } from "@/components/ui/modal";
-import { itemLabel } from "@/lib/format";
+import { Badge } from "@cashier/web-core/components/ui/badge";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { Field, TextAreaField } from "@cashier/web-core/components/ui/field";
+import { Modal } from "@cashier/web-core/components/ui/modal";
+import { itemLabel } from "@cashier/web-core/lib/format";
 import {
   approveTransferRequest,
   getTransferRequest,

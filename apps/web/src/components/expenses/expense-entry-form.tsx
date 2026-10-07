@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { Receipt } from "lucide-react";
 import type { ExpenseCategory } from "@cashier/shared";
-import { useAuth } from "@/components/auth/auth-provider";
-import { Button } from "@/components/ui/button";
-import { SelectField } from "@/components/ui/select-field";
-import { ErrorBanner, LoadingState } from "@/components/ui/states";
-import { cairoCalendarDate } from "@/lib/cairo-date";
+import { useAuth } from "@cashier/web-core/components/auth/auth-provider";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { SelectField } from "@cashier/web-core/components/ui/select-field";
+import { ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
+import { cairoCalendarDate } from "@cashier/web-core/lib/cairo-date";
 import {
   createExpense,
   listExpenseCategories,

@@ -3,11 +3,11 @@
 import { useMemo, useState } from "react";
 import { RotateCcw, Search } from "lucide-react";
 import type { OrderSummary } from "@cashier/shared";
-import { Button } from "@/components/ui/button";
-import { DataTable, type DataColumn } from "@/components/ui/data-table";
-import { EmptyState } from "@/components/ui/states";
-import { formatMoney } from "@/lib/format";
-import { matchesQuery } from "@/lib/search";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
+import { EmptyState } from "@cashier/web-core/components/ui/states";
+import { formatMoney } from "@cashier/web-core/lib/format";
+import { matchesQuery } from "@cashier/web-core/lib/search";
 
 /** Search + order table, so every place that offers a refund looks the same. */
 export function OrderPicker({

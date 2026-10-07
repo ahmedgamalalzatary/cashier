@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LoadingState } from "@/components/ui/states";
+import { LoadingState } from "@cashier/web-core/components/ui/states";
 
 export default function CafeTransferDetailRedirectPage() {
   return (

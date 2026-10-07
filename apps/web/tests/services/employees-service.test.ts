@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../../src/lib/api";
+import { api } from "@cashier/web-core/lib/api";
 import {
   createEmployee,
   deactivateEmployee,
@@ -10,7 +10,7 @@ import {
   employeeSalaryPayload,
 } from "../../src/services/employees-service";
 
-vi.mock("../../src/lib/api", () => ({ api: vi.fn() }));
+vi.mock("@cashier/web-core/lib/api", () => ({ api: vi.fn() }));
 const request = vi.mocked(api);
 
 describe("employees service", () => {

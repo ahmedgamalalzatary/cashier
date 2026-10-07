@@ -3,7 +3,7 @@ import type {
   PurchaseInvoiceSummary,
   PurchaseUnitMode,
 } from "@cashier/shared";
-import { api } from "../lib/api";
+import { api } from "@cashier/web-core/lib/api";
 
 export type PurchaseCreateBody = {
   clientRequestId: string;

@@ -1,13 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Coins, Receipt, Scissors, ShoppingBag, TrendingUp } from "lucide-react";
-import { Stat, StatStrip } from "@/components/ui/stat";
-import { ErrorBanner, LoadingState } from "@/components/ui/states";
-import { formatMoney } from "@/lib/format";
+import { Stat, StatStrip } from "@cashier/web-core/components/ui/stat";
+import { ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
+import { formatMoney } from "@cashier/web-core/lib/format";
 import {
   getReportsDashboard,
   type DashboardData,
-} from "@/services/reports-service";
+} from "@cashier/web-core/services/reports-service";
 
 export function AdminMetrics() {
   const [data, setData] = useState<DashboardData | null>(null),

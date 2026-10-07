@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { OrderDetail } from "@cashier/shared";
 import { OrderReceipt } from "../../../src/components/pos/order-receipt";
-import { formatMoney } from "../../../src/lib/format";
+import { formatMoney } from "@cashier/web-core/lib/format";
 
 const order: OrderDetail = {
   id: 1,

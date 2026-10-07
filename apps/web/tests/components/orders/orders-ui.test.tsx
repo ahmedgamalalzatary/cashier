@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { ExternalOrderSummary } from "@cashier/shared";
 import { ExternalOrdersPanelView } from "../../../src/components/orders/external-orders-panel";
-import { formatMoney } from "../../../src/lib/format";
+import { formatMoney } from "@cashier/web-core/lib/format";
 
 const order = {
   id: 17,

@@ -10,7 +10,7 @@ vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useState: useStateMock,
 }));
-vi.mock("@/components/auth/auth-provider", () => ({
+vi.mock("@cashier/web-core/components/auth/auth-provider", () => ({
   useAuth: () => ({ user: { id: 1, role: "admin" } }),
 }));
 vi.mock(
@@ -22,39 +22,39 @@ vi.mock(
   async () => import("../../../src/components/shifts/shift-history"),
 );
 vi.mock(
-  "@/components/ui/button",
-  async () => import("../../../src/components/ui/button"),
+  "@cashier/web-core/components/ui/button",
+  async () => import("@cashier/web-core/components/ui/button"),
 );
 vi.mock(
-  "@/components/ui/modal",
-  async () => import("../../../src/components/ui/modal"),
+  "@cashier/web-core/components/ui/modal",
+  async () => import("@cashier/web-core/components/ui/modal"),
 );
 vi.mock(
-  "@/components/ui/field",
-  async () => import("../../../src/components/ui/field"),
+  "@cashier/web-core/components/ui/field",
+  async () => import("@cashier/web-core/components/ui/field"),
 );
 vi.mock(
-  "@/components/ui/badge",
-  async () => import("../../../src/components/ui/badge"),
+  "@cashier/web-core/components/ui/badge",
+  async () => import("@cashier/web-core/components/ui/badge"),
 );
 vi.mock(
-  "@/components/ui/page-header",
-  async () => import("../../../src/components/ui/page-header"),
+  "@cashier/web-core/components/ui/page-header",
+  async () => import("@cashier/web-core/components/ui/page-header"),
 );
 vi.mock(
-  "@/components/ui/icon-button",
-  async () => import("../../../src/components/ui/icon-button"),
+  "@cashier/web-core/components/ui/icon-button",
+  async () => import("@cashier/web-core/components/ui/icon-button"),
 );
-vi.mock("@/lib/format", async () => import("../../../src/lib/format"));
+vi.mock("@cashier/web-core/lib/format", async () => import("@cashier/web-core/lib/format"));
 vi.mock(
   "@/services/shifts-service",
   async () => import("../../../src/services/shifts-service"),
 );
 vi.mock(
-  "@/services/reports-service",
-  async () => import("../../../src/services/reports-service"),
+  "@cashier/web-core/services/reports-service",
+  async () => import("@cashier/web-core/services/reports-service"),
 );
-vi.mock("@/lib/api", async () => import("../../../src/lib/api"));
+vi.mock("@cashier/web-core/lib/api", async () => import("@cashier/web-core/lib/api"));
 
 function stateValues(values: unknown[]) {
   useStateMock.mockImplementation((initial: unknown) => [

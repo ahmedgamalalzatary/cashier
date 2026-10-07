@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LoadingState } from "@/components/ui/states";
+import { LoadingState } from "@cashier/web-core/components/ui/states";
 
 export default function WarehouseRedirectPage() {
   const router = useRouter();

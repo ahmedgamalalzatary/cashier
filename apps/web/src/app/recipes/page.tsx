@@ -31,14 +31,14 @@ import {
   RecipeFlowRail,
   RecipeHeaderActions,
 } from "@/components/recipes/recipe-controls";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { DataTable, type DataColumn } from "@/components/ui/data-table";
-import { PageHeader } from "@/components/ui/page-header";
-import { Stat, StatStrip } from "@/components/ui/stat";
-import { TabPanel, Tabs } from "@/components/ui/tabs";
-import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
-import { formatMoney, itemLabel } from "@/lib/format";
+import { Badge } from "@cashier/web-core/components/ui/badge";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
+import { Stat, StatStrip } from "@cashier/web-core/components/ui/stat";
+import { TabPanel, Tabs } from "@cashier/web-core/components/ui/tabs";
+import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
+import { formatMoney, itemLabel } from "@cashier/web-core/lib/format";
 import {
   catalogRefreshOutcome,
   requestCatalogRefresh,

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { NAV_ITEMS } from "../../src/lib/navigation";
+import { NAV_ITEMS } from "@cashier/web-core/lib/navigation";
 
 describe("POS feature boundaries", () => {
   it("provides a real POS route in shared navigation", () => {

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ExternalProduct } from "@cashier/shared";
 import { ExternalProductCard } from "../../../src/components/recipes/external-product-card";
 import { ProductStockSetupModal } from "../../../src/components/recipes/product-stock-setup-modal";
-import { formatMoney } from "../../../src/lib/format";
+import { formatMoney } from "@cashier/web-core/lib/format";
 
 const product: ExternalProduct = {
   externalId: 9,

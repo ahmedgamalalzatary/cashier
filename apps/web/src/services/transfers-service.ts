@@ -4,7 +4,7 @@ import type {
   TransferRequestSummary,
   TransferSummary,
 } from "@cashier/shared";
-import { api } from "../lib/api";
+import { api } from "@cashier/web-core/lib/api";
 
 export type TransferLineBody = { itemId: number; quantity: number };
 export type TransferRequestBody = {

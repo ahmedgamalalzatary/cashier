@@ -19,20 +19,20 @@ import type {
   Item,
   ItemType,
 } from "@cashier/shared";
-import { useAuth } from "@/components/auth/auth-provider";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { DataTable, type DataColumn } from "@/components/ui/data-table";
-import { Field, TextAreaField } from "@/components/ui/field";
-import { IconButton } from "@/components/ui/icon-button";
-import { Modal } from "@/components/ui/modal";
-import { PageHeader } from "@/components/ui/page-header";
-import { Stat, StatStrip } from "@/components/ui/stat";
-import { TabPanel, Tabs } from "@/components/ui/tabs";
-import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
+import { useAuth } from "@cashier/web-core/components/auth/auth-provider";
+import { Badge } from "@cashier/web-core/components/ui/badge";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { ConfirmDialog } from "@cashier/web-core/components/ui/confirm-dialog";
+import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
+import { Field, TextAreaField } from "@cashier/web-core/components/ui/field";
+import { IconButton } from "@cashier/web-core/components/ui/icon-button";
+import { Modal } from "@cashier/web-core/components/ui/modal";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
+import { Stat, StatStrip } from "@cashier/web-core/components/ui/stat";
+import { TabPanel, Tabs } from "@cashier/web-core/components/ui/tabs";
+import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
 import { ItemFormModal } from "@/components/warehouse/item-form-modal";
-import { formatItemCode, formatMoney, sumDecimalValues } from "@/lib/format";
+import { formatItemCode, formatMoney, sumDecimalValues } from "@cashier/web-core/lib/format";
 import {
   categoryFilterOptions,
   filterStockRows,

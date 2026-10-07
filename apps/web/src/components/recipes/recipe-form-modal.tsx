@@ -21,12 +21,12 @@ import {
 } from "@/models/recipe-model";
 import { createRecipe, updateRecipe } from "@/services/recipes-service";
 import { listItems } from "@/services/items-service";
-import { itemLabel } from "@/lib/format";
-import { Button } from "../ui/button";
-import { EntityPicker } from "../ui/entity-picker";
-import { Field } from "../ui/field";
-import { Modal } from "../ui/modal";
-import { SearchSelect } from "../ui/search-select";
+import { itemLabel } from "@cashier/web-core/lib/format";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { EntityPicker } from "@cashier/web-core/components/ui/entity-picker";
+import { Field } from "@cashier/web-core/components/ui/field";
+import { Modal } from "@cashier/web-core/components/ui/modal";
+import { SearchSelect } from "@cashier/web-core/components/ui/search-select";
 import { ItemFormModal } from "../warehouse/item-form-modal";
 
 async function defaultItemsChanged() {

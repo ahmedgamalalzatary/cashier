@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { ADMIN_PATHS, NAV_ITEMS } from "../../src/lib/navigation";
+import { ADMIN_PATHS, NAV_ITEMS } from "@cashier/web-core/lib/navigation";
 
 const read = (relative: string) =>
   fs.readFileSync(path.resolve(process.cwd(), relative), "utf8");

@@ -10,16 +10,16 @@ import type {
   TransferRequestSummary,
   TransferSummary,
 } from "@cashier/shared";
-import { useAuth } from "@/components/auth/auth-provider";
+import { useAuth } from "@cashier/web-core/components/auth/auth-provider";
 import { TransferFormModal } from "@/components/transfers/transfer-form-modal";
 import { TransferReviewModal } from "@/components/transfers/transfer-review-modal";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { DataTable, type DataColumn } from "@/components/ui/data-table";
-import { PageHeader } from "@/components/ui/page-header";
-import { TabPanel, Tabs } from "@/components/ui/tabs";
-import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
-import { formatMoney } from "@/lib/format";
+import { Badge } from "@cashier/web-core/components/ui/badge";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
+import { TabPanel, Tabs } from "@cashier/web-core/components/ui/tabs";
+import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
+import { formatMoney } from "@cashier/web-core/lib/format";
 import {
   getCafeWarehouseStock,
   getMainWarehouseStock,

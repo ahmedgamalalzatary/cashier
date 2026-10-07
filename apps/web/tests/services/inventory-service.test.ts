@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { api } from "../../src/lib/api";
+import { api } from "@cashier/web-core/lib/api";
 import {
   getCafeWarehouseStock,
   getMainWarehouseStock,
 } from "../../src/services/inventory-service";
 
-vi.mock("../../src/lib/api", () => ({ api: vi.fn() }));
+vi.mock("@cashier/web-core/lib/api", () => ({ api: vi.fn() }));
 
 describe("inventory service", () => {
   it("loads main warehouse stock", async () => {

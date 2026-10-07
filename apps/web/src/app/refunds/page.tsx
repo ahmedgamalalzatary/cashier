@@ -7,14 +7,14 @@ import type {
   RefundSummary,
 } from "@cashier/shared";
 import { RotateCcw } from "lucide-react";
-import { PageHeader } from "@/components/ui/page-header";
-import { DataTable, type DataColumn } from "@/components/ui/data-table";
-import { Modal } from "@/components/ui/modal";
-import { Section } from "@/components/ui/section";
-import { EmptyState, ErrorBanner } from "@/components/ui/states";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
+import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
+import { Modal } from "@cashier/web-core/components/ui/modal";
+import { Section } from "@cashier/web-core/components/ui/section";
+import { EmptyState, ErrorBanner } from "@cashier/web-core/components/ui/states";
 import { OrderPicker } from "@/components/refunds/order-picker";
 import { RefundOrderModal } from "@/components/refunds/refund-order-modal";
-import { formatMoney } from "@/lib/format";
+import { formatMoney } from "@cashier/web-core/lib/format";
 import { listOrders } from "@/services/orders-service";
 import { getRefund, listRefunds } from "@/services/refunds-service";
 

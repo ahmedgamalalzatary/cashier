@@ -10,13 +10,13 @@ import {
   Tags,
 } from "lucide-react";
 import type { Category } from "@cashier/shared";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { IconButton as IconBtn } from "@/components/ui/icon-button";
-import { PageHeader } from "@/components/ui/page-header";
-import { Section } from "@/components/ui/section";
-import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { Badge } from "@cashier/web-core/components/ui/badge";
+import { ConfirmDialog } from "@cashier/web-core/components/ui/confirm-dialog";
+import { IconButton as IconBtn } from "@cashier/web-core/components/ui/icon-button";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
+import { Section } from "@cashier/web-core/components/ui/section";
+import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
 import { CategoryFormModal } from "@/components/categories/category-form-modal";
 import {
   deactivateCategory,

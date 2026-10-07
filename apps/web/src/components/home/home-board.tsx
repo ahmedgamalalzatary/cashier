@@ -8,14 +8,14 @@ import type {
   Supplier,
   TransferRequestSummary,
 } from "@cashier/shared";
-import { useAuth } from "@/components/auth/auth-provider";
+import { useAuth } from "@cashier/web-core/components/auth/auth-provider";
 import { AttentionQueue } from "@/components/home/attention-queue";
 import { AdminMetrics } from "@/components/home/admin-metrics";
 import { QuickActions } from "@/components/home/quick-actions";
 import { ShiftTape } from "@/components/home/shift-tape";
-import { Section } from "@/components/ui/section";
-import { ErrorBanner, LoadingState } from "@/components/ui/states";
-import { cairoClock, cairoDayLabel, cairoHour } from "@/lib/cairo-date";
+import { Section } from "@cashier/web-core/components/ui/section";
+import { ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
+import { cairoClock, cairoDayLabel, cairoHour } from "@cashier/web-core/lib/cairo-date";
 import { attentionItems, greetingFor } from "@/models/home-model";
 import {
   getCafeWarehouseStock,

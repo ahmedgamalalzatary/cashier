@@ -13,14 +13,14 @@ import {
   Truck,
 } from "lucide-react";
 import type { Supplier } from "@cashier/shared";
-import { formatMoney } from "@/lib/format";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { DataTable, type DataColumn } from "@/components/ui/data-table";
-import { IconButton as IconBtn } from "@/components/ui/icon-button";
-import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState, ErrorBanner, LoadingState } from "@/components/ui/states";
+import { formatMoney } from "@cashier/web-core/lib/format";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { Badge } from "@cashier/web-core/components/ui/badge";
+import { ConfirmDialog } from "@cashier/web-core/components/ui/confirm-dialog";
+import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
+import { IconButton as IconBtn } from "@cashier/web-core/components/ui/icon-button";
+import { PageHeader } from "@cashier/web-core/components/ui/page-header";
+import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
 import { SupplierFormModal } from "@/components/suppliers/supplier-form-modal";
 import { PaymentModal } from "@/components/suppliers/payment-modal";
 import { supplierBalanceClass } from "@/models/supplier-model";

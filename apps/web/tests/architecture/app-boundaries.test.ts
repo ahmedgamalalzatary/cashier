@@ -42,7 +42,7 @@ describe("web source boundaries", () => {
         .filter((path) => [".ts", ".tsx"].includes(extname(path)))
         .filter((path) => {
           const source = readFileSync(path, "utf8");
-          return source.includes("/api/") || source.includes("@/lib/api");
+          return source.includes("/api/") || source.includes("@cashier/web-core/lib/api");
         })
         .map((path) => path.slice(sourceRoot.length + 1).replaceAll("\\", "/")),
     );

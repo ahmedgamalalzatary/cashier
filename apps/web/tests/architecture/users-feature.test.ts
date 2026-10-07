@@ -8,14 +8,14 @@ function read(relative: string) {
 
 describe("user management boundaries", () => {
   it("keeps cashier account actions in the employee feature", () => {
-    const page = read("src/app/users/page.tsx");
+    const page = read("../../packages/web-core/src/features/users-page.tsx");
 
     expect(page).toContain('user.role !== "admin"');
     expect(page).toContain("يُدار من سجل الموظف");
   });
 
   it("gates admin management on the super-admin and marks the managed account", () => {
-    const page = read("src/app/users/page.tsx");
+    const page = read("../../packages/web-core/src/features/users-page.tsx");
 
     expect(page).toContain("currentUser?.isSuperAdmin");
     expect(page).toContain("user.isSuperAdmin");

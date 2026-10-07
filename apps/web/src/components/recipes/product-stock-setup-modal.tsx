@@ -8,13 +8,13 @@ import type {
   Item,
   ProductStockSetupBody,
 } from "@cashier/shared";
-import { itemLabel } from "../../lib/format";
+import { itemLabel } from "@cashier/web-core/lib/format";
 import { configureProductStock } from "../../services/products-service";
 import { listItems } from "../../services/items-service";
-import { Button } from "../ui/button";
-import { EntityPicker } from "../ui/entity-picker";
-import { Field } from "../ui/field";
-import { Modal } from "../ui/modal";
+import { Button } from "@cashier/web-core/components/ui/button";
+import { EntityPicker } from "@cashier/web-core/components/ui/entity-picker";
+import { Field } from "@cashier/web-core/components/ui/field";
+import { Modal } from "@cashier/web-core/components/ui/modal";
 import { ItemFormModal } from "../warehouse/item-form-modal";
 
 async function defaultItemsChanged() {

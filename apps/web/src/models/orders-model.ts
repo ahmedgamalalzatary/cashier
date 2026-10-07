@@ -1,6 +1,6 @@
 import type { OrderSummary } from "@cashier/shared";
-import { cairoCalendarDate } from "../lib/cairo-date";
-import { formatMoney, sumDecimalValues } from "../lib/format";
+import { cairoCalendarDate } from "@cashier/web-core/lib/cairo-date";
+import { formatMoney, sumDecimalValues } from "@cashier/web-core/lib/format";
 
 export type OrderFilters = {
   query: string;

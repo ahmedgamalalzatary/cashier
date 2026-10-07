@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../../src/lib/api";
+import { api } from "@cashier/web-core/lib/api";
 import {
   adminCloseShift,
   closeShift,
@@ -10,7 +10,7 @@ import {
   reopenShift,
 } from "../../src/services/shifts-service";
 
-vi.mock("../../src/lib/api", () => ({ api: vi.fn() }));
+vi.mock("@cashier/web-core/lib/api", () => ({ api: vi.fn() }));
 const request = vi.mocked(api);
 
 describe("shifts service", () => {

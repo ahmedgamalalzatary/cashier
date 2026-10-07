@@ -3,7 +3,7 @@ import type {
   ExternalProductCatalog,
   ProductStockSetupBody,
 } from "@cashier/shared";
-import { api } from "../lib/api";
+import { api } from "@cashier/web-core/lib/api";
 
 type ProductCatalogPage = ExternalProductCatalog & {
   pagination: {

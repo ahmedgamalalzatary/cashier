@@ -5,7 +5,7 @@ import type {
   ExternalPaymentMethod,
   ExternalPaymentStatus,
 } from "@cashier/shared";
-import { formatMoney, sumDecimalValues } from "../lib/format";
+import { formatMoney, sumDecimalValues } from "@cashier/web-core/lib/format";
 
 export type ExternalOrderFilters = {
   query: string;
