@@ -191,7 +191,7 @@ Business endpoints select the workspace with `X-Branch-Id`. Admin defaults to Ma
 
 ## 8. Shifts
 
-- **Concurrency:** one open shift per cashier account, with multiple cashiers able to work simultaneously within/across branches. The database enforces the cashier account limit. Orders, refunds, expenses, waste, and cashier transfer requests require and attach to the owning cashier's branch-scoped open shift.
+- **Concurrency:** one open shift per branch, enforced by the unique `(branch_id, open_slot)` index. Different branches may each have an open shift. Orders, refunds, expenses, waste, and cashier transfer requests still require and attach to the owning cashier's branch-scoped open shift.
 - **Open:** cashier logs in and enters the counted **starting float** directly on Home or POS. Both pages also offer counted-cash closing and the cashier's own paginated history. The separate Shifts page is admin-only.
 - Each shift records the authenticated cashier user and, through that user's required employee link, the employee who operated it.
 - A cashier's worked time sums open/reopened work segments, excluding closed gaps. Non-cashier employees have no attendance or worked-hours tracking.
@@ -216,7 +216,7 @@ Business endpoints select the workspace with `X-Branch-Id`. Admin defaults to Ma
   the close. POS and Home show "no shift open", and a sale receives the normal 409 until
   a new shift is opened. Cashiers see a warning an hour before the 16-hour limit.
 - Admin can view shifts, force-close a shift left open, and reopen/correct a closed shift with an audit note. Admin cannot open a shift.
-- Admin Home and Shifts show every open shift in the selected branch. Reopening conflicts only when that cashier already has an open shift. History pages retain access beyond 100 records and expose audit events and cash snapshots.
+- Admin Home and Shifts show the branch's open shift. Reopening conflicts whenever that branch already has an open shift, including one owned by another cashier. History pages retain access beyond 100 records and expose audit events and cash snapshots.
 - **Controls:** cashiers use **فتح وردية** / **إغلاق وعدّ الدرج** on Home or POS, and **سجل وردياتي** for their own paginated history (**تفاصيل الوردية** shows totals, closing time, and audit events). Admin uses the **الورديات** page to force-close with a note, reopen, or correct float/actual cash with a note.
 
 #### Shift API
@@ -231,11 +231,16 @@ All requests use the authenticated branch selection.
 | `GET /api/shifts?limit=100&offset=0` | Paginated history; limit 1–100, offset nonnegative; same ownership rules                      |
 | `GET /api/reports/dashboard`         | `openShifts`: every open shift in the selected branch                                         |
 
-Open, close, admin-close, reopen, and correction routes keep their payloads. A duplicate open/reopen for one cashier returns 409; a cashier cannot close another cashier's shift, and admin actions are limited to the selected branch.
+Open, close, admin-close, reopen, and correction routes keep their payloads. A duplicate open/reopen in the same branch returns 409; a cashier cannot close another cashier's shift, and admin actions are limited to the selected branch.
 
 #### Shift rollout
 
-`0041_cashier_concurrent_shifts` replaces the unique `(branch_id, open_slot)` index with `(cashier_user_id, open_slot)` (open shifts use slot 1, closed use NULL), preserving every record, ID, total, and event. Stop the old API/worker before migrating: the old app assumes one shift per branch. Start the updated API, web, and worker together.
+Desktop/online Phase 4 restores the unique `(branch_id, open_slot)` index: open shifts
+use slot 1; counted, admin and system closes release the slot with NULL. This replaces
+the earlier per-cashier concurrency introduced by `0041_cashier_concurrent_shifts`.
+The UUID schema is verified in slice 4.2; activating it on existing demo databases waits
+for the 4.3 baseline reset and the remaining API ID conversion in 4.4. Do not apply the
+new schema to an old runtime during the intermediate slices.
 
 ---
 
@@ -367,6 +372,21 @@ Online revenue counted once for completed orders, per-branch online stock costs,
 All stock changes go through `stock_movements` + `stock_batches` so every quantity and cost is traceable to a document.
 
 `branches` stores workspace lifecycle. Operational tables carry `branch_id`; local uniqueness and external IDs are scoped by branch. Composite references prevent cross-branch links between owned records. Global administrator identities remain shared; cashier/employee assignment and all operational reads/writes are branch-scoped.
+
+Desktop/online Phase 4 schema rules:
+
+- Business keys and their references use app-generated UUIDv7 strings stored as
+  `CHAR(36) CHARACTER SET ascii COLLATE ascii_bin`. External-system IDs remain numeric.
+- Branch scope is explicit; database helpers do not invent a default branch. Admin
+  `users.branch_id` is NULL; cashiers require their branch's UUID. Cashier usernames
+  are unique within a branch, admin usernames globally, and the two roles may share a
+  username. Account lookup and seed integration are completed in the remaining Phase 4 slices.
+- `admin_branches` stores admin-to-branch assignments. `devices` permits one linked
+  device per branch. `link_codes` stores code hashes, expiry and usage times.
+- `sync_outbox` stores ordered local change records with a numeric auto-increment
+  sequence; `sync_state` has one row (`id = 1`). Their workers arrive in later phases.
+- The three external-ingredient mapping tables have composite primary keys over their
+  branch, external target and local item. Existing branch-scoped foreign keys remain enforced.
 
 ---
 

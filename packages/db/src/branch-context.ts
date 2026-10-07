@@ -5,14 +5,17 @@ import type { Db } from "./client.js";
 import { branches } from "./schema.js";
 import { HttpError } from "./http-error.js";
 
-const context = new AsyncLocalStorage<{ id: number; writable: boolean }>();
+const context = new AsyncLocalStorage<{ id: string; writable: boolean }>();
 
-// Seeds and existing direct repository callers use the migrated Main Branch.
-// HTTP operations establish their validated branch before entering any module.
-export const currentBranchId = () => context.getStore()?.id ?? 1;
+// HTTP handlers, workers and direct callers must establish their branch scope.
+export const currentBranchId = () => {
+  const branchId = context.getStore()?.id;
+  if (!branchId) throw new HttpError(500, "Branch scope is required");
+  return branchId;
+};
 
 export function withBranch<T>(
-  branchId: number,
+  branchId: string,
   action: () => T,
   writable = true,
 ): T {
@@ -46,10 +49,10 @@ export function branchCondition(
 
 export function branchValues<T extends object>(
   rows: T[],
-): Array<T & { branchId: number }>;
+): Array<T & { branchId: string }>;
 export function branchValues<T extends object>(
   row: T,
-): T & { branchId: number };
+): T & { branchId: string };
 export function branchValues<T extends object>(input: T | T[]) {
   const assign = (row: T) => ({ ...row, branchId: currentBranchId() });
   return Array.isArray(input) ? input.map(assign) : assign(input);

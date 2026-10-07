@@ -3,6 +3,9 @@ import {
   mysqlTable,
   varchar,
   int,
+  bigint,
+  tinyint,
+  json,
   decimal,
   boolean,
   timestamp,
@@ -17,18 +20,18 @@ import {
   check,
 } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
+import { id, uuidColumn } from "./uuid.js";
 
 export const branches = mysqlTable("branches", {
-  id: int("id").autoincrement().primaryKey(),
+  id: id().primaryKey(),
   name: varchar("name", { length: 191 }).notNull().unique(),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 const branchColumn = () =>
-  int("branch_id")
+  uuidColumn("branch_id")
     .notNull()
-    .default(1)
     .references(() => branches.id);
 
 function scopedReference(
@@ -49,7 +52,7 @@ export const employees = mysqlTable(
   "employees",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
+    id: id().primaryKey(),
     name: varchar("name", { length: 191 }).notNull(),
     phone: varchar("phone", { length: 50 }),
     jobTitle: varchar("job_title", { length: 100 }),
@@ -68,14 +71,11 @@ export const employees = mysqlTable(
 export const users = mysqlTable(
   "users",
   {
-    id: int("id").autoincrement().primaryKey(),
-    branchId: int("branch_id")
-      .notNull()
-      .default(1)
-      .references(() => branches.id),
-    employeeId: int("employee_id").references(() => employees.id),
+    id: id().primaryKey(),
+    branchId: uuidColumn("branch_id").references(() => branches.id),
+    employeeId: uuidColumn("employee_id").references(() => employees.id),
     name: varchar("name", { length: 191 }).notNull(),
-    username: varchar("username", { length: 100 }).notNull().unique(),
+    username: varchar("username", { length: 100 }).notNull(),
     passwordHash: varchar("password_hash", { length: 255 }).notNull(),
     tokenVersion: int("token_version").notNull().default(0),
     role: mysqlEnum("role", ["admin", "cashier"]).notNull(),
@@ -93,21 +93,68 @@ export const users = mysqlTable(
       (): AnyMySqlColumn => employees.id,
     ),
     uniqueIndex("users_employee_id_uidx").on(table.employeeId),
+    uniqueIndex("users_cashier_username_branch_uidx").on(table.role, table.branchId, table.username),
+    // Nullable branches cannot enforce admin uniqueness in a composite index.
+    // A functional index protects admins without adding generated sync columns.
+    uniqueIndex("users_admin_username_uidx").on(sql`(CASE WHEN \`role\` = 'admin' THEN \`username\` ELSE NULL END)`),
+    check("users_role_branch_chk", sql`(${table.role} = 'admin' AND ${table.branchId} IS NULL) OR (${table.role} = 'cashier' AND ${table.branchId} IS NOT NULL)`),
   ],
 );
+
+export const adminBranches = mysqlTable("admin_branches", {
+  adminUserId: uuidColumn("admin_user_id").notNull().references(() => users.id),
+  branchId: branchColumn(),
+}, (table) => [
+  primaryKey({ columns: [table.adminUserId, table.branchId] }),
+  index("admin_branches_branch_idx").on(table.branchId),
+]);
+
+export const devices = mysqlTable("devices", {
+  id: id().primaryKey(),
+  branchId: branchColumn(),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  linkedAt: timestamp("linked_at", { fsp: 3 }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { fsp: 3 }),
+  appVersion: varchar("app_version", { length: 64 }),
+  lastUploadAt: timestamp("last_upload_at", { fsp: 3 }),
+}, (table) => [uniqueIndex("devices_branch_uidx").on(table.branchId)]);
+
+export const linkCodes = mysqlTable("link_codes", {
+  codeHash: varchar("code_hash", { length: 64 }).primaryKey(),
+  branchId: branchColumn(),
+  expiresAt: timestamp("expires_at", { fsp: 3 }).notNull(),
+  usedAt: timestamp("used_at", { fsp: 3 }),
+}, (table) => [index("link_codes_branch_idx").on(table.branchId)]);
+
+export const syncOutbox = mysqlTable("sync_outbox", {
+  seq: bigint("seq", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
+  tableName: varchar("table_name", { length: 64 }).notNull(),
+  op: mysqlEnum("op", ["upsert", "delete"]).notNull(),
+  pk: json("pk").$type<Record<string, unknown>>().notNull(),
+  rowJson: json("row_json").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at", { fsp: 3 }).notNull().defaultNow(),
+});
+
+export const syncState = mysqlTable("sync_state", {
+  id: tinyint("id").primaryKey(),
+  lastUploadedSeq: bigint("last_uploaded_seq", { mode: "number", unsigned: true }).notNull().default(0),
+  lastSuccessAt: timestamp("last_success_at", { fsp: 3 }),
+  lastError: text("last_error"),
+  lastAttemptAt: timestamp("last_attempt_at", { fsp: 3 }),
+}, (table) => [check("sync_state_singleton_chk", sql`${table.id} = 1`)]);
 
 export const salaryAdvances = mysqlTable(
   "salary_advances",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    employeeId: int("employee_id")
+    id: id().primaryKey(),
+    employeeId: uuidColumn("employee_id")
       .notNull()
       .references(() => employees.id),
     amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
     entryDate: date("entry_date", { mode: "string" }).notNull(),
     note: varchar("note", { length: 500 }),
-    recordedBy: int("recorded_by")
+    recordedBy: uuidColumn("recorded_by")
       .notNull()
       .references(() => users.id),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -133,15 +180,15 @@ export const salaryAdjustments = mysqlTable(
   "salary_adjustments",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    employeeId: int("employee_id")
+    id: id().primaryKey(),
+    employeeId: uuidColumn("employee_id")
       .notNull()
       .references(() => employees.id),
     type: mysqlEnum("type", ["bonus", "deduction"]).notNull(),
     amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
     entryDate: date("entry_date", { mode: "string" }).notNull(),
     note: varchar("note", { length: 500 }),
-    recordedBy: int("recorded_by")
+    recordedBy: uuidColumn("recorded_by")
       .notNull()
       .references(() => users.id),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -170,8 +217,8 @@ export const salaryPayments = mysqlTable(
   "salary_payments",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    employeeId: int("employee_id")
+    id: id().primaryKey(),
+    employeeId: uuidColumn("employee_id")
       .notNull()
       .references(() => employees.id),
     periodMonth: date("period_month", { mode: "string" }).notNull(),
@@ -180,7 +227,7 @@ export const salaryPayments = mysqlTable(
     deductions: decimal("deductions", { precision: 12, scale: 2 }).notNull(),
     advances: decimal("advances", { precision: 12, scale: 2 }).notNull(),
     netPay: decimal("net_pay", { precision: 12, scale: 2 }).notNull(),
-    paidBy: int("paid_by")
+    paidBy: uuidColumn("paid_by")
       .notNull()
       .references(() => users.id),
     paidAt: timestamp("paid_at").notNull().defaultNow(),
@@ -212,9 +259,9 @@ export const categories = mysqlTable(
   "categories",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
+    id: id().primaryKey(),
     name: varchar("name", { length: 191 }).notNull(),
-    parentId: int("parent_id").references((): AnyMySqlColumn => categories.id),
+    parentId: uuidColumn("parent_id").references((): AnyMySqlColumn => categories.id),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
@@ -235,7 +282,7 @@ export const suppliers = mysqlTable(
   "suppliers",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
+    id: id().primaryKey(),
     name: varchar("name", { length: 191 }).notNull(),
     phone: varchar("phone", { length: 50 }),
     address: varchar("address", { length: 255 }),
@@ -255,8 +302,8 @@ export const purchaseInvoices = mysqlTable(
   "purchase_invoices",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    supplierId: int("supplier_id")
+    id: id().primaryKey(),
+    supplierId: uuidColumn("supplier_id")
       .notNull()
       .references(() => suppliers.id),
     invoiceNumber: varchar("invoice_number", { length: 100 }),
@@ -264,7 +311,7 @@ export const purchaseInvoices = mysqlTable(
     notes: text("notes"),
     totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
     paidAmount: decimal("paid_amount", { precision: 12, scale: 2 }).notNull(),
-    createdBy: int("created_by")
+    createdBy: uuidColumn("created_by")
       .notNull()
       .references(() => users.id),
     clientRequestId: varchar("client_request_id", { length: 36 }).notNull(),
@@ -303,11 +350,11 @@ export const supplierPayments = mysqlTable(
   "supplier_payments",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    supplierId: int("supplier_id")
+    id: id().primaryKey(),
+    supplierId: uuidColumn("supplier_id")
       .notNull()
       .references(() => suppliers.id),
-    purchaseInvoiceId: int("purchase_invoice_id").references(
+    purchaseInvoiceId: uuidColumn("purchase_invoice_id").references(
       () => purchaseInvoices.id,
     ),
     amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
@@ -343,11 +390,11 @@ export const items = mysqlTable(
   "items",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
+    id: id().primaryKey(),
     // system-assigned sequential display code (0001, 0002, …); never reused
     code: int("code").notNull(),
     name: varchar("name", { length: 191 }).notNull(),
-    categoryId: int("category_id")
+    categoryId: uuidColumn("category_id")
       .notNull()
       .references(() => categories.id),
     type: mysqlEnum("type", ["raw", "resale", "prepared"]).notNull(),
@@ -391,11 +438,11 @@ export const purchaseLines = mysqlTable(
   "purchase_lines",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    invoiceId: int("invoice_id")
+    id: id().primaryKey(),
+    invoiceId: uuidColumn("invoice_id")
       .notNull()
       .references(() => purchaseInvoices.id),
-    itemId: int("item_id")
+    itemId: uuidColumn("item_id")
       .notNull()
       .references(() => items.id),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
@@ -433,8 +480,8 @@ export const stockBatches = mysqlTable(
   "stock_batches",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    itemId: int("item_id")
+    id: id().primaryKey(),
+    itemId: uuidColumn("item_id")
       .notNull()
       .references(() => items.id),
     warehouse: mysqlEnum("warehouse", ["main", "cafe"]).notNull(),
@@ -449,7 +496,7 @@ export const stockBatches = mysqlTable(
     unitCost: decimal("unit_cost", { precision: 16, scale: 6 }).notNull(),
     receivedAt: timestamp("received_at").notNull(),
     sourceType: varchar("source_type", { length: 50 }).notNull(),
-    sourceId: int("source_id"),
+    sourceId: uuidColumn("source_id"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [
@@ -474,17 +521,17 @@ export const stocktakes = mysqlTable(
   "stocktakes",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
+    id: id().primaryKey(),
     kind: mysqlEnum("kind", ["stocktake", "manual"])
       .notNull()
       .default("stocktake"),
     warehouse: mysqlEnum("warehouse", ["main", "cafe"]).notNull(),
-    categoryId: int("category_id").references(() => categories.id),
+    categoryId: uuidColumn("category_id").references(() => categories.id),
     status: mysqlEnum("status", ["draft", "confirmed"])
       .notNull()
       .default("draft"),
     note: varchar("note", { length: 500 }),
-    createdBy: int("created_by")
+    createdBy: uuidColumn("created_by")
       .notNull()
       .references(() => users.id),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -507,11 +554,11 @@ export const stocktakeLines = mysqlTable(
   "stocktake_lines",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    stocktakeId: int("stocktake_id")
+    id: id().primaryKey(),
+    stocktakeId: uuidColumn("stocktake_id")
       .notNull()
       .references(() => stocktakes.id),
-    itemId: int("item_id")
+    itemId: uuidColumn("item_id")
       .notNull()
       .references(() => items.id),
     recordedQuantity: decimal("recorded_quantity", {
@@ -549,16 +596,16 @@ export const transferRequests = mysqlTable(
   "transfer_requests",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    requestedBy: int("requested_by")
+    id: id().primaryKey(),
+    requestedBy: uuidColumn("requested_by")
       .notNull()
       .references(() => users.id),
-    shiftId: int("shift_id").references((): AnyMySqlColumn => shifts.id),
+    shiftId: uuidColumn("shift_id").references((): AnyMySqlColumn => shifts.id),
     notes: text("notes"),
     status: mysqlEnum("status", ["pending", "approved", "rejected"])
       .notNull()
       .default("pending"),
-    reviewedBy: int("reviewed_by").references(() => users.id),
+    reviewedBy: uuidColumn("reviewed_by").references(() => users.id),
     rejectionReason: varchar("rejection_reason", { length: 500 }),
     reviewedAt: timestamp("reviewed_at"),
     clientRequestId: varchar("client_request_id", { length: 36 }).notNull(),
@@ -595,11 +642,11 @@ export const transferRequestLines = mysqlTable(
   "transfer_request_lines",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    requestId: int("request_id")
+    id: id().primaryKey(),
+    requestId: uuidColumn("request_id")
       .notNull()
       .references(() => transferRequests.id),
-    itemId: int("item_id")
+    itemId: uuidColumn("item_id")
       .notNull()
       .references(() => items.id),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
@@ -636,15 +683,15 @@ export const transfers = mysqlTable(
   "transfers",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    requestId: int("request_id").references(() => transferRequests.id),
-    purchaseInvoiceId: int("purchase_invoice_id").references(
+    id: id().primaryKey(),
+    requestId: uuidColumn("request_id").references(() => transferRequests.id),
+    purchaseInvoiceId: uuidColumn("purchase_invoice_id").references(
       () => purchaseInvoices.id,
     ),
-    createdBy: int("created_by")
+    createdBy: uuidColumn("created_by")
       .notNull()
       .references(() => users.id),
-    approvedBy: int("approved_by")
+    approvedBy: uuidColumn("approved_by")
       .notNull()
       .references(() => users.id),
     notes: text("notes"),
@@ -680,19 +727,19 @@ export const transferLines = mysqlTable(
   "transfer_lines",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    transferId: int("transfer_id")
+    id: id().primaryKey(),
+    transferId: uuidColumn("transfer_id")
       .notNull()
       .references(() => transfers.id),
-    itemId: int("item_id")
+    itemId: uuidColumn("item_id")
       .notNull()
       .references(() => items.id),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
     unitCost: decimal("unit_cost", { precision: 16, scale: 6 }).notNull(),
-    sourceBatchId: int("source_batch_id")
+    sourceBatchId: uuidColumn("source_batch_id")
       .notNull()
       .references(() => stockBatches.id),
-    cafeBatchId: int("cafe_batch_id")
+    cafeBatchId: uuidColumn("cafe_batch_id")
       .notNull()
       .references(() => stockBatches.id),
   },
@@ -739,13 +786,13 @@ export const recipes = mysqlTable(
   "recipes",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
+    id: id().primaryKey(),
     name: varchar("name", { length: 191 }).notNull(),
     type: mysqlEnum("type", ["product", "prepared"]).notNull(),
-    categoryId: int("category_id")
+    categoryId: uuidColumn("category_id")
       .notNull()
       .references(() => categories.id),
-    outputItemId: int("output_item_id").references(() => items.id),
+    outputItemId: uuidColumn("output_item_id").references(() => items.id),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
@@ -778,8 +825,8 @@ export const recipeSizes = mysqlTable(
   "recipe_sizes",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    recipeId: int("recipe_id")
+    id: id().primaryKey(),
+    recipeId: uuidColumn("recipe_id")
       .notNull()
       .references(() => recipes.id),
     name: varchar("name", { length: 100 }).notNull(),
@@ -809,11 +856,11 @@ export const recipeIngredients = mysqlTable(
   "recipe_ingredients",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    recipeSizeId: int("recipe_size_id")
+    id: id().primaryKey(),
+    recipeSizeId: uuidColumn("recipe_size_id")
       .notNull()
       .references(() => recipeSizes.id),
-    itemId: int("item_id")
+    itemId: uuidColumn("item_id")
       .notNull()
       .references(() => items.id),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
@@ -988,7 +1035,7 @@ export const externalProductIngredients = mysqlTable(
   {
     branchId: branchColumn(),
     externalProductId: int("external_product_id").notNull(),
-    itemId: int("item_id")
+    itemId: uuidColumn("item_id")
       .notNull()
       .references(() => items.id),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
@@ -1002,11 +1049,7 @@ export const externalProductIngredients = mysqlTable(
       (): AnyMySqlColumn => items.branchId,
       (): AnyMySqlColumn => items.id,
     ),
-    uniqueIndex("external_product_ingredients_uidx").on(
-      table.branchId,
-      table.externalProductId,
-      table.itemId,
-    ),
+    primaryKey({ name: "ext_product_ingredients_pk", columns: [table.branchId, table.externalProductId, table.itemId] }),
     index("external_product_ingredients_item_idx").on(table.itemId),
     foreignKey({
       name: "ext_prod_ing_prod_fk",
@@ -1021,7 +1064,7 @@ export const externalSizeIngredients = mysqlTable(
   {
     branchId: branchColumn(),
     externalSizeId: int("external_size_id").notNull(),
-    itemId: int("item_id")
+    itemId: uuidColumn("item_id")
       .notNull()
       .references(() => items.id),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
@@ -1035,11 +1078,7 @@ export const externalSizeIngredients = mysqlTable(
       (): AnyMySqlColumn => items.branchId,
       (): AnyMySqlColumn => items.id,
     ),
-    uniqueIndex("external_size_ingredients_uidx").on(
-      table.branchId,
-      table.externalSizeId,
-      table.itemId,
-    ),
+    primaryKey({ name: "ext_size_ingredients_pk", columns: [table.branchId, table.externalSizeId, table.itemId] }),
     index("external_size_ingredients_item_idx").on(table.itemId),
     foreignKey({
       name: "ext_size_ing_size_fk",
@@ -1057,7 +1096,7 @@ export const externalModifierIngredients = mysqlTable(
   {
     branchId: branchColumn(),
     externalModifierOptionId: int("external_modifier_option_id").notNull(),
-    itemId: int("item_id")
+    itemId: uuidColumn("item_id")
       .notNull()
       .references(() => items.id),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
@@ -1071,11 +1110,7 @@ export const externalModifierIngredients = mysqlTable(
       (): AnyMySqlColumn => items.branchId,
       (): AnyMySqlColumn => items.id,
     ),
-    uniqueIndex("external_modifier_ingredients_uidx").on(
-      table.branchId,
-      table.externalModifierOptionId,
-      table.itemId,
-    ),
+    primaryKey({ name: "ext_modifier_ingredients_pk", columns: [table.branchId, table.externalModifierOptionId, table.itemId] }),
     index("external_modifier_ingredients_item_idx").on(table.itemId),
     foreignKey({
       name: "ext_mod_ing_opt_fk",
@@ -1163,12 +1198,12 @@ export const preparations = mysqlTable(
   "preparations",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    recipeId: int("recipe_id")
+    id: id().primaryKey(),
+    recipeId: uuidColumn("recipe_id")
       .notNull()
       .references(() => recipes.id),
     recipeName: varchar("recipe_name", { length: 191 }).notNull(),
-    outputItemId: int("output_item_id")
+    outputItemId: uuidColumn("output_item_id")
       .notNull()
       .references(() => items.id),
     outputItemName: varchar("output_item_name", { length: 191 }).notNull(),
@@ -1178,8 +1213,8 @@ export const preparations = mysqlTable(
     }).notNull(),
     totalCost: decimal("total_cost", { precision: 30, scale: 2 }).notNull(),
     unitCost: decimal("unit_cost", { precision: 16, scale: 6 }).notNull(),
-    outputBatchId: int("output_batch_id").references(() => stockBatches.id),
-    preparedBy: int("prepared_by")
+    outputBatchId: uuidColumn("output_batch_id").references(() => stockBatches.id),
+    preparedBy: uuidColumn("prepared_by")
       .notNull()
       .references(() => users.id),
     notes: text("notes"),
@@ -1222,11 +1257,11 @@ export const preparationAllocations = mysqlTable(
   "preparation_allocations",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    preparationId: int("preparation_id")
+    id: id().primaryKey(),
+    preparationId: uuidColumn("preparation_id")
       .notNull()
       .references(() => preparations.id),
-    ingredientItemId: int("ingredient_item_id")
+    ingredientItemId: uuidColumn("ingredient_item_id")
       .notNull()
       .references(() => items.id),
     ingredientItemName: varchar("ingredient_item_name", {
@@ -1234,7 +1269,7 @@ export const preparationAllocations = mysqlTable(
     }).notNull(),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
     unitCost: decimal("unit_cost", { precision: 16, scale: 6 }).notNull(),
-    sourceBatchId: int("source_batch_id")
+    sourceBatchId: uuidColumn("source_batch_id")
       .notNull()
       .references(() => stockBatches.id),
   },
@@ -1273,11 +1308,11 @@ export const shifts = mysqlTable(
   "shifts",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    cashierUserId: int("cashier_user_id")
+    id: id().primaryKey(),
+    cashierUserId: uuidColumn("cashier_user_id")
       .notNull()
       .references(() => users.id),
-    employeeId: int("employee_id")
+    employeeId: uuidColumn("employee_id")
       .notNull()
       .references(() => employees.id),
     status: mysqlEnum("status", ["open", "closed"]).notNull().default("open"),
@@ -1288,7 +1323,7 @@ export const shifts = mysqlTable(
     }).notNull(),
     openedAt: timestamp("opened_at").notNull(),
     closedAt: timestamp("closed_at"),
-    closedByUserId: int("closed_by_user_id").references(() => users.id),
+    closedByUserId: uuidColumn("closed_by_user_id").references(() => users.id),
     actualCash: decimal("actual_cash", { precision: 12, scale: 2 }),
     expectedCash: decimal("expected_cash", { precision: 12, scale: 2 }),
     overShort: decimal("over_short", { precision: 12, scale: 2 }),
@@ -1304,7 +1339,7 @@ export const shifts = mysqlTable(
       (): AnyMySqlColumn => employees.id,
     ),
     uniqueIndex("shifts_open_slot_uidx").on(
-      table.cashierUserId,
+      table.branchId,
       table.openSlot,
     ),
     index("shifts_cashier_opened_idx").on(table.cashierUserId, table.openedAt),
@@ -1316,8 +1351,8 @@ export const shiftEvents = mysqlTable(
   "shift_events",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    shiftId: int("shift_id")
+    id: id().primaryKey(),
+    shiftId: uuidColumn("shift_id")
       .notNull()
       .references(() => shifts.id),
     action: mysqlEnum("action", [
@@ -1329,7 +1364,7 @@ export const shiftEvents = mysqlTable(
       "correction",
     ]).notNull(),
     // NULL means the system acted: an auto_close has no human actor.
-    actorUserId: int("actor_user_id").references(() => users.id),
+    actorUserId: uuidColumn("actor_user_id").references(() => users.id),
     note: varchar("note", { length: 500 }),
     openingFloat: decimal("opening_float", { precision: 12, scale: 2 }),
     actualCash: decimal("actual_cash", { precision: 12, scale: 2 }),
@@ -1357,16 +1392,16 @@ export const orders = mysqlTable(
   "orders",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
+    id: id().primaryKey(),
     orderNumber: varchar("order_number", { length: 64 }).notNull(),
     clientRequestId: varchar("client_request_id", { length: 36 }).notNull(),
     requestFingerprint: varchar("request_fingerprint", {
       length: 64,
     }).notNull(),
-    cashierId: int("cashier_id")
+    cashierId: uuidColumn("cashier_id")
       .notNull()
       .references(() => users.id),
-    shiftId: int("shift_id").references(() => shifts.id),
+    shiftId: uuidColumn("shift_id").references(() => shifts.id),
     subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
     discountType: mysqlEnum("discount_type", ["percent", "fixed"]),
     discountValue: decimal("discount_value", {
@@ -1422,16 +1457,16 @@ export const orderLines = mysqlTable(
   "order_lines",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    orderId: int("order_id")
+    id: id().primaryKey(),
+    orderId: uuidColumn("order_id")
       .notNull()
       .references(() => orders.id),
     type: mysqlEnum("type", ["recipe", "item", "external_product"]).notNull(),
-    recipeId: int("recipe_id").references(() => recipes.id),
-    recipeSizeId: int("recipe_size_id").references(() => recipeSizes.id, {
+    recipeId: uuidColumn("recipe_id").references(() => recipes.id),
+    recipeSizeId: uuidColumn("recipe_size_id").references(() => recipeSizes.id, {
       onDelete: "set null",
     }),
-    itemId: int("item_id").references(() => items.id),
+    itemId: uuidColumn("item_id").references(() => items.id),
     externalProductId: int("external_product_id"),
     externalSizeId: int("external_size_id"),
     productName: varchar("product_name", { length: 191 }).notNull(),
@@ -1496,8 +1531,8 @@ export const orderLineModifiers = mysqlTable(
   "order_line_modifiers",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    orderLineId: int("order_line_id")
+    id: id().primaryKey(),
+    orderLineId: uuidColumn("order_line_id")
       .notNull()
       .references(() => orderLines.id),
     externalModifierGroupId: int("external_modifier_group_id").notNull(),
@@ -1535,16 +1570,16 @@ export const refunds = mysqlTable(
   "refunds",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
+    id: id().primaryKey(),
     clientRequestId: varchar("client_request_id", { length: 36 }).notNull(),
     requestFingerprint: varchar("request_fingerprint", {
       length: 64,
     }).notNull(),
-    orderId: int("order_id")
+    orderId: uuidColumn("order_id")
       .notNull()
       .references(() => orders.id),
-    shiftId: int("shift_id").references(() => shifts.id),
-    cashierId: int("cashier_id")
+    shiftId: uuidColumn("shift_id").references(() => shifts.id),
+    cashierId: uuidColumn("cashier_id")
       .notNull()
       .references(() => users.id),
     reason: varchar("reason", { length: 500 }).notNull(),
@@ -1594,11 +1629,11 @@ export const refundLines = mysqlTable(
   "refund_lines",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    refundId: int("refund_id")
+    id: id().primaryKey(),
+    refundId: uuidColumn("refund_id")
       .notNull()
       .references(() => refunds.id),
-    orderLineId: int("order_line_id")
+    orderLineId: uuidColumn("order_line_id")
       .notNull()
       .references(() => orderLines.id),
     type: mysqlEnum("type", ["recipe", "item", "external_product"]).notNull(),
@@ -1658,17 +1693,17 @@ export const stockMovements = mysqlTable(
   "stock_movements",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    itemId: int("item_id")
+    id: id().primaryKey(),
+    itemId: uuidColumn("item_id")
       .notNull()
       .references(() => items.id),
     warehouse: mysqlEnum("warehouse", ["main", "cafe"]).notNull(),
-    batchId: int("batch_id").references(() => stockBatches.id),
+    batchId: uuidColumn("batch_id").references(() => stockBatches.id),
     movementType: varchar("movement_type", { length: 50 }).notNull(),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
     unitCost: decimal("unit_cost", { precision: 16, scale: 6 }).notNull(),
     referenceType: varchar("reference_type", { length: 50 }),
-    referenceId: int("reference_id"),
+    referenceId: uuidColumn("reference_id"),
     notes: varchar("notes", { length: 255 }),
     occurredAt: timestamp("occurred_at").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -1705,9 +1740,9 @@ export const stockDeficitAllocations = mysqlTable(
   "stock_deficit_allocations",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    deficitMovementId: int("deficit_movement_id").notNull(),
-    batchId: int("batch_id").notNull(),
+    id: id().primaryKey(),
+    deficitMovementId: uuidColumn("deficit_movement_id").notNull(),
+    batchId: uuidColumn("batch_id").notNull(),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
     unitCost: decimal("unit_cost", { precision: 16, scale: 6 }).notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -1736,16 +1771,16 @@ export const orderLineAllocations = mysqlTable(
   "order_line_allocations",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    orderLineId: int("order_line_id")
+    id: id().primaryKey(),
+    orderLineId: uuidColumn("order_line_id")
       .notNull()
       .references(() => orderLines.id),
-    itemId: int("item_id")
+    itemId: uuidColumn("item_id")
       .notNull()
       .references(() => items.id),
     itemName: varchar("item_name", { length: 191 }).notNull(),
-    batchId: int("batch_id").references(() => stockBatches.id),
-    stockMovementId: int("stock_movement_id")
+    batchId: uuidColumn("batch_id").references(() => stockBatches.id),
+    stockMovementId: uuidColumn("stock_movement_id")
       .notNull()
       .references(() => stockMovements.id),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
@@ -1797,17 +1832,17 @@ export const refundLineAllocations = mysqlTable(
   "refund_line_allocations",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    refundLineId: int("refund_line_id")
+    id: id().primaryKey(),
+    refundLineId: uuidColumn("refund_line_id")
       .notNull()
       .references(() => refundLines.id),
-    orderLineAllocationId: int("order_line_allocation_id").notNull(),
-    itemId: int("item_id")
+    orderLineAllocationId: uuidColumn("order_line_allocation_id").notNull(),
+    itemId: uuidColumn("item_id")
       .notNull()
       .references(() => items.id),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
     unitCost: decimal("unit_cost", { precision: 16, scale: 6 }).notNull(),
-    returnedBatchId: int("returned_batch_id"),
+    returnedBatchId: uuidColumn("returned_batch_id"),
   },
   (table) => [
     uniqueIndex("refund_line_allocations_branch_id_uidx").on(
@@ -1851,19 +1886,19 @@ export const wasteEntries = mysqlTable(
   "waste_entries",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
+    id: id().primaryKey(),
     clientRequestId: varchar("client_request_id", { length: 36 }),
     requestFingerprint: varchar("request_fingerprint", { length: 64 }),
-    shiftId: int("shift_id").references(() => shifts.id),
+    shiftId: uuidColumn("shift_id").references(() => shifts.id),
     warehouse: mysqlEnum("warehouse", ["main", "cafe"]).notNull(),
     targetType: mysqlEnum("target_type", [
       "item",
       "recipe",
       "external_product",
     ]),
-    itemId: int("item_id").references(() => items.id),
-    recipeId: int("recipe_id").references(() => recipes.id),
-    recipeSizeId: int("recipe_size_id").references(() => recipeSizes.id),
+    itemId: uuidColumn("item_id").references(() => items.id),
+    recipeId: uuidColumn("recipe_id").references(() => recipes.id),
+    recipeSizeId: uuidColumn("recipe_size_id").references(() => recipeSizes.id),
     externalProductId: int("external_product_id"),
     externalSizeId: int("external_size_id"),
     targetName: varchar("target_name", { length: 191 }),
@@ -1879,10 +1914,10 @@ export const wasteEntries = mysqlTable(
     ]),
     note: varchar("note", { length: 500 }),
     totalCost: decimal("total_cost", { precision: 30, scale: 2 }).notNull(),
-    recordedBy: int("recorded_by")
+    recordedBy: uuidColumn("recorded_by")
       .notNull()
       .references(() => users.id),
-    refundLineId: int("refund_line_id").references(() => refundLines.id),
+    refundLineId: uuidColumn("refund_line_id").references(() => refundLines.id),
     occurredAt: timestamp("occurred_at").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
@@ -1994,16 +2029,16 @@ export const wasteAllocations = mysqlTable(
   "waste_allocations",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
-    wasteEntryId: int("waste_entry_id")
+    id: id().primaryKey(),
+    wasteEntryId: uuidColumn("waste_entry_id")
       .notNull()
       .references(() => wasteEntries.id),
-    itemId: int("item_id")
+    itemId: uuidColumn("item_id")
       .notNull()
       .references(() => items.id),
     itemName: varchar("item_name", { length: 191 }).notNull(),
-    batchId: int("batch_id").references(() => stockBatches.id),
-    stockMovementId: int("stock_movement_id")
+    batchId: uuidColumn("batch_id").references(() => stockBatches.id),
+    stockMovementId: uuidColumn("stock_movement_id")
       .notNull()
       .references(() => stockMovements.id),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
@@ -2063,7 +2098,7 @@ export const expenseCategories = mysqlTable(
   "expense_categories",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
+    id: id().primaryKey(),
     name: varchar("name", { length: 191 }).notNull(),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -2081,20 +2116,20 @@ export const expenses = mysqlTable(
   "expenses",
   {
     branchId: branchColumn(),
-    id: int("id").autoincrement().primaryKey(),
+    id: id().primaryKey(),
     clientRequestId: varchar("client_request_id", { length: 36 }).notNull(),
     requestFingerprint: varchar("request_fingerprint", {
       length: 64,
     }).notNull(),
     type: mysqlEnum("type", ["shift", "general"]).notNull(),
-    categoryId: int("category_id")
+    categoryId: uuidColumn("category_id")
       .notNull()
       .references(() => expenseCategories.id),
-    shiftId: int("shift_id").references(() => shifts.id),
+    shiftId: uuidColumn("shift_id").references(() => shifts.id),
     amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
     expenseDate: date("expense_date", { mode: "string" }).notNull(),
     note: varchar("note", { length: 500 }),
-    recordedBy: int("recorded_by")
+    recordedBy: uuidColumn("recorded_by")
       .notNull()
       .references(() => users.id),
     createdAt: timestamp("created_at").notNull().defaultNow(),

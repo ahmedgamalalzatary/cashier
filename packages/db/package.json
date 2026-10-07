@@ -29,7 +29,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "test:mysql:api": "vitest run --config vitest.api-mysql.config.ts"
+    "test:mysql:api": "vitest run --config vitest.api-mysql.config.ts",
+    "test:schema": "vitest run --config vitest.schema.config.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

@@ -145,8 +145,8 @@ Status: ☐ todo · ◐ in progress · ☑ done. Write the date when done.
 | 3 Web core           | 3.1 `packages/web-core`: api client, auth/session, ui primitives  | ☑      | 2026-10-07 | `navigation.ts` moved too (`canOpenPath` needs `ADMIN_PATHS`) |
 |                      | 3.2 move reports page/components/model/service                    | ☑      | 2026-10-07 | page body → `features/reports-page.tsx`; route is thin     |
 |                      | 3.3 move login + users/branches management UI                     | ☑      | 2026-10-07 | merged with 3.2: reports needs `branch-provider`            |
-| 4 Schema reset       | 4.1 UUID helper + custom column type + tests                      | ?      | 2026-10-07 | UUIDv7 + ASCII column; isolated lint/typecheck/build and 19 unit tests green |
-|                      | 4.2 schema: all ids → UUID, new tables, one shift per branch      | ☐      |            |                                                           |
+| 4 Schema reset       | 4.1 UUID helper + custom column type + tests                      | ☑      | 2026-10-07 | UUIDv7 + ASCII column; isolated lint/typecheck/build and 19 unit tests green |
+|                      | 4.2 schema: all ids → UUID, new tables, one shift per branch      | ☑      | 2026-10-07 | 54 tables; DB scope moved from 4.4; 26 unit + 7 MySQL tests green |
 |                      | 4.3 baseline migration reset                                      | ☐      |            |                                                           |
 |                      | 4.4 api modules + zod schemas + shared types → string ids         | ☐      |            |                                                           |
 |                      | 4.5 web → string ids                                              | ☐      |            |                                                           |
@@ -257,7 +257,25 @@ No UUID/schema/login changes were included in this verification.
 **4.1 UUID.** Add `uuidv7()` in `packages/db` and a Drizzle column helper `id()` =
 `char(36)` ascii_bin with `$defaultFn(uuidv7)`. Unit-test ordering and format.
 
-**4.2 Schema** (`packages/db/src/schema.ts`, 49 tables):
+**4.2 Schema** (`packages/db/src/schema.ts`, 54 tables after adding five):
+
+**Slice dependency adjustment approved by the owner (2026-10-07):** the UUID conversion
+of `packages/db/src/branch-context.ts` moves from 4.4 into 4.2. The schema does not
+typecheck with numeric branch context. This includes removing the implicit branch `1`
+fallback and requiring explicit UUID scope. The remaining API, web and login work stays
+in its original slices. `branchColumn().default(1)` is removed with the UUID schema.
+
+**Username decision confirmed 2026-10-07:** cashier usernames are unique within each
+branch; separate branches may each have a cashier named `ali`. Admin usernames are
+unique globally. Admin and cashier accounts may share a username. The functional admin
+index enforces uniqueness despite nullable admin `branch_id`, without generated sync columns.
+
+Verification uses `pnpm --filter @cashier/db test:schema`: generate SQL into a temporary
+directory, install it in a newly created local `cashier_schema42_<pid>_test` database,
+exercise the schema, and remove only that owned scratch database. Existing databases,
+repository migrations and desktop migration checkpoints are left for 4.3.
+
+
 
 - Every `int().autoincrement()` id and every FK column → UUID. Keep the existing
   `(branch_id, id)` unique indexes and composite FKs.
@@ -269,13 +287,22 @@ No UUID/schema/login changes were included in this verification.
 - Shifts: replace `shifts_open_slot_uidx (cashier_user_id, open_slot)` with one open shift
   per **branch**. Update shift open/close/auto-close logic and its tests.
 
+**4.2 completed 2026-10-07:** isolated DB lint/typecheck/build, 26 unit tests and seven
+fresh-MySQL tests passed. Verification covers UUID/FK storage, usernames, concurrent
+branch shift opening, releasing/reopening slots, archived-branch write protection,
+external numeric IDs and the new account/link/backup tables. Explicit short names fix
+MySQL's primary-key identifier limit on ingredient mappings. No repository migration
+reset, existing-database wipe, API/web/login completion or desktop checkpoint change
+is included in this slice.
+
 **4.3 Baseline reset.** Delete `drizzle/0000…0045` + meta, generate a fresh `0000_baseline`.
 Wipe dev, test and VPS databases (D15). Update the desktop migration checkpoint.
 
 **4.4 API.** Every zod `z.coerce.number()` id param/body → `z.string().uuid()`; route params;
 `X-Branch-Id` validation in `middleware/branch.ts` (regex is `^[1-9]\d*$` today);
-`currentBranchId()` fallback `?? 1` must go (no "branch 1" anymore: the PC's branch comes
-from its link, online always uses an explicit branch). `branchColumn().default(1)` must go.
+The DB-side explicit UUID scope and removal of `branchColumn().default(1)` land in 4.2
+(owner-approved dependency adjustment above). The PC's branch comes from its settings/link;
+online always uses an explicit branch.
 `packages/shared/src/types.ts` id types → `string`.
 
 **4.5 Web.** Number parsing of ids (`Number(id)`, `parseInt`) → strings; `branch-session.ts`.
@@ -468,7 +495,7 @@ and an update here.
 
 ### 7.1 Every table and its sync direction
 
-Tables today (49, in `schema.ts` order). "Up" = PC → online by upload. "Down" = online → PC by
+Tables after 4.2 (54, in `schema.ts` order). "Up" = PC → online by upload. "Down" = online → PC by
 accounts pull. "None" = never leaves its database.
 
 | Direction     | Tables                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
