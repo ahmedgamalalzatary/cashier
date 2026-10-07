@@ -25,12 +25,16 @@ export function salaryBlockedLabel(
   }
 }
 
-/** Arabic counted form: one, two, 3–10 plural, 11+ singular */
+/**
+ * Arabic counted form: one, two, 3–10 plural, 11+ singular. The adjective must
+ * agree with the counted noun: مدفوع dual is مدفوعين and مدفوع in the accusative
+ * singular, so مدفوق (the broken plural) never appears here.
+ */
 function earlierMonthsPhrase(count: number): string {
   if (count === 1) return "شهر واحد سابق غير مدفوع";
-  if (count === 2) return "شهرين سابقين غير مدفوقين";
+  if (count === 2) return "شهرين سابقين غير مدفوعين";
   if (count <= 10) return `${count} أشهر سابقة غير مدفوعة`;
-  return `${count} شهراً سابقاً غير مدفوعاً`;
+  return `${count} شهراً سابقاً غير مدفوع`;
 }
 
 export function payConfirmationText({

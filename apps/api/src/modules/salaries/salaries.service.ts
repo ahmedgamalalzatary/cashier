@@ -117,10 +117,17 @@ export class SalariesService {
           if (employee.payRate === null) return blocked("no_salary");
           const latest = await this.repo.latestPaymentForEmployee(employee.id);
           const latestMonth = latest?.periodMonth.slice(0, 7) ?? null;
-          // paying this month locks every month between the last payment and it
+          // paying this month locks every month between the last payment and it;
+          // with no payment history the hire month is what the gap starts from,
+          // otherwise paying the first month would silently skip the months the
+          // employee already worked
+          // the last payment is itself paid, so it does not count; the hire
+          // month is not paid either, so it does count
           const unpaidEarlierMonths = latestMonth
             ? Math.max(0, monthsBetween(latestMonth, month) - 1)
-            : 0;
+            : employee.hireDate
+              ? Math.max(0, monthsBetween(employee.hireDate.slice(0, 7), month))
+              : 0;
           if (latestMonth && latestMonth >= month)
             return blocked("month_closed", null, unpaidEarlierMonths);
           let c;

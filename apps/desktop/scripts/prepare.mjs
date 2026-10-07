@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { build } from "esbuild";
+import { collectDependencyLicenses } from "./licenses.mjs";
 
 const desktop = path.resolve(import.meta.dirname, "..");
 const root = path.resolve(desktop, "../..");
@@ -57,28 +58,10 @@ const bundled = await build({
   },
   logLevel: "warning",
 });
-const packages = new Map();
-for (const input of Object.keys(bundled.metafile.inputs)) {
-  let directory = path.dirname(path.resolve(root, input));
-  if (!directory.split(path.sep).includes("node_modules")) continue;
-  while (path.dirname(directory) !== directory) {
-    const packageFile = path.join(directory, "package.json");
-    if (fs.existsSync(packageFile)) {
-      const info = JSON.parse(fs.readFileSync(packageFile, "utf8"));
-      const license = fs
-        .readdirSync(directory)
-        .find((name) => /^licen[sc]e(?:\.(?:md|txt))?$/i.test(name));
-      if (license && fs.statSync(path.join(directory, license)).isFile()) {
-        packages.set(
-          `${info.name}@${info.version}`,
-          fs.readFileSync(path.join(directory, license), "utf8"),
-        );
-      }
-      break;
-    }
-    directory = path.dirname(directory);
-  }
-}
+const packages = collectDependencyLicenses(
+  root,
+  Object.keys(bundled.metafile.inputs),
+);
 fs.writeFileSync(
   path.join(runtime, "dependency-LICENSES.txt"),
   [...packages].map(([name, text]) => `--- ${name} ---\n${text}`).join("\n\n"),

@@ -243,7 +243,7 @@ Open, close, admin-close, reopen, and correction routes keep their payloads. A d
   `net = monthly salary + bonuses − deductions − advances` → confirm to record the salary payment, showing the net amount in the confirmation. Full salary history retained. Payday is one calendar month at a time. A month on or before the latest paid month cannot be paid; the payday screen shows those months as not payable. Net pay is computed in integer cents so two-decimal amounts do not drift.
 - **Why a month is not payable:** every month row carries the real reason instead of a single generic message —
   `no_salary` (set the monthly salary), `month_closed` (a later month was already paid), or `invalid_data` (the numbers themselves are inconsistent: broken advances or a negative net), the last carrying the underlying message.
-- **Earlier unpaid months:** a row also reports how many months between the last payment and the shown month are still unpaid. Paying this month locks them for good, so the confirmation warns about them before the payment is recorded.
+- **Earlier unpaid months:** a row also reports how many months between the last payment and the shown month are still unpaid. With no payment history the gap is measured from the hire month instead, so paying an employee's first month warns about the months they already worked. Paying this month locks them for good, so the confirmation warns about them before the payment is recorded.
 
 ---
 

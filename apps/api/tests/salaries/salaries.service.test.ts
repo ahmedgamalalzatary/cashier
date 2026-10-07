@@ -240,12 +240,84 @@ describe("SalariesService", () => {
     });
 
     // no payment history at all: nothing is being locked behind this one
-    const { repo, service } = repository();
-    vi.mocked(repo.listEmployees).mockResolvedValue([
+    const none = repository();
+    vi.mocked(none.repo.listEmployees).mockResolvedValue([
       { id: 1, name: "أحمد", isActive: true, payRate: "5000.00" },
     ]);
 
+    await expect(none.service.month("2026-09")).resolves.toMatchObject({
+      employees: [{ employeeId: 1, unpaidEarlierMonths: 0 }],
+    });
+  });
+
+  it("counts from the hire month when the employee was never paid", async () => {
+    const { repo, service } = repository();
+    vi.mocked(repo.listEmployees).mockResolvedValue([
+      {
+        id: 1,
+        name: "أحمد",
+        isActive: true,
+        payRate: "5000.00",
+        hireDate: "2026-07-15",
+      },
+    ]);
+
+    // paying September for someone hired in July locks July and August
     await expect(service.month("2026-09")).resolves.toMatchObject({
+      employees: [{ employeeId: 1, unpaidEarlierMonths: 2 }],
+    });
+
+    // the hire month itself leaves nothing behind
+    const firstMonth = repository();
+    vi.mocked(firstMonth.repo.listEmployees).mockResolvedValue([
+      {
+        id: 1,
+        name: "أحمد",
+        isActive: true,
+        payRate: "5000.00",
+        hireDate: "2026-09-30",
+      },
+    ]);
+
+    await expect(
+      firstMonth.service.month("2026-09"),
+    ).resolves.toMatchObject({
+      employees: [{ employeeId: 1, unpaidEarlierMonths: 0 }],
+    });
+
+    // hired after the shown month: nothing to lock
+    const futureHire = repository();
+    vi.mocked(futureHire.repo.listEmployees).mockResolvedValue([
+      {
+        id: 1,
+        name: "أحمد",
+        isActive: true,
+        payRate: "5000.00",
+        hireDate: "2026-11-01",
+      },
+    ]);
+
+    await expect(
+      futureHire.service.month("2026-09"),
+    ).resolves.toMatchObject({
+      employees: [{ employeeId: 1, unpaidEarlierMonths: 0 }],
+    });
+
+    // a hire month inside the target month still counts nothing
+    const midMonth = repository();
+    vi.mocked(midMonth.repo.listEmployees).mockResolvedValue([
+      {
+        id: 1,
+        name: "أحمد",
+        isActive: true,
+        payRate: "5000.00",
+        hireDate: "2026-09-02",
+      },
+    ]);
+
+    await expect(
+      midMonth.service.month("2026-09"),
+    ).resolves.toMatchObject({
       employees: [{ employeeId: 1, unpaidEarlierMonths: 0 }],
     });
   });

@@ -86,9 +86,13 @@ describe("pay confirmation", () => {
 
   it("warns that paying now locks the unpaid earlier months for good", () => {
     expect(confirmation(2)).toContain("تنبيه");
-    expect(confirmation(1)).toContain("شهر واحد سابق");
-    expect(confirmation(2)).toContain("شهرين سابقين");
-    expect(confirmation(3)).toContain("3 أشهر سابقة");
-    expect(confirmation(12)).toContain("12 شهراً سابقاً");
+    expect(confirmation(1)).toContain("شهر واحد سابق غير مدفوع");
+    // dual takes the dual of مدفوع, not its broken plural
+    expect(confirmation(2)).toContain("شهرين سابقين غير مدفوعين");
+    expect(confirmation(3)).toContain("3 أشهر سابقة غير مدفوعة");
+    // 11 and up take a singular counted noun, so the adjective is genitive
+    expect(confirmation(12)).toContain("12 شهراً سابقاً غير مدفوع");
+    expect(confirmation(11)).toContain("11 شهراً سابقاً غير مدفوع");
+    expect(confirmation(10)).toContain("10 أشهر سابقة غير مدفوعة");
   });
 });

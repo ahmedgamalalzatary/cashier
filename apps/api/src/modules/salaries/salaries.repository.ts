@@ -63,6 +63,7 @@ export class SalariesRepository {
         name: employees.name,
         isActive: employees.isActive,
         payRate: employees.payRate,
+        hireDate: employees.hireDate,
       })
       .from(employees)
       .where(branchCondition(employees))
