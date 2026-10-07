@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -20,7 +21,7 @@ function appWithStubs(controller: AuthController) {
 
 describe("auth routes", () => {
   it("logs in with cookies and logs out cleanly", async () => {
-    const session = { token: "tok", user: { id: 1 } };
+    const session = { token: "tok", user: { id: testId(1) } };
     const service = {
       login: vi.fn(async () => session),
     } as unknown as AuthService;

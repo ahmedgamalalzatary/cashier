@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import type { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { describe, expect, it, vi } from 'vitest';
@@ -27,7 +28,7 @@ describe('readRequestToken', () => {
 });
 
 describe('auth token lifetime', () => {
-  const user = { id: 1, username: 'admin', role: 'admin' } as never;
+  const user = { id: testId(1), username: 'admin', role: 'admin' } as never;
 
   it('signs tokens that last 30 days', () => {
     const token = signToken(user, 0, 'secret');

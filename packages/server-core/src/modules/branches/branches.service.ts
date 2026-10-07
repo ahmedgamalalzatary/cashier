@@ -6,9 +6,8 @@ import type { BranchInput, BranchUpdateInput } from "./branches.schemas.js";
 export class BranchesService {
   constructor(private repo: BranchesRepository) {}
   list(actor: AuthUser) {
-    return this.repo.list(
-      actor.role === "cashier" ? (actor.branchId ?? 1) : undefined,
-    );
+    if (actor.role === "cashier" && !actor.branchId) throw new HttpError(401, "حساب الكاشير غير مرتبط بفرع");
+    return this.repo.list(actor.role === "cashier" ? actor.branchId! : undefined);
   }
   async create(input: BranchInput) {
     try {
@@ -21,7 +20,7 @@ export class BranchesService {
       this.rethrow(error);
     }
   }
-  async update(id: number, input: BranchUpdateInput) {
+  async update(id: string, input: BranchUpdateInput) {
     try {
       await this.repo.transaction(async (repo) => {
         const rows = await repo.lockAll();

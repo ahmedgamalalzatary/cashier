@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { it } from "../support/ids.js";
+import { describe, expect } from "vitest";
 import request from "supertest";
 import { createApp } from "../../../../apps/api/src/app.js";
 import { appOptions, db } from "../support/api-setup.js";
@@ -24,7 +25,7 @@ describe("user management", () => {
     expect(list.status).toBe(200);
     expect(list.body).toHaveLength(2);
     expect(
-      list.body.find((user: { id: number }) => user.id === created.body.id),
+      list.body.find((user: { id: string }) => user.id === created.body.id),
     ).toMatchObject({
       name: "مدير مسائي",
       username: "evening-admin",
@@ -203,7 +204,7 @@ describe("user management", () => {
     expect(
       (
         await request(app())
-          .put("/api/users/1")
+          .put("/api/users/00000000-0000-7000-8000-000000000001")
           .set(authorization)
           .send({ name: "محاولة" })
       ).status,

@@ -1,3 +1,4 @@
+import { it, testId } from "../support/ids.js";
 import request from "supertest";
 import { randomUUID } from "node:crypto";
 import { ProductsRepository } from "../../../../apps/api/src/modules/products/products.repository.js";
@@ -5,7 +6,7 @@ import { CacheRefreshRepository } from "../../../../apps/api/src/modules/externa
 import * as refreshModule from "../../../../apps/api/src/modules/external/cache-refresh.module.js";
 import { withBranch } from "@cashier/db";
 import { externalCatalogSync } from "@cashier/db";
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 import { createApp } from "../../../../apps/api/src/app.js";
 import { appOptions, db } from "../support/api-setup.js";
 import { loginAs } from "../support/api-helpers.js";
@@ -26,7 +27,7 @@ describe("branch workspaces", () => {
       expiresAt = new Date(now.getTime() + 60_000);
     try {
       expect(
-        await withBranch(1, () =>
+        await withBranch(testId(1), () =>
           mainStore.tryAcquire("main-test", now, expiresAt),
         ),
       ).toBe(true);
@@ -37,7 +38,7 @@ describe("branch workspaces", () => {
       ).toBe(true);
     } finally {
       await withBranch(branch.body.id, () => otherStore.release("other-test"));
-      await withBranch(1, () => mainStore.release("main-test"));
+      await withBranch(testId(1), () => mainStore.release("main-test"));
     }
   });
 
@@ -77,14 +78,14 @@ describe("branch workspaces", () => {
       .select({ branchId: externalCatalogSync.branchId })
       .from(externalCatalogSync)
       .orderBy(externalCatalogSync.branchId);
-    expect(rows.map((row) => row.branchId)).toEqual([1, active.body.id]);
+    expect(rows.map((row) => row.branchId)).toEqual([testId(1), active.body.id]);
   });
   it("retains the existing workspace as Main Branch", async () => {
     const auth = await loginAs(app, "admin");
     const response = await request(app).get("/api/branches").set(auth);
     expect(response.status).toBe(200);
     expect(response.body).toContainEqual(
-      expect.objectContaining({ id: 1, name: "الفرع الرئيسي", isActive: true }),
+      expect.objectContaining({ id: testId(1), name: "الفرع الرئيسي", isActive: true }),
     );
   });
 
@@ -95,8 +96,8 @@ describe("branch workspaces", () => {
       .set(auth)
       .send({ name: "فرع المعادي" });
     expect(created.status).toBe(201);
-    expect(created.body.id).toBeGreaterThan(1);
-    const id = created.body.id as number;
+    expect(created.body.id).toEqual(expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));
+    const id = created.body.id as string;
 
     const renamed = await request(app)
       .put(`/api/branches/${id}`)
@@ -127,8 +128,8 @@ describe("branch workspaces", () => {
     expect(created.status).toBe(201);
     const response = await request(app).get("/api/branches").set(cashier);
     expect(response.status).toBe(200);
-    expect(response.body.map((branch: { id: number }) => branch.id)).toEqual([
-      1,
+    expect(response.body.map((branch: { id: string }) => branch.id)).toEqual([
+      testId(1),
     ]);
     await request(app)
       .post("/api/branches")
@@ -152,7 +153,7 @@ describe("branch workspaces", () => {
     await request(app)
       .get("/api/orders")
       .set(auth)
-      .set("X-Branch-Id", "999999")
+      .set("X-Branch-Id", testId(999999))
       .expect(404);
     await request(app)
       .get("/api/orders")
@@ -359,13 +360,13 @@ describe("branch workspaces", () => {
       .get("/api/branches")
       .set(cashier)
       .expect(200);
-    expect(visible.body.map((row: { id: number }) => row.id)).toEqual([
+    expect(visible.body.map((row: { id: string }) => row.id)).toEqual([
       branch.body.id,
     ]);
     await request(app)
       .get("/api/orders")
       .set(cashier)
-      .set("X-Branch-Id", "1")
+      .set("X-Branch-Id", testId(1))
       .expect(403);
     const mainUsers = await request(app)
       .get("/api/users")
@@ -417,7 +418,7 @@ describe("branch workspaces", () => {
       .get("/api/employees")
       .set(other)
       .expect(200);
-    expect(retained.body.map((row: { id: number }) => row.id)).toEqual([
+    expect(retained.body.map((row: { id: string }) => row.id)).toEqual([
       employee.body.id,
     ]);
     await request(app)
@@ -635,8 +636,8 @@ describe("branch workspaces", () => {
       .get("/api/transfers")
       .set(other)
       .expect(200);
-    expect(transfer.body.transferId).toEqual(expect.any(Number));
-    expect(transfers.body.map((row: { id: number }) => row.id)).toEqual([
+    expect(transfer.body.transferId).toEqual(expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));
+    expect(transfers.body.map((row: { id: string }) => row.id)).toEqual([
       transfer.body.transferId,
     ]);
     const cafe = await request(app)
@@ -681,7 +682,7 @@ describe("branch workspaces", () => {
       .get("/api/recipes/preparations")
       .set(other)
       .expect(200);
-    expect(preparations.body.map((row: { id: number }) => row.id)).toEqual([
+    expect(preparations.body.map((row: { id: string }) => row.id)).toEqual([
       prepared.body.preparationId,
     ]);
     const mainPreparations = await request(app)

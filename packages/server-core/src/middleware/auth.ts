@@ -6,6 +6,7 @@ import { users } from "@cashier/db";
 import { HttpError } from "./error.js";
 import type { AuthUser } from "@cashier/shared";
 import { toAuthUser } from "../modules/auth/auth-user.js";
+import { idParam } from "./validation.js";
 
 declare global {
   // Express request fields are extended globally by the framework's type definitions.
@@ -79,6 +80,7 @@ export function authenticate(db: Db, jwtSecret: string) {
     let payload: AuthToken;
     try {
       payload = jwt.verify(token, jwtSecret) as AuthToken;
+      if (!idParam.safeParse(payload.id).success) throw new Error("Invalid session ID");
     } catch {
       throw new HttpError(401, "انتهت الجلسة — سجّل الدخول من جديد");
     }
@@ -90,6 +92,7 @@ export function authenticate(db: Db, jwtSecret: string) {
       .limit(1);
     if (!user?.isActive || payload.tokenVersion !== user.tokenVersion)
       throw new HttpError(401, "انتهت الجلسة — سجّل الدخول من جديد");
+
     req.user = toAuthUser(user);
     next();
   };

@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import bcrypt from "bcryptjs";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthRepository } from "../../src/modules/auth/auth.repository.js";
@@ -26,7 +27,7 @@ describe("AuthService credential work", () => {
     const storedHash = await bcrypt.hash("secret123", 4);
     const repo = {
       findByUsername: vi.fn().mockResolvedValue({
-        id: 1,
+        id: testId(1),
         name: "Inactive",
         username: "inactive",
         passwordHash: storedHash,
@@ -73,13 +74,13 @@ describe("AuthService credential work", () => {
 const JWT_SECRET = "test-only-jwt-secret-at-least-32-characters";
 
 const activeUser = (overrides: Record<string, unknown> = {}) => ({
-  id: 1,
+  id: testId(1),
   name: "Cashier",
   username: "cashier",
   passwordHash: "stored-hash",
   role: "cashier",
   isActive: true,
-  branchId: 1,
+  branchId: testId(1),
   branchIsActive: true,
   isSuperAdmin: false,
   tokenVersion: 0,
@@ -87,6 +88,9 @@ const activeUser = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("AuthService login outcomes", () => {
+
+
+
   it("returns a token and safe profile for valid credentials", async () => {
     const repo = {
       findByUsername: vi.fn().mockResolvedValue(activeUser()),
@@ -103,10 +107,10 @@ describe("AuthService login outcomes", () => {
     });
 
     expect(session.user).toEqual({
-      id: 1,
+      id: testId(1),
       name: "Cashier",
       role: "cashier",
-      branchId: 1,
+      branchId: testId(1),
       isSuperAdmin: false,
     });
     expect(typeof session.token).toBe("string");

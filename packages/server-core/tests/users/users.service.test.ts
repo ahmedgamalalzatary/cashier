@@ -1,10 +1,11 @@
+import { testId } from "@cashier/shared/test-support";
 import type { AuthUser } from "@cashier/shared";
 import { describe, expect, it, vi } from "vitest";
 import type { UsersRepository } from "../../src/modules/users/users.repository.js";
 import { UsersService } from "../../src/modules/users/users.service.js";
 
 const superAdmin: AuthUser = {
-  id: 7,
+  id: testId(7),
   name: "المدير الرئيسي",
   role: "admin",
   branchId: null,
@@ -30,7 +31,7 @@ describe("UsersService admin-management guards", () => {
       }),
     ).rejects.toMatchObject({ status: 403 });
     await expect(
-      service.update(regularAdmin, 3, { name: "x" }),
+      service.update(regularAdmin, testId(3), { name: "x" }),
     ).rejects.toMatchObject({ status: 403 });
 
     expect(repo.create).not.toHaveBeenCalled();
@@ -41,7 +42,7 @@ describe("UsersService admin-management guards", () => {
     const repo = { transaction: vi.fn() } as unknown as UsersRepository;
 
     await expect(
-      new UsersService(repo).update(superAdmin, 7, { name: "x" }),
+      new UsersService(repo).update(superAdmin, testId(7), { name: "x" }),
     ).rejects.toMatchObject({
       status: 409,
       message: "بيانات المدير الرئيسي تُدار من إعدادات الخادم",
@@ -51,7 +52,7 @@ describe("UsersService admin-management guards", () => {
 });
 
 function repoForUpdate(
-  user: { id: number; role: string; isSuperAdmin?: boolean } | undefined,
+  user: { id: string; role: string; isSuperAdmin?: boolean } | undefined,
   overrides: Record<string, unknown> = {},
 ) {
   const tx = {
@@ -74,7 +75,7 @@ describe("UsersService update guards", () => {
     const repo = repoForUpdate(undefined);
 
     await expect(
-      new UsersService(repo).update(superAdmin, 999, { name: "x" }),
+      new UsersService(repo).update(superAdmin, testId(999), { name: "x" }),
     ).rejects.toMatchObject({
       status: 404,
     });
@@ -83,22 +84,22 @@ describe("UsersService update guards", () => {
   it("409s cashier-managed accounts in either direction", async () => {
     await expect(
       new UsersService(
-        repoForUpdate({ id: 2, role: "cashier" }),
-      ).update(superAdmin, 2, { name: "x" }),
+        repoForUpdate({ id: testId(2), role: "cashier" }),
+      ).update(superAdmin, testId(2), { name: "x" }),
     ).rejects.toMatchObject({ status: 409 });
 
     await expect(
       new UsersService(
-        repoForUpdate({ id: 2, role: "admin" }),
-      ).update(superAdmin, 2, { role: "cashier" }),
+        repoForUpdate({ id: testId(2), role: "admin" }),
+      ).update(superAdmin, testId(2), { role: "cashier" }),
     ).rejects.toMatchObject({ status: 409 });
   });
 
   it("409s editing another flagged super-admin", async () => {
     await expect(
       new UsersService(
-        repoForUpdate({ id: 2, role: "admin", isSuperAdmin: true }),
-      ).update(superAdmin, 2, { name: "x" }),
+        repoForUpdate({ id: testId(2), role: "admin", isSuperAdmin: true }),
+      ).update(superAdmin, testId(2), { name: "x" }),
     ).rejects.toMatchObject({ status: 409 });
   });
 
@@ -107,7 +108,7 @@ describe("UsersService update guards", () => {
       code: "ER_DUP_ENTRY",
     });
     const repo = repoForUpdate(
-      { id: 2, role: "admin" },
+      { id: testId(2), role: "admin" },
       {
         update: vi.fn(async () => {
           throw duplicate;
@@ -116,14 +117,14 @@ describe("UsersService update guards", () => {
     );
 
     await expect(
-      new UsersService(repo).update(superAdmin, 2, { username: "taken" }),
+      new UsersService(repo).update(superAdmin, testId(2), { username: "taken" }),
     ).rejects.toMatchObject({ status: 409 });
   });
 
   it("stores a password hash instead of the plain password", async () => {
-    const repo = repoForUpdate({ id: 2, role: "admin" });
+    const repo = repoForUpdate({ id: testId(2), role: "admin" });
 
-    await new UsersService(repo).update(superAdmin, 2, {
+    await new UsersService(repo).update(superAdmin, testId(2), {
       password: "replacement-789",
     });
 

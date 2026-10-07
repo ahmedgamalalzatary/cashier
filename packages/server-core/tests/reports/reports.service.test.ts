@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it, vi } from "vitest";
 import type { ReportsRepository } from "../../src/modules/reports/reports.repository.js";
 import {
@@ -115,15 +116,15 @@ describe("ReportsService.dashboard", () => {
       dashboard: vi.fn(async () => [{ sales: "10.00" }]),
       openShifts: vi.fn(async () => []),
       stock: vi.fn(async () => [
-        { id: 1, isActive: true, quantity: "2.000", minimumLevel: "5.000" },
-        { id: 2, isActive: true, quantity: "9.000", minimumLevel: "5.000" },
-        { id: 3, isActive: false, quantity: "0.000", minimumLevel: "5.000" },
-        { id: 4, isActive: 1, quantity: "1.000", minimumLevel: "5.000" },
-        { id: 5, isActive: true, quantity: "-1.000", minimumLevel: "0.000" },
-        { id: 6, isActive: false, quantity: "-1.000", minimumLevel: "0.000" },
-        { id: 7, isActive: true, quantity: "1.000", minimumLevel: "0.000" },
-        { id: 8, isActive: true, quantity: "0.000", minimumLevel: "0.000" },
-        { id: 9, isActive: true, quantity: "5.000", minimumLevel: "5.000" },
+        { id: testId(1), isActive: true, quantity: "2.000", minimumLevel: "5.000" },
+        { id: testId(2), isActive: true, quantity: "9.000", minimumLevel: "5.000" },
+        { id: testId(3), isActive: false, quantity: "0.000", minimumLevel: "5.000" },
+        { id: testId(4), isActive: 1, quantity: "1.000", minimumLevel: "5.000" },
+        { id: testId(5), isActive: true, quantity: "-1.000", minimumLevel: "0.000" },
+        { id: testId(6), isActive: false, quantity: "-1.000", minimumLevel: "0.000" },
+        { id: testId(7), isActive: true, quantity: "1.000", minimumLevel: "0.000" },
+        { id: testId(8), isActive: true, quantity: "0.000", minimumLevel: "0.000" },
+        { id: testId(9), isActive: true, quantity: "5.000", minimumLevel: "5.000" },
       ]),
     } as unknown as ReportsRepository;
 
@@ -131,7 +132,7 @@ describe("ReportsService.dashboard", () => {
 
     expect(dashboard.summary).toEqual({ sales: "10.00" });
     expect(dashboard.openShifts).toEqual([]);
-    expect(dashboard.stock.map((row) => row.id)).toEqual([1, 4, 5, 9]);
+    expect(dashboard.stock.map((row) => row.id)).toEqual([testId(1), testId(4), testId(5), testId(9)]);
   });
 
   it("does not flag an item that has no minimum level set", async () => {
@@ -139,13 +140,13 @@ describe("ReportsService.dashboard", () => {
       dashboard: vi.fn(async () => []),
       openShifts: vi.fn(async () => []),
       stock: vi.fn(async () => [
-        { id: 1, isActive: true, quantity: "0.000", minimumLevel: "0.000" },
-        { id: 2, isActive: true, quantity: "0.000", minimumLevel: "5.000" },
+        { id: testId(1), isActive: true, quantity: "0.000", minimumLevel: "0.000" },
+        { id: testId(2), isActive: true, quantity: "0.000", minimumLevel: "5.000" },
       ]),
     } as unknown as ReportsRepository;
 
     const dashboard = await new ReportsService(repo).dashboard();
 
-    expect(dashboard.stock.map((row) => row.id)).toEqual([2]);
+    expect(dashboard.stock.map((row) => row.id)).toEqual([testId(2)]);
   });
 });

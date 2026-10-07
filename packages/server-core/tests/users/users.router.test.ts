@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -11,7 +12,7 @@ function appWithStubs(controller: UsersController) {
   const app = express();
   app.use((req, _res, next) => {
     req.user = {
-      id: 7,
+      id: testId(7),
       name: "Admin",
       role: "admin",
       branchId: null,
@@ -28,7 +29,7 @@ describe("user routes", () => {
   it("dispatches list, create, and update to the controller", async () => {
     const controller = {
       list: vi.fn((_req, res) => res.json([])),
-      create: vi.fn((_req, res) => res.status(201).json({ id: 3 })),
+      create: vi.fn((_req, res) => res.status(201).json({ id: testId(3) })),
       update: vi.fn((_req, res) => res.json({ ok: true })),
     } as unknown as UsersController;
     const app = appWithStubs(controller);
@@ -41,7 +42,7 @@ describe("user routes", () => {
         role: "admin",
         password: "password-123",
       }),
-      request(app).put("/3").send({ name: "جديد" }),
+      request(app).put("/00000000-0000-7000-8000-000000000003").send({ name: "جديد" }),
     ]);
 
     expect(list.status).toBe(200);
@@ -56,7 +57,7 @@ describe("user routes", () => {
 describe("user controller wiring", () => {
   it("creates with the parsed body and updates with actor, id, and changes", async () => {
     const service = {
-      create: vi.fn(async () => 3),
+      create: vi.fn(async () => testId(3)),
       update: vi.fn(async () => undefined),
     } as unknown as UsersService;
     const app = appWithStubs(new RealUsersController(service));
@@ -68,13 +69,13 @@ describe("user controller wiring", () => {
       password: "password-123",
     });
     expect(created.status).toBe(201);
-    expect(created.body).toEqual({ id: 3 });
+    expect(created.body).toEqual({ id: testId(3) });
 
-    const updated = await request(app).put("/3").send({ name: "جديد" });
+    const updated = await request(app).put("/00000000-0000-7000-8000-000000000003").send({ name: "جديد" });
     expect(updated.status).toBe(200);
     expect(service.update).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 7, isSuperAdmin: true }),
-      3,
+      expect.objectContaining({ id: testId(7), isSuperAdmin: true }),
+      testId(3),
       { name: "جديد" },
     );
   });
@@ -87,7 +88,7 @@ describe("user controller wiring", () => {
     } as unknown as UsersService;
     const app = appWithStubs(new RealUsersController(service));
 
-    expect((await request(app).put("/3").send({})).status).toBe(400);
+    expect((await request(app).put("/00000000-0000-7000-8000-000000000003").send({})).status).toBe(400);
     expect((await request(app).put("/abc").send({ name: "x" })).status).toBe(
       400,
     );
@@ -102,7 +103,7 @@ describe("user controller wiring", () => {
       ).status,
     ).toBe(400);
 
-    const missing = await request(app).put("/999").send({ name: "x" });
+    const missing = await request(app).put("/00000000-0000-7000-8000-0000000003e7").send({ name: "x" });
     expect(missing.status).toBe(404);
   });
 });

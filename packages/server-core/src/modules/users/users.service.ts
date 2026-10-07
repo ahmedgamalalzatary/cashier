@@ -34,7 +34,7 @@ export class UsersService {
     }
   }
 
-  async update(actor: AuthUser, id: number, data: UserUpdateInput) {
+  async update(actor: AuthUser, id: string, data: UserUpdateInput) {
     if (!actor.isSuperAdmin) throw new HttpError(403, SUPER_ADMIN_ONLY);
     if (id === actor.id) throw new HttpError(409, SUPER_ADMIN_MANAGED);
     const passwordHash = data.password

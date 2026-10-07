@@ -10,7 +10,7 @@ const safeUserColumns = {
   username: users.username,
   role: users.role,
   branchId: sql<
-    number | null
+    string | null
   >`CASE WHEN ${users.role}='cashier' THEN ${users.branchId} ELSE NULL END`,
   isActive: users.isActive,
   isSuperAdmin: users.isSuperAdmin,
@@ -34,7 +34,7 @@ export class UsersRepository {
       .orderBy(users.name);
   }
 
-  async findByIdForUpdate(id: number) {
+  async findByIdForUpdate(id: string) {
     const [row] = await this.db
       .select()
       .from(users)
@@ -54,12 +54,12 @@ export class UsersRepository {
       username: data.username,
       role: data.role,
       passwordHash,
-    });
-    return result.insertId;
+    }).$returningId();
+    return result.id;
   }
 
   async update(
-    id: number,
+    id: string,
     data: Omit<UserUpdateInput, "password"> & { passwordHash?: string },
   ) {
     await this.db

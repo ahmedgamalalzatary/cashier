@@ -29,14 +29,12 @@ export class BranchesRepository {
       action(new BranchesRepository(tx as unknown as Db)),
     );
   }
-  list(branchId?: number) {
-    return this.db
-      .select()
-      .from(branches)
+  list(branchId?: string) {
+    return this.db.select().from(branches)
       .where(branchId === undefined ? undefined : eq(branches.id, branchId))
       .orderBy(asc(branches.id));
   }
-  async get(id: number) {
+  async get(id: string) {
     const [row] = await this.db
       .select()
       .from(branches)
@@ -50,7 +48,7 @@ export class BranchesRepository {
       .orderBy(asc(branches.id))
       .for("update");
   }
-  async hasOpenShift(id: number) {
+  async hasOpenShift(id: string) {
     const [row] = await this.db
       .select({ id: shifts.id })
       .from(shifts)
@@ -60,10 +58,10 @@ export class BranchesRepository {
     return !!row;
   }
   async create(input: BranchInput) {
-    const [result] = await this.db.insert(branches).values(input);
-    return result.insertId;
+    const [result] = await this.db.insert(branches).values(input).$returningId();
+    return result.id;
   }
-  async copyCatalog(branchId: number) {
+  async copyCatalog(branchId: string) {
     const [source] = await this.db
       .select({
         branchId: externalCatalogSync.branchId,
@@ -109,7 +107,7 @@ export class BranchesRepository {
       lastAttemptAt: source.lastSuccessfulSyncAt,
     });
   }
-  async update(id: number, input: BranchUpdateInput) {
+  async update(id: string, input: BranchUpdateInput) {
     await this.db.update(branches).set(input).where(eq(branches.id, id));
     if (input.isActive === false) {
       await this.db

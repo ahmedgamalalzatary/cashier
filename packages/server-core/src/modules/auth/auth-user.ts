@@ -1,10 +1,10 @@
 import type { AuthUser } from "@cashier/shared";
 
 type AuthUserRow = {
-  id: number;
+  id: string;
   name: string;
   role: AuthUser["role"];
-  branchId: number;
+  branchId: string | null;
   isSuperAdmin: boolean;
 };
 

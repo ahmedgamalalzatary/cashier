@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -15,7 +16,7 @@ describe("reports route authorization", () => {
     } as unknown as ReportsController;
     const app = express();
     app.use((req, _res, next) => {
-      req.user = { id: 1, name: "Cashier", role: "cashier" };
+      req.user = { id: testId(1), name: "Cashier", role: "cashier" };
       next();
     });
     app.use(reportsRouter(controller));
