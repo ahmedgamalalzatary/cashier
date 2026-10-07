@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import type { Db } from "./db/index.js";
+import type { Db } from "@cashier/db";
 import { errorHandler } from "./middleware/error.js";
 import { authenticate, requireRole } from "./middleware/auth.js";
 import { createAuthModule } from "./modules/auth/auth.module.js";

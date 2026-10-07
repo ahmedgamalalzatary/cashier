@@ -2,14 +2,14 @@ import {
   branchCondition,
   branchValues,
   branchTransaction,
-} from "../../db/branch-context.js";
+} from "@cashier/db";
 import { and, eq, sql } from "drizzle-orm";
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import {
   purchaseInvoices,
   supplierPayments,
   suppliers,
-} from "../../db/schema.js";
+} from "@cashier/db";
 import type {
   PaymentInput,
   SupplierInput,

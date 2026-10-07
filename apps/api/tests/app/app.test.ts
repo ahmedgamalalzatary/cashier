@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../src/app.js';
-import type { Db } from '../../src/db/index.js';
+import type { Db } from '@cashier/db';
 import { signToken } from '../../src/middleware/auth.js';
 
 const db = {} as Db;

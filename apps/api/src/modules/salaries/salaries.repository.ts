@@ -2,16 +2,16 @@ import {
   branchCondition,
   branchValues,
   branchTransaction,
-} from "../../db/branch-context.js";
+} from "@cashier/db";
 import { and, asc, desc, eq, gte, lt, sql } from "drizzle-orm";
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import {
   employees,
   salaryAdjustments,
   salaryAdvances,
   salaryPayments,
   users,
-} from "../../db/schema.js";
+} from "@cashier/db";
 import type { AdjustmentInput, AdvanceInput } from "./salaries.schemas.js";
 
 const advanceColumns = {

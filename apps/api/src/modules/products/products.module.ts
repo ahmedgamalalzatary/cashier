@@ -1,5 +1,5 @@
 import type { RequestHandler } from "express";
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import { ProductsController } from "./products.controller.js";
 import { ProductsRepository } from "./products.repository.js";
 import { productsRouter } from "./products.router.js";

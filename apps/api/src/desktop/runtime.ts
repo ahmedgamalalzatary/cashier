@@ -4,8 +4,7 @@ import { hostname } from "node:os";
 import type { Server } from "node:http";
 import type { RowDataPacket } from "mysql2/promise";
 import { createApp } from "../app.js";
-import { closeDb, createDb, type Db } from "../db/index.js";
-import { syncConfiguredAdmin } from "../db/seed-admin.js";
+import { closeDb, createDb, syncConfiguredAdmin, type Db } from "@cashier/db";
 import {
   createCacheRefreshService,
   refreshActiveBranches,

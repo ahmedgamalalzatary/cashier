@@ -1,7 +1,7 @@
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import { eq } from "drizzle-orm";
-import { branches } from "../../db/schema.js";
-import { withBranch } from "../../db/branch-context.js";
+import { branches } from "@cashier/db";
+import { withBranch } from "@cashier/db";
 import {
   ExternalOrdersClient,
   type ExternalOrdersConfig,

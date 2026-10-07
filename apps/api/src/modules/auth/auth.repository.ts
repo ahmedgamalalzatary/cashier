@@ -1,6 +1,6 @@
 import { eq, getTableColumns } from "drizzle-orm";
-import type { Db } from "../../db/index.js";
-import { branches, users } from "../../db/schema.js";
+import type { Db } from "@cashier/db";
+import { branches, users } from "@cashier/db";
 
 export class AuthRepository {
   constructor(private db: Db) {}

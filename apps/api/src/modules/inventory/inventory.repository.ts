@@ -3,16 +3,16 @@ import {
   branchValues,
   branchTable,
   branchTransaction,
-} from "../../db/branch-context.js";
+} from "@cashier/db";
 import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import {
   categories,
   items,
   stockBatches,
   stockDeficitAllocations,
   stockMovements,
-} from "../../db/schema.js";
+} from "@cashier/db";
 import type { ItemType, Warehouse } from "@cashier/shared";
 export type { Warehouse } from "@cashier/shared";
 

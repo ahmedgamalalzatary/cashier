@@ -1,4 +1,4 @@
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import { StocktakesController } from "./stocktakes.controller.js";
 import { StocktakesRepository } from "./stocktakes.repository.js";
 import { stocktakesRouter } from "./stocktakes.router.js";

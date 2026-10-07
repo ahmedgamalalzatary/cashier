@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Db } from "../../src/db/index.js";
+import type { Db } from "@cashier/db";
 import { verifyDesktopSchema } from "../../src/desktop/runtime.js";
 
 function database(createdAt: number | null) {

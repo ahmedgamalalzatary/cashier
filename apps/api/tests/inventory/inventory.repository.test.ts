@@ -1,9 +1,9 @@
 import { drizzle } from "drizzle-orm/mysql-proxy";
 import { describe, expect, it } from "vitest";
-import type { Db } from "../../src/db/index.js";
-import * as schema from "../../src/db/schema.js";
+import type { Db } from "@cashier/db";
+import * as schema from "@cashier/db";
 import { InventoryRepository } from "../../src/modules/inventory/inventory.repository.js";
-import { withBranch } from "../../src/db/branch-context.js";
+import { withBranch } from "@cashier/db";
 
 function proxyDb() {
   return drizzle(async () => ({ rows: [] }), {

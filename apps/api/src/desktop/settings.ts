@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { parse } from "dotenv";
 import { parseRuntimeEnv } from "../env.js";
-import { getAdminSeedConfig } from "../db/seed-config.js";
+import { getAdminSeedConfig } from "@cashier/db";
 
 export const desktopOrigins = [
   "http://localhost:3000",

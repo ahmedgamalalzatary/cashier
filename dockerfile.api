@@ -9,25 +9,29 @@ WORKDIR /app
 FROM pnpm AS dependencies
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
+COPY packages/db/package.json packages/db/package.json
 COPY packages/shared/package.json packages/shared/package.json
 RUN pnpm install --frozen-lockfile --filter @cashier/api...
 
 FROM dependencies AS build
 COPY tsconfig.base.json ./
 COPY apps/api ./apps/api
+COPY packages/db ./packages/db
 COPY packages/shared ./packages/shared
 RUN pnpm --filter @cashier/api build
 
 FROM dependencies AS migrate
 COPY tsconfig.base.json ./
 COPY apps/api ./apps/api
+COPY packages/db ./packages/db
 COPY packages/shared ./packages/shared
-WORKDIR /app/apps/api
+WORKDIR /app/packages/db
 CMD ["pnpm", "db:migrate"]
 
 FROM pnpm AS production-dependencies
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
+COPY packages/db/package.json packages/db/package.json
 COPY packages/shared/package.json packages/shared/package.json
 RUN pnpm install --frozen-lockfile --prod --filter @cashier/api...
 
@@ -36,6 +40,9 @@ ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=production-dependencies /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=production-dependencies /app/packages/db/node_modules ./packages/db/node_modules
+COPY --from=production-dependencies /app/packages/shared/node_modules ./packages/shared/node_modules
+COPY --from=build /app/packages/db ./packages/db
 COPY --from=build /app/packages/shared ./packages/shared
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY apps/api/package.json ./apps/api/package.json

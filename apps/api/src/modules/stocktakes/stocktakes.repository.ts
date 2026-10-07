@@ -3,17 +3,17 @@ import {
   branchValues,
   branchTable,
   branchTransaction,
-} from "../../db/branch-context.js";
+} from "@cashier/db";
 import { and, asc, desc, eq, or, sql } from "drizzle-orm";
 import type { Warehouse } from "@cashier/shared";
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import {
   categories,
   items,
   stocktakeLines,
   stocktakes,
   users,
-} from "../../db/schema.js";
+} from "@cashier/db";
 import { InventoryRepository } from "../inventory/inventory.repository.js";
 import { InventoryTransaction } from "../inventory/inventory.service.js";
 import { HttpError } from "../../middleware/error.js";

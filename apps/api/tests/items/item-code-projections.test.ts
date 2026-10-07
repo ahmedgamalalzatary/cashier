@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/mysql-proxy";
 import { describe, expect, it } from "vitest";
-import type { Db } from "../../src/db/index.js";
-import * as schema from "../../src/db/schema.js";
+import type { Db } from "@cashier/db";
+import * as schema from "@cashier/db";
 import { ItemsRepository } from "../../src/modules/items/items.repository.js";
 import { OrdersRepository } from "../../src/modules/orders/orders.repository.js";
 import { PurchasesRepository } from "../../src/modules/purchases/purchases.repository.js";

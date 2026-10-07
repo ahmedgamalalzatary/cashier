@@ -1,4 +1,4 @@
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import { SalariesController } from "./salaries.controller.js";
 import { SalariesRepository } from "./salaries.repository.js";
 import { salariesRouter } from "./salaries.router.js";

@@ -2,11 +2,11 @@ import {
   branchCondition,
   branchValues,
   currentBranchId,
-} from "../../db/branch-context.js";
+} from "@cashier/db";
 import { and, eq, lte, sql } from "drizzle-orm";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import type { Db } from "../../db/index.js";
-import { externalCatalogSync } from "../../db/schema.js";
+import type { Db } from "@cashier/db";
+import { externalCatalogSync } from "@cashier/db";
 import type { CacheRefreshStateStore } from "./cache-refresh.service.js";
 
 export class CacheRefreshRepository implements CacheRefreshStateStore {

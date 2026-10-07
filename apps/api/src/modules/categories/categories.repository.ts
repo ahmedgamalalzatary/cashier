@@ -3,10 +3,10 @@ import {
   branchValues,
   branchTable,
   branchTransaction,
-} from "../../db/branch-context.js";
+} from "@cashier/db";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
-import type { Db } from "../../db/index.js";
-import { categories, items, recipes } from "../../db/schema.js";
+import type { Db } from "@cashier/db";
+import { categories, items, recipes } from "@cashier/db";
 
 export class CategoriesRepository {
   constructor(private db: Db) {}

@@ -1,7 +1,7 @@
 import { and, eq, or, sql } from "drizzle-orm";
-import { currentBranchId } from "../../db/branch-context.js";
-import type { Db } from "../../db/index.js";
-import { users } from "../../db/schema.js";
+import { currentBranchId } from "@cashier/db";
+import type { Db } from "@cashier/db";
+import { users } from "@cashier/db";
 import type { UserInput, UserUpdateInput } from "./users.schemas.js";
 
 const safeUserColumns = {

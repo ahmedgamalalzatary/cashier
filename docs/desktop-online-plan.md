@@ -135,9 +135,9 @@ Status: ☐ todo · ◐ in progress · ☑ done. Write the date when done.
 
 | Phase                | Slice                                                             | Status | Done on | Notes |
 | -------------------- | ----------------------------------------------------------------- | ------ | ------- | ----- |
-| 1 DB package         | 1.1 create `packages/db`, move schema/client/branch-context/seeds | ☐      |         |       |
-|                      | 1.2 move migrations + drizzle config, api uses package            | ☐      |         |       |
-|                      | 1.3 desktop prepare/smoke + Docker files use package              | ☐      |         |       |
+| 1 DB package         | 1.1 create `packages/db`, move schema/client/branch-context/seeds | ☑      | 2026-10-07 | `HttpError` moved to the package; api re-exports it |
+|                      | 1.2 move migrations + drizzle config, api uses package            | ☑      | 2026-10-07 | `db:*` scripts live in `packages/db`; api keeps `db:seed` |
+|                      | 1.3 desktop prepare/smoke + Docker files use package              | ☑      | 2026-10-07 | all MySQL tests now live in `packages/db/tests/mysql` |
 | 2 Server core        | 2.1 `packages/server-core`: middleware (error, validation, auth)  | ☐      |         |       |
 |                      | 2.2 move auth module                                              | ☐      |         |       |
 |                      | 2.3 move reports module                                           | ☐      |         |       |
@@ -535,15 +535,21 @@ reports (shared), admins page + branches page + link code generation + devices/l
 
 | Area                       | Command                                                                                  | Where tests live                          |
 | -------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------- |
-| DB package (after Phase 1) | `pnpm --filter @cashier/db test`, `pnpm --filter @cashier/db db:generate`                | `packages/db/tests`                       |
-| API                        | `pnpm --filter @cashier/api test` (unit + MySQL config)                                  | `apps/api/tests/**`                       |
+| DB package (after Phase 1) | `pnpm --filter @cashier/db test` (unit + MySQL config), `pnpm --filter @cashier/db db:generate` | `packages/db/tests/**` (every MySQL test, incl. the API's) |
+| API                        | `pnpm --filter @cashier/api test` (unit only; MySQL tests moved to `@cashier/db`)        | `apps/api/tests/**`                       |
 | Online API                 | `pnpm --filter @cashier/online-api test`                                                 | `apps/online-api/tests/**`                |
 | Web / online-web           | `pnpm --filter @cashier/web test`, `pnpm --filter @cashier/online-web test`              | `*/tests/**`                              |
 | Desktop                    | `pnpm test:desktop`, `pnpm lint:desktop`, `pnpm typecheck:desktop`, `pnpm smoke:desktop` | `apps/desktop/tests`, Rust `#[cfg(test)]` |
 
-MySQL tests use the `*_test` database from `.env.test`. Sync tests need two databases at once:
+MySQL tests use the `*_test` database from `.env.test` and all of them live in
+`packages/db/tests/mysql` (they exercise the API through a real database, and one
+package now owns the schema, its migrations, and its test database lifecycle).
+`packages/db/tests/support` holds the shared fixtures: `database.ts` (connection +
+table cleanup), `test-env.ts` (`.env.test` loading + migrations), and
+`api-setup.ts` / `api-helpers.ts` (Express app options and user fixtures).
+Sync tests need two databases at once:
 `cashier_test` (PC) and `cashier_online_test` (online). Add the second one to `.env.test` and
-`tests/global-setup.ts` in Phase 10.
+`packages/db/tests/mysql-setup.ts` in Phase 10.
 
 Each phase writes tests **first** for its acceptance line (red → green), then keeps the old
 tests green. Phases 1–3 add no new behavior, so their proof is that the existing tests pass

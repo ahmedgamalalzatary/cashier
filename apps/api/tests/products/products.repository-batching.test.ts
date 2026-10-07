@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/mysql-proxy";
 import { describe, expect, it } from "vitest";
-import type { Db } from "../../src/db/index.js";
-import * as schema from "../../src/db/schema.js";
+import type { Db } from "@cashier/db";
+import * as schema from "@cashier/db";
 import { ProductsRepository } from "../../src/modules/products/products.repository.js";
 
 const INSERT_CHUNK_SIZE = 250;

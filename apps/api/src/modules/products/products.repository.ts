@@ -2,9 +2,9 @@ import {
   branchCondition,
   branchValues,
   branchTransaction,
-} from "../../db/branch-context.js";
+} from "@cashier/db";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import {
   externalCatalogSync,
   externalCategories,
@@ -17,7 +17,7 @@ import {
   externalSizeIngredients,
   categories,
   items,
-} from "../../db/schema.js";
+} from "@cashier/db";
 import type { ExternalCatalog } from "../external/external-catalog.client.js";
 import { HttpError } from "../../middleware/error.js";
 import type { ProductStockSetupInput } from "./products.schemas.js";

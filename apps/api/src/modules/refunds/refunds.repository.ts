@@ -2,9 +2,9 @@ import {
   branchCondition,
   branchValues,
   branchTransaction,
-} from "../../db/branch-context.js";
+} from "@cashier/db";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import {
   items,
   orderLineAllocations,
@@ -16,7 +16,7 @@ import {
   shifts,
   users,
   wasteEntries,
-} from "../../db/schema.js";
+} from "@cashier/db";
 import { InventoryRepository } from "../inventory/inventory.repository.js";
 import { InventoryTransaction } from "../inventory/inventory.service.js";
 

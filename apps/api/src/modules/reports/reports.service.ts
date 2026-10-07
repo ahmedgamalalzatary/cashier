@@ -1,6 +1,6 @@
 import type { ReportRange } from "./reports.schemas.js";
 import type { ReportsRepository } from "./reports.repository.js";
-import { currentBranchId } from "../../db/branch-context.js";
+import { currentBranchId } from "@cashier/db";
 
 const cairoDate = () =>
   new Intl.DateTimeFormat("en-CA", {

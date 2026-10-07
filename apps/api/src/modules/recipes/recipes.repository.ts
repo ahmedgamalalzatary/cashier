@@ -3,10 +3,10 @@ import {
   branchValues,
   branchTable,
   branchTransaction,
-} from "../../db/branch-context.js";
+} from "@cashier/db";
 import { asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import {
   categories,
   items,
@@ -17,7 +17,7 @@ import {
   recipeSizes,
   stockBatches,
   users,
-} from "../../db/schema.js";
+} from "@cashier/db";
 import { InventoryRepository } from "../inventory/inventory.repository.js";
 import { InventoryTransaction } from "../inventory/inventory.service.js";
 

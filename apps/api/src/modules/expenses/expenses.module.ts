@@ -1,5 +1,5 @@
 import type { RequestHandler } from "express";
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import { ExpensesController } from "./expenses.controller.js";
 import { ExpensesRepository } from "./expenses.repository.js";
 import { expensesRouter } from "./expenses.router.js";

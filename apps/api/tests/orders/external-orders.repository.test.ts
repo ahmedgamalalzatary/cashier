@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/mysql-proxy";
 import { describe, expect, it } from "vitest";
-import type { Db } from "../../src/db/index.js";
+import type { Db } from "@cashier/db";
 import { ExternalOrdersRepository } from "../../src/modules/orders/external-orders.repository.js";
 
 describe("ExternalOrdersRepository search", () => {

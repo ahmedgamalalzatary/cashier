@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
-import { closeDb, createDb } from "./db/index.js";
+import { closeDb, createDb } from "@cashier/db";
 import { loadRuntimeEnv } from "./env.js";
 import { runRefreshLoop } from "./modules/external/worker-loop.js";
 import {

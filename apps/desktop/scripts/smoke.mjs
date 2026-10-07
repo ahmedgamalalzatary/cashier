@@ -24,7 +24,7 @@ if (
 const testPool = mysql.createPool({ uri: source.DATABASE_URL, timezone: "Z" });
 try {
   await migrate(drizzle(testPool), {
-    migrationsFolder: path.join(root, "apps/api/drizzle"),
+    migrationsFolder: path.join(root, "packages/db/drizzle"),
   });
 } finally {
   await testPool.end();

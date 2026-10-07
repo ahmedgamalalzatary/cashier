@@ -1,4 +1,4 @@
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import { WasteController } from "./waste.controller.js";
 import { WasteRepository } from "./waste.repository.js";
 import { wasteRouter } from "./waste.router.js";

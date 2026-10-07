@@ -1,7 +1,7 @@
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-import type { Db } from "../../src/db/index.js";
+import type { Db } from "@cashier/db";
 import { errorHandler } from "../../src/middleware/error.js";
 import type { AuthController } from "../../src/modules/auth/auth.controller.js";
 import { AuthController as RealAuthController } from "../../src/modules/auth/auth.controller.js";

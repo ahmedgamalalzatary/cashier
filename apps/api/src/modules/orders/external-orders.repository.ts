@@ -1,8 +1,8 @@
-import { branchCondition, branchValues } from "../../db/branch-context.js";
+import { branchCondition, branchValues } from "@cashier/db";
 import type { ExternalOrderSummary } from "@cashier/shared";
 import { and, desc, like, or, sql, type SQL } from "drizzle-orm";
-import type { Db } from "../../db/index.js";
-import { externalOrdersCache } from "../../db/schema.js";
+import type { Db } from "@cashier/db";
+import { externalOrdersCache } from "@cashier/db";
 
 const CHUNK_SIZE = 250;
 

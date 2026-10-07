@@ -1,6 +1,6 @@
-import { branchTable } from "../../db/branch-context.js";
+import { branchTable } from "@cashier/db";
 import { sql, type SQL } from "drizzle-orm";
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 
 export class ReportsRepository {
   constructor(private db: Db) {}

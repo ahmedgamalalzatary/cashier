@@ -8,9 +8,10 @@ Full specification: [docs/system-specs.md](docs/system-specs.md).
 ```
 apps/
   web/        Next.js frontend (Arabic RTL, Tailwind)
-  api/        Express.js REST API (TypeScript, Drizzle ORM, MySQL)
+  api/        Express.js REST API (TypeScript, MySQL)
   desktop/    Tauri frontend + bundled local API/Node runtime
 packages/
+  db/         Schema, migrations, branch scoping, admin seeding (Drizzle ORM)
   shared/     Types/utilities shared between web and api
 ```
 
@@ -51,11 +52,16 @@ cp .env.example .env   # then edit DATABASE_URL, JWT_SECRET and deployment origi
 | `pnpm typecheck`                               | TypeScript and Rust checks across workspaces (`turbo run typecheck`)    |
 | `pnpm format`                                  | Prettier write                                                          |
 
-### Database (run in `apps/api`)
+### Database (run in `packages/db`)
 
-| Command            | What it does                                    |
-| ------------------ | ----------------------------------------------- |
-| `pnpm db:generate` | Generate SQL migrations from `src/db/schema.ts` |
-| `pnpm db:migrate`  | Apply migrations                                |
-| `pnpm db:push`     | Push schema directly (dev only)                 |
-| `pnpm db:studio`   | Browse the database in Drizzle Studio           |
+| Command                                    | What it does                                        |
+| ------------------------------------------ | --------------------------------------------------- |
+| `pnpm --filter @cashier/db db:generate`    | Generate SQL migrations from `src/schema.ts`         |
+| `pnpm --filter @cashier/db db:migrate`     | Apply migrations                                     |
+| `pnpm --filter @cashier/db db:push`        | Push schema directly (dev only)                      |
+| `pnpm --filter @cashier/db db:studio`      | Browse the database in Drizzle Studio                |
+| `pnpm --filter @cashier/api db:seed`       | Create the configured admin user if none exists      |
+
+The schema, migrations, branch scoping and admin seeding live in
+`packages/db`, so every API in the repo uses the same tables and the same
+migration history.

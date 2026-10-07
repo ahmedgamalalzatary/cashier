@@ -1,0 +1,51 @@
+{
+  "name": "@cashier/db",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./test-support": {
+      "types": "./tests/support/index.ts",
+      "default": "./tests/support/index.ts"
+    },
+    "./test-support/env": {
+      "types": "./tests/support/test-env.ts",
+      "default": "./tests/support/test-env.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests && vitest run --config vitest.mysql.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src tests",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "dotenv": "^16.5.0",
+    "drizzle-orm": "^0.43.1",
+    "mysql2": "^3.14.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.15.0",
+    "@types/supertest": "^6.0.3",
+    "drizzle-kit": "^0.31.1",
+    "eslint": "^9.27.0",
+    "express": "^5.1.0",
+    "supertest": "^7.1.1",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.32.0",
+    "vitest": "^3.1.4",
+    "zod": "^3.25.0"
+  }
+}

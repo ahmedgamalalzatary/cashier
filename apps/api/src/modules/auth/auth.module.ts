@@ -1,4 +1,4 @@
-import type { Db } from '../../db/index.js';
+import type { Db } from '@cashier/db';
 import { AuthRepository } from './auth.repository.js';
 import { AuthService } from './auth.service.js';
 import { AuthController } from './auth.controller.js';

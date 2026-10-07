@@ -21,7 +21,7 @@ Reviewer: Claude (reviews every phase before it is accepted).
 - Commands:
   - API unit: `pnpm --filter @cashier/api test` · API DB tests: `pnpm --filter @cashier/api exec vitest run -c vitest.mysql.config.ts`
   - Web: `pnpm --filter @cashier/web test` · typecheck: `pnpm typecheck` · lint: `pnpm lint` · build: `pnpm build`
-- New migrations: edit `apps/api/src/db/schema.ts`, then `pnpm --filter @cashier/api db:generate`. Never hand-edit old migrations.
+- New migrations: edit `packages/db/src/schema.ts`, then `pnpm --filter @cashier/db db:generate`. Never hand-edit old migrations.
 - Shared types live in `packages/shared/src/types.ts` (rebuild shared before web/api typecheck).
 - Update `docs/system-specs.md` in the same phase whenever a rule changes (permission matrix, payroll, transfers…).
 
@@ -81,7 +81,7 @@ cashier = as today, BUT cannot change his own password (only an admin sets it)
 ```
 
 ### 2.1 Schema
-- `apps/api/src/db/schema.ts` → `users`: add `isSuperAdmin: boolean("is_super_admin").notNull().default(false)`.
+- `packages/db/src/schema.ts` → `users`: add `isSuperAdmin: boolean("is_super_admin").notNull().default(false)`.
 - Generate migration.
 
 ### 2.2 Shared types
@@ -228,7 +228,7 @@ invoice page never shows what already went to the cafe.
 ## 5. Phase 5 — Payroll: monthly only (D2) + wrong reason label (B4) — backend + web, TDD
 
 ### 5.1 Remove daily / hourly (D2)
-- Schema `apps/api/src/db/schema.ts` `employees`: drop `payType` (`pay_type` enum monthly/daily/hourly, ~L57).
+- Schema `packages/db/src/schema.ts` `employees`: drop `payType` (`pay_type` enum monthly/daily/hourly, ~L57).
   Keep `payRate` as **the monthly salary** (nullable = "not set yet").
 - Migration (generated), with one data step **before** dropping the column: `UPDATE employees SET pay_rate = NULL
   WHERE pay_type <> 'monthly'` — a daily/hourly rate is not a monthly salary, so the admin re-enters it. (Test data only.)

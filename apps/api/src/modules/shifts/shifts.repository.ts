@@ -2,9 +2,9 @@ import {
   branchCondition,
   branchValues,
   branchTransaction,
-} from "../../db/branch-context.js";
+} from "@cashier/db";
 import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import {
   employees,
   expenses,
@@ -15,7 +15,7 @@ import {
   transferRequests,
   users,
   wasteEntries,
-} from "../../db/schema.js";
+} from "@cashier/db";
 
 const shiftColumns = {
   id: shifts.id,

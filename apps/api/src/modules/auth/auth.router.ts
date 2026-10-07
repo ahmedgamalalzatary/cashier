@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authenticate } from "../../middleware/auth.js";
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import type { AuthController } from "./auth.controller.js";
 import { createLoginRateLimiter } from "./login-rate-limit.js";
 

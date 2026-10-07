@@ -1,8 +1,8 @@
 import type { Request, Response, NextFunction } from "express";
 import { eq } from "drizzle-orm";
-import type { Db } from "../db/index.js";
-import { branches } from "../db/schema.js";
-import { withBranch } from "../db/branch-context.js";
+import type { Db } from "@cashier/db";
+import { branches } from "@cashier/db";
+import { withBranch } from "@cashier/db";
 import { HttpError } from "./error.js";
 
 export function selectBranch(db: Db) {

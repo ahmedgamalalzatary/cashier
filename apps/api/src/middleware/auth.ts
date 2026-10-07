@@ -1,8 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { eq } from "drizzle-orm";
-import type { Db } from "../db/index.js";
-import { users } from "../db/schema.js";
+import type { Db } from "@cashier/db";
+import { users } from "@cashier/db";
 import { HttpError } from "./error.js";
 import type { AuthUser } from "@cashier/shared";
 import { toAuthUser } from "../modules/auth/auth-user.js";

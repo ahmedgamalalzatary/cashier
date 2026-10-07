@@ -1,4 +1,4 @@
-import type { Db } from '../../db/index.js';
+import type { Db } from '@cashier/db';
 import { CategoriesRepository } from './categories.repository.js';
 import { CategoriesService } from './categories.service.js';
 import { CategoriesController } from './categories.controller.js';

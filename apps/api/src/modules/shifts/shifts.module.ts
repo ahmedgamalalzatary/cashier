@@ -1,4 +1,4 @@
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import { ShiftsController } from "./shifts.controller.js";
 import { ShiftsRepository } from "./shifts.repository.js";
 import { shiftsRouter } from "./shifts.router.js";

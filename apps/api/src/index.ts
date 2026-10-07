@@ -1,8 +1,6 @@
 import { loadRuntimeEnv } from './env.js';
 import { createApp } from './app.js';
-import { createDb } from './db/index.js';
-import { getAdminSeedConfig } from './db/seed-config.js';
-import { syncConfiguredAdmin } from './db/seed-admin.js';
+import { createDb, getAdminSeedConfig, syncConfiguredAdmin } from '@cashier/db';
 
 const environment = loadRuntimeEnv();
 const db = createDb(environment.DATABASE_URL);

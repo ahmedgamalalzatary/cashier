@@ -1,5 +1,5 @@
 import { Router } from "express";
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import { requireRole } from "../../middleware/auth.js";
 import { idParam } from "../../middleware/validation.js";
 import { BranchesRepository } from "./branches.repository.js";

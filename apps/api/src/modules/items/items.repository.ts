@@ -3,9 +3,9 @@ import {
   branchValues,
   branchTable,
   branchTransaction,
-} from "../../db/branch-context.js";
+} from "@cashier/db";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import {
   categories,
   items,
@@ -13,7 +13,7 @@ import {
   recipes,
   recipeSizes,
   stockMovements,
-} from "../../db/schema.js";
+} from "@cashier/db";
 import type { ItemInput, ItemUpdateInput } from "./items.schemas.js";
 
 const itemColumns = () => ({

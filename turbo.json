@@ -5,6 +5,9 @@
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**", "out/**"]
     },
+    "@cashier/db#test": {
+      "cache": false
+    },
     "@cashier/desktop#build:desktop": {
       "dependsOn": ["@cashier/web#build", "prepare:desktop"],
       "cache": false,

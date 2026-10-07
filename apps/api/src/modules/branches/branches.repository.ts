@@ -7,7 +7,7 @@ import {
   isNotNull,
   sql,
 } from "drizzle-orm";
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import {
   branches,
   shifts,
@@ -18,7 +18,7 @@ import {
   externalProductSizes,
   externalModifierGroups,
   externalModifierOptions,
-} from "../../db/schema.js";
+} from "@cashier/db";
 import type { BranchInput, BranchUpdateInput } from "./branches.schemas.js";
 
 export class BranchesRepository {

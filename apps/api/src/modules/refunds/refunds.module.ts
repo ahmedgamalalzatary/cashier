@@ -1,4 +1,4 @@
-import type { Db } from "../../db/index.js";
+import type { Db } from "@cashier/db";
 import { RefundsController } from "./refunds.controller.js";
 import { RefundsRepository } from "./refunds.repository.js";
 import { refundsRouter } from "./refunds.router.js";

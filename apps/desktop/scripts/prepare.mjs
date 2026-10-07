@@ -68,7 +68,7 @@ fs.writeFileSync(
 );
 const journal = JSON.parse(
   fs.readFileSync(
-    path.join(root, "apps/api/drizzle/meta/_journal.json"),
+    path.join(root, "packages/db/drizzle/meta/_journal.json"),
     "utf8",
   ),
 );
