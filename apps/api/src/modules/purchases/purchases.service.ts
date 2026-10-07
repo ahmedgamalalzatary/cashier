@@ -1,6 +1,6 @@
 import { requestFingerprint as hashRequest } from '../../lib/request-fingerprint.js';
 import { transactionWithDeadlockRetry } from '../../lib/deadlock-retry.js';
-import { HttpError } from '../../middleware/error.js';
+import { HttpError } from '@cashier/server-core';
 import { moveStockToCafe } from '../transfers/move-stock.js';
 import type { PurchasesRepository } from './purchases.repository.js';
 import type { PurchaseInput } from './purchases.schemas.js';

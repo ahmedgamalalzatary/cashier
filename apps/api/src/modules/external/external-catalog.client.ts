@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { HttpError } from "../../middleware/error.js";
+import { HttpError } from "@cashier/server-core";
 import type { ExternalBackendClient } from "./external-backend.client.js";
 
 const SQL_INT_MAX = 2_147_483_647;

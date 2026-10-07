@@ -1,8 +1,8 @@
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-import { requireRole } from "../../src/middleware/auth.js";
-import { errorHandler } from "../../src/middleware/error.js";
+import { requireRole } from "@cashier/server-core";
+import { errorHandler } from "@cashier/server-core";
 import type { ExpensesController } from "../../src/modules/expenses/expenses.controller.js";
 import { ExpensesController as RealExpensesController } from "../../src/modules/expenses/expenses.controller.js";
 import type { ExpensesService } from "../../src/modules/expenses/expenses.service.js";

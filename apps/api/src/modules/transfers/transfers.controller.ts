@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { idParam } from "../../middleware/validation.js";
+import { idParam } from "@cashier/server-core";
 import type { TransfersService } from "./transfers.service.js";
 import {
   transferApprovalInput,

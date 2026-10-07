@@ -65,3 +65,10 @@ cp .env.example .env   # then edit DATABASE_URL, JWT_SECRET and deployment origi
 The schema, migrations, branch scoping and admin seeding live in
 `packages/db`, so every API in the repo uses the same tables and the same
 migration history.
+
+### Shared server code
+
+Login, error handling, request validation, branch scoping and the auth, reports,
+branches and users modules live in `packages/server-core`. Both the desktop API
+and the online API mount the same routers, so an online install behaves exactly
+like a shop PC.

@@ -1,4 +1,4 @@
-import { HttpError } from "../../middleware/error.js";
+import { cairoMidnight, HttpError } from "@cashier/server-core";
 import type { AuthUser } from "@cashier/shared";
 import type {
   AdminCloseShiftInput,
@@ -8,7 +8,6 @@ import type {
   ShiftAuditNoteInput,
 } from "./shifts.schemas.js";
 import type { ShiftsRepository } from "./shifts.repository.js";
-import { cairoMidnight } from "../reports/reports.service.js";
 
 function isDuplicateEntry(error: unknown) {
   return (

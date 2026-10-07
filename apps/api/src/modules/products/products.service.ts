@@ -1,5 +1,5 @@
 import type { ExternalCategory, ExternalProduct } from "@cashier/shared";
-import { HttpError } from "../../middleware/error.js";
+import { HttpError } from "@cashier/server-core";
 import type { ProductStockSetupInput } from "./products.schemas.js";
 
 type CachedCatalog = {

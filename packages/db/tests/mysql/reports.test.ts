@@ -32,7 +32,7 @@ import {
 } from "@cashier/db";
 import { appOptions, db, nextTestItemCode } from "../support/api-setup.js";
 import { loginAs } from "../support/api-helpers.js";
-import { ReportsRepository } from "../../../../apps/api/src/modules/reports/reports.repository.js";
+import { ReportsRepository } from "../../../../packages/server-core/src/modules/reports/reports.repository.js";
 
 const app = createApp(db, appOptions);
 describe("reports", () => {

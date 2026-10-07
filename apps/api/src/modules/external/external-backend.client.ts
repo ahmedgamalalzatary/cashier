@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { HttpError } from "../../middleware/error.js";
+import { HttpError } from "@cashier/server-core";
 
 /**
  * Failure kinds callers can branch on. Wording of the messages may change, so

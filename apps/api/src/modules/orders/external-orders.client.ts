@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { ExternalOrderSummary } from "@cashier/shared";
-import { HttpError } from "../../middleware/error.js";
+import { HttpError } from "@cashier/server-core";
 import {
   ExternalBackendClient,
   ExternalBackendError,

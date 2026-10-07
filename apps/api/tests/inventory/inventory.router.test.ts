@@ -1,8 +1,8 @@
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-import { requireRole } from "../../src/middleware/auth.js";
-import { errorHandler } from "../../src/middleware/error.js";
+import { requireRole } from "@cashier/server-core";
+import { errorHandler } from "@cashier/server-core";
 import type { InventoryController } from "../../src/modules/inventory/inventory.controller.js";
 import { InventoryController as RealInventoryController } from "../../src/modules/inventory/inventory.controller.js";
 import type { InventoryService } from "../../src/modules/inventory/inventory.service.js";

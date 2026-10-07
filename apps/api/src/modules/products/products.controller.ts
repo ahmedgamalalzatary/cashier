@@ -1,10 +1,10 @@
 import type { Request, Response } from "express";
-import { idParam } from "../../middleware/validation.js";
+import { idParam } from "@cashier/server-core";
 import type { ProductsService } from "./products.service.js";
 import { productStockSetupInput } from "./products.schemas.js";
 import type { CacheRefreshRepository } from "../external/cache-refresh.repository.js";
 import type { ProductsRepository } from "./products.repository.js";
-import { HttpError } from "../../middleware/error.js";
+import { HttpError } from "@cashier/server-core";
 
 export class ProductsController {
   constructor(

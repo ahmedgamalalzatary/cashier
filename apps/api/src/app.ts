@@ -1,14 +1,20 @@
 import express from "express";
 import cors from "cors";
 import type { Db } from "@cashier/db";
-import { errorHandler } from "./middleware/error.js";
-import { authenticate, requireRole } from "./middleware/auth.js";
-import { createAuthModule } from "./modules/auth/auth.module.js";
+import {
+  authenticate,
+  createAuthModule,
+  createBranchesModule,
+  createReportsModule,
+  createUsersModule,
+  errorHandler,
+  requireRole,
+  selectBranch,
+} from "@cashier/server-core";
 import { createSuppliersModule } from "./modules/suppliers/suppliers.module.js";
 import { createCategoriesModule } from "./modules/categories/categories.module.js";
 import { createItemsModule } from "./modules/items/items.module.js";
 import { createInventoryModule } from "./modules/inventory/inventory.module.js";
-import { createUsersModule } from "./modules/users/users.module.js";
 import { createPurchasesModule } from "./modules/purchases/purchases.module.js";
 import { createTransfersModule } from "./modules/transfers/transfers.module.js";
 import { createRecipesModule } from "./modules/recipes/recipes.module.js";
@@ -18,12 +24,9 @@ import { createShiftsModule } from "./modules/shifts/shifts.module.js";
 import { createRefundsModule } from "./modules/refunds/refunds.module.js";
 import { createWasteModule } from "./modules/waste/waste.module.js";
 import { createExpensesModule } from "./modules/expenses/expenses.module.js";
-import { createReportsModule } from "./modules/reports/reports.module.js";
 import { createProductsModule } from "./modules/products/products.module.js";
 import { createStocktakesModule } from "./modules/stocktakes/stocktakes.module.js";
 import { createSalariesModule } from "./modules/salaries/salaries.module.js";
-import { createBranchesModule } from "./modules/branches/branches.module.js";
-import { selectBranch } from "./middleware/branch.js";
 
 export type AppOptions = {
   jwtSecret: string;

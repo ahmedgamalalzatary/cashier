@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { HttpError } from "../../src/middleware/error.js";
+import { HttpError } from "@cashier/server-core";
 import type { PurchasesRepository } from "../../src/modules/purchases/purchases.repository.js";
 import { PurchasesService } from "../../src/modules/purchases/purchases.service.js";
 

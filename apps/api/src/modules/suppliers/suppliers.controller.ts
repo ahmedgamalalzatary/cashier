@@ -5,7 +5,7 @@ import {
   supplierInput,
   supplierUpdateInput,
 } from './suppliers.schemas.js';
-import { idParam } from '../../middleware/validation.js';
+import { idParam } from '@cashier/server-core';
 
 export class SuppliersController {
   constructor(private service: SuppliersService) {}

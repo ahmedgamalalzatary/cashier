@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { AuthUser } from "@cashier/shared";
 import { requestFingerprint as hashRequest } from "../../lib/request-fingerprint.js";
 import { transactionWithDeadlockRetry } from "../../lib/deadlock-retry.js";
-import { HttpError } from "../../middleware/error.js";
+import { HttpError } from "@cashier/server-core";
 import type { FifoAllocation } from "../inventory/inventory.service.js";
 import { calculateExternalOrderLine } from "./external-order-line.js";
 import type { OrdersRepository } from "./orders.repository.js";

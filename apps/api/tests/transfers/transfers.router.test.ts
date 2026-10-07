@@ -1,9 +1,9 @@
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-import { requireRole } from "../../src/middleware/auth.js";
-import { errorHandler } from "../../src/middleware/error.js";
-import { HttpError } from "../../src/middleware/error.js";
+import { requireRole } from "@cashier/server-core";
+import { errorHandler } from "@cashier/server-core";
+import { HttpError } from "@cashier/server-core";
 import type { TransfersController } from "../../src/modules/transfers/transfers.controller.js";
 import { TransfersController as RealTransfersController } from "../../src/modules/transfers/transfers.controller.js";
 import type { TransfersService } from "../../src/modules/transfers/transfers.service.js";

@@ -19,6 +19,7 @@ coverage
 docs
 apps/api/tests
 packages/db/tests
+packages/server-core/tests
 **/*.test.ts
 **/*.test.tsx
 **/.DS_Store

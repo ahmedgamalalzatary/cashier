@@ -1,7 +1,7 @@
 import type { AuthUser } from "@cashier/shared";
 import { requestFingerprint as hashRequest } from "../../lib/request-fingerprint.js";
 import { transactionWithDeadlockRetry } from "../../lib/deadlock-retry.js";
-import { HttpError } from "../../middleware/error.js";
+import { HttpError } from "@cashier/server-core";
 import type { WasteInput } from "./waste.schemas.js";
 import type { WasteRepository } from "./waste.repository.js";
 

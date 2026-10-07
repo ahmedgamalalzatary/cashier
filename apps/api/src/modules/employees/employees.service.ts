@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { HttpError } from "../../middleware/error.js";
+import { HttpError } from "@cashier/server-core";
 import type { EmployeesRepository } from "./employees.repository.js";
 import type {
   CashierAccessInput,

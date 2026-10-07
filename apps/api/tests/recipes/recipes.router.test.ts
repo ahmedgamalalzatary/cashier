@@ -1,7 +1,7 @@
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-import { errorHandler, HttpError } from "../../src/middleware/error.js";
+import { errorHandler, HttpError } from "@cashier/server-core";
 import type { RecipesController } from "../../src/modules/recipes/recipes.controller.js";
 import { RecipesController as RealRecipesController } from "../../src/modules/recipes/recipes.controller.js";
 import type { RecipesService } from "../../src/modules/recipes/recipes.service.js";

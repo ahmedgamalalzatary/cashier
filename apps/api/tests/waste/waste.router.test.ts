@@ -1,7 +1,7 @@
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-import { errorHandler, HttpError } from "../../src/middleware/error.js";
+import { errorHandler, HttpError } from "@cashier/server-core";
 import type { WasteController } from "../../src/modules/waste/waste.controller.js";
 import { WasteController as RealWasteController } from "../../src/modules/waste/waste.controller.js";
 import type { WasteService } from "../../src/modules/waste/waste.service.js";

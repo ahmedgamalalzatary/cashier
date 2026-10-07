@@ -1,4 +1,4 @@
-import { HttpError } from "../../middleware/error.js";
+import { HttpError } from "@cashier/server-core";
 import type { SalaryBlockedReason } from "@cashier/shared";
 import type { SalariesRepository } from "./salaries.repository.js";
 import type { AdjustmentInput, AdvanceInput } from "./salaries.schemas.js";

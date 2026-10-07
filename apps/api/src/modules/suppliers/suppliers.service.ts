@@ -1,4 +1,4 @@
-import { HttpError } from '../../middleware/error.js';
+import { HttpError } from '@cashier/server-core';
 import type { SuppliersRepository } from './suppliers.repository.js';
 import type {
   PaymentInput,

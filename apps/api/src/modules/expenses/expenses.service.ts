@@ -1,6 +1,6 @@
 import type { AuthUser } from "@cashier/shared";
 import { requestFingerprint } from "../../lib/request-fingerprint.js";
-import { HttpError } from "../../middleware/error.js";
+import { HttpError } from "@cashier/server-core";
 import type { CreateExpenseInput } from "./expenses.schemas.js";
 import type { ExpensesRepository } from "./expenses.repository.js";
 

@@ -117,15 +117,15 @@ Shift: lives in the database, so closing, crashing or updating never ends it.
 
 ### Owner answers to the open questions
 
-| ID  | Question                                                                                                                                                                             | Answer                                                                                                                                                                        |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q1  | Username clashes: a local cashier "ali" (offline) vs an online admin "ali".                                                                                                          | Same username is allowed. The login screen has an **Admin / Cashier** choice, so no password rule is needed (see Q5).                                                      |
-| Q2  | Does the VPS stop running the old cashier (`api`, `web`, `cache-worker`)?                                                                                                            | Yes. The VPS only runs `mysql`, `migrate`, `online-api`, `online-web`.                                                                                                        |
-| Q3  | External online orders (`EXTERNAL_ORDERS_*`): one account or one per branch?                                                                                                         | One account for all branches. Same `EXTERNAL_ORDERS_*` values on every PC.                                                                                                    |
-| Q4  | MySQL is GPL. Is bundling it OK?                                                                                                                                                     | Yes, owner accepts.                                                                                                                                                           |
-| Q5  | Owner proposed "same username, password must differ". That leaks passwords: a branch admin who gets "password already used" when creating cashier "ali" learns admin ali's password. | **Answered 2026-10-07:** same username allowed; login screen has an **Admin / Cashier** choice. No password rule. Needed by Phase 4.                              |
+| ID  | Question                                                                                                                                                                             | Answer                                                                                                                                                                          |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | Username clashes: a local cashier "ali" (offline) vs an online admin "ali".                                                                                                          | Same username is allowed. The login screen has an **Admin / Cashier** choice, so no password rule is needed (see Q5).                                                           |
+| Q2  | Does the VPS stop running the old cashier (`api`, `web`, `cache-worker`)?                                                                                                            | Yes. The VPS only runs `mysql`, `migrate`, `online-api`, `online-web`.                                                                                                          |
+| Q3  | External online orders (`EXTERNAL_ORDERS_*`): one account or one per branch?                                                                                                         | One account for all branches. Same `EXTERNAL_ORDERS_*` values on every PC.                                                                                                      |
+| Q4  | MySQL is GPL. Is bundling it OK?                                                                                                                                                     | Yes, owner accepts.                                                                                                                                                             |
+| Q5  | Owner proposed "same username, password must differ". That leaks passwords: a branch admin who gets "password already used" when creating cashier "ali" learns admin ali's password. | **Answered 2026-10-07:** same username allowed; login screen has an **Admin / Cashier** choice. No password rule. Needed by Phase 4.                                            |
 | Q6  | `docs/cleanup-plan.md` phases 5A (shift auto-close), 6, 7, 8, 9 have no matching commits yet. Finish them before Phase 1 here, or after Phase 11?                                    | **Answered 2026-10-07:** finish 5A before Phase 4 (it changes shift rules that Phase 4 also changes); 6–9 (web restyle) after Phase 3 so they land in the shared packages once. |
-| Q7  | `seed-admin.ts` bumps the super-admin `tokenVersion` on **every** start, so every online-api restart logs the super-admin out online and (after the next accounts pull) on every PC. | **Answered 2026-10-07:** bump only when the configured username or password actually changed. Needed by Phase 7.                                                   |
+| Q7  | `seed-admin.ts` bumps the super-admin `tokenVersion` on **every** start, so every online-api restart logs the super-admin out online and (after the next accounts pull) on every PC. | **Answered 2026-10-07:** bump only when the configured username or password actually changed. Needed by Phase 7.                                                                |
 
 ---
 
@@ -133,47 +133,47 @@ Shift: lives in the database, so closing, crashing or updating never ends it.
 
 Status: ☐ todo · ◐ in progress · ☑ done. Write the date when done.
 
-| Phase                | Slice                                                             | Status | Done on | Notes |
-| -------------------- | ----------------------------------------------------------------- | ------ | ------- | ----- |
-| 1 DB package         | 1.1 create `packages/db`, move schema/client/branch-context/seeds | ☑      | 2026-10-07 | `HttpError` moved to the package; api re-exports it |
+| Phase                | Slice                                                             | Status | Done on    | Notes                                                     |
+| -------------------- | ----------------------------------------------------------------- | ------ | ---------- | --------------------------------------------------------- |
+| 1 DB package         | 1.1 create `packages/db`, move schema/client/branch-context/seeds | ☑      | 2026-10-07 | `HttpError` moved to the package; api re-exports it       |
 |                      | 1.2 move migrations + drizzle config, api uses package            | ☑      | 2026-10-07 | `db:*` scripts live in `packages/db`; api keeps `db:seed` |
-|                      | 1.3 desktop prepare/smoke + Docker files use package              | ☑      | 2026-10-07 | all MySQL tests now live in `packages/db/tests/mysql` |
-| 2 Server core        | 2.1 `packages/server-core`: middleware (error, validation, auth)  | ☐      |         |       |
-|                      | 2.2 move auth module                                              | ☐      |         |       |
-|                      | 2.3 move reports module                                           | ☐      |         |       |
-|                      | 2.4 move users/branches admin-management parts                    | ☐      |         |       |
-| 3 Web core           | 3.1 `packages/web-core`: api client, auth/session, ui primitives  | ☐      |         |       |
-|                      | 3.2 move reports page/components/model/service                    | ☐      |         |       |
-|                      | 3.3 move login + users/branches management UI                     | ☐      |         |       |
-| 4 Schema reset       | 4.1 UUID helper + custom column type + tests                      | ☐      |         |       |
-|                      | 4.2 schema: all ids → UUID, new tables, one shift per branch      | ☐      |         |       |
-|                      | 4.3 baseline migration reset                                      | ☐      |         |       |
-|                      | 4.4 api modules + zod schemas + shared types → string ids         | ☐      |         |       |
-|                      | 4.5 web → string ids                                              | ☐      |         |       |
-|                      | 4.6 login rule: admin must be assigned to the branch              | ☐      |         |       |
-| 5 Bundled MySQL      | 5.1 fetch + trim MySQL noinstall ZIP in `prepare.mjs`             | ☐      |         |       |
-|                      | 5.2 Rust: init data dir, start/stop `mysqld`, health wait         | ☐      |         |       |
-|                      | 5.3 auto backup + auto migrate on start                           | ☐      |         |       |
-|                      | 5.4 installer/uninstaller keep data; smoke test on clean VM       | ☐      |         |       |
-| 6 Updater + releases | 6.1 signing keys + updater plugin config                          | ☐      |         |       |
-|                      | 6.2 forced check on open with 5s fallback                         | ☐      |         |       |
-|                      | 6.3 optional mid-session update button                            | ☐      |         |       |
-|                      | 6.4 GitHub Actions release workflow                               | ☐      |         |       |
-| 7 Online apps + VPS  | 7.1 `apps/online-api` (auth, reports, scoping)                    | ☐      |         |       |
-|                      | 7.2 `apps/online-web` (login + reports)                           | ☐      |         |       |
-|                      | 7.3 Docker compose + Nginx + runbook                              | ☐      |         |       |
-| 8 Admin management   | 8.1 branches CRUD (super-admin)                                   | ☐      |         |       |
-|                      | 8.2 admins CRUD + multi-branch assignment                         | ☐      |         |       |
-|                      | 8.3 device link codes                                             | ☐      |         |       |
-| 9 Link + accounts    | 9.1 online `POST /device/link`, device token                      | ☐      |         |       |
-|                      | 9.2 desktop first-launch link screen                              | ☐      |         |       |
-|                      | 9.3 accounts pull (on start + every 15 min)                       | ☐      |         |       |
-| 10 Upload sync       | 10.1 outbox table + trigger generator + tests                     | ☐      |         |       |
-|                      | 10.2 online ingest endpoint (idempotent)                          | ☐      |         |       |
-|                      | 10.3 PC uploader worker (15 min) + "Upload now" + status          | ☐      |         |       |
-|                      | 10.4 full resend tool (recovery)                                  | ☐      |         |       |
-| 11 Release v1        | 11.1 end-to-end: 2 PCs → online, offline/online cycles            | ☐      |         |       |
-|                      | 11.2 docs + runbooks + system-specs                               | ☐      |         |       |
+|                      | 1.3 desktop prepare/smoke + Docker files use package              | ☑      | 2026-10-07 | all MySQL tests now live in `packages/db/tests/mysql`     |
+| 2 Server core        | 2.1 `packages/server-core`: middleware (error, validation, auth)  | ☑      | 2026-10-07 | `branch` scoping moved too (both APIs need it)          |
+|                      | 2.2 move auth module                                              | ☑      | 2026-10-07 | 4 unit tests moved with the code                        |
+|                      | 2.3 move reports module                                           | ☑      | 2026-10-07 | `cairoMidnight` is shared with the shifts module        |
+|                      | 2.4 move users/branches modules whole                             | ☑      | 2026-10-07 | 3 unit tests moved with the code                        |
+| 3 Web core           | 3.1 `packages/web-core`: api client, auth/session, ui primitives  | ☐      |            |                                                           |
+|                      | 3.2 move reports page/components/model/service                    | ☐      |            |                                                           |
+|                      | 3.3 move login + users/branches management UI                     | ☐      |            |                                                           |
+| 4 Schema reset       | 4.1 UUID helper + custom column type + tests                      | ☐      |            |                                                           |
+|                      | 4.2 schema: all ids → UUID, new tables, one shift per branch      | ☐      |            |                                                           |
+|                      | 4.3 baseline migration reset                                      | ☐      |            |                                                           |
+|                      | 4.4 api modules + zod schemas + shared types → string ids         | ☐      |            |                                                           |
+|                      | 4.5 web → string ids                                              | ☐      |            |                                                           |
+|                      | 4.6 login rule: admin must be assigned to the branch              | ☐      |            |                                                           |
+| 5 Bundled MySQL      | 5.1 fetch + trim MySQL noinstall ZIP in `prepare.mjs`             | ☐      |            |                                                           |
+|                      | 5.2 Rust: init data dir, start/stop `mysqld`, health wait         | ☐      |            |                                                           |
+|                      | 5.3 auto backup + auto migrate on start                           | ☐      |            |                                                           |
+|                      | 5.4 installer/uninstaller keep data; smoke test on clean VM       | ☐      |            |                                                           |
+| 6 Updater + releases | 6.1 signing keys + updater plugin config                          | ☐      |            |                                                           |
+|                      | 6.2 forced check on open with 5s fallback                         | ☐      |            |                                                           |
+|                      | 6.3 optional mid-session update button                            | ☐      |            |                                                           |
+|                      | 6.4 GitHub Actions release workflow                               | ☐      |            |                                                           |
+| 7 Online apps + VPS  | 7.1 `apps/online-api` (auth, reports, scoping)                    | ☐      |            |                                                           |
+|                      | 7.2 `apps/online-web` (login + reports)                           | ☐      |            |                                                           |
+|                      | 7.3 Docker compose + Nginx + runbook                              | ☐      |            |                                                           |
+| 8 Admin management   | 8.1 branches CRUD (super-admin)                                   | ☐      |            |                                                           |
+|                      | 8.2 admins CRUD + multi-branch assignment                         | ☐      |            |                                                           |
+|                      | 8.3 device link codes                                             | ☐      |            |                                                           |
+| 9 Link + accounts    | 9.1 online `POST /device/link`, device token                      | ☐      |            |                                                           |
+|                      | 9.2 desktop first-launch link screen                              | ☐      |            |                                                           |
+|                      | 9.3 accounts pull (on start + every 15 min)                       | ☐      |            |                                                           |
+| 10 Upload sync       | 10.1 outbox table + trigger generator + tests                     | ☐      |            |                                                           |
+|                      | 10.2 online ingest endpoint (idempotent)                          | ☐      |            |                                                           |
+|                      | 10.3 PC uploader worker (15 min) + "Upload now" + status          | ☐      |            |                                                           |
+|                      | 10.4 full resend tool (recovery)                                  | ☐      |            |                                                           |
+| 11 Release v1        | 11.1 end-to-end: 2 PCs → online, offline/online cycles            | ☐      |            |                                                           |
+|                      | 11.2 docs + runbooks + system-specs                               | ☐      |            |                                                           |
 
 ---
 
@@ -205,9 +205,12 @@ Status: ☐ todo · ◐ in progress · ☑ done. Write the date when done.
 Move the parts both APIs need, as Express module factories (same shape as today's
 `createXModule(db)`):
 
-- `apps/api/src/middleware/{error,validation,auth}.ts`
+- `apps/api/src/middleware/{error,validation,auth}.ts` — plus `branch.ts`: branch scoping is
+  middleware the online API needs too, so it moves with the rest.
 - `apps/api/src/modules/auth/*`, `modules/reports/*`
-- the read side of `modules/branches/*` and the admin parts of `modules/users/*`
+- `modules/branches/*` and `modules/users/*`, **whole** (owner decision: no splitting).
+  `users` create/update is already super-admin only and admin-only; `branches` is one small
+  module. Each app chooses what it mounts; PC-only restrictions (section 7.6) come in Phases 4.6/9.
 
 `apps/api/src/app.ts` keeps mounting them at the same paths. Tests move with the code.
 
@@ -533,13 +536,14 @@ reports (shared), admins page + branches page + link code generation + devices/l
 
 ### 7.7 Tests and commands
 
-| Area                       | Command                                                                                  | Where tests live                          |
-| -------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Area                       | Command                                                                                         | Where tests live                                           |
+| -------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | DB package (after Phase 1) | `pnpm --filter @cashier/db test` (unit + MySQL config), `pnpm --filter @cashier/db db:generate` | `packages/db/tests/**` (every MySQL test, incl. the API's) |
-| API                        | `pnpm --filter @cashier/api test` (unit only; MySQL tests moved to `@cashier/db`)        | `apps/api/tests/**`                       |
-| Online API                 | `pnpm --filter @cashier/online-api test`                                                 | `apps/online-api/tests/**`                |
-| Web / online-web           | `pnpm --filter @cashier/web test`, `pnpm --filter @cashier/online-web test`              | `*/tests/**`                              |
-| Desktop                    | `pnpm test:desktop`, `pnpm lint:desktop`, `pnpm typecheck:desktop`, `pnpm smoke:desktop` | `apps/desktop/tests`, Rust `#[cfg(test)]` |
+| API                        | `pnpm --filter @cashier/api test` (unit only; MySQL tests moved to `@cashier/db`)               | `apps/api/tests/**`                                        |
+| Server core (after Phase 2) | `pnpm --filter @cashier/server-core test` (unit only)                                            | `packages/server-core/tests/**`                            |
+| Online API                 | `pnpm --filter @cashier/online-api test`                                                        | `apps/online-api/tests/**`                                 |
+| Web / online-web           | `pnpm --filter @cashier/web test`, `pnpm --filter @cashier/online-web test`                     | `*/tests/**`                                               |
+| Desktop                    | `pnpm test:desktop`, `pnpm lint:desktop`, `pnpm typecheck:desktop`, `pnpm smoke:desktop`        | `apps/desktop/tests`, Rust `#[cfg(test)]`                  |
 
 MySQL tests use the `*_test` database from `.env.test` and all of them live in
 `packages/db/tests/mysql` (they exercise the API through a real database, and one
@@ -547,6 +551,11 @@ package now owns the schema, its migrations, and its test database lifecycle).
 `packages/db/tests/support` holds the shared fixtures: `database.ts` (connection +
 table cleanup), `test-env.ts` (`.env.test` loading + migrations), and
 `api-setup.ts` / `api-helpers.ts` (Express app options and user fixtures).
+
+Both `@cashier/db` and `@cashier/server-core` publish compiled `dist` but type
+from `src`, so they must be built before another package's tests run. Root `pnpm test`
+does that automatically (`test` depends on `^build`); a filtered run like
+`pnpm --filter @cashier/api test` needs the dependency builds to have happened.
 Sync tests need two databases at once:
 `cashier_test` (PC) and `cashier_online_test` (online). Add the second one to `.env.test` and
 `packages/db/tests/mysql-setup.ts` in Phase 10.

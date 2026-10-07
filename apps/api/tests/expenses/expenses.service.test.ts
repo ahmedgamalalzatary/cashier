@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AuthUser } from "@cashier/shared";
-import { HttpError } from "../../src/middleware/error.js";
+import { HttpError } from "@cashier/server-core";
 import type { ExpensesRepository } from "../../src/modules/expenses/expenses.repository.js";
 import { ExpensesService } from "../../src/modules/expenses/expenses.service.js";
 

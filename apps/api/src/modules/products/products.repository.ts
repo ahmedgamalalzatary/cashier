@@ -19,7 +19,7 @@ import {
   items,
 } from "@cashier/db";
 import type { ExternalCatalog } from "../external/external-catalog.client.js";
-import { HttpError } from "../../middleware/error.js";
+import { HttpError } from "@cashier/server-core";
 import type { ProductStockSetupInput } from "./products.schemas.js";
 import type { ProductsRepositoryContract } from "./products.service.js";
 

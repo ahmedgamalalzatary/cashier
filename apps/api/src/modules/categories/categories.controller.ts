@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import type { CategoriesService } from './categories.service.js';
 import { categoryInput, categoryUpdateInput } from './categories.schemas.js';
-import { idParam } from '../../middleware/validation.js';
+import { idParam } from '@cashier/server-core';
 
 export class CategoriesController {
   constructor(private service: CategoriesService) {}

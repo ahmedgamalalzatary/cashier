@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
-import { HttpError } from "../../middleware/error.js";
-import { idParam } from "../../middleware/validation.js";
+import { HttpError } from "@cashier/server-core";
+import { idParam } from "@cashier/server-core";
 import {
   createExpenseCategoryInput,
   createExpenseInput,

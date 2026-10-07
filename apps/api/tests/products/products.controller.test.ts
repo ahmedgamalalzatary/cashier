@@ -1,8 +1,8 @@
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-import { requireRole } from "../../src/middleware/auth.js";
-import { errorHandler } from "../../src/middleware/error.js";
+import { requireRole } from "@cashier/server-core";
+import { errorHandler } from "@cashier/server-core";
 import { ProductsController } from "../../src/modules/products/products.controller.js";
 import type { ProductsService } from "../../src/modules/products/products.service.js";
 import type { CacheRefreshRepository } from "../../src/modules/external/cache-refresh.repository.js";

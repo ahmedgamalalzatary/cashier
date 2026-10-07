@@ -1,7 +1,7 @@
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-import { errorHandler } from "../../src/middleware/error.js";
+import { errorHandler } from "@cashier/server-core";
 import type { ShiftsController } from "../../src/modules/shifts/shifts.controller.js";
 import { ShiftsController as RealShiftsController } from "../../src/modules/shifts/shifts.controller.js";
 import type { ShiftsService } from "../../src/modules/shifts/shifts.service.js";

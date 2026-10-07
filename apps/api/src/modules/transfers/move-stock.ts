@@ -1,4 +1,4 @@
-import { HttpError } from "../../middleware/error.js";
+import { HttpError } from "@cashier/server-core";
 import type { InventoryTransaction } from "../inventory/inventory.service.js";
 import type { TransfersRepository } from "./transfers.repository.js";
 

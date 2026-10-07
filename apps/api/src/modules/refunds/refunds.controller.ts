@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { idParam } from "../../middleware/validation.js";
+import { idParam } from "@cashier/server-core";
 import type { RefundsService } from "./refunds.service.js";
 import { refundInput } from "./refunds.schemas.js";
 

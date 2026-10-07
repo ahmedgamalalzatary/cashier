@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import type { PurchasesService } from './purchases.service.js';
 import { purchaseInput } from './purchases.schemas.js';
-import { idParam } from '../../middleware/validation.js';
+import { idParam } from '@cashier/server-core';
 
 export class PurchasesController {
   constructor(private service: PurchasesService) {}

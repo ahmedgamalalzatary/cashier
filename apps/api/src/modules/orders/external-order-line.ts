@@ -1,5 +1,5 @@
 import { isExternalDiscountActive } from "@cashier/shared";
-import { HttpError } from "../../middleware/error.js";
+import { HttpError } from "@cashier/server-core";
 
 type Ingredient = { itemId: number; itemName: string; quantity: string };
 type ExternalOrderProduct = {

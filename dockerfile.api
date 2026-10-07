@@ -10,6 +10,7 @@ FROM pnpm AS dependencies
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
 COPY packages/db/package.json packages/db/package.json
+COPY packages/server-core/package.json packages/server-core/package.json
 COPY packages/shared/package.json packages/shared/package.json
 RUN pnpm install --frozen-lockfile --filter @cashier/api...
 
@@ -17,6 +18,7 @@ FROM dependencies AS build
 COPY tsconfig.base.json ./
 COPY apps/api ./apps/api
 COPY packages/db ./packages/db
+COPY packages/server-core ./packages/server-core
 COPY packages/shared ./packages/shared
 RUN pnpm --filter @cashier/api build
 
@@ -32,6 +34,7 @@ FROM pnpm AS production-dependencies
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
 COPY packages/db/package.json packages/db/package.json
+COPY packages/server-core/package.json packages/server-core/package.json
 COPY packages/shared/package.json packages/shared/package.json
 RUN pnpm install --frozen-lockfile --prod --filter @cashier/api...
 
@@ -41,8 +44,10 @@ WORKDIR /app
 COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=production-dependencies /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=production-dependencies /app/packages/db/node_modules ./packages/db/node_modules
+COPY --from=production-dependencies /app/packages/server-core/node_modules ./packages/server-core/node_modules
 COPY --from=production-dependencies /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY --from=build /app/packages/db ./packages/db
+COPY --from=build /app/packages/server-core ./packages/server-core
 COPY --from=build /app/packages/shared ./packages/shared
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY apps/api/package.json ./apps/api/package.json

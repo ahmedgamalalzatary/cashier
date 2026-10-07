@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireRole } from "../../middleware/auth.js";
+import { requireRole } from "@cashier/server-core";
 import type { EmployeesController } from "./employees.controller.js";
 
 export function employeesRouter(controller: EmployeesController) {
