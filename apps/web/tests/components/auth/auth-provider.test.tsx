@@ -7,6 +7,7 @@ const {
   writeSessionMock,
   currentUserMock,
   updateSessionUserMock,
+  readSessionMock,
   useEffectMock,
   useStateMock,
 } = vi.hoisted(() => ({
@@ -15,6 +16,7 @@ const {
   writeSessionMock: vi.fn(),
   currentUserMock: vi.fn(),
   updateSessionUserMock: vi.fn(),
+  readSessionMock: vi.fn(),
   useEffectMock: vi.fn(),
   useStateMock: vi.fn(),
 }));
@@ -44,7 +46,7 @@ vi.mock("@/lib/auth", () => ({
   canOpenPath: () => true,
   loginPathFor: () => "/login",
   postLoginPath: () => "/",
-  readSession: () => ({ user: { role: "admin" } }),
+  readSession: () => readSessionMock(),
   subscribeToSessionChanges: () => () => undefined,
   writeSession: writeSessionMock,
   updateSessionUser: updateSessionUserMock,
@@ -123,6 +125,9 @@ describe("auth provider session refresh", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    readSessionMock.mockReturnValue({
+      user: { id: 1, name: "Super", role: "admin" },
+    });
     currentUserMock.mockResolvedValue(freshUser);
   });
 
@@ -136,6 +141,44 @@ describe("auth provider session refresh", () => {
 
   it("does not rewrite the stored user when the session is no longer valid", async () => {
     currentUserMock.mockRejectedValue(new Error("انتهت الجلسة"));
+    renderProvider();
+    runEffects();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(updateSessionUserMock).not.toHaveBeenCalled();
+  });
+
+  it("discards a late response that belongs to a replaced session", async () => {
+    // the mount-time request is in flight when the user logs out and someone
+    // else logs in, so the stored session no longer holds this user
+    readSessionMock.mockReturnValueOnce({
+      user: { id: 1, name: "Super", role: "admin" },
+    });
+    currentUserMock.mockImplementation(async () => {
+      readSessionMock.mockReturnValue({
+        user: { id: 2, name: "Other", role: "admin" },
+      });
+      return freshUser;
+    });
+
+    renderProvider();
+    runEffects();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(updateSessionUserMock).not.toHaveBeenCalled();
+  });
+
+  it("discards the response when the session was cleared while in flight", async () => {
+    readSessionMock.mockReturnValueOnce({
+      user: { id: 1, name: "Super", role: "admin" },
+    });
+    currentUserMock.mockImplementation(async () => {
+      readSessionMock.mockReturnValue(null);
+      return freshUser;
+    });
+
     renderProvider();
     runEffects();
     await Promise.resolve();

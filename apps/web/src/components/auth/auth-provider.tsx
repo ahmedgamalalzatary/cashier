@@ -42,9 +42,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const sync = () => setSession(readSession());
     sync();
-    if (readSession()) {
+    const stored = readSession();
+    if (stored) {
+      const requestedUserId = stored.user.id;
       void currentUser()
-        .then((user) => updateSessionUser(user))
+        .then((user) => {
+          // a logout or another login may have replaced the session while this
+          // request was in flight — never write this user into it
+          if (readSession()?.user.id !== requestedUserId) return;
+          updateSessionUser(user);
+        })
         .catch(() => undefined);
     }
     return subscribeToSessionChanges(sync);

@@ -97,30 +97,6 @@ export function selectedTransferLines(
     }));
 }
 
-/**
- * Folds applied invoice rows into whatever the form already holds, so a second
- * invoice adds to the first instead of replacing it. Blank lines are dropped and
- * a repeated item keeps its original key — the API rejects duplicate items.
- */
-export function mergeTransferLines(
-  existing: TransferLineForm[],
-  applied: TransferLineForm[],
-): TransferLineForm[] {
-  const byItem = new Map(
-    existing
-      .filter((line) => line.itemId !== "")
-      .map((line) => [line.itemId, line]),
-  );
-  for (const line of applied) {
-    const previous = byItem.get(line.itemId);
-    byItem.set(
-      line.itemId,
-      previous ? { ...previous, quantity: line.quantity } : line,
-    );
-  }
-  return [...byItem.values()];
-}
-
 export function newTransferLine(key: number): TransferLineForm {
   return { key, itemId: "", quantity: "" };
 }

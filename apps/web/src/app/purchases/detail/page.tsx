@@ -87,7 +87,7 @@ function PurchaseDetailView() {
                 تحويل إلى الكافيه
               </Link>
             ) : (
-              <Badge tone="neutral">لا يتبقَّ رصيد للتحويل للكافيه</Badge>
+              <Badge tone="neutral">لم يتبقَّ رصيد للتحويل للكافيه</Badge>
             )}
             <Button variant="secondary" onClick={() => void openPayment()}>
               دفعة على حساب المورد

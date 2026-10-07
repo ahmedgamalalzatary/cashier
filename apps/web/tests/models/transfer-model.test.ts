@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { InventoryStockRow, PurchaseInvoiceLine } from "@cashier/shared";
 import {
   invoiceTransferRows,
-  mergeTransferLines,
   newTransferLine,
   selectedTransferLines,
   transferDirectBody,
@@ -164,24 +163,6 @@ describe("transfer model", () => {
 
     expect(selectedTransferLines(rows, 4)).toEqual([
       { key: 4, itemId: "3", quantity: "2" },
-    ]);
-  });
-
-  it("merges applied invoice rows into the lines already entered", () => {
-    const existing = [
-      { key: 1, itemId: "3", quantity: "1" },
-      { key: 2, itemId: "", quantity: "" },
-    ];
-    const applied = [
-      { key: 8, itemId: "3", quantity: "4" },
-      { key: 9, itemId: "7", quantity: "2" },
-    ];
-
-    // the blank line is dropped, item 3 keeps its existing key but takes the
-    // invoice quantity, and item 7 is appended — the API rejects duplicates
-    expect(mergeTransferLines(existing, applied)).toEqual([
-      { key: 1, itemId: "3", quantity: "4" },
-      { key: 9, itemId: "7", quantity: "2" },
     ]);
   });
 

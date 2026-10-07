@@ -75,7 +75,7 @@ describe("purchase invoice to cafe transfer link", () => {
     const page = readSource("app/purchases/detail/page.tsx");
 
     expect(page).toContain("canTransferToCafe");
-    expect(page).toContain("لا يتبقَّ رصيد للتحويل للكافيه");
+    expect(page).toContain("لم يتبقَّ رصيد للتحويل للكافيه");
   });
 
   it("lists the transfers the invoice paid for, linking to each one", () => {

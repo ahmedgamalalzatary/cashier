@@ -13,7 +13,6 @@ import { SearchSelect } from "@/components/ui/search-select";
 import { itemLabel } from "@/lib/format";
 import {
   invoiceTransferRows,
-  mergeTransferLines,
   newTransferLine,
   selectedTransferLines,
   transferDirectBody,
@@ -134,7 +133,10 @@ export function TransferFormModal({
     const applied = selectedTransferLines(invoiceRows, nextKey.current);
     if (applied.length === 0) return;
     nextKey.current += applied.length;
-    setLines((current) => mergeTransferLines(current, applied));
+    // the transfer becomes exactly what the invoice offers: merging would keep
+    // hand-entered lines and then claim invoice quantities for items the
+    // invoice never bought
+    setLines(applied);
     setAppliedInvoiceId(Number(invoiceId));
     setTab("manual");
   }
@@ -147,6 +149,21 @@ export function TransferFormModal({
         line.key === key ? { ...line, ...changes } : line,
       ),
     );
+  }
+
+  function addLine() {
+    // an added line is not part of the invoice's own quantities
+    setAppliedInvoiceId(null);
+    setLines((current) => [
+      ...current,
+      newTransferLine(nextKey.current++),
+    ]);
+  }
+
+  function removeLine(key: number) {
+    // the invoice was applied as a whole, so dropping one line breaks the link
+    setAppliedInvoiceId(null);
+    setLines((current) => current.filter((line) => line.key !== key));
   }
 
   // the invoice link only survives while every line still comes from it
@@ -409,13 +426,7 @@ className={`rounded-xl border border-line p-3 ${
                         aria-label={`حذف الصنف رقم ${index + 1}`}
                         title="حذف الصنف"
                         disabled={lines.length === 1}
-                        onClick={() =>
-                          setLines((current) =>
-                            current.filter(
-                              (candidate) => candidate.key !== line.key,
-                            ),
-                          )
-                        }
+                        onClick={() => removeLine(line.key)}
                         className="rounded-lg p-1.5 text-muted hover:bg-danger/10 hover:text-danger disabled:opacity-30"
                       >
                         <Trash2 className="size-4" />
@@ -478,16 +489,7 @@ className={`rounded-xl border border-line p-3 ${
               })}
             </div>
 
-            <Button
-              variant="ghost"
-              onClick={() =>
-                setLines((current) => [
-                  ...current,
-                  newTransferLine(nextKey.current++),
-                ])
-              }
-              disabled={lines.length >= activeItems.length}
-            >
+            <Button variant="ghost" onClick={addLine} disabled={lines.length >= activeItems.length}>
               <Plus className="size-4" /> إضافة صنف
             </Button>
           </>
