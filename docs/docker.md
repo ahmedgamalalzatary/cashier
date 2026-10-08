@@ -67,9 +67,8 @@ sees a dead process, not a wedged one.
 ## First deploy (replacing the old online cashier)
 
 The old `api`, `web` and `cache-worker` services are gone from this repository.
-Their containers are still defined in the old Compose file on the VPS, so remove
-them after the new stack is up. The old online data is disposable and the
-database starts empty.
+Their containers may still exist on the VPS as orphans; remove them once the new
+stack is up (see below).
 
 ```bash
 git pull
@@ -79,10 +78,15 @@ sudo docker compose --env-file .env.production up -d
 sudo docker compose --env-file .env.production ps
 ```
 
-Then, once the site answers, drop the leftover containers and images:
+Compose refuses to interpolate without the file, so `--env-file
+.env.production` belongs on **every** `docker compose` command; a bare
+`docker compose ps` fails with "MYSQL_PASSWORD is required".
+
+Then, once the site answers, drop the leftover containers by name — Compose no
+longer knows those service names and answers `no such service`:
 
 ```bash
-sudo docker compose --env-file .env.production rm -sf api web cache-worker
+docker rm -f cashier-app-web-1 cashier-app-api-1 cashier-app-cache-worker-1
 sudo docker image prune
 ```
 
@@ -96,14 +100,24 @@ sudo docker volume rm cashier-app_mysql_data
 
 ## Nginx
 
-The host Nginx terminates TLS and forwards to the two loopback ports: `/` goes
-to `127.0.0.1:3010` (online-web) and `/api/` to `127.0.0.1:4010` (online-api).
-`client_max_body_size 4m` leaves room for the Phase 10 upload batches. The site
-calls `/api` on its own origin, so the `location /api/` block is what makes
-signing in work at all.
+The host Nginx terminates TLS and forwards to the two loopback ports. The live
+site at `/etc/nginx/sites-available/cashier` already does this (verified
+2026-10-08), so **check it before changing anything**:
 
-Keep the `ssl_certificate` / `ssl_certificate_key` lines of the site that is
-already working, and add the rest inside the existing `server` block for
+```bash
+grep -n "server_name\|proxy_pass\|client_max_body_size" /etc/nginx/sites-available/cashier
+```
+
+What has to be true:
+
+- `location /` → `http://127.0.0.1:3010` (online-web)
+- `location /api/` → `http://127.0.0.1:4010` (online-api). The site calls
+  `/api` on its own origin, so without this block signing in cannot work.
+- `client_max_body_size` of at least `4m`, leaving room for the Phase 10
+  upload batches (the live file has `10m`).
+- the Certbot `listen 443 ssl` and certificate lines, which must not be touched.
+
+Only if a line is missing, add it inside the existing `server` block for
 `cashier.biscofa.tech`:
 
 ```nginx
@@ -127,6 +141,13 @@ location / {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 }
+```
+
+Then validate and reload:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
 Then validate and reload:
