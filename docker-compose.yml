@@ -37,7 +37,7 @@ services:
   migrate:
     build:
       context: .
-      dockerfile: dockerfile.api
+      dockerfile: dockerfile.online-api
       target: migrate
     restart: "no"
     env_file:
@@ -51,7 +51,7 @@ services:
       test:
         - CMD
         - node
-        - /app/apps/api/scripts/process-liveness.cjs
+        - /app/packages/db/scripts/process-liveness.cjs
         - drizzle-kit
       interval: 10s
       timeout: 5s
@@ -62,10 +62,10 @@ services:
     networks:
       - application
 
-  api:
+  online-api:
     build:
       context: .
-      dockerfile: dockerfile.api
+      dockerfile: dockerfile.online-api
       target: runtime
     restart: unless-stopped
     init: true
@@ -76,9 +76,9 @@ services:
       PORT: "4000"
       CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required}
       TRUST_PROXY: "true"
-      EXTERNAL_ORDERS_BASE_URL: ${EXTERNAL_ORDERS_BASE_URL:?EXTERNAL_ORDERS_BASE_URL is required}
-      EXTERNAL_ORDERS_PHONE_NUMBER: ${EXTERNAL_ORDERS_PHONE_NUMBER:?EXTERNAL_ORDERS_PHONE_NUMBER is required}
-      EXTERNAL_ORDERS_PASSWORD: ${EXTERNAL_ORDERS_PASSWORD:?EXTERNAL_ORDERS_PASSWORD is required}
+      ADMIN_NAME: ${ADMIN_NAME:-المدير}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?ADMIN_USERNAME is required}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
     ports:
       - 127.0.0.1:4010:4000
     depends_on:
@@ -100,47 +100,11 @@ services:
     networks:
       - application
 
-  cache-worker:
+  online-web:
     build:
       context: .
-      dockerfile: dockerfile.api
+      dockerfile: dockerfile.online-web
       target: runtime
-    command: ["node", "dist/worker.js"]
-    restart: unless-stopped
-    init: true
-    env_file:
-      - .env.production
-    environment:
-      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
-      EXTERNAL_ORDERS_BASE_URL: ${EXTERNAL_ORDERS_BASE_URL:?EXTERNAL_ORDERS_BASE_URL is required}
-      EXTERNAL_ORDERS_PHONE_NUMBER: ${EXTERNAL_ORDERS_PHONE_NUMBER:?EXTERNAL_ORDERS_PHONE_NUMBER is required}
-      EXTERNAL_ORDERS_PASSWORD: ${EXTERNAL_ORDERS_PASSWORD:?EXTERNAL_ORDERS_PASSWORD is required}
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-    healthcheck:
-      test:
-        - CMD
-        - node
-        - scripts/process-liveness.cjs
-        - dist/worker.js
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    mem_limit: 384m
-    stop_grace_period: 20s
-    logging: *default-logging
-    networks:
-      - application
-
-  web:
-    build:
-      context: .
-      dockerfile: dockerfile.web
-      target: runtime
-      args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
     restart: unless-stopped
     init: true
     environment:
@@ -150,7 +114,7 @@ services:
     ports:
       - 127.0.0.1:3010:3000
     depends_on:
-      api:
+      online-api:
         condition: service_healthy
     healthcheck:
       test:

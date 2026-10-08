@@ -169,7 +169,7 @@ Status: ☐ todo · ◐ in progress · ☑ done. Write the date when done.
 |                      | 6.4 GitHub Actions release workflow                               | ☑      | 2026-10-08 | First real release `desktop-v0.2.3` (CI 9m55s); installed 0.2.2 updated itself from GitHub in 22 s                                            |
 | 7 Online apps + VPS  | 7.1 `apps/online-api` (auth, reports, scoping)                    | ☑      | 2026-10-08 | Own env schema (no `EXTERNAL_*`); cashiers refused online; read-only branch list; 5 server-core + 18 online-api + 5 MySQL tests green |
 |                      | 7.2 `apps/online-web` (login + reports)                           | ☑      | 2026-10-08 | Next standalone on `web-core`; admin-only login; same-origin `/api`; branch picker + logout shell; 9 tests, both web builds green |
-|                      | 7.3 Docker compose + Nginx + runbook                              | ☐      |            |                                                                                                                                               |
+|                      | 7.3 Docker compose + Nginx + runbook                              | ☑      | 2026-10-08 | Compose runs `mysql`/`migrate`/`online-api`/`online-web`; old `api`/`web`/`cache-worker` + their images deleted; Nginx config and rewritten runbook (`/root/cashier`); VPS deploy not yet executed |
 | 8 Admin management   | 8.1 branches CRUD (super-admin)                                   | ☐      |            |                                                                                                                                               |
 |                      | 8.2 admins CRUD + multi-branch assignment                         | ☐      |            |                                                                                                                                               |
 |                      | 8.3 device link codes                                             | ☐      |            |                                                                                                                                               |
@@ -695,7 +695,7 @@ vX+2 → button appears; offline → app opens with no delay beyond 5 s.
 - `docker-compose.yml`: services `mysql`, `migrate`, `online-api`, `online-web` (per Q2).
   New Dockerfiles `dockerfile.online-api`, `dockerfile.online-web`. Nginx: site → online-web,
   `/api` → online-api, raise `client_max_body_size` for uploads.
-- Fix `docs/docker.md` (still says `/opt/minikoshk` / "MiniKoshk"; the live folder is `/opt/cashier`, confirmed by the owner 2026-10-08).
+- Fix `docs/docker.md` (still says `/opt/minikoshk` / "MiniKoshk"; the live folder is `/root/cashier`, confirmed on the VPS 2026-10-08).
 
 **Owner answers (Q8–Q12, 2026-10-08):** the site is `https://cashier.biscofa.tech` (Nginx and HTTPS
 already work on the VPS); the old online cashier is already offline and is removed; the online

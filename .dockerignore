@@ -18,6 +18,9 @@ coverage
 *.log
 docs
 apps/api/tests
+apps/online-api/tests
+apps/online-web/tests
+apps/web/tests
 packages/db/tests
 packages/server-core/tests
 **/*.test.ts

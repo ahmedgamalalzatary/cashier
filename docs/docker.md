@@ -1,42 +1,75 @@
 # Docker operations runbook
 
-MiniKoshk runs as the `cashier-app` Compose project with five services:
+Cashier runs as the `cashier-app` Compose project with four services:
 
-- `web`: Next.js on `127.0.0.1:3010`
-- `api`: Express on `127.0.0.1:4010`
+- `online-web`: the reports site, Next.js standalone on `127.0.0.1:3010`
+- `online-api`: the read-only API, Express on `127.0.0.1:4010`
 - `mysql`: private MySQL 8.4 database
 - `migrate`: one-shot Drizzle migration job
-- `cache-worker`: catalog refresh worker (`node dist/worker.js`, same API image; depends on `migrate` completing)
 
-Run every command from `/opt/minikoshk`. Always provide `.env.production` explicitly:
+There is no point-of-sale service on the server. Each shop PC keeps its own
+database and uploads to this one (Phase 10); the online site never changes
+business data.
+
+Run every command from `/root/cashier`. Always provide `.env.production`
+explicitly:
 
 ```bash
-cd /opt/minikoshk
+cd /root/cashier
 sudo docker compose --env-file .env.production COMMAND
 ```
 
-## Status and health
+## Settings (`.env.production` on the VPS)
 
-Show service state and health:
+The file stays on the VPS and is never committed. It needs exactly these keys:
+
+| Key                  | Meaning                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------ |
+| `MYSQL_DATABASE`     | database name (default `cashier`)                                                            |
+| `MYSQL_USER`         | application database user (default `cashier`)                                                |
+| `MYSQL_PASSWORD`     | password of that user                                                                       |
+| `MYSQL_ROOT_PASSWORD`| root password of the container                                                              |
+| `DATABASE_URL`       | `mysql://<MYSQL_USER>:<MYSQL_PASSWORD>@mysql:3306/<MYSQL_DATABASE>` — host `mysql`, the Compose service |
+| `JWT_SECRET`         | at least 32 characters, random, not the example value                                        |
+| `CORS_ORIGIN`        | exactly `https://cashier.biscofa.tech`                                                       |
+| `ADMIN_NAME`         | display name of the super-admin                                                              |
+| `ADMIN_USERNAME`     | super-admin username                                                                         |
+| `ADMIN_PASSWORD`     | super-admin password                                                                         |
+
+`PORT` and `TRUST_PROXY` are fixed by Compose (`4000`, `true`). The old
+`EXTERNAL_ORDERS_*` and `EXTERNAL_CATALOG_ENABLED` keys are no longer read by
+anything and can be deleted.
+
+## Status and health
 
 ```bash
 sudo docker compose --env-file .env.production ps
 ```
 
-Verify the application locally on the VPS:
+Verify both services on the VPS itself:
 
 ```bash
 curl --fail http://127.0.0.1:4010/health
 curl --fail --head http://127.0.0.1:3010/
 ```
 
-The API response should be `{"ok":true}`; `/health` is intentionally unauthenticated and safe to expose on its loopback port. The `migrate` service should show `Exited (0)` after completing; that is its normal healthy state.
+The API answers `{"ok":true}`; `/health` is unauthenticated and safe on its
+loopback port. The `migrate` service shows `Exited (0)` after completing; that
+is its normal healthy state.
 
-`migrate` and `cache-worker` have liveness healthchecks (`node scripts/process-liveness.cjs`). `migrate` reports `healthy` only while another process has `drizzle-kit` as an argument — normal runs finish in seconds and show `Exited (0)`, while `unhealthy` means the container kept running for over a minute with no migration process (check its logs). `cache-worker` reports `healthy` while another process has `dist/worker.js` as an argument; `unhealthy` means that process died while the container still ran — check `docker compose --env-file .env.production logs cache-worker`. Each probe ignores its own process and ignores `node -e` scripts whose source text mentions the marker, so the healthcheck cannot mark the service healthy by matching itself. These probes see a dead process, not a wedged one: a worker alive but stuck on a hung request still reports `healthy`.
+`migrate` has a liveness healthcheck
+(`node /app/packages/db/scripts/process-liveness.cjs drizzle-kit`). It reports
+`healthy` only while another process runs `drizzle-kit`: normal runs finish in
+seconds and show `Exited (0)`, while `unhealthy` means the container kept
+running for over a minute with no migration process (check its logs). The probe
+sees a dead process, not a wedged one.
 
-## Deploy an update
+## First deploy (replacing the old online cashier)
 
-For a local menu that must retain archived external products/categories, set `EXTERNAL_CATALOG_ENABLED=false` in `.env.production`. The cache worker then skips loading and writing the upstream product catalog while continuing the existing online-order refresh schedule and manual refresh requests. Archived products/categories and historical sales remain stored; enabling the flag again allows upstream catalog refresh. Recreate `cache-worker` after changing this value. The default is `true`.
+The old `api`, `web` and `cache-worker` services are gone from this repository.
+Their containers are still defined in the old Compose file on the VPS, so remove
+them after the new stack is up. The old online data is disposable and the
+database starts empty.
 
 ```bash
 git pull
@@ -46,182 +79,163 @@ sudo docker compose --env-file .env.production up -d
 sudo docker compose --env-file .env.production ps
 ```
 
-The persistent MySQL volume is retained across builds and container replacements. Compose waits for MySQL, runs pending migrations, then starts the API, `cache-worker`, and web service.
-
-This update includes migration `0033_revoke_all_auth_tokens`, which invalidates every previously issued login token as part of the move to HttpOnly cookie auth. All users must log in again after this deploy; that is expected, not a failure.
-
-### First branch-workspace rollout (0039/0040)
-
-Take the normal backup first. Stop old application traffic and the old worker before changing the schema: older code makes unscoped queries, so it must not overlap the new branch-aware deployment.
+Then, once the site answers, drop the leftover containers and images:
 
 ```bash
-sudo docker compose --env-file .env.production stop web api cache-worker
+sudo docker compose --env-file .env.production rm -sf api web cache-worker
+sudo docker image prune
 ```
 
-Build the updated images and run the migration job before starting the application:
-
-```bash
-sudo docker compose --env-file .env.production build
-sudo docker compose --env-file .env.production run --rm migrate
-```
-
-After successful migration, start the updated stack:
-
-```bash
-sudo docker compose --env-file .env.production up -d --force-recreate api cache-worker web
-```
-
-Existing records remain in **الفرع الرئيسي**. MySQL DDL does not roll back on failure; inspect logs and the partial schema before retrying a failed migration. Branch ownership is implemented throughout the API, worker, and web client, so deploy those versions together.
-
-## Admin account
-
-The API synchronizes the admin account from `.env.production` on every start:
-
-- Empty database: creates the admin from `ADMIN_USERNAME` / `ADMIN_PASSWORD` (first deploy needs no manual seeding).
-- Changed name, username, or password: applied automatically; a password change logs all users out.
-- Unchanged values: silent no-op, nobody is logged out.
-- Deactivation is never managed from the environment file.
-
-Apply new admin credentials with:
-
-```bash
-sudo docker compose --env-file .env.production up -d --force-recreate api
-```
-
-For password recovery outside the normal flow, the manual seed script still resets and reactivates the admin. `ADMIN_USERNAME` and `ADMIN_PASSWORD` must always be set; the API refuses to start without them.
-
-## Start, stop, and restart
-
-Start or reconcile the complete stack:
-
-```bash
-sudo docker compose --env-file .env.production up -d
-```
-
-Restart one service without touching MySQL:
-
-```bash
-sudo docker compose --env-file .env.production restart api
-sudo docker compose --env-file .env.production restart web
-```
-
-Stop application traffic while leaving MySQL running:
-
-```bash
-sudo docker compose --env-file .env.production stop web api cache-worker
-```
-
-Start application traffic again:
-
-```bash
-sudo docker compose --env-file .env.production start api cache-worker web
-```
-
-Stop and remove containers and the project network while preserving the database volume:
+To start from an empty database instead of the old cashier data, remove the
+volume **before** the first `up -d` (this deletes everything in it):
 
 ```bash
 sudo docker compose --env-file .env.production down
+sudo docker volume rm cashier-app_mysql_data
 ```
 
-Never add `--volumes` to the `down` command in production. It deletes the persistent MySQL data.
+## Nginx
+
+The host Nginx terminates TLS and forwards to the two loopback ports: `/` goes
+to `127.0.0.1:3010` (online-web) and `/api/` to `127.0.0.1:4010` (online-api).
+`client_max_body_size 4m` leaves room for the Phase 10 upload batches. The site
+calls `/api` on its own origin, so the `location /api/` block is what makes
+signing in work at all.
+
+Keep the `ssl_certificate` / `ssl_certificate_key` lines of the site that is
+already working, and add the rest inside the existing `server` block for
+`cashier.biscofa.tech`:
+
+```nginx
+client_max_body_size 4m;
+
+location /api/ {
+    proxy_pass http://127.0.0.1:4010;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    # online-api runs with TRUST_PROXY=true so the session cookie is Secure.
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location / {
+    proxy_pass http://127.0.0.1:3010;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Then validate and reload:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+## Deploy an update
+
+```bash
+git pull
+sudo docker compose --env-file .env.production config --quiet
+sudo docker compose --env-file .env.production build
+sudo docker compose --env-file .env.production up -d
+sudo docker compose --env-file .env.production ps
+```
+
+The MySQL volume is retained across builds and container replacements. Compose
+waits for MySQL, runs pending migrations, then starts the API and the site. A
+release that adds a migration must reach the VPS **before** it is pushed to the
+shops (deploy order is in the plan, section 5).
+
+## Super-admin account
+
+`online-api` synchronizes the super-admin from `.env.production` on every start:
+
+- Empty database: creates the account from `ADMIN_USERNAME` / `ADMIN_PASSWORD`.
+- Changed name, username, or password: applied automatically; a password change
+  logs everyone out.
+- Unchanged values: silent no-op, nobody is logged out.
+- Deactivation is never managed from the environment file.
+
+Apply new credentials with:
+
+```bash
+sudo docker compose --env-file .env.production up -d --force-recreate online-api
+```
+
+Cashiers cannot sign in on the online site at all; the sign-in screen offers no
+cashier choice.
+
+## Start, stop, and restart
+
+```bash
+sudo docker compose --env-file .env.production up -d
+sudo docker compose --env-file .env.production restart online-api
+sudo docker compose --env-file .env.production restart online-web
+sudo docker compose --env-file .env.production stop online-web online-api
+sudo docker compose --env-file .env.production start online-api online-web
+sudo docker compose --env-file .env.production down
+```
+
+Never add `--volumes` to the `down` command in production. It deletes the
+persistent MySQL data.
 
 ## Logs
 
-Follow all service logs:
-
 ```bash
 sudo docker compose --env-file .env.production logs --follow --tail=200
-```
-
-Inspect selected services:
-
-```bash
 sudo docker compose --env-file .env.production logs --tail=200 mysql migrate
-sudo docker compose --env-file .env.production logs --tail=200 api web
+sudo docker compose --env-file .env.production logs --tail=200 online-api online-web
+sudo docker compose --env-file .env.production logs --since=30m online-api
 ```
 
-Show logs since a specific time:
-
-```bash
-sudo docker compose --env-file .env.production logs --since=30m api
-sudo docker compose --env-file .env.production logs --since=2026-01-01T12:00:00 web
-```
-
-Container logs rotate automatically at 10 MB with three retained files per service.
+Container logs rotate automatically at 10 MB with three retained files per
+service.
 
 ## Common failures
 
 ### `migrate` exits with a nonzero status
 
-Read both database and migration logs:
-
 ```bash
 sudo docker compose --env-file .env.production logs --tail=300 mysql migrate
 ```
 
-After correcting the database connection or migration problem, recreate the migration job and application services:
+MySQL DDL does not roll back, so inspect the logs and the partial schema before
+retrying. Do not edit an applied SQL migration: add a new one and redeploy.
+
+### online-api is unhealthy or will not start
 
 ```bash
-sudo docker compose --env-file .env.production up -d --force-recreate migrate api cache-worker web
+sudo docker compose --env-file .env.production logs --tail=300 online-api
 ```
 
-Do not edit an already-applied SQL migration. Add a new migration and redeploy.
-
-### API is unhealthy
+`DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGIN`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`
+and the database credentials must all exist in `.env.production`. A missing or
+malformed value stops the process with a message naming the key. After changing
+the file, recreate the service instead of merely restarting it:
 
 ```bash
-sudo docker compose --env-file .env.production logs --tail=300 api
-sudo docker compose --env-file .env.production exec api node -e \
-  "fetch('http://127.0.0.1:4000/health').then(async r=>console.log(r.status,await r.text()))"
+sudo docker compose --env-file .env.production up -d --force-recreate online-api online-web
 ```
 
-Check that `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGIN`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and the database credentials exist in `.env.production`. `CORS_ORIGIN` must list the exact web origin (browsers reject credentialed cookie requests to unlisted origins). After changing the file, recreate the API instead of merely restarting it:
+### The site loads but signing in fails
 
-```bash
-sudo docker compose --env-file .env.production up -d --force-recreate api cache-worker web
-```
-
-### CORS and TRUST_PROXY security notes
-
-- CORS is not auth and not access control. Browsers enforce `CORS_ORIGIN`, but curl / non-browser clients with no-Origin bypass CORS entirely. Every `/api/*` route still requires JWT/cookie auth.
-- `TRUST_PROXY`: default `false` locally, `"true"` in compose behind host Nginx. Set `TRUST_PROXY=true` only behind a trusted proxy that terminates TLS, because Express trusts `X-Forwarded-Proto` for secure cookies when enabled. Setting it true without a proxy lets a client spoof `X-Forwarded-Proto`.
-
-### Web is unhealthy or shows an old API URL
-
-`NEXT_PUBLIC_API_URL` is baked into the web bundle at build time: Next.js inlines `NEXT_PUBLIC_*` variables into the client JavaScript while the image is built, so changing `.env.production` alone has no effect on an already-built image. The value reaches the build as a Compose build arg from `.env.production` (see the `web` service's `build.args` in `docker-compose.yml`). After changing it there, rebuild the web image:
-
-```bash
-sudo docker compose --env-file .env.production build --no-cache web
-sudo docker compose --env-file .env.production up -d --force-recreate web
-```
-
-This rebuild requirement is an accepted trade-off; making the API URL runtime-configurable is out of scope.
-
-### MySQL is unhealthy
-
-```bash
-sudo docker compose --env-file .env.production logs --tail=300 mysql
-sudo docker compose --env-file .env.production exec mysql \
-  mysqladmin ping -u root -p
-```
-
-Do not delete or recreate the volume as a troubleshooting shortcut. Check disk space, memory, credentials, and MySQL logs first.
+`CORS_ORIGIN` must list the exact browser origin
+(`https://cashier.biscofa.tech`); browsers reject credentialed cookie requests
+to an unlisted origin. `TRUST_PROXY=true` must stay on, because TLS terminates
+at Nginx and the session cookie only becomes `Secure` behind the proxy.
 
 ### Nginx returns `502 Bad Gateway`
-
-Confirm both application ports respond on the VPS:
 
 ```bash
 curl --fail http://127.0.0.1:4010/health
 curl --fail --head http://127.0.0.1:3010/
 sudo docker compose --env-file .env.production ps
-```
-
-If a container is unhealthy, inspect its logs. If both endpoints work, validate and reload host Nginx:
-
-```bash
 sudo nginx -t
-sudo systemctl reload nginx
 ```
 
 ### A host port is already allocated
@@ -230,11 +244,10 @@ sudo systemctl reload nginx
 sudo ss -lntp | grep -E ':(3010|4010)\b'
 ```
 
-Only this Compose project should bind those ports, and both bindings must remain on `127.0.0.1`.
+Only this Compose project should bind those ports, and both must stay on
+`127.0.0.1`.
 
 ## Database backup
-
-Create a timestamped SQL dump outside the container:
 
 ```bash
 set -a
@@ -247,45 +260,33 @@ sudo docker compose --env-file .env.production exec -T mysql \
 unset MYSQL_ROOT_PASSWORD
 ```
 
-Confirm that the dump exists and is not empty:
-
-```bash
-ls -lh backups/*.sql
-```
-
-Copy backups off the VPS regularly. A dump stored only on the same VPS is not a complete backup.
+A dump stored only on the same VPS is not a complete backup: copy it off the
+server regularly.
 
 ## Database restore
 
-Restoring replaces live database state. Take a new backup first and perform the restore during a maintenance window:
+Restoring replaces live database state. Take a new backup first and do it in a
+maintenance window:
 
 ```bash
 set -a
 . ./.env.production
 set +a
-sudo docker compose --env-file .env.production stop api web cache-worker
+sudo docker compose --env-file .env.production stop online-web online-api
 sudo docker compose --env-file .env.production exec -T mysql \
   mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE" < backups/selected-dump.sql
-sudo docker compose --env-file .env.production up -d --force-recreate migrate api cache-worker web
+sudo docker compose --env-file .env.production up -d --force-recreate migrate online-api online-web
 unset MYSQL_ROOT_PASSWORD
 ```
 
-Verify API health and inspect its logs after restoration.
-
 ## Disk usage and safe cleanup
-
-Inspect Docker disk usage:
 
 ```bash
 sudo docker system df
-sudo du -sh /var/lib/docker
-```
-
-Remove only unused build cache and dangling images:
-
-```bash
+sudo docker du -sh /var/lib/docker
 sudo docker builder prune
 sudo docker image prune
 ```
 
-Review every prompt before confirming. Do not run volume-pruning commands on the production VPS.
+Review every prompt before confirming. Never prune volumes on the production
+VPS.

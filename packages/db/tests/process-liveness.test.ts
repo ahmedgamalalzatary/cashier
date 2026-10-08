@@ -2,7 +2,7 @@ import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 
 const { hasLivingProcess } = createRequire(import.meta.url)(
-  "../../scripts/process-liveness.cjs",
+  "../scripts/process-liveness.cjs",
 ) as {
   hasLivingProcess: (
     marker: string,
