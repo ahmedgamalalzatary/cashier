@@ -19,7 +19,7 @@ const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
 function repoForCode(overrides: Record<string, unknown> = {}) {
   return {
-    insert: vi.fn(async () => undefined),
+    replaceUnused: vi.fn(async () => undefined),
     existingBranchIds: vi.fn(async () => [branchId]),
     ...overrides,
   } as unknown as LinkCodesRepository;
@@ -32,7 +32,7 @@ describe("LinkCodesService.generate", () => {
     await expect(
       new LinkCodesService(repo).generate(regularAdmin, { branchId }),
     ).rejects.toMatchObject({ status: 403 });
-    expect(repo.insert).not.toHaveBeenCalled();
+    expect(repo.replaceUnused).not.toHaveBeenCalled();
   });
 
   it("returns the plaintext code once and stores only its hash", async () => {
@@ -44,7 +44,7 @@ describe("LinkCodesService.generate", () => {
 
     expect(result.code).toMatch(new RegExp(`^[${CODE_ALPHABET}]{8}$`));
     expect(result.expiresAt.getTime()).toBeGreaterThan(Date.now());
-    const [hash, expiresAt] = repo.insert.mock.calls[0] as unknown as [
+    const [hash, expiresAt] = repo.replaceUnused.mock.calls[0] as unknown as [
       string,
       Date,
       string,
@@ -76,7 +76,7 @@ describe("LinkCodesService.generate", () => {
         branchId: archivedBranchId,
       }),
     ).rejects.toMatchObject({ status: 404 });
-    expect(repo.insert).not.toHaveBeenCalled();
+    expect(repo.replaceUnused).not.toHaveBeenCalled();
   });
 
   it("never stores the code in a form that could be replayed from the database", async () => {
@@ -86,7 +86,7 @@ describe("LinkCodesService.generate", () => {
       branchId,
     });
 
-    const stored = JSON.stringify(repo.insert.mock.calls[0]);
+    const stored = JSON.stringify(repo.replaceUnused.mock.calls[0]);
     expect(stored).not.toContain(result.code);
   });
 });

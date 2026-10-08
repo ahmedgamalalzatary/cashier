@@ -80,6 +80,23 @@ describe("online branch management", () => {
     expect(listed.body.map((row) => row.id)).toContain(branch.id);
   });
 
+  it("reopens an archived branch for the super-admin", async () => {
+    const auth = await loginAsAdmin("owner", { isSuperAdmin: true });
+    const branch = await createBranch(auth, "فرع يعود للعمل");
+    await request(onlineApp)
+      .delete(`/api/branches/${branch.id}`)
+      .set(auth)
+      .expect(200);
+
+    const reopened = await request(onlineApp)
+      .put(`/api/branches/${branch.id}`)
+      .set(auth)
+      .send({ isActive: true })
+      .expect(200);
+
+    expect(reopened.body.isActive).toBe(true);
+  });
+
   it("keeps the new branch out of an ordinary admin's list", async () => {
     const owner = await loginAsAdmin("owner", { isSuperAdmin: true });
     await createBranch(owner, "فرع مدير");

@@ -21,14 +21,10 @@ export const updateAdmin = (
     username?: string;
     password?: string;
     isActive?: boolean;
+    branchIds?: string[];
   },
 ) =>
   api<{ ok: true }>(`/api/admins/${id}`, {
     method: "PUT",
     body: JSON.stringify(changes),
-  });
-export const assignAdminBranches = (id: string, branchIds: string[]) =>
-  api<{ ok: true }>(`/api/admins/${id}/branches`, {
-    method: "PUT",
-    body: JSON.stringify({ branchIds }),
   });

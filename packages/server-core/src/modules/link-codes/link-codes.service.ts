@@ -38,7 +38,7 @@ export class LinkCodesService {
 
     const code = generateCode();
     const expiresAt = new Date(Date.now() + TTL_MS);
-    await this.repo.insert(hashCode(code), expiresAt, data.branchId);
+    await this.repo.replaceUnused(hashCode(code), expiresAt, data.branchId);
     return { code, expiresAt };
   }
 }

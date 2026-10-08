@@ -77,6 +77,9 @@ export function OnlineLinkCodesPage() {
           <KeyRound className="size-4" />
           إنشاء كود ربط
         </Button>
+        <p className="text-sm text-muted">
+          إنشاء كود جديد يُلغي أي كود سابق لم يُستخدم لنفس الفرع.
+        </p>
       </Section>
       {issued && (
         <Section title="الكود">

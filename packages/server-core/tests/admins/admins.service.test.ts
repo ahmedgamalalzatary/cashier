@@ -20,7 +20,6 @@ const accountId = testId(3);
 const newAdmin = {
   name: "مدير جديد",
   username: "new-admin",
-  role: "admin" as const,
   password: "password-123",
   branchIds: [] as string[],
 };
@@ -151,6 +150,63 @@ describe("AdminsService update", () => {
       repo.tx.update as unknown as { mock: { calls: unknown[][] } }
     ).mock.calls[0][1] as Record<string, unknown>;
     expect(changes.isActive).toBe(false);
+  });
+
+  it("saves details and branches together in one transaction", async () => {
+    const repo = repoForUpdate(
+      { id: testId(2), role: "admin" },
+      {
+        existingBranchIds: vi.fn(async () => [branchId]),
+        replaceBranches: vi.fn(async () => undefined),
+      },
+    );
+
+    await new AdminsService(repo).update(superAdmin, testId(2), {
+      name: "اسم جديد",
+      branchIds: [branchId],
+    });
+
+    expect(repo.transaction).toHaveBeenCalledTimes(1);
+    expect(repo.tx.update).toHaveBeenCalledWith(testId(2), {
+      name: "اسم جديد",
+    });
+    expect(
+      (repo.tx as unknown as { replaceBranches: unknown }).replaceBranches,
+    ).toHaveBeenCalledWith(testId(2), [branchId]);
+  });
+
+  it("changes only the branches when nothing else was edited", async () => {
+    const repo = repoForUpdate(
+      { id: testId(2), role: "admin" },
+      {
+        existingBranchIds: vi.fn(async () => [branchId]),
+        replaceBranches: vi.fn(async () => undefined),
+      },
+    );
+
+    await new AdminsService(repo).update(superAdmin, testId(2), {
+      branchIds: [branchId],
+    });
+
+    expect(repo.tx.update).not.toHaveBeenCalled();
+  });
+
+  it("saves nothing when one of the branches is unknown", async () => {
+    const repo = repoForUpdate(
+      { id: testId(2), role: "admin" },
+      {
+        existingBranchIds: vi.fn(async () => [branchId]),
+        replaceBranches: vi.fn(async () => undefined),
+      },
+    );
+
+    await expect(
+      new AdminsService(repo).update(superAdmin, testId(2), {
+        name: "اسم جديد",
+        branchIds: [otherBranchId],
+      }),
+    ).rejects.toMatchObject({ status: 404 });
+    expect(repo.tx.update).not.toHaveBeenCalled();
   });
 });
 

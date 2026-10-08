@@ -151,6 +151,10 @@ describe("online link code screen", () => {
     expect(text(render())).toContain("لن يظهر هذا الكود مرة أخرى");
   });
 
+  it("warns that a new code cancels the branch's earlier unused code", () => {
+    expect(text(render())).toContain("يُلغي أي كود سابق لم يُستخدم");
+  });
+
   it("keeps the branch it is pointing at rather than resetting to the first", async () => {
     chooseBranch(scope.branches[1].id);
     await buttonLabelled("إنشاء كود ربط").onClick();

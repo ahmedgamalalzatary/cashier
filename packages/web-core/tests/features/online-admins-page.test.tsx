@@ -15,7 +15,6 @@ const calls = vi.hoisted(() => ({
   listAdmins: vi.fn(),
   createAdmin: vi.fn(),
   updateAdmin: vi.fn(),
-  assignAdminBranches: vi.fn(),
 }));
 const scope = vi.hoisted(() => ({
   branches: [
@@ -28,6 +27,11 @@ const scope = vi.hoisted(() => ({
       id: "019a1234-5678-7000-8000-000000000002",
       name: "فرع الجنوب",
       isActive: true,
+    },
+    {
+      id: "019a1234-5678-7000-8000-000000000003",
+      name: "فرع قديم",
+      isActive: false,
     },
   ] as { id: string; name: string; isActive: boolean }[],
   accounts: [
@@ -82,7 +86,6 @@ vi.mock("../../src/services/admins-service", () => ({
   listAdmins: calls.listAdmins,
   createAdmin: calls.createAdmin,
   updateAdmin: calls.updateAdmin,
-  assignAdminBranches: calls.assignAdminBranches,
 }));
 
 import { OnlineAdminsPage } from "../../src/features/online-admins-page";
@@ -155,7 +158,6 @@ beforeEach(() => {
   calls.listAdmins.mockReset().mockResolvedValue(scope.accounts);
   calls.createAdmin.mockReset().mockResolvedValue({ id: "new-id" });
   calls.updateAdmin.mockReset().mockResolvedValue({ ok: true });
-  calls.assignAdminBranches.mockReset().mockResolvedValue({ ok: true });
 });
 
 describe("online admin management screen", () => {
@@ -274,10 +276,68 @@ describe("online admin management screen", () => {
       preventDefault: () => {},
     });
 
-    expect(calls.assignAdminBranches).toHaveBeenCalledWith(row.id, [
-      scope.branches[0].id,
-      scope.branches[1].id,
-    ]);
+    // one request, so a refused branch can never leave the details half-saved
+    expect(calls.updateAdmin).toHaveBeenCalledTimes(1);
+    expect(calls.updateAdmin).toHaveBeenCalledWith(row.id, {
+      name: row.name,
+      username: row.username,
+      branchIds: [scope.branches[0].id, scope.branches[1].id],
+    });
+  });
+
+  it("keeps an archived branch the admin already reads, and shows it as archived", async () => {
+    await loaded();
+    const [north, , archived] = scope.branches;
+    const row: Account = {
+      ...rowFor("branch-manager"),
+      branchIds: [north.id, archived.id],
+    };
+    const edit = ofType(table().actions(row), Button).find((button) =>
+      text(button).includes("تعديل"),
+    )!;
+    (edit.props as { onClick: () => void }).onClick();
+    const modalChildren = () =>
+      (rendered(Modal)[0].props as { children?: ReactNode }).children;
+    const labels = ofType(modalChildren(), "label").map((label) => text(label));
+    const [form] = ofType(modalChildren(), "form");
+
+    await (form!.props as { onSubmit: (event: unknown) => void }).onSubmit({
+      preventDefault: () => {},
+    });
+
+    expect(labels.some((label) => label.includes("فرع قديم (مؤرشف)"))).toBe(true);
+    expect(calls.updateAdmin).toHaveBeenCalledWith(row.id, {
+      name: row.name,
+      username: row.username,
+      branchIds: [north.id, archived.id],
+    });
+  });
+
+  it("offers no archived branch to an admin that never had it", async () => {
+    await loaded();
+    const header = rendered(PageHeader)[0].props as { actions?: ReactNode };
+    const addButton = ofType(header.actions, Button).find((button) =>
+      text(button).includes("إضافة مدير"),
+    )!;
+    (addButton.props as { onClick: () => void }).onClick();
+    const labels = ofType(
+      (rendered(Modal)[0].props as { children?: ReactNode }).children,
+      "label",
+    ).map((label) => text(label));
+
+    expect(labels.some((label) => label.includes("فرع قديم"))).toBe(false);
+  });
+
+  it("reactivates a stopped admin", async () => {
+    await loaded();
+    const row = rowFor("disabled-manager");
+    const reactivate = ofType(table().actions(row), Button).find((button) =>
+      text(button).includes("تفعيل"),
+    )!;
+
+    await (reactivate.props as { onClick: () => Promise<void> }).onClick();
+
+    expect(calls.updateAdmin).toHaveBeenCalledWith(row.id, { isActive: true });
   });
 
   it("deactivates an admin instead of deleting the account", async () => {

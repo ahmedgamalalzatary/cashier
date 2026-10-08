@@ -182,4 +182,24 @@ describe("online branch management screen", () => {
 
     expect(calls.archiveBranch).toHaveBeenCalledWith(scope.branches[0].id);
   });
+
+  it("reopens an archived branch and offers no archive control for it", async () => {
+    const archived = scope.branches.find((branch) => !branch.isActive)!;
+    const table = rendered(DataTable)[0].props as {
+      actions: (row: Branch) => ReactNode;
+    };
+    const controls = ofType(table.actions(archived), Button);
+    const reopen = controls.find((button) =>
+      text(button).includes("إعادة فتح"),
+    )!;
+
+    await (reopen.props as { onClick: () => Promise<void> }).onClick();
+
+    expect(controls.some((button) => text(button).includes("أرشفة"))).toBe(
+      false,
+    );
+    expect(calls.updateBranch).toHaveBeenCalledWith(archived.id, {
+      isActive: true,
+    });
+  });
 });

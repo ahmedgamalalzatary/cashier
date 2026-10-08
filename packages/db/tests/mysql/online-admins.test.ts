@@ -251,4 +251,124 @@ describe("online admin management", () => {
       .where(eq(adminBranches.adminUserId, first.body.id));
     expect(remaining).toHaveLength(0);
   });
+
+  it("creates an admin from the screen's request, which names no role", async () => {
+    const owner = await loginAsAdmin("owner", { isSuperAdmin: true });
+    const north = await createBranch("فرع الشمال");
+
+    const created = await request(onlineApp)
+      .post("/api/admins")
+      .set(owner)
+      .send({
+        name: "مدير",
+        username: "no-role",
+        password: "secret123",
+        // ticked twice by a double click: still one assignment
+        branchIds: [north, north],
+      })
+      .expect(201);
+
+    const rows = await db
+      .select()
+      .from(adminBranches)
+      .where(eq(adminBranches.adminUserId, created.body.id));
+    expect(rows.map((row) => row.branchId)).toEqual([north]);
+  });
+
+  it("saves an admin that keeps an archived branch", async () => {
+    const owner = await loginAsAdmin("owner", { isSuperAdmin: true });
+    const open = await createBranch("فرع مفتوح");
+    const closed = await createBranch("فرع سيُؤرشف");
+    const created = await request(onlineApp)
+      .post("/api/admins")
+      .set(owner)
+      .send({
+        name: "مدير",
+        username: "keeps-archived",
+        password: "secret123",
+        branchIds: [open, closed],
+      })
+      .expect(201);
+    await db
+      .update(branches)
+      .set({ isActive: false })
+      .where(eq(branches.id, closed));
+
+    // one request saves the details and the branches together
+    await request(onlineApp)
+      .put(`/api/admins/${created.body.id}`)
+      .set(owner)
+      .send({ name: "اسم جديد", branchIds: [open, closed] })
+      .expect(200);
+    const listed = await request(onlineApp)
+      .get("/api/admins")
+      .set(owner)
+      .expect(200);
+    const manager = listed.body.find(
+      (row: { id: string }) => row.id === created.body.id,
+    );
+
+    expect(manager.name).toBe("اسم جديد");
+    expect([...manager.branchIds].sort()).toEqual([open, closed].sort());
+  });
+
+  it("changes nothing when one of the saved branches does not exist", async () => {
+    const owner = await loginAsAdmin("owner", { isSuperAdmin: true });
+    const north = await createBranch("فرع الشمال");
+    const created = await request(onlineApp)
+      .post("/api/admins")
+      .set(owner)
+      .send({
+        name: "مدير",
+        username: "stays-same",
+        password: "secret123",
+        branchIds: [north],
+      })
+      .expect(201);
+
+    await request(onlineApp)
+      .put(`/api/admins/${created.body.id}`)
+      .set(owner)
+      .send({ name: "اسم جديد", branchIds: [testId(901)] })
+      .expect(404);
+    const listed = await request(onlineApp)
+      .get("/api/admins")
+      .set(owner)
+      .expect(200);
+    const manager = listed.body.find(
+      (row: { id: string }) => row.id === created.body.id,
+    );
+
+    expect(manager.name).toBe("مدير");
+    expect(manager.branchIds).toEqual([north]);
+  });
+
+  it("lets a reactivated admin sign in again", async () => {
+    const owner = await loginAsAdmin("owner", { isSuperAdmin: true });
+    const created = await request(onlineApp)
+      .post("/api/admins")
+      .set(owner)
+      .send({ name: "مدير", username: "comes-back", password: "secret123" })
+      .expect(201);
+    const signIn = () =>
+      request(onlineApp).post("/api/auth/login").send({
+        role: "admin",
+        username: "comes-back",
+        password: "secret123",
+      });
+    await request(onlineApp)
+      .put(`/api/admins/${created.body.id}`)
+      .set(owner)
+      .send({ isActive: false })
+      .expect(200);
+    expect((await signIn()).status).toBe(401);
+
+    await request(onlineApp)
+      .put(`/api/admins/${created.body.id}`)
+      .set(owner)
+      .send({ isActive: true })
+      .expect(200);
+
+    expect((await signIn()).status).toBe(200);
+  });
 });

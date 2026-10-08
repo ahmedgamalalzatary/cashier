@@ -66,11 +66,12 @@ export class AdminsService {
         if (!user) throw new HttpError(404, "المستخدم غير موجود");
         if (user.isSuperAdmin) throw new HttpError(409, SUPER_ADMIN_MANAGED);
         if (user.role === "cashier") throw new HttpError(409, CASHIER_MANAGED);
-        const { password: _password, ...changes } = data;
-        await repo.update(id, {
-          ...changes,
-          ...(passwordHash ? { passwordHash } : {}),
-        });
+        const { password: _password, branchIds, ...changes } = data;
+        // Checked before any write, so a bad branch leaves the account as it was.
+        if (branchIds) await this.assertBranchesExist(repo, branchIds);
+        const columns = { ...changes, ...(passwordHash ? { passwordHash } : {}) };
+        if (Object.keys(columns).length > 0) await repo.update(id, columns);
+        if (branchIds) await repo.replaceBranches(id, branchIds);
       });
     } catch (error) {
       if (duplicateUsername(error))

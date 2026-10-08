@@ -13,7 +13,6 @@ import { Modal } from "../components/ui/modal";
 import { PageHeader } from "../components/ui/page-header";
 import { ErrorBanner } from "../components/ui/states";
 import {
-  assignAdminBranches,
   createAdmin,
   listAdmins,
   updateAdmin,
@@ -26,6 +25,8 @@ type FormState = {
   username: string;
   password: string;
   branchIds: string[];
+  /** Archived branches this admin already reads; only these stay on offer. */
+  keptArchived: string[];
 };
 
 /**
@@ -89,12 +90,13 @@ export function OnlineAdminsPage() {
           branchIds: form.branchIds,
         });
       else {
+        // One request: a refused branch leaves the details unsaved too.
         await updateAdmin(form.id, {
           name: form.name.trim(),
           username: form.username.trim(),
           ...(form.password ? { password: form.password } : {}),
+          branchIds: form.branchIds,
         });
-        await assignAdminBranches(form.id, form.branchIds);
       }
       setForm(null);
     });
@@ -173,6 +175,7 @@ export function OnlineAdminsPage() {
                 username: "",
                 password: "",
                 branchIds: [],
+                keptArchived: [],
               });
             }}
           >
@@ -203,6 +206,11 @@ export function OnlineAdminsPage() {
                     username: row.username,
                     password: "",
                     branchIds: row.branchIds,
+                    keptArchived: row.branchIds.filter((id) =>
+                      branches.some(
+                        (branch) => branch.id === id && !branch.isActive,
+                      ),
+                    ),
                   });
                 }}
               >
@@ -221,6 +229,19 @@ export function OnlineAdminsPage() {
                 >
                   <UserCheck className="size-4" />
                   إيقاف
+                </Button>
+              )}
+              {!row.isActive && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() =>
+                    run(() => updateAdmin(row.id, { isActive: true }))
+                  }
+                >
+                  <UserCheck className="size-4" />
+                  تفعيل
                 </Button>
               )}
             </div>
@@ -282,7 +303,10 @@ export function OnlineAdminsPage() {
                 الفروع المسموح بها
               </legend>
               {branches
-                .filter((branch) => branch.isActive)
+                .filter(
+                  (branch) =>
+                    branch.isActive || form.keptArchived.includes(branch.id),
+                )
                 .map((branch) => (
                   <label
                     key={branch.id}
@@ -296,7 +320,7 @@ export function OnlineAdminsPage() {
                         toggleBranch(branch.id, event.target.checked)
                       }
                     />
-                    {branch.name}
+                    {`${branch.name}${branch.isActive ? "" : " (مؤرشف)"}`}
                   </label>
                 ))}
             </fieldset>

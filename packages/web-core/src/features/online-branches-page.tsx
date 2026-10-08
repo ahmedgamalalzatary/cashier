@@ -1,7 +1,14 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Archive, Building2, Pencil, Plus, RefreshCw } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  Building2,
+  Pencil,
+  Plus,
+  RefreshCw,
+} from "lucide-react";
 import type { Branch } from "@cashier/shared";
 import { useAuth } from "../components/auth/auth-provider";
 import { useBranch } from "../components/branches/branch-provider";
@@ -103,7 +110,7 @@ export function OnlineBranchesPage() {
     <div className="space-y-5">
       <PageHeader
         title="إدارة الفروع"
-        description="أنشئ فروعًا جديدة، أعد تسميةها، أو أرشفها. سجلات الفرع تبقى محفوظة بعد الأرشفة."
+        description="أنشئ فروعًا جديدة، أعد تسميتها، أو أرشفها. سجلات الفرع تبقى محفوظة بعد الأرشفة ويمكن إعادة فتحه لاحقًا."
         actions={
           <>
             <Button
@@ -159,6 +166,19 @@ export function OnlineBranchesPage() {
               >
                 <Archive className="size-4" />
                 أرشفة
+              </Button>
+            )}
+            {!row.isActive && (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={busy}
+                onClick={() =>
+                  run(() => updateBranch(row.id, { isActive: true }))
+                }
+              >
+                <ArchiveRestore className="size-4" />
+                إعادة فتح
               </Button>
             )}
           </div>

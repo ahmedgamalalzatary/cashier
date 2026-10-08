@@ -133,6 +133,28 @@ describe("online link codes", () => {
       .expect(404);
   });
 
+  it("cancels the branch's unused code when a new one is made", async () => {
+    const owner = await loginAsAdmin("owner", { isSuperAdmin: true });
+    const branch = await createBranch("فرع الكود الجديد");
+    const other = await createBranch("فرع آخر");
+    const mint = (branchId: string) =>
+      request(onlineApp)
+        .post("/api/link-codes")
+        .set(owner)
+        .send({ branchId })
+        .expect(201)
+        .then((response) => response.body.code as string);
+    const otherCode = await mint(other);
+    const first = await mint(branch);
+
+    const second = await mint(branch);
+
+    expect(await rowForHash(hashCode(first))).toBeUndefined();
+    expect(await rowForHash(hashCode(second))).toBeDefined();
+    // another branch's code is untouched
+    expect(await rowForHash(hashCode(otherCode))).toBeDefined();
+  });
+
   it("refuses minting from an admin that is not the super-admin", async () => {
     const manager = await loginAsAdmin("manager", { isSuperAdmin: false });
     const branch = await createBranch("فرع المدير");

@@ -70,6 +70,7 @@ export class AdminsRepository {
       .values({
         name: data.name,
         username: data.username,
+        // Every account made online is an admin; cashiers belong to the PCs.
         role: "admin",
         passwordHash,
       })
@@ -79,7 +80,9 @@ export class AdminsRepository {
 
   async update(
     id: string,
-    data: Omit<AdminUpdateInput, "password"> & { passwordHash?: string },
+    data: Omit<AdminUpdateInput, "password" | "branchIds"> & {
+      passwordHash?: string;
+    },
   ) {
     await this.db
       .update(users)
@@ -103,11 +106,12 @@ export class AdminsRepository {
       .values(branchIds.map((branchId) => ({ adminUserId, branchId })));
   }
 
+  /**
+   * Archived branches count too: an admin keeps read access to an archived
+   * branch's history, so saving that admin must not drop or reject it.
+   */
   async existingBranchIds() {
-    const rows = await this.db
-      .select({ id: branches.id })
-      .from(branches)
-      .where(eq(branches.isActive, true));
+    const rows = await this.db.select({ id: branches.id }).from(branches);
     return rows.map((row) => row.id);
   }
 }
