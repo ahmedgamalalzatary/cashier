@@ -11,7 +11,11 @@ export default defineConfig({
     globalSetup: ["./tests/mysql-setup.ts"],
     fileParallelism: false,
     maxWorkers: 1,
-    hookTimeout: 30_000,
+    // schema.test.ts creates a scratch database and applies every migration to
+    // it. That takes ~14s on its own, but the full suite runs the other packages
+    // against the same local MySQL at the same time, which pushes it past the
+    // 30s default and fails the run for no reason.
+    hookTimeout: 120_000,
     pool: "forks",
     poolOptions: {
       forks: { singleFork: true },

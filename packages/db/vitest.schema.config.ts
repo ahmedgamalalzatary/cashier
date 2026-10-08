@@ -6,6 +6,8 @@ export default defineConfig({
     include: ["tests/mysql/schema.test.ts"],
     fileParallelism: false,
     maxWorkers: 1,
-    hookTimeout: 30_000,
+    // Same reasoning as vitest.mysql.config.ts: a fresh database plus every
+    // migration outlasts 30s whenever the rest of the suite shares the MySQL.
+    hookTimeout: 120_000,
   },
 });
