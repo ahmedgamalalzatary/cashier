@@ -105,26 +105,12 @@ describe("online API surface", () => {
     expect(res.status).toBe(401);
   });
 
-  it("exposes no branch write route", async () => {
-    const app = createApp(dbFinding(admin), options);
-    const token = { Authorization: tokenFor(admin) };
-    const branchId = testId(9);
+  it("mounts no staff business write route", async () => {
+    const res = await request(createApp(dbFinding(admin), options))
+      .post("/api/items")
+      .set("Authorization", tokenFor(admin));
 
-    const created = await request(app)
-      .post("/api/branches")
-      .set(token)
-      .send({ name: "New branch" });
-    const renamed = await request(app)
-      .put(`/api/branches/${branchId}`)
-      .set(token)
-      .send({ name: "Renamed" });
-    const archived = await request(app)
-      .delete(`/api/branches/${branchId}`)
-      .set(token);
-
-    expect([created.status, renamed.status, archived.status]).toEqual([
-      404, 404, 404,
-    ]);
+    expect(res.status).toBe(404);
   });
 
   it("requires an explicit branch selection before reports", async () => {

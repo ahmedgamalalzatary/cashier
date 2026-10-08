@@ -137,3 +137,16 @@ export function requireRole(role: AuthUser["role"]) {
     next();
   };
 }
+
+/**
+ * Online management is the super-admin's alone (plan Phase 8): an ordinary
+ * admin reads branches but never creates, renames, or archives one.
+ */
+export function requireSuperAdmin() {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.user) throw new HttpError(401, "يجب تسجيل الدخول");
+    if (!req.user.isSuperAdmin)
+      throw new HttpError(403, "هذا الإجراء متاح للمدير العام فقط");
+    next();
+  };
+}

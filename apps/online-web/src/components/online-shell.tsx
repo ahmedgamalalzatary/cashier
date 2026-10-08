@@ -21,6 +21,11 @@ export function OnlineShell({ children }: { children: ReactNode }) {
             تقارير الكاشير
           </Link>
           <BranchPicker />
+          {user.isSuperAdmin && (
+            <Link href="/branches" className="text-sm text-primary hover:underline">
+              إدارة الفروع
+            </Link>
+          )}
           <Button onClick={() => void logout()}>تسجيل الخروج</Button>
         </div>
       </header>

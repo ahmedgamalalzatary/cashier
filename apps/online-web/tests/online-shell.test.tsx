@@ -25,15 +25,21 @@ function elements(node: ReactNode, found: ReactElement[] = []) {
   return found;
 }
 
-const signedIn = () => {
+const signedIn = (isSuperAdmin = true) => {
   scope.user = {
     id: testId(9),
     name: "Manager",
     role: "admin",
     branchId: null,
-    isSuperAdmin: true,
+    isSuperAdmin,
   } as never;
 };
+
+const linksTo = (pathname: string) =>
+  elements(OnlineShell({ children: "reports" }) as never).filter(
+    (node) =>
+      (node.props as { href?: string }).href === pathname,
+  );
 
 beforeEach(() => {
   scope.user = null;
@@ -59,5 +65,13 @@ describe("online shell", () => {
     expect(rendered.filter((node) => node.type === "header")).toHaveLength(1);
     (logoutControl!.props as { onClick: () => void }).onClick();
     expect(scope.logout).toHaveBeenCalledOnce();
+  });
+
+  it("offers branch management to the super-admin only", () => {
+    signedIn(true);
+    expect(linksTo("/branches")).toHaveLength(1);
+
+    signedIn(false);
+    expect(linksTo("/branches")).toHaveLength(0);
   });
 });

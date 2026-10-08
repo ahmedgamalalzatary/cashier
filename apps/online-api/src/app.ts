@@ -4,7 +4,7 @@ import type { Db } from "@cashier/db";
 import {
   authenticate,
   createAuthModule,
-  createBranchesListModule,
+  createBranchesManagementModule,
   createReportsModule,
   errorHandler,
   requireRole,
@@ -17,8 +17,9 @@ export type AppOptions = {
   trustProxy?: boolean;
 };
 
-// Online serves every branch and refuses cashiers outright (plan D4). It also
-// mounts no business write route: management arrives in Phase 8.
+// Online serves every branch and refuses cashiers outright (plan D4). The only
+// writes it accepts are super-admin management (plan Phase 8); no business
+// write route is ever mounted here.
 const onlineAccess = { online: true } as const;
 
 export function createApp(
@@ -44,7 +45,7 @@ export function createApp(
   app.use(
     "/api/branches",
     authenticate(db, jwtSecret, onlineAccess),
-    createBranchesListModule(db),
+    createBranchesManagementModule(db),
   );
   app.use(
     "/api/reports",
