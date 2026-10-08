@@ -1,8 +1,10 @@
-//! Forced update on open (plan 6.2): before MySQL and the local API start,
-//! look for a newer release for at most a few seconds and install it.
+//! Updates. On open (plan 6.2): before MySQL and the local API start, look for
+//! a newer release for at most a few seconds and install it. While open
+//! (plan 6.3): check every 30 minutes and offer an "Update available" button.
 
+use std::sync::Mutex;
 use std::time::Duration;
-use tauri::{AppHandle, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_updater::UpdaterExt;
 
 /// How long opening Cashier may wait for GitHub before starting normally.
@@ -11,6 +13,63 @@ const CHECK_LIMIT: Duration = Duration::from_secs(5);
 const DOWNLOAD_LIMIT: Duration = Duration::from_secs(20 * 60);
 
 pub const UPDATING_WINDOW: &str = "updating";
+
+/// How often an open Cashier looks for a newer release (plan 6.3).
+const WATCH_INTERVAL: Duration = Duration::from_secs(30 * 60);
+/// A check while Cashier is open may wait longer; nobody is waiting on it.
+const WATCH_CHECK_LIMIT: Duration = Duration::from_secs(30);
+
+/// The newer version found while Cashier is open, shown as "Update available".
+#[derive(Default)]
+pub struct PendingUpdate(Mutex<Option<String>>);
+
+fn watch_interval() -> Duration {
+    // Test hook for the release rehearsal; never set on shop PCs.
+    std::env::var("CASHIER_UPDATE_CHECK_SECONDS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|seconds| *seconds >= 5)
+        .map_or(WATCH_INTERVAL, Duration::from_secs)
+}
+
+/// Looks for a newer release every 30 minutes while Cashier is open and tells
+/// the screen, which shows the "Update available" button.
+pub fn watch_for_updates(handle: AppHandle) {
+    if cfg!(debug_assertions) {
+        return;
+    }
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(watch_interval());
+            let found = tauri::async_runtime::block_on(async {
+                let updater = handle
+                    .updater_builder()
+                    .timeout(WATCH_CHECK_LIMIT)
+                    .build()
+                    .ok()?;
+                updater.check().await.ok().flatten()
+            });
+            if let Some(update) = found {
+                if let Ok(mut pending) = handle.state::<PendingUpdate>().0.lock() {
+                    *pending = Some(update.version.clone());
+                }
+                let _ = handle.emit("update-available", update.version);
+            }
+        }
+    });
+}
+
+#[tauri::command]
+pub fn pending_update(state: tauri::State<'_, PendingUpdate>) -> Option<String> {
+    state.0.lock().ok().and_then(|pending| pending.clone())
+}
+
+/// "Update now": closes Cashier the normal way (local API, then MySQL) and
+/// reopens it; the check on open then installs the update and reopens again.
+#[tauri::command]
+pub fn install_update(handle: AppHandle) {
+    handle.request_restart();
+}
 
 /// Percentage for the progress bar; unknown size shows an indeterminate bar.
 fn percent(received: u64, total: Option<u64>) -> Option<u64> {
@@ -82,5 +141,11 @@ mod tests {
     fn opening_waits_briefly_but_a_download_may_take_long() {
         assert_eq!(CHECK_LIMIT, Duration::from_secs(5));
         assert!(DOWNLOAD_LIMIT >= Duration::from_secs(10 * 60));
+    }
+
+    #[test]
+    fn an_open_cashier_checks_every_thirty_minutes() {
+        assert_eq!(WATCH_INTERVAL, Duration::from_secs(30 * 60));
+        assert_eq!(watch_interval(), WATCH_INTERVAL);
     }
 }

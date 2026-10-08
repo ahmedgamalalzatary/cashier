@@ -13,6 +13,7 @@
   "dependencies": {
     "@cashier/shared": "workspace:*",
     "@cashier/web-core": "workspace:*",
+    "@tauri-apps/api": "2.12.1",
     "lucide-react": "^1.25.0",
     "next": "16.2.10",
     "react": "19.2.4",

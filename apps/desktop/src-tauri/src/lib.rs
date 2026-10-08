@@ -127,6 +127,7 @@ fn start(handle: &tauri::AppHandle, update: &str) -> Result<(), Box<dyn std::err
     WebviewWindowBuilder::from_config(handle, config)?
         .initialization_script(script)
         .build()?;
+    update::watch_for_updates(handle.clone());
     Ok(())
 }
 
@@ -162,6 +163,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(DesktopRuntime(Mutex::new(None)))
+        .manage(update::PendingUpdate::default())
+        .invoke_handler(tauri::generate_handler![
+            update::pending_update,
+            update::install_update
+        ])
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Coffee, Menu } from "lucide-react";
 import { normalizePath } from "@cashier/web-core/lib/auth";
 import { Sidebar } from "./sidebar";
+import { UpdateBanner } from "./update-banner";
 import { WorkspaceBar } from "@cashier/web-core/components/branches/workspace-bar";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -25,7 +26,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [navOpen]);
 
   if (pathname === "/login")
-    return <main className="min-h-screen">{children}</main>;
+    return (
+      <main className="min-h-screen">
+        <UpdateBanner />
+        {children}
+      </main>
+    );
 
   return (
     <div className="min-h-screen lg:flex">
@@ -48,6 +54,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
       <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
         <div className="mx-auto w-full max-w-[96rem]">
+          <UpdateBanner />
           <WorkspaceBar />
           {children}
         </div>
