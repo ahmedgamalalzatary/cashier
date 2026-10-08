@@ -3,6 +3,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { build } from "esbuild";
 import { collectDependencyLicenses } from "./licenses.mjs";
+import { MYSQL_PIN, prepareMysql } from "./mysql.mjs";
 
 const desktop = path.resolve(import.meta.dirname, "..");
 const root = path.resolve(desktop, "../..");
@@ -21,6 +22,10 @@ if (process.platform === "win32" && process.arch !== "x64")
   throw new Error("This Windows installer currently targets x64.");
 fs.mkdirSync(runtime, { recursive: true });
 fs.mkdirSync(binaryDirectory, { recursive: true });
+await prepareMysql({
+  cacheDirectory: path.join(desktop, ".cache/mysql"),
+  destination: path.join(runtime, "mysql"),
+});
 const binary = path.join(
   binaryDirectory,
   `cashier-node-${target}${process.platform === "win32" ? ".exe" : ""}`,
@@ -94,5 +99,5 @@ fs.copyFileSync(
   path.join(runtime, "settings.example.env"),
 );
 console.log(
-  `Prepared desktop API and Node ${process.version} for ${target}. No local credentials included.`,
+  `Prepared desktop API, Node ${process.version} and MySQL ${MYSQL_PIN.version} for ${target}. No local credentials included.`,
 );

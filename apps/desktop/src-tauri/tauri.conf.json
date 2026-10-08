@@ -30,7 +30,8 @@
       "runtime/manifest.json": "runtime/manifest.json",
       "runtime/settings.example.env": "runtime/settings.example.env",
       "runtime/node-LICENSE.txt": "runtime/node-LICENSE.txt",
-      "runtime/dependency-LICENSES.txt": "runtime/dependency-LICENSES.txt"
+      "runtime/dependency-LICENSES.txt": "runtime/dependency-LICENSES.txt",
+      "runtime/mysql/": "runtime/mysql/"
     },
     "icon": [
       "icons/32x32.png",

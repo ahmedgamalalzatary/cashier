@@ -28,4 +28,5 @@ temp-backend
 **/gen/schemas
 apps/desktop/src-tauri/binaries/
 apps/desktop/src-tauri/runtime/
+apps/desktop/.cache/
 *.version-tmp
