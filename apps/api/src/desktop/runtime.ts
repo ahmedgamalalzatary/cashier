@@ -1,15 +1,14 @@
 import fs from "node:fs";
+import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import type { Server } from "node:http";
-import type { RowDataPacket } from "mysql2/promise";
 import { createApp } from "../app.js";
 import {
   branches,
   closeDb,
   createDb,
   syncConfiguredAdmin,
-  type Db,
 } from "@cashier/db";
 import {
   createCacheRefreshService,
@@ -17,41 +16,34 @@ import {
 } from "../modules/external/cache-refresh.module.js";
 import { runRefreshLoop } from "../modules/external/worker-loop.js";
 import { loadDesktopSettings } from "./settings.js";
+import { prepareDesktopDatabase } from "./upgrade.js";
 import { runAutoCloseLoop } from "../modules/shifts/auto-close.js";
 
-export async function verifyDesktopSchema(db: Db, expected: number) {
-  if (!Number.isSafeInteger(expected) || expected < 1)
-    throw new Error("Desktop migrations manifest is invalid");
-  let rows: RowDataPacket[];
-  try {
-    [rows] = await db.$client.query<RowDataPacket[]>(
-      "SELECT created_at FROM __drizzle_migrations ORDER BY created_at DESC LIMIT 1",
-    );
-  } catch {
-    throw new Error(
-      "Local MySQL is unavailable or the database needs migrations. Check settings.env and prepare the database before opening Cashier.",
-    );
-  }
-  if (Number(rows[0]?.created_at) !== expected) {
-    throw new Error(
-      "Database migrations do not match this Cashier version. Apply the matching database migrations before opening the app.",
-    );
-  }
-}
+/** Where the desktop shell keeps the bundled MySQL tools and shared data. */
+export type DesktopTools = {
+  mysqlBin: string;
+  dataDir: string;
+  /** Called before a slow database update starts. */
+  onBusy?: () => void;
+};
 
 export async function startDesktopApi(
   settingsFile: string,
   manifestFile: string,
   signal: AbortSignal,
   databaseUrl: string,
+  tools: DesktopTools = { mysqlBin: "", dataDir: process.cwd() },
 ) {
   const { environment, admin, syncEnabled, branchId } = loadDesktopSettings(
     settingsFile,
     databaseUrl,
   );
   const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8")) as {
+    version: string;
     schemaCreatedAt: number;
   };
+  if (!Number.isSafeInteger(manifest.schemaCreatedAt))
+    throw new Error("Desktop migrations manifest is invalid");
   const db = createDb(environment.DATABASE_URL);
   let server: Server | undefined;
   let worker = Promise.resolve();
@@ -60,7 +52,16 @@ export async function startDesktopApi(
   const stopWorker = () => workerShutdown.abort();
   signal.addEventListener("abort", stopWorker, { once: true });
   try {
-    await verifyDesktopSchema(db, manifest.schemaCreatedAt);
+    await prepareDesktopDatabase({
+      db,
+      databaseUrl: environment.DATABASE_URL,
+      mysqlBin: tools.mysqlBin,
+      dataDir: tools.dataDir,
+      migrationsFolder: path.join(path.dirname(manifestFile), "migrations"),
+      expected: manifest.schemaCreatedAt,
+      appVersion: manifest.version,
+      onBusy: tools.onBusy,
+    });
     const localBranches = await db.select({ id: branches.id }).from(branches);
     if (localBranches.length !== 1 || localBranches[0].id !== branchId)
       throw new Error(

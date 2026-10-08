@@ -71,6 +71,12 @@ fs.writeFileSync(
   path.join(runtime, "dependency-LICENSES.txt"),
   [...packages].map(([name, text]) => `--- ${name} ---\n${text}`).join("\n\n"),
 );
+// The app applies these itself on start (plan 5.3).
+const migrations = path.join(runtime, "migrations");
+fs.rmSync(migrations, { recursive: true, force: true });
+fs.cpSync(path.join(root, "packages/db/drizzle"), migrations, {
+  recursive: true,
+});
 const journal = JSON.parse(
   fs.readFileSync(
     path.join(root, "packages/db/drizzle/meta/_journal.json"),

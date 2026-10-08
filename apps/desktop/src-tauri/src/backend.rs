@@ -60,7 +60,40 @@ impl Drop for OwnedBackend {
     }
 }
 
-fn parse_ready(line: &str) -> Option<Result<String, String>> {
+/// A startup stop reported by the local API; `can_restore` offers "Restore backup".
+#[derive(Debug, PartialEq)]
+pub struct StartupFailure {
+    pub message: String,
+    pub can_restore: bool,
+}
+
+impl std::fmt::Display for StartupFailure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for StartupFailure {}
+
+impl StartupFailure {
+    fn plain(message: &str) -> Self {
+        Self {
+            message: message.to_string(),
+            can_restore: false,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum Event {
+    Ready(String),
+    /// A database update started; startup may take minutes.
+    Busy,
+    Restored,
+    Failed(StartupFailure),
+}
+
+fn parse_event(line: &str) -> Option<Event> {
     let event: serde_json::Value = serde_json::from_str(line).ok()?;
     match event.get("event")?.as_str()? {
         "ready" => {
@@ -73,16 +106,23 @@ fn parse_ready(line: &str) -> Option<Result<String, String>> {
                 .and_then(|port| port.parse::<u16>().ok())
                 .is_some_and(|port| port > 0);
             Some(if valid {
-                Ok(address.to_string())
+                Event::Ready(address.to_string())
             } else {
-                Err("Backend returned an invalid local address".to_string())
+                Event::Failed(StartupFailure::plain(
+                    "Backend returned an invalid local address",
+                ))
             })
         }
-        "error" => Some(Err(event
-            .get("message")
-            .and_then(|value| value.as_str())
-            .unwrap_or("Local API startup failed")
-            .to_string())),
+        "busy" => Some(Event::Busy),
+        "restored" => Some(Event::Restored),
+        "error" => Some(Event::Failed(StartupFailure {
+            message: event
+                .get("message")
+                .and_then(|value| value.as_str())
+                .unwrap_or("Local API startup failed")
+                .to_string(),
+            can_restore: event.get("restore").and_then(|value| value.as_bool()) == Some(true),
+        })),
         _ => None,
     }
 }
@@ -117,6 +157,8 @@ fn api_command(
     // The environment, unlike the command line, is hidden from other Windows users.
     command
         .env("CASHIER_DATABASE_URL", database_url)
+        .env("CASHIER_MYSQL_BIN", node_path(&runtime.join("mysql/bin")))
+        .env("CASHIER_DATA_DIR", node_path(data))
         .arg(node_path(&runtime.join("api.mjs")))
         .arg(node_path(settings))
         .arg(node_path(&runtime.join("manifest.json")))
@@ -131,19 +173,7 @@ fn api_command(
     command
 }
 
-pub fn start(
-    app: &tauri::AppHandle,
-    runtime: &Path,
-    settings: &Path,
-    data: &Path,
-    database_url: &str,
-) -> Result<OwnedBackend, Box<dyn std::error::Error>> {
-    let binary_name = if cfg!(windows) {
-        "cashier-node.exe"
-    } else {
-        "cashier-node"
-    };
-    let binary = std::env::current_exe()?.with_file_name(binary_name);
+fn open_log(data: &Path) -> std::io::Result<fs::File> {
     let log_path = data.join("backend.log");
     if fs::metadata(&log_path).is_ok_and(|metadata| metadata.len() > 5 * 1024 * 1024) {
         let previous = data.join("backend.previous.log");
@@ -152,11 +182,27 @@ pub fn start(
         }
         fs::rename(&log_path, previous)?;
     }
-    let mut log = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_path)?;
+    OpenOptions::new().create(true).append(true).open(log_path)
+}
+
+fn spawn_api(
+    runtime: &Path,
+    settings: &Path,
+    data: &Path,
+    database_url: &str,
+    command_name: Option<&str>,
+) -> Result<(OwnedBackend, std::process::ChildStdout, fs::File), Box<dyn std::error::Error>> {
+    let binary_name = if cfg!(windows) {
+        "cashier-node.exe"
+    } else {
+        "cashier-node"
+    };
+    let binary = std::env::current_exe()?.with_file_name(binary_name);
+    let log = open_log(data)?;
     let mut command = api_command(&binary, runtime, settings, data, database_url);
+    if let Some(name) = command_name {
+        command.arg(name).stdin(Stdio::null());
+    }
     command.stderr(Stdio::from(log.try_clone()?));
     let mut backend = OwnedBackend::new(command.spawn()?)?;
     let output = backend
@@ -164,6 +210,17 @@ pub fn start(
         .stdout
         .take()
         .ok_or("Backend stdout is unavailable")?;
+    Ok((backend, output, log))
+}
+
+pub fn start(
+    app: &tauri::AppHandle,
+    runtime: &Path,
+    settings: &Path,
+    data: &Path,
+    database_url: &str,
+) -> Result<OwnedBackend, Box<dyn std::error::Error>> {
+    let (mut backend, output, mut log) = spawn_api(runtime, settings, data, database_url, None)?;
     let closing = Arc::clone(&backend.closing);
     let handle = app.clone();
     let (sender, receiver) = mpsc::channel();
@@ -171,19 +228,19 @@ pub fn start(
         let mut ready = false;
         for line in BufReader::new(output).lines().map_while(Result::ok) {
             let _ = writeln!(log, "{line}");
-            if !ready && let Some(result) = parse_ready(&line) {
-                ready = result.is_ok();
-                let failed = result.is_err();
-                let _ = sender.send(result);
+            if !ready && let Some(event) = parse_event(&line) {
+                ready = matches!(event, Event::Ready(_));
+                let failed = matches!(event, Event::Failed(_));
+                let _ = sender.send(event);
                 if failed {
                     return;
                 }
             }
         }
         if !ready {
-            let _ = sender.send(Err(
-                "Local API exited before it was ready; check backend.log".to_string(),
-            ));
+            let _ = sender.send(Event::Failed(StartupFailure::plain(
+                "Local API exited before it was ready; check backend.log",
+            )));
         } else if !closing.load(Ordering::SeqCst) {
             crate::fail_while_running(
                 &handle,
@@ -191,10 +248,50 @@ pub fn start(
             );
         }
     });
-    backend.api_url = receiver
-        .recv_timeout(Duration::from_secs(30))
-        .map_err(|_| "Local API startup timed out; check backend.log")??;
-    Ok(backend)
+    // A database update (backup + migration) may take minutes; ordinary starts take seconds.
+    let mut limit = Duration::from_secs(30);
+    loop {
+        match receiver.recv_timeout(limit) {
+            Ok(Event::Ready(address)) => {
+                backend.api_url = address;
+                return Ok(backend);
+            }
+            Ok(Event::Busy) => limit = Duration::from_secs(60 * 60),
+            Ok(Event::Failed(failure)) => return Err(Box::new(failure)),
+            Ok(Event::Restored) => {}
+            Err(_) => return Err("Local API startup timed out; check backend.log".into()),
+        }
+    }
+}
+
+/// Runs the local API once in restore mode: recreates the database from the
+/// backup taken before the failed update.
+pub fn restore(
+    runtime: &Path,
+    settings: &Path,
+    data: &Path,
+    database_url: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (mut backend, output, mut log) = spawn_api(
+        runtime,
+        settings,
+        data,
+        database_url,
+        Some("restore-backup"),
+    )?;
+    let mut result = Err(StartupFailure::plain(
+        "Restoring the backup stopped unexpectedly; check backend.log",
+    ));
+    for line in BufReader::new(output).lines().map_while(Result::ok) {
+        let _ = writeln!(log, "{line}");
+        match parse_event(&line) {
+            Some(Event::Restored) => result = Ok(()),
+            Some(Event::Failed(failure)) => result = Err(failure),
+            _ => {}
+        }
+    }
+    let _ = backend.child.wait();
+    Ok(result?)
 }
 
 #[cfg(windows)]
@@ -350,8 +447,8 @@ mod tests {
     #[test]
     fn ready_message_exposes_only_a_valid_loopback_port() {
         assert_eq!(
-            parse_ready(r#"{"event":"ready","apiUrl":"http://127.0.0.1:43210"}"#),
-            Some(Ok("http://127.0.0.1:43210".to_string()))
+            parse_event(r#"{"event":"ready","apiUrl":"http://127.0.0.1:43210"}"#),
+            Some(Event::Ready("http://127.0.0.1:43210".to_string()))
         );
         for address in [
             "http://remote.example:43210",
@@ -359,16 +456,32 @@ mod tests {
             "http://127.0.0.1:43210/path",
         ] {
             let line = format!(r#"{{"event":"ready","apiUrl":"{address}"}}"#);
-            assert!(matches!(parse_ready(&line), Some(Err(_))));
+            assert!(matches!(parse_event(&line), Some(Event::Failed(_))));
         }
     }
 
     #[test]
     fn startup_failure_is_reported_and_ordinary_logs_are_ignored() {
-        assert_eq!(parse_ready("Starting API"), None);
+        assert_eq!(parse_event("Starting API"), None);
         assert_eq!(
-            parse_ready(r#"{"event":"error","message":"Database unavailable"}"#),
-            Some(Err("Database unavailable".to_string()))
+            parse_event(r#"{"event":"error","message":"Database unavailable"}"#),
+            Some(Event::Failed(StartupFailure::plain("Database unavailable")))
+        );
+    }
+
+    #[test]
+    fn a_failed_update_offers_the_restore_and_a_long_update_keeps_startup_waiting() {
+        assert_eq!(
+            parse_event(r#"{"event":"error","message":"The last update failed","restore":true}"#),
+            Some(Event::Failed(StartupFailure {
+                message: "The last update failed".to_string(),
+                can_restore: true,
+            }))
+        );
+        assert_eq!(parse_event(r#"{"event":"busy"}"#), Some(Event::Busy));
+        assert_eq!(
+            parse_event(r#"{"event":"restored"}"#),
+            Some(Event::Restored)
         );
     }
 }
