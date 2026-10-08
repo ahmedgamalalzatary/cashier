@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cashier</title>
+    <style>
+      :root {
+        --paper: #f7f4ef;
+        --surface: #ffffff;
+        --ink: #2b2118;
+        --muted: #6b5d4f;
+        --border: #e7dfd4;
+        --primary: #a05c17;
+        --danger: #b42318;
+        --success: #2f6f3e;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: "Segoe UI", Tahoma, system-ui, sans-serif;
+      }
+      main {
+        width: min(400px, calc(100% - 32px));
+        padding: 28px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--surface);
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 1.35rem;
+      }
+      p {
+        margin: 0 0 20px;
+        line-height: 1.7;
+        color: var(--muted);
+      }
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+      }
+      input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        font: 600 1.4rem ui-monospace, Consolas, monospace;
+        letter-spacing: 0.25em;
+        text-align: center;
+        text-transform: uppercase;
+        direction: ltr;
+      }
+      input:focus {
+        outline: 2px solid color-mix(in srgb, var(--primary) 30%, transparent);
+        border-color: var(--primary);
+      }
+      button {
+        width: 100%;
+        margin-top: 16px;
+        padding: 12px;
+        border: 0;
+        border-radius: 10px;
+        background: var(--primary);
+        color: #fff;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+      #status {
+        min-height: 1.7em;
+        margin: 14px 0 0;
+      }
+      #status.error {
+        color: var(--danger);
+      }
+      #status.done {
+        color: var(--success);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Shown by the desktop shell on the first start of a PC that is not linked yet. -->
+    <main>
+      <h1>ربط هذا الجهاز</h1>
+      <p>
+        اكتب كود الربط الذي أنشأه المدير الرئيسي من موقع كاشير. يحتاج الربط إلى
+        الإنترنت مرة واحدة فقط.
+      </p>
+      <form id="form">
+        <label for="code">كود الربط</label>
+        <input
+          id="code"
+          name="code"
+          autocomplete="off"
+          spellcheck="false"
+          maxlength="12"
+          required
+          autofocus
+        />
+        <button id="submit" type="submit">ربط الجهاز</button>
+      </form>
+      <p id="status" role="status" aria-live="polite"></p>
+    </main>
+    <script>
+      const form = document.getElementById("form");
+      const input = document.getElementById("code");
+      const button = document.getElementById("submit");
+      const status = document.getElementById("status");
+      const show = (text, kind) => {
+        status.textContent = text;
+        status.className = kind;
+      };
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const code = input.value.trim();
+        if (!code) return;
+        button.disabled = true;
+        input.disabled = true;
+        show("جارٍ الربط…", "");
+        try {
+          const branch = await window.__TAURI__.core.invoke("link_device", { code });
+          show(`تم ربط الجهاز بفرع «${branch}». جارٍ فتح كاشير…`, "done");
+        } catch (error) {
+          show(String(error), "error");
+          button.disabled = false;
+          input.disabled = false;
+          input.focus();
+          input.select();
+        }
+      });
+    </script>
+  </body>
+</html>

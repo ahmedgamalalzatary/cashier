@@ -54,12 +54,16 @@ if (!pick("ADMIN_USERNAME") || !pick("ADMIN_PASSWORD"))
   throw new Error(
     "Configure admin credentials before importing desktop settings.",
   );
-if (!z.string().uuid().safeParse(pick("BRANCH_ID")).success)
+// Without a branch the PC shows its link screen on the next start (Phase 9);
+// a developer may still preset one to skip linking.
+const branch = pick("BRANCH_ID");
+if (branch && !z.string().uuid().safeParse(branch).success)
   throw new Error(
-    "Configure BRANCH_ID with the UUID of this PC's branch before importing settings.",
+    "BRANCH_ID must be the UUID of this PC's branch, or left out so the PC links itself.",
   );
 const keys = [
   "BRANCH_ID",
+  "ONLINE_API_URL",
   "JWT_SECRET",
   "ADMIN_NAME",
   "ADMIN_USERNAME",

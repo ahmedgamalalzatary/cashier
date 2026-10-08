@@ -10,8 +10,20 @@ The app runs its own bundled MySQL; no separate MySQL installation is used.
 Everything it stores (settings, database, logs) lives in `C:\ProgramData\Cashier`,
 shared by every Windows user of the PC. Each Windows user installs the app once;
 only one of them can have Cashier open at a time. The first start creates the
-database with random passwords and an unconfigured PC says "This PC is not linked
-yet". The app updates itself from GitHub releases (see "Publishing a release").
+database with random passwords. The app updates itself from GitHub releases (see
+"Publishing a release").
+
+## Linking a PC to its branch
+
+A new PC opens a **Link this PC** window instead of the cashier. The super-admin
+makes a one-time code for the branch on the online site (**أكواد الربط**), and
+someone types it on the PC. Linking needs the internet once (it is valid for 24
+hours and works only once). Cashier then stores the branch in its database and
+writes `BRANCH_ID` and `DEVICE_TOKEN` into `settings.env`, and opens normally;
+later starts work offline. Linking the branch again on another PC (for example a
+replacement) disconnects the old one. Closing the window closes Cashier.
+`ONLINE_API_URL` in `settings.env` points a test PC at another online site, for
+example `http://127.0.0.1:4001/api` for a local online-api.
 
 On every start the app brings the database to its own version before serving:
 a new database gets its tables; when an installed update brings database changes,
@@ -28,10 +40,10 @@ workload, Rust with the Windows MSVC toolchain, and WebView2. Restart your
 terminal after installing Rust so Cargo is available on PATH.
 Build tools require Node 20.11 or later; the installed app includes its own Node.
 
-Set `BRANCH_ID` in the source `.env` to the UUID of this PC's branch, then import
-the branch and admin settings once. The desktop
-database must contain exactly that one branch; an empty or multi-branch database
-is rejected. Phase 9 will supply the branch through the linking screen.
+Import the admin settings once. Leave `BRANCH_ID` out of the source `.env` to
+link the PC through the link screen, or set it to a branch UUID to skip linking
+during development; the desktop database must then contain exactly that one
+branch (an empty or multi-branch database is rejected).
 
 ```powershell
 pnpm configure:desktop

@@ -31,7 +31,7 @@ fn is_secret(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
-fn setting(text: &str, key: &str) -> Option<String> {
+pub(crate) fn setting(text: &str, key: &str) -> Option<String> {
     text.lines()
         .filter_map(|line| {
             let (name, value) = line.split_once('=')?;

@@ -9,6 +9,7 @@ import {
   closeDb,
   createDb,
   syncConfiguredAdmin,
+  type Db,
 } from "@cashier/db";
 import {
   createCacheRefreshService,
@@ -27,6 +28,37 @@ export type DesktopTools = {
   onBusy?: () => void;
 };
 
+type Manifest = { version: string; schemaCreatedAt: number };
+
+export function readDesktopManifest(manifestFile: string): Manifest {
+  const manifest = JSON.parse(
+    fs.readFileSync(manifestFile, "utf8"),
+  ) as Manifest;
+  if (!Number.isSafeInteger(manifest.schemaCreatedAt))
+    throw new Error("Desktop migrations manifest is invalid");
+  return manifest;
+}
+
+/** Brings the database to this app's version (backup first when it changes). */
+export function prepareForApp(
+  db: Db,
+  databaseUrl: string,
+  manifestFile: string,
+  manifest: Manifest,
+  tools: DesktopTools,
+) {
+  return prepareDesktopDatabase({
+    db,
+    databaseUrl,
+    mysqlBin: tools.mysqlBin,
+    dataDir: tools.dataDir,
+    migrationsFolder: path.join(path.dirname(manifestFile), "migrations"),
+    expected: manifest.schemaCreatedAt,
+    appVersion: manifest.version,
+    onBusy: tools.onBusy,
+  });
+}
+
 export async function startDesktopApi(
   settingsFile: string,
   manifestFile: string,
@@ -38,12 +70,7 @@ export async function startDesktopApi(
     settingsFile,
     databaseUrl,
   );
-  const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8")) as {
-    version: string;
-    schemaCreatedAt: number;
-  };
-  if (!Number.isSafeInteger(manifest.schemaCreatedAt))
-    throw new Error("Desktop migrations manifest is invalid");
+  const manifest = readDesktopManifest(manifestFile);
   const db = createDb(environment.DATABASE_URL);
   let server: Server | undefined;
   let worker = Promise.resolve();
@@ -52,16 +79,13 @@ export async function startDesktopApi(
   const stopWorker = () => workerShutdown.abort();
   signal.addEventListener("abort", stopWorker, { once: true });
   try {
-    await prepareDesktopDatabase({
+    await prepareForApp(
       db,
-      databaseUrl: environment.DATABASE_URL,
-      mysqlBin: tools.mysqlBin,
-      dataDir: tools.dataDir,
-      migrationsFolder: path.join(path.dirname(manifestFile), "migrations"),
-      expected: manifest.schemaCreatedAt,
-      appVersion: manifest.version,
-      onBusy: tools.onBusy,
-    });
+      environment.DATABASE_URL,
+      manifestFile,
+      manifest,
+      tools,
+    );
     const localBranches = await db.select({ id: branches.id }).from(branches);
     if (localBranches.length !== 1 || localBranches[0].id !== branchId)
       throw new Error(

@@ -1,4 +1,5 @@
 mod backend;
+mod link;
 mod mysql;
 mod update;
 use std::sync::Mutex;
@@ -83,6 +84,18 @@ fn start(handle: &tauri::AppHandle, update: &str) -> Result<(), Box<dyn std::err
     let runtime = handle.path().resource_dir()?.join("runtime");
     let database = mysql::start(&runtime.join("mysql"), &root, &credentials)?;
     let database_url = database.database_url(&credentials);
+    if !link::is_linked(&settings) {
+        backend::note(&root, "This PC is not linked yet; showing the link screen");
+        if let link::Outcome::Closed =
+            link::wait_for_link(handle, &runtime, &settings, &root, &database_url)?
+        {
+            // MySQL stops cleanly before Cashier closes.
+            drop(database);
+            drop(lock);
+            handle.exit(0);
+            return Ok(());
+        }
+    }
     let backend = match backend::start(handle, &runtime, &settings, &root, &database_url) {
         Ok(backend) => backend,
         Err(error) => match error.downcast::<backend::StartupFailure>() {
@@ -127,6 +140,7 @@ fn start(handle: &tauri::AppHandle, update: &str) -> Result<(), Box<dyn std::err
     WebviewWindowBuilder::from_config(handle, config)?
         .initialization_script(script)
         .build()?;
+    link::close_window(handle);
     update::watch_for_updates(handle.clone());
     Ok(())
 }
@@ -164,9 +178,11 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(DesktopRuntime(Mutex::new(None)))
         .manage(update::PendingUpdate::default())
+        .manage(link::LinkState::default())
         .invoke_handler(tauri::generate_handler![
             update::pending_update,
-            update::install_update
+            update::install_update,
+            link::link_device
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

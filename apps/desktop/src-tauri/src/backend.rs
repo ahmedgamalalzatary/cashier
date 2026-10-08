@@ -90,6 +90,8 @@ enum Event {
     /// A database update started; startup may take minutes.
     Busy,
     Restored,
+    /// The PC was linked to the named branch.
+    Linked(String),
     Failed(StartupFailure),
 }
 
@@ -115,6 +117,13 @@ fn parse_event(line: &str) -> Option<Event> {
         }
         "busy" => Some(Event::Busy),
         "restored" => Some(Event::Restored),
+        "linked" => Some(Event::Linked(
+            event
+                .pointer("/branch/name")
+                .and_then(|value| value.as_str())
+                .unwrap_or_default()
+                .to_string(),
+        )),
         "error" => Some(Event::Failed(StartupFailure {
             message: event
                 .get("message")
@@ -173,6 +182,24 @@ fn api_command(
     command
 }
 
+/// The one-off "link this PC" run: the code goes in the environment, which,
+/// unlike the command line, other Windows users cannot read.
+fn link_command(
+    binary: &Path,
+    runtime: &Path,
+    settings: &Path,
+    data: &Path,
+    database_url: &str,
+    code: &str,
+) -> Command {
+    let mut command = api_command(binary, runtime, settings, data, database_url);
+    command
+        .arg("link-device")
+        .env("CASHIER_LINK_CODE", code)
+        .stdin(Stdio::null());
+    command
+}
+
 fn open_log(data: &Path) -> std::io::Result<fs::File> {
     let log_path = data.join("backend.log");
     if fs::metadata(&log_path).is_ok_and(|metadata| metadata.len() > 5 * 1024 * 1024) {
@@ -192,24 +219,33 @@ pub fn note(data: &Path, line: &str) {
     }
 }
 
+fn node_binary() -> std::io::Result<PathBuf> {
+    let binary_name = if cfg!(windows) {
+        "cashier-node.exe"
+    } else {
+        "cashier-node"
+    };
+    Ok(std::env::current_exe()?.with_file_name(binary_name))
+}
+
+type Spawned = (OwnedBackend, std::process::ChildStdout, fs::File);
+
 fn spawn_api(
     runtime: &Path,
     settings: &Path,
     data: &Path,
     database_url: &str,
     command_name: Option<&str>,
-) -> Result<(OwnedBackend, std::process::ChildStdout, fs::File), Box<dyn std::error::Error>> {
-    let binary_name = if cfg!(windows) {
-        "cashier-node.exe"
-    } else {
-        "cashier-node"
-    };
-    let binary = std::env::current_exe()?.with_file_name(binary_name);
-    let log = open_log(data)?;
-    let mut command = api_command(&binary, runtime, settings, data, database_url);
+) -> Result<Spawned, Box<dyn std::error::Error>> {
+    let mut command = api_command(&node_binary()?, runtime, settings, data, database_url);
     if let Some(name) = command_name {
         command.arg(name).stdin(Stdio::null());
     }
+    spawn_owned(command, data)
+}
+
+fn spawn_owned(mut command: Command, data: &Path) -> Result<Spawned, Box<dyn std::error::Error>> {
+    let log = open_log(data)?;
     command.stderr(Stdio::from(log.try_clone()?));
     let mut backend = OwnedBackend::new(command.spawn()?)?;
     let output = backend
@@ -265,7 +301,7 @@ pub fn start(
             }
             Ok(Event::Busy) => limit = Duration::from_secs(60 * 60),
             Ok(Event::Failed(failure)) => return Err(Box::new(failure)),
-            Ok(Event::Restored) => {}
+            Ok(Event::Restored | Event::Linked(_)) => {}
             Err(_) => return Err("Local API startup timed out; check backend.log".into()),
         }
     }
@@ -299,6 +335,40 @@ pub fn restore(
     }
     let _ = backend.child.wait();
     Ok(result?)
+}
+
+/// Runs the local API once in link mode (plan Phase 9): it prepares the
+/// database, exchanges the code online and saves the link. Returns the branch name.
+pub fn link(
+    runtime: &Path,
+    settings: &Path,
+    data: &Path,
+    database_url: &str,
+    code: &str,
+) -> Result<String, StartupFailure> {
+    let spawned = node_binary()
+        .map_err(Box::<dyn std::error::Error>::from)
+        .and_then(|binary| {
+            spawn_owned(
+                link_command(&binary, runtime, settings, data, database_url, code),
+                data,
+            )
+        });
+    let (mut backend, output, mut log) =
+        spawned.map_err(|error| StartupFailure::plain(&error.to_string()))?;
+    let mut result = Err(StartupFailure::plain(
+        "Linking stopped unexpectedly; check backend.log",
+    ));
+    for line in BufReader::new(output).lines().map_while(Result::ok) {
+        let _ = writeln!(log, "{line}");
+        match parse_event(&line) {
+            Some(Event::Linked(name)) => result = Ok(name),
+            Some(Event::Failed(failure)) => result = Err(failure),
+            _ => {}
+        }
+    }
+    let _ = backend.child.wait();
+    result
 }
 
 #[cfg(windows)]
@@ -490,5 +560,33 @@ mod tests {
             parse_event(r#"{"event":"restored"}"#),
             Some(Event::Restored)
         );
+    }
+    #[test]
+    fn a_finished_link_reports_the_branch_name() {
+        assert_eq!(
+            parse_event(r#"{"event":"linked","branch":{"id":"x","name":"فرع الشمال"}}"#),
+            Some(Event::Linked("فرع الشمال".to_string()))
+        );
+    }
+
+    #[test]
+    fn the_link_code_travels_only_in_the_environment() {
+        let command = link_command(
+            Path::new("node"),
+            Path::new("runtime"),
+            Path::new("settings.env"),
+            Path::new("data"),
+            "mysql://local",
+            "ABCD2345",
+        );
+        let args: Vec<_> = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect();
+        assert!(args.iter().all(|arg| !arg.contains("ABCD2345")));
+        assert_eq!(args.last().map(String::as_str), Some("link-device"));
+        assert!(command.get_envs().any(|(key, value)| {
+            key == "CASHIER_LINK_CODE" && value.is_some_and(|value| value == "ABCD2345")
+        }));
     }
 }

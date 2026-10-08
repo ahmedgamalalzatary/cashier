@@ -1,5 +1,10 @@
 import { closeDb, createDb } from "@cashier/db";
-import { startDesktopApi } from "./runtime.js";
+import { databaseBranches, linkDesktop } from "./link.js";
+import {
+  prepareForApp,
+  readDesktopManifest,
+  startDesktopApi,
+} from "./runtime.js";
 import { DesktopStartupError, restoreDesktopBackup } from "./upgrade.js";
 
 // One JSON line per event; the desktop shell reads them from stdout.
@@ -26,6 +31,35 @@ async function restore() {
     await closeDb(db);
   }
   emit({ event: "restored" });
+}
+
+/**
+ * Links this PC with the one-time code the shell passes in CASHIER_LINK_CODE
+ * (plan Phase 9): the database is prepared first so the branch row can be
+ * stored, then the settings file is completed.
+ */
+async function link(settingsFile: string, manifestFile: string) {
+  const { databaseUrl, mysqlBin, dataDir } = fromShell();
+  const code = process.env.CASHIER_LINK_CODE ?? "";
+  delete process.env.CASHIER_LINK_CODE;
+  const manifest = readDesktopManifest(manifestFile);
+  const db = createDb(databaseUrl);
+  try {
+    await prepareForApp(db, databaseUrl, manifestFile, manifest, {
+      mysqlBin,
+      dataDir,
+      onBusy: () => emit({ event: "busy" }),
+    });
+    const branch = await linkDesktop({
+      settingsFile,
+      code,
+      appVersion: manifest.version,
+      branches: databaseBranches(db),
+    });
+    emit({ event: "linked", branch });
+  } finally {
+    await closeDb(db);
+  }
 }
 
 async function serve(settingsFile: string, manifestFile: string) {
@@ -71,11 +105,13 @@ const [settingsFile, manifestFile, command] = process.argv.slice(2);
 const task =
   command === "restore-backup"
     ? restore()
-    : settingsFile && manifestFile
-      ? serve(settingsFile, manifestFile)
-      : Promise.reject(
-          new Error("Desktop settings and runtime manifest are required"),
-        );
+    : command === "link-device"
+      ? link(settingsFile, manifestFile)
+      : settingsFile && manifestFile
+        ? serve(settingsFile, manifestFile)
+        : Promise.reject(
+            new Error("Desktop settings and runtime manifest are required"),
+          );
 void task.catch((error: unknown) => {
   const message =
     error instanceof Error ? error.message : "Desktop API startup failed";

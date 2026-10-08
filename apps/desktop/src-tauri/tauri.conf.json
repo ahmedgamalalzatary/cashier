@@ -9,6 +9,7 @@
     "beforeDevCommand": "pnpm --filter @cashier/web dev"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "Cashier",

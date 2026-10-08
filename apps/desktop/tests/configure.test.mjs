@@ -48,8 +48,26 @@ test("imports only application settings into the user-data folder", (t) => {
   assert.ok(!result.stdout.includes("private-password"));
   assert.ok(!result.stdout.includes("local-admin-password"));
 });
-test("rejects a missing branch instead of selecting a branch automatically", (t) => {
+test("leaves the branch to the link screen when none is configured", (t) => {
   const { source, destination } = fixture(t);
+  fs.appendFileSync(source, 'ONLINE_API_URL="http://127.0.0.1:4001/api"\n');
+  const result = spawnSync(
+    process.execPath,
+    [script, "--source", source, "--directory", destination],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const settings = fs.readFileSync(
+    path.join(destination, "settings.env"),
+    "utf8",
+  );
+  assert.ok(!settings.includes("BRANCH_ID"));
+  // a developer PC may link against a local online API
+  assert.ok(settings.includes('ONLINE_API_URL="http://127.0.0.1:4001/api"'));
+});
+test("rejects a branch that is not a UUID instead of guessing one", (t) => {
+  const { source, destination } = fixture(t);
+  fs.appendFileSync(source, 'BRANCH_ID="1"\n');
   const result = spawnSync(
     process.execPath,
     [script, "--source", source, "--directory", destination],
