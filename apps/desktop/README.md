@@ -105,16 +105,40 @@ logged once.
 
 ## Release versions
 
-Rebuilding reproduces the current version. Bump it explicitly for a new release:
+Rebuilding reproduces the current version. `patch`, `minor`, and `major` update
+the desktop package, Tauri config, Cargo manifest, and desktop Cargo.lock entry
+together. Starting from `0.2.0`, these produce `0.2.1`, `0.3.0`, and `1.0.0`,
+respectively.
+
+### Publishing a release (how shop PCs get updates)
 
 ```powershell
-pnpm version:desktop patch
-pnpm build:desktop
+pnpm version:desktop patch          # 0.2.3 -> 0.2.4; then commit the 4 changed files
+git push origin main
+git tag desktop-v0.2.4              # must equal the new version
+git push origin desktop-v0.2.4      # push the tag by name; --follow-tags skips plain tags
 ```
 
-`patch`, `minor`, and `major` update the desktop package, Tauri config, Cargo
-manifest, and desktop Cargo.lock entry together. Starting from `0.2.0`, these
-produce `0.2.1`, `0.3.0`, and `1.0.0`, respectively.
+The tag starts `.github/workflows/desktop-release.yml` (about 10 minutes). GitHub
+builds the installer, signs it with the repository secrets `TAURI_SIGNING_PRIVATE_KEY`
+and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, and publishes `Cashier_<version>_x64-setup.exe`
+with `latest.json` as the newest release. Follow it under the repository's
+**Actions** tab. Shop PCs then update on their next open, or within 30 minutes
+through the "Update available" button.
+
+- **Database changes:** if the release adds a migration, deploy the VPS first,
+  then push the tag (plan D16).
+- **Wrong tag:** the workflow stops if the tag does not match
+  `apps/desktop/package.json`; delete the tag (`git push origin :desktop-vX.Y.Z`
+  and `git tag -d desktop-vX.Y.Z`), fix the version, and tag again.
+- **Never** publish a draft (installed PCs cannot see it) or a version lower than
+  the installed one (they ignore it).
+- **Signing key:** the private key is the owner's `cashier.key` plus its password,
+  backed up offline. If it is lost, installed PCs can never update again; keep
+  the GitHub secrets and the backup in sync.
+
+`pnpm build:desktop` still builds an unsigned local installer for testing;
+signing is switched on only by `src-tauri/tauri.release.conf.json` in the workflow.
 
 ## Settings and troubleshooting
 

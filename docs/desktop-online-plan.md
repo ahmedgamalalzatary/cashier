@@ -158,10 +158,10 @@ Status: ☐ todo · ◐ in progress · ☑ done. Write the date when done.
 |                      | 5.2 Rust: init data dir, start/stop `mysqld`, health wait         | ☑      | 2026-10-08 | Shared `C:\ProgramData\Cashier` (D19); 10 Rust + API/DB tests; real first start shows "not linked"                                            |
 |                      | 5.3 auto backup + auto migrate on start                           | ☑      | 2026-10-08 | Migrations bundled in `runtime/migrations`; 13 unit + 6 real-MySQL upgrade tests; real app built a fresh DB                                   |
 |                      | 5.4 installer/uninstaller keep data; smoke test on clean VM       | ☑      | 2026-10-08 | Owner: clean PC shows "not linked"; dev PC GUI test passed (admin, cashier, selling); data kept across crash/reinstall/uninstall; 8.4 upgrade |
-| 6 Updater + releases | 6.1 signing keys + updater plugin config                          | ☑      | 2026-10-08 | Owner key in `C:\Users\Admin\.tauri` (backed up offline); local builds stay unsigned; 3 config tests                                          |     |
-|                      | 6.2 forced check on open with 5s fallback                         | ☑      | 2026-10-08 | Local rehearsal with a test key: 0.2.2 → 0.2.3 installed and reopened itself; offline ready in 4 s; dev builds skip; download limit 20 min    |     |
-|                      | 6.3 optional mid-session update button                            | ☑      | 2026-10-08 | Rehearsal: banner appeared while open; button → clean close (MySQL SHUTDOWN) → install → reopened as 0.2.3 in ~12 s                           |     |
-|                      | 6.4 GitHub Actions release workflow                               | ◐      |            | Workflow written, all actions pinned, 6 updater tests; waiting for secrets + first real release                                               |     |
+| 6 Updater + releases | 6.1 signing keys + updater plugin config                          | ☑      | 2026-10-08 | Owner key in `C:\Users\Admin\.tauri` (backed up offline); local builds stay unsigned; 3 config tests                                          |
+|                      | 6.2 forced check on open with 5s fallback                         | ☑      | 2026-10-08 | Local rehearsal with a test key: 0.2.2 → 0.2.3 installed and reopened itself; offline ready in 4 s; dev builds skip; download limit 20 min    |
+|                      | 6.3 optional mid-session update button                            | ☑      | 2026-10-08 | Rehearsal: banner appeared while open; button → clean close (MySQL SHUTDOWN) → install → reopened as 0.2.3 in ~12 s                           |
+|                      | 6.4 GitHub Actions release workflow                               | ☑      | 2026-10-08 | First real release `desktop-v0.2.3` (CI 9m55s); installed 0.2.2 updated itself from GitHub in 22 s                                            |
 | 7 Online apps + VPS  | 7.1 `apps/online-api` (auth, reports, scoping)                    | ☐      |            |                                                                                                                                               |
 |                      | 7.2 `apps/online-web` (login + reports)                           | ☐      |            |                                                                                                                                               |
 |                      | 7.3 Docker compose + Nginx + runbook                              | ☐      |            |                                                                                                                                               |
@@ -757,6 +757,9 @@ online: one transaction, @cashier_sync_apply=1, FK checks off, upsert/delete in 
 ---
 
 ## 5. Guides
+
+**Publishing a desktop release:** see "Publishing a release" in
+[apps/desktop/README.md](../apps/desktop/README.md).
 
 **Release order when a change touches the database**
 
