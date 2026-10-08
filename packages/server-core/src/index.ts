@@ -6,6 +6,8 @@ export * from "./middleware/auth.js";
 export * from "./middleware/branch.js";
 export { createAuthModule } from "./modules/auth/auth.module.js";
 export { createAdminsModule } from "./modules/admins/admins.module.js";
+export { createLinkCodesModule } from "./modules/link-codes/link-codes.module.js";
+export { hashCode } from "./modules/link-codes/link-codes.service.js";
 export {
   createBranchesManagementModule,
   createBranchesModule,

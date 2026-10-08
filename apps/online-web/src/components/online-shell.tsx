@@ -35,6 +35,12 @@ export function OnlineShell({ children }: { children: ReactNode }) {
               >
                 إدارة المديرين
               </Link>
+              <Link
+                href="/link-codes"
+                className="text-sm text-primary hover:underline"
+              >
+                أكواد ربط الأجهزة
+              </Link>
             </>
           )}
           <Button onClick={() => void logout()}>تسجيل الخروج</Button>

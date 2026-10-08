@@ -80,4 +80,12 @@ describe("online shell", () => {
     signedIn(false);
     expect(linksTo("/admins")).toHaveLength(0);
   });
+
+  it("offers link code generation to the super-admin only", () => {
+    signedIn(true);
+    expect(linksTo("/link-codes")).toHaveLength(1);
+
+    signedIn(false);
+    expect(linksTo("/link-codes")).toHaveLength(0);
+  });
 });
