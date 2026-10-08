@@ -5,6 +5,7 @@ export * from "./middleware/validation.js";
 export * from "./middleware/auth.js";
 export * from "./middleware/branch.js";
 export { createAuthModule } from "./modules/auth/auth.module.js";
+export { createAdminsModule } from "./modules/admins/admins.module.js";
 export {
   createBranchesManagementModule,
   createBranchesModule,

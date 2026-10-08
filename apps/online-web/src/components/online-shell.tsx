@@ -22,9 +22,20 @@ export function OnlineShell({ children }: { children: ReactNode }) {
           </Link>
           <BranchPicker />
           {user.isSuperAdmin && (
-            <Link href="/branches" className="text-sm text-primary hover:underline">
-              إدارة الفروع
-            </Link>
+            <>
+              <Link
+                href="/branches"
+                className="text-sm text-primary hover:underline"
+              >
+                إدارة الفروع
+              </Link>
+              <Link
+                href="/admins"
+                className="text-sm text-primary hover:underline"
+              >
+                إدارة المديرين
+              </Link>
+            </>
           )}
           <Button onClick={() => void logout()}>تسجيل الخروج</Button>
         </div>

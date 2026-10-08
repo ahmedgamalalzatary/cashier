@@ -3,6 +3,7 @@ import cors from "cors";
 import type { Db } from "@cashier/db";
 import {
   authenticate,
+  createAdminsModule,
   createAuthModule,
   createBranchesManagementModule,
   createReportsModule,
@@ -46,6 +47,11 @@ export function createApp(
     "/api/branches",
     authenticate(db, jwtSecret, onlineAccess),
     createBranchesManagementModule(db),
+  );
+  app.use(
+    "/api/admins",
+    authenticate(db, jwtSecret, onlineAccess),
+    createAdminsModule(db),
   );
   app.use(
     "/api/reports",

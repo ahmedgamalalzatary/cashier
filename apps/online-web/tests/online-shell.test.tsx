@@ -37,8 +37,7 @@ const signedIn = (isSuperAdmin = true) => {
 
 const linksTo = (pathname: string) =>
   elements(OnlineShell({ children: "reports" }) as never).filter(
-    (node) =>
-      (node.props as { href?: string }).href === pathname,
+    (node) => (node.props as { href?: string }).href === pathname,
   );
 
 beforeEach(() => {
@@ -58,8 +57,7 @@ describe("online shell", () => {
     const rendered = elements(OnlineShell({ children: "reports" }) as never);
     const logoutControl = rendered.find(
       (node) =>
-        (node.props as { children?: ReactNode }).children ===
-        "تسجيل الخروج",
+        (node.props as { children?: ReactNode }).children === "تسجيل الخروج",
     );
 
     expect(rendered.filter((node) => node.type === "header")).toHaveLength(1);
@@ -73,5 +71,13 @@ describe("online shell", () => {
 
     signedIn(false);
     expect(linksTo("/branches")).toHaveLength(0);
+  });
+
+  it("offers admin management to the super-admin only", () => {
+    signedIn(true);
+    expect(linksTo("/admins")).toHaveLength(1);
+
+    signedIn(false);
+    expect(linksTo("/admins")).toHaveLength(0);
   });
 });
