@@ -5,8 +5,6 @@ use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, mpsc};
 use std::time::{Duration, Instant};
-use tauri::Manager;
-use tauri_plugin_dialog::DialogExt;
 
 pub struct OwnedBackend {
     child: Child,
@@ -90,7 +88,7 @@ fn parse_ready(line: &str) -> Option<Result<String, String>> {
 }
 
 // Node's CLI rejects Windows verbatim paths (\\?\), even though Rust can use them.
-fn node_path(path: &Path) -> PathBuf {
+pub(crate) fn node_path(path: &Path) -> PathBuf {
     #[cfg(windows)]
     {
         use std::path::{Component, Prefix};
@@ -108,9 +106,17 @@ fn node_path(path: &Path) -> PathBuf {
     path.to_path_buf()
 }
 
-fn api_command(binary: &Path, runtime: &Path, settings: &Path, data: &Path) -> Command {
+fn api_command(
+    binary: &Path,
+    runtime: &Path,
+    settings: &Path,
+    data: &Path,
+    database_url: &str,
+) -> Command {
     let mut command = Command::new(node_path(binary));
+    // The environment, unlike the command line, is hidden from other Windows users.
     command
+        .env("CASHIER_DATABASE_URL", database_url)
         .arg(node_path(&runtime.join("api.mjs")))
         .arg(node_path(settings))
         .arg(node_path(&runtime.join("manifest.json")))
@@ -130,6 +136,7 @@ pub fn start(
     runtime: &Path,
     settings: &Path,
     data: &Path,
+    database_url: &str,
 ) -> Result<OwnedBackend, Box<dyn std::error::Error>> {
     let binary_name = if cfg!(windows) {
         "cashier-node.exe"
@@ -149,7 +156,7 @@ pub fn start(
         .create(true)
         .append(true)
         .open(log_path)?;
-    let mut command = api_command(&binary, runtime, settings, data);
+    let mut command = api_command(&binary, runtime, settings, data, database_url);
     command.stderr(Stdio::from(log.try_clone()?));
     let mut backend = OwnedBackend::new(command.spawn()?)?;
     let output = backend
@@ -177,24 +184,25 @@ pub fn start(
             let _ = sender.send(Err(
                 "Local API exited before it was ready; check backend.log".to_string(),
             ));
-        } else if !closing.load(Ordering::SeqCst) && handle.get_webview_window("main").is_some() {
-            let exit_handle = handle.clone();
-            handle.dialog().message("The local API stopped unexpectedly. Close and reopen Cashier. Details are in backend.log.")
-                .title("Cashier").kind(tauri_plugin_dialog::MessageDialogKind::Error).show(move |_| exit_handle.exit(1));
+        } else if !closing.load(Ordering::SeqCst) {
+            crate::fail_while_running(
+                &handle,
+                "The local API stopped unexpectedly. Close and reopen Cashier. Details are in backend.log.",
+            );
         }
     });
     backend.api_url = receiver
         .recv_timeout(Duration::from_secs(30))
-        .map_err(|_| "Local API startup timed out; check local MySQL and backend.log")??;
+        .map_err(|_| "Local API startup timed out; check backend.log")??;
     Ok(backend)
 }
 
 #[cfg(windows)]
-struct WindowsJob(isize);
+pub(crate) struct WindowsJob(isize);
 
 #[cfg(windows)]
 impl WindowsJob {
-    fn attach(child: &Child) -> std::io::Result<Self> {
+    pub(crate) fn attach(child: &Child) -> std::io::Result<Self> {
         use std::os::windows::io::AsRawHandle;
         use windows_sys::Win32::Foundation::CloseHandle;
         use windows_sys::Win32::System::JobObjects::{
@@ -261,7 +269,7 @@ mod tests {
         let directory =
             std::env::temp_dir().join(format!("cashier-node-path-{}", std::process::id()));
         fs::create_dir_all(&directory).unwrap();
-        fs::write(directory.join("api.mjs"), "import fs from 'node:fs';console.log(fs.readFileSync(process.argv[2],'utf8')+'|'+fs.readFileSync(process.argv[3],'utf8'));").unwrap();
+        fs::write(directory.join("api.mjs"), "import fs from 'node:fs';console.log(fs.readFileSync(process.argv[2],'utf8')+'|'+fs.readFileSync(process.argv[3],'utf8')+'|'+process.env.CASHIER_DATABASE_URL+'|'+process.argv.join(' ').includes('mysql:'));").unwrap();
         fs::write(directory.join("settings with spaces.env"), "settings-ok").unwrap();
         fs::write(directory.join("manifest.json"), "manifest-ok").unwrap();
         let binary = fs::canonicalize(
@@ -275,6 +283,7 @@ mod tests {
             &canonical,
             &canonical.join("settings with spaces.env"),
             &canonical,
+            "mysql://cashier:secret@127.0.0.1:3307/cashier",
         )
         .output()
         .unwrap();
@@ -287,7 +296,7 @@ mod tests {
         );
         assert_eq!(
             String::from_utf8_lossy(&output.stdout).trim(),
-            "settings-ok|manifest-ok"
+            "settings-ok|manifest-ok|mysql://cashier:secret@127.0.0.1:3307/cashier|false"
         );
     }
 

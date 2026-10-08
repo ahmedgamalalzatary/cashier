@@ -1,9 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import { randomBytes } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { URL } from "node:url";
 
 const root = path.resolve(import.meta.dirname, "../../..");
 const require = createRequire(path.join(root, "apps/api/package.json"));
@@ -15,20 +14,31 @@ const option = (name) => {
   if (!process.argv[index + 1]) throw new Error(`${name} needs a path`);
   return path.resolve(process.argv[index + 1]);
 };
-const dataHome =
-  process.platform === "win32"
-    ? process.env.APPDATA
-    : process.platform === "darwin"
-      ? path.join(os.homedir(), "Library/Application Support")
-      : process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local/share");
-if (!dataHome) throw new Error("Cannot find the application user-data folder.");
-const identifier = JSON.parse(
-  fs.readFileSync(
-    path.join(root, "apps/desktop/src-tauri/tauri.conf.json"),
-    "utf8",
-  ),
-).identifier;
-const directory = option("--directory") ?? path.join(dataHome, identifier);
+if (process.platform !== "win32")
+  throw new Error("Desktop settings are configured on Windows only.");
+// The shared folder the app uses for every Windows user (plan D19).
+function sharedFolder() {
+  if (!process.env.ProgramData)
+    throw new Error("Windows did not report the ProgramData folder.");
+  const folder = path.join(process.env.ProgramData, "Cashier");
+  if (fs.existsSync(folder)) return folder;
+  // Same steps as the app: create under a temporary name, let every Windows
+  // user change it (S-1-5-32-545 = Users), then rename.
+  const staging = `${folder}.setup-${process.pid}`;
+  fs.mkdirSync(staging, { recursive: true });
+  const granted = spawnSync(
+    "icacls",
+    [staging, "/grant", "*S-1-5-32-545:(OI)(CI)M", "/Q"],
+    { stdio: "ignore" },
+  );
+  if (granted.status !== 0) {
+    fs.rmSync(staging, { recursive: true, force: true });
+    throw new Error(`Cannot share ${folder} with the other Windows users.`);
+  }
+  fs.renameSync(staging, folder);
+  return folder;
+}
+const directory = option("--directory") ?? sharedFolder();
 const filename = path.join(directory, "settings.env");
 if (fs.existsSync(filename)) {
   console.log(`Existing desktop settings preserved: ${filename}`);
@@ -36,23 +46,16 @@ if (fs.existsSync(filename)) {
   const source = parse(
     fs.readFileSync(option("--source") ?? path.join(root, ".env")),
   );
-  if (!source.DATABASE_URL || !source.ADMIN_USERNAME || !source.ADMIN_PASSWORD)
+  if (!source.ADMIN_USERNAME || !source.ADMIN_PASSWORD)
     throw new Error(
-      "Configure DATABASE_URL and admin credentials before importing desktop settings.",
+      "Configure admin credentials before importing desktop settings.",
     );
-  if (
-    !["localhost", "127.0.0.1", "[::1]"].includes(
-      new URL(source.DATABASE_URL).hostname,
-    )
-  )
-    throw new Error("Desktop settings require local MySQL.");
   if (!z.string().uuid().safeParse(source.BRANCH_ID).success)
     throw new Error(
       "Configure BRANCH_ID with the UUID of this PC's branch before importing settings.",
     );
   const keys = [
     "BRANCH_ID",
-    "DATABASE_URL",
     "JWT_SECRET",
     "ADMIN_NAME",
     "ADMIN_USERNAME",

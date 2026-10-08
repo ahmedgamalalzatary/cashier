@@ -43,9 +43,12 @@ export async function startDesktopApi(
   settingsFile: string,
   manifestFile: string,
   signal: AbortSignal,
+  databaseUrl: string,
 ) {
-  const { environment, admin, syncEnabled, branchId } =
-    loadDesktopSettings(settingsFile);
+  const { environment, admin, syncEnabled, branchId } = loadDesktopSettings(
+    settingsFile,
+    databaseUrl,
+  );
   const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8")) as {
     schemaCreatedAt: number;
   };

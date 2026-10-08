@@ -46,7 +46,6 @@ async function start(sync = false, branchId = TEST_BRANCH_ID) {
     settings,
     Object.entries({
       BRANCH_ID: branchId,
-      DATABASE_URL: loadTestEnvironment(),
       JWT_SECRET: "desktop-test-secret-more-than-32-characters",
       ADMIN_USERNAME: "desktop-test-admin",
       ADMIN_PASSWORD: "desktop-test-password",
@@ -62,6 +61,7 @@ async function start(sync = false, branchId = TEST_BRANCH_ID) {
     settings,
     manifest,
     new AbortController().signal,
+    loadTestEnvironment(),
   );
   running.push(runtime);
   return runtime;

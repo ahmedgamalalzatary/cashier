@@ -39,11 +39,8 @@ test("imports only application settings into the user-data folder", (t) => {
     path.join(destination, "settings.env"),
     "utf8",
   );
-  assert.ok(
-    settings.includes(
-      'DATABASE_URL="mysql://cashier:private-password@localhost/cashier"',
-    ),
-  );
+  // the bundled database replaces any configured server
+  assert.ok(!settings.includes("DATABASE_URL"));
   assert.ok(!settings.includes("UNRELATED_SETTING"));
   assert.ok(
     settings.includes('BRANCH_ID="019a1234-5678-7000-8000-000000000001"'),
@@ -75,17 +72,19 @@ test("a second import preserves the user's edited settings", (t) => {
   assert.equal(result.status, 0, result.stderr);
   assert.equal(fs.readFileSync(target, "utf8"), "user-edited-settings\n");
 });
-test("does not import a remote database into a local desktop installation", (t) => {
-  const { source, destination } = fixture(t);
-  fs.writeFileSync(
+test("writes to the folder every Windows user shares by default", (t) => {
+  const { directory, source } = fixture(t);
+  fs.appendFileSync(
     source,
-    'DATABASE_URL="mysql://cashier:password@remote.example/cashier"\nADMIN_USERNAME="admin"\nADMIN_PASSWORD="password"\n',
+    'BRANCH_ID="019a1234-5678-7000-8000-000000000001"\n',
   );
-  const result = spawnSync(
-    process.execPath,
-    [script, "--source", source, "--directory", destination],
-    { encoding: "utf8" },
-  );
-  assert.notEqual(result.status, 0);
-  assert.ok(!fs.existsSync(path.join(destination, "settings.env")));
+  const result = spawnSync(process.execPath, [script, "--source", source], {
+    encoding: "utf8",
+    env: { ...process.env, ProgramData: directory },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const shared = path.join(directory, "Cashier");
+  assert.ok(fs.existsSync(path.join(shared, "settings.env")));
+  const acl = spawnSync("icacls", [shared], { encoding: "utf8" }).stdout;
+  assert.match(acl, /BUILTIN\\Users:\(OI\)\(CI\)\(M\)/);
 });

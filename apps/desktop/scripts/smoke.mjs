@@ -82,7 +82,6 @@ try {
   fs.writeFileSync(
     settings,
     Object.entries({
-      DATABASE_URL: scratchUrl.href,
       BRANCH_ID: branchId,
       JWT_SECRET: "desktop-smoke-test-secret-over-32-characters",
       ADMIN_USERNAME: "desktop-smoke-admin",
@@ -107,7 +106,12 @@ try {
     ],
     {
       cwd: directory,
-      env: { ...process.env, NODE_PATH: "", NODE_OPTIONS: "" },
+      env: {
+        ...process.env,
+        NODE_PATH: "",
+        NODE_OPTIONS: "",
+        CASHIER_DATABASE_URL: scratchUrl.href,
+      },
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
     },

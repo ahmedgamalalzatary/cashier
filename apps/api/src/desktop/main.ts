@@ -25,10 +25,14 @@ async function main() {
   const [settingsFile, manifestFile] = process.argv.slice(2);
   if (!settingsFile || !manifestFile)
     throw new Error("Desktop settings and runtime manifest are required");
+  // passed by the desktop shell through the environment, never the command line
+  const databaseUrl = process.env.CASHIER_DATABASE_URL ?? "";
+  delete process.env.CASHIER_DATABASE_URL;
   const runtime = await startDesktopApi(
     settingsFile,
     manifestFile,
     shutdown.signal,
+    databaseUrl,
   );
   try {
     process.stdout.write(
