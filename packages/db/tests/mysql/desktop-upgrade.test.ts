@@ -5,7 +5,7 @@ import mysql from "mysql2/promise";
 import type { RowDataPacket } from "mysql2/promise";
 import { afterEach, describe, expect, it } from "vitest";
 import { closeDb, createDb, type Db } from "../../src/client.js";
-import { loadTestEnvironment, migrationsFolder } from "../support/test-env.js";
+import { loadTestEnvironment } from "../support/test-env.js";
 import {
   DesktopStartupError,
   prepareDesktopDatabase,
@@ -18,9 +18,9 @@ const mysqlBin = path.resolve(
   import.meta.dirname,
   "../../../../apps/desktop/src-tauri/runtime/mysql/bin",
 );
-const baseline = JSON.parse(
-  fs.readFileSync(path.join(migrationsFolder, "meta/_journal.json"), "utf8"),
-).entries.at(-1).when as number;
+// A one-table starting schema keeps these tests light; they prove the backup,
+// update and restore logic, not the real schema (the desktop smoke covers that).
+const baseline = 1_700_000_000_000;
 const next = baseline + 60_000;
 
 const cleanups: Array<() => Promise<void> | void> = [];
@@ -54,23 +54,37 @@ async function scratchDatabase() {
   return { url, db };
 }
 
-/** The real baseline plus an optional later migration. */
+/** A small baseline plus an optional later migration, in drizzle's layout. */
 function migrations(extra?: string) {
   const folder = scratchFolder("cashier-migrations-");
-  fs.cpSync(migrationsFolder, folder, { recursive: true });
+  fs.mkdirSync(path.join(folder, "meta"));
+  fs.writeFileSync(
+    path.join(folder, "0000_base.sql"),
+    "CREATE TABLE `branches` (`id` char(36) PRIMARY KEY, `name` varchar(191) NOT NULL);",
+  );
+  const entries = [
+    {
+      idx: 0,
+      version: "5",
+      when: baseline,
+      tag: "0000_base",
+      breakpoints: true,
+    },
+  ];
   if (extra) {
     fs.writeFileSync(path.join(folder, "0001_next.sql"), extra);
-    const journalFile = path.join(folder, "meta/_journal.json");
-    const journal = JSON.parse(fs.readFileSync(journalFile, "utf8"));
-    journal.entries.push({
+    entries.push({
       idx: 1,
       version: "5",
       when: next,
       tag: "0001_next",
       breakpoints: true,
     });
-    fs.writeFileSync(journalFile, JSON.stringify(journal));
   }
+  fs.writeFileSync(
+    path.join(folder, "meta/_journal.json"),
+    JSON.stringify({ version: "7", dialect: "mysql", entries }),
+  );
   return folder;
 }
 const working =

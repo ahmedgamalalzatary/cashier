@@ -59,18 +59,40 @@ test("rejects a missing branch instead of selecting a branch automatically", (t)
   assert.match(result.stderr, /BRANCH_ID/);
   assert.ok(!fs.existsSync(path.join(destination, "settings.env")));
 });
-test("a second import preserves the user's edited settings", (t) => {
+test("an existing file keeps every line and only gains missing settings", (t) => {
   const { source, destination } = fixture(t);
+  fs.appendFileSync(
+    source,
+    'BRANCH_ID="019a1234-5678-7000-8000-000000000001"\n',
+  );
   fs.mkdirSync(destination);
   const target = path.join(destination, "settings.env");
-  fs.writeFileSync(target, "user-edited-settings\n");
+  // written by the app on its first start, then edited by the user
+  const existing =
+    'MYSQL_PASSWORD="kept-database-password"\nADMIN_USERNAME="edited-admin"\n';
+  fs.writeFileSync(target, existing);
   const result = spawnSync(
     process.execPath,
     [script, "--source", source, "--directory", destination],
     { encoding: "utf8" },
   );
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(fs.readFileSync(target, "utf8"), "user-edited-settings\n");
+  const settings = fs.readFileSync(target, "utf8");
+  assert.ok(settings.startsWith(existing));
+  assert.equal(settings.match(/^ADMIN_USERNAME=/gm).length, 1);
+  assert.ok(
+    settings.includes('BRANCH_ID="019a1234-5678-7000-8000-000000000001"'),
+  );
+  assert.ok(settings.includes('ADMIN_PASSWORD="local-admin-password"'));
+  assert.ok(!result.stdout.includes("local-admin-password"));
+
+  const again = spawnSync(
+    process.execPath,
+    [script, "--source", source, "--directory", destination],
+    { encoding: "utf8" },
+  );
+  assert.equal(again.status, 0, again.stderr);
+  assert.equal(fs.readFileSync(target, "utf8"), settings);
 });
 test("writes to the folder every Windows user shares by default", (t) => {
   const { directory, source } = fixture(t);

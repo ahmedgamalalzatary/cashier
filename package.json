@@ -15,6 +15,7 @@
     "test:desktop": "turbo run test --filter=@cashier/desktop --concurrency=1",
     "smoke:desktop": "turbo run smoke:desktop --filter=@cashier/desktop --concurrency=1",
     "configure:desktop": "pnpm --filter @cashier/desktop configure:desktop",
+    "branch:desktop": "pnpm --filter @cashier/desktop branch:desktop",
     "version:desktop": "pnpm --filter @cashier/desktop version:desktop",
     "build": "turbo run build",
     "test": "turbo run test",

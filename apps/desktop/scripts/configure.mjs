@@ -40,45 +40,56 @@ function sharedFolder() {
 }
 const directory = option("--directory") ?? sharedFolder();
 const filename = path.join(directory, "settings.env");
-if (fs.existsSync(filename)) {
+// An existing file (the app creates one on its first start) keeps every line;
+// only settings it lacks are added.
+const existingText = fs.existsSync(filename)
+  ? fs.readFileSync(filename, "utf8")
+  : null;
+const existing = existingText === null ? {} : parse(existingText);
+const source = parse(
+  fs.readFileSync(option("--source") ?? path.join(root, ".env")),
+);
+const pick = (key) => existing[key] ?? source[key];
+if (!pick("ADMIN_USERNAME") || !pick("ADMIN_PASSWORD"))
+  throw new Error(
+    "Configure admin credentials before importing desktop settings.",
+  );
+if (!z.string().uuid().safeParse(pick("BRANCH_ID")).success)
+  throw new Error(
+    "Configure BRANCH_ID with the UUID of this PC's branch before importing settings.",
+  );
+const keys = [
+  "BRANCH_ID",
+  "JWT_SECRET",
+  "ADMIN_NAME",
+  "ADMIN_USERNAME",
+  "ADMIN_PASSWORD",
+  "EXTERNAL_ORDERS_BASE_URL",
+  "EXTERNAL_ORDERS_PHONE_NUMBER",
+  "EXTERNAL_ORDERS_PASSWORD",
+  "EXTERNAL_CATALOG_ENABLED",
+  "DESKTOP_SYNC_ENABLED",
+];
+const values = Object.fromEntries(
+  keys
+    .filter((key) => existing[key] === undefined && source[key] !== undefined)
+    .map((key) => [key, source[key]]),
+);
+if (!pick("JWT_SECRET")) values.JWT_SECRET = randomBytes(32).toString("hex");
+if (pick("DESKTOP_SYNC_ENABLED") === undefined)
+  values.DESKTOP_SYNC_ENABLED = "true";
+const lines = Object.entries(values).map(
+  ([key, value]) => `${key}=${JSON.stringify(value)}`,
+);
+if (lines.length === 0) {
   console.log(`Existing desktop settings preserved: ${filename}`);
 } else {
-  const source = parse(
-    fs.readFileSync(option("--source") ?? path.join(root, ".env")),
-  );
-  if (!source.ADMIN_USERNAME || !source.ADMIN_PASSWORD)
-    throw new Error(
-      "Configure admin credentials before importing desktop settings.",
-    );
-  if (!z.string().uuid().safeParse(source.BRANCH_ID).success)
-    throw new Error(
-      "Configure BRANCH_ID with the UUID of this PC's branch before importing settings.",
-    );
-  const keys = [
-    "BRANCH_ID",
-    "JWT_SECRET",
-    "ADMIN_NAME",
-    "ADMIN_USERNAME",
-    "ADMIN_PASSWORD",
-    "EXTERNAL_ORDERS_BASE_URL",
-    "EXTERNAL_ORDERS_PHONE_NUMBER",
-    "EXTERNAL_ORDERS_PASSWORD",
-    "EXTERNAL_CATALOG_ENABLED",
-  ];
-  const values = Object.fromEntries(
-    keys
-      .filter((key) => source[key] !== undefined)
-      .map((key) => [key, source[key]]),
-  );
-  values.JWT_SECRET ||= randomBytes(32).toString("hex");
-  values.DESKTOP_SYNC_ENABLED = source.DESKTOP_SYNC_ENABLED ?? "true";
   fs.mkdirSync(directory, { recursive: true });
-  fs.writeFileSync(
-    filename,
-    Object.entries(values)
-      .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
-      .join("\n") + "\n",
-    { flag: "wx", mode: 0o600 },
+  const separator = existingText && !existingText.endsWith("\n") ? "\n" : "";
+  fs.appendFileSync(filename, separator + lines.join("\n") + "\n", {
+    mode: 0o600,
+  });
+  console.log(
+    `${existingText === null ? "Imported" : "Added missing"} local desktop settings: ${filename}`,
   );
-  console.log(`Imported local desktop settings: ${filename}`);
 }

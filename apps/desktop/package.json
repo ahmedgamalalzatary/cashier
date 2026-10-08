@@ -1,6 +1,6 @@
 {
   "name": "@cashier/desktop",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "scripts": {
     "tauri": "tauri",
@@ -8,6 +8,7 @@
     "build:desktop": "tauri build",
     "prepare:desktop": "node scripts/prepare.mjs",
     "configure:desktop": "node scripts/configure.mjs",
+    "branch:desktop": "node scripts/dev-branch.mjs",
     "version:desktop": "node scripts/version.mjs",
     "smoke:desktop": "node scripts/smoke.mjs",
     "typecheck": "cargo check --manifest-path src-tauri/Cargo.toml --all-targets --locked",
