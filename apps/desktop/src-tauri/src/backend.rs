@@ -185,6 +185,13 @@ fn open_log(data: &Path) -> std::io::Result<fs::File> {
     OpenOptions::new().create(true).append(true).open(log_path)
 }
 
+/// Adds one line to backend.log (for startup events outside the local API).
+pub fn note(data: &Path, line: &str) {
+    if let Ok(mut log) = open_log(data) {
+        let _ = writeln!(log, "{line}");
+    }
+}
+
 fn spawn_api(
     runtime: &Path,
     settings: &Path,
