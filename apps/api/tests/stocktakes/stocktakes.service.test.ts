@@ -75,7 +75,7 @@ describe("stocktake confirmation", () => {
     const repo = new FakeRepository();
     const result = await new StocktakesService(repo).confirm(
       testId(1),
-      { note: "Ø¬Ø±Ø¯ Ø§Ù„Ø´Ù‡Ø±" },
+      { note: "جرد شهري" },
       testId(9),
     );
 
@@ -104,7 +104,7 @@ describe("stocktake confirmation", () => {
     const repo = new FakeRepository();
     repo.current.set(testId(1), "4.000");
     await expect(
-      new StocktakesService(repo).confirm(testId(1), { note: "Ø¬Ø±Ø¯" }, testId(9)),
+      new StocktakesService(repo).confirm(testId(1), { note: "جرد" }, testId(9)),
     ).rejects.toMatchObject({ status: 409 });
     expect(repo.movements).toEqual([]);
     expect(repo.completed).toBe(false);
@@ -114,7 +114,7 @@ describe("stocktake confirmation", () => {
     const repo = new FakeRepository();
     repo.session = { ...repo.session, status: "confirmed" };
     await expect(
-      new StocktakesService(repo).confirm(testId(1), { note: "Ø¬Ø±Ø¯" }, testId(9)),
+      new StocktakesService(repo).confirm(testId(1), { note: "جرد" }, testId(9)),
     ).rejects.toMatchObject({ status: 409 });
   });
 });

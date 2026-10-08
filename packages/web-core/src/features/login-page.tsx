@@ -51,7 +51,7 @@ export function LoginPage({ adminsOnly = false }: { adminsOnly?: boolean } = {})
           </h1>
           <p className="mt-5 max-w-sm leading-7 text-sidebar-ink">
             {adminsOnly
-              ? "سجّل الدخول للاطلاع على تقارير الفروع التيを維持 حسابك."
+              ? "سجّل الدخول للاطلاع على تقارير الفروع التي يديرها حسابك."
               : "سجّل الدخول للوصول إلى نقطة البيع وإدارة المخزون والورديات حسب صلاحيتك."}
           </p>
         </div>
