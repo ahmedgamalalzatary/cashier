@@ -7,7 +7,12 @@ import { Button } from "../components/ui/button";
 import { Field } from "../components/ui/field";
 import { SelectField } from "../components/ui/select-field";
 
-export function LoginPage() {
+/**
+ * The shop login asks whether an admin or a cashier is signing in, because the
+ * same username may exist as both (plan Q5). The online site refuses cashiers
+ * (D4), so it asks for nothing and submits the admin identity directly.
+ */
+export function LoginPage({ adminsOnly = false }: { adminsOnly?: boolean } = {}) {
   const { login } = useAuth();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,7 +26,7 @@ export function LoginPage() {
       await login(
         String(data.get("username")),
         String(data.get("password")),
-        data.get("role") === "admin" ? "admin" : "cashier",
+        adminsOnly || data.get("role") === "admin" ? "admin" : "cashier",
       );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "تعذر تسجيل الدخول");
@@ -45,8 +50,9 @@ export function LoginPage() {
             ابدأ من هنا.
           </h1>
           <p className="mt-5 max-w-sm leading-7 text-sidebar-ink">
-            سجّل الدخول للوصول إلى نقطة البيع وإدارة المخزون والورديات حسب
-            صلاحيتك.
+            {adminsOnly
+              ? "سجّل الدخول للاطلاع على تقارير الفروع التيを維持 حسابك."
+              : "سجّل الدخول للوصول إلى نقطة البيع وإدارة المخزون والورديات حسب صلاحيتك."}
           </p>
         </div>
       </section>
@@ -70,15 +76,19 @@ export function LoginPage() {
               </p>
             </div>
             <form className="space-y-5" onSubmit={submit}>
-              <SelectField
-                label="نوع الحساب"
-                name="role"
-                defaultValue="cashier"
-                required
-              >
-                <option value="cashier">كاشير</option>
-                <option value="admin">مدير</option>
-              </SelectField>
+              {adminsOnly ? (
+                <input type="hidden" name="role" value="admin" />
+              ) : (
+                <SelectField
+                  label="نوع الحساب"
+                  name="role"
+                  defaultValue="cashier"
+                  required
+                >
+                  <option value="cashier">كاشير</option>
+                  <option value="admin">مدير</option>
+                </SelectField>
+              )}
               <Field
                 label="اسم المستخدم"
                 name="username"
