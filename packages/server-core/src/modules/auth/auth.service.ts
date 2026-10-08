@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { resolveAccess, type Access } from "../../access.js";
 import { HttpError } from "../../middleware/error.js";
 import { signToken } from "../../middleware/auth.js";
 import { toAuthUser } from "./auth-user.js";
@@ -10,18 +11,25 @@ const DUMMY_PASSWORD_HASH =
 type ComparePassword = (password: string, hash: string) => Promise<boolean>;
 
 export class AuthService {
+  private readonly branchId?: string;
+  private readonly online: boolean;
+
   constructor(
     private repo: AuthRepository,
     private jwtSecret: string,
     private comparePassword: ComparePassword = bcrypt.compare,
-    private localBranchId?: string,
-  ) {}
+    access?: Access,
+  ) {
+    const resolved = resolveAccess(access);
+    this.branchId = resolved.branchId;
+    this.online = resolved.online;
+  }
 
   async login({ username, password, role }: LoginInput) {
     const user = await this.repo.findByUsername(
       username,
       role,
-      this.localBranchId,
+      this.branchId,
     );
     // same error for unknown user and wrong password — no username probing
     const invalid = new HttpError(401, "اسم المستخدم أو كلمة المرور غير صحيحة");
@@ -36,12 +44,16 @@ export class AuthService {
       (user.role === "cashier" && !user.branchIsActive)
     )
       throw invalid;
+    // Checked after the password so a wrong password never reveals which
+    // usernames belong to cashiers.
+    if (this.online && user.role === "cashier")
+      throw new HttpError(401, "لا يملك الكاشير صلاحية الدخول عبر الإنترنت");
     if (
-      this.localBranchId &&
+      this.branchId &&
       (user.role === "cashier"
-        ? user.branchId !== this.localBranchId
+        ? user.branchId !== this.branchId
         : !user.isSuperAdmin &&
-          !(await this.repo.isAdminAssigned(user.id, this.localBranchId)))
+          !(await this.repo.isAdminAssigned(user.id, this.branchId)))
     )
       throw new HttpError(
         403,

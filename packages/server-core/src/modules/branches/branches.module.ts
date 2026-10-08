@@ -7,6 +7,18 @@ import { BranchesService } from "./branches.service.js";
 import { branchInput, branchUpdateInput } from "./branches.schemas.js";
 import { HttpError } from "../../middleware/error.js";
 
+/**
+ * The online deployment serves this list for the branch picker only. Branch
+ * management arrives with the super-admin screens (plan Phase 8), so no write
+ * route exists here and the online site can never change business data.
+ */
+export function createBranchesListModule(db: Db) {
+  const router = Router();
+  const service = new BranchesService(new BranchesRepository(db));
+  router.get("/", async (req, res) => res.json(await service.list(req.user!)));
+  return router;
+}
+
 export function createBranchesModule(db: Db, branchId?: string) {
   const router = Router();
   const service = new BranchesService(new BranchesRepository(db));

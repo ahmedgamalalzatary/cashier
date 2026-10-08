@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import type { Db } from "@cashier/db";
 import { adminBranches, branches, users } from "@cashier/db";
 import { HttpError } from "./error.js";
+import { resolveAccess, type Access } from "../access.js";
 import type { AuthUser } from "@cashier/shared";
 import { toAuthUser } from "../modules/auth/auth-user.js";
 import { idParam } from "./validation.js";
@@ -72,7 +73,8 @@ export function readRequestToken(req: Request) {
   return header?.startsWith("Bearer ") ? header.slice(7) : undefined;
 }
 
-export function authenticate(db: Db, jwtSecret: string, branchId?: string) {
+export function authenticate(db: Db, jwtSecret: string, access?: Access) {
+  const { branchId, online } = resolveAccess(access);
   return async (req: Request, _res: Response, next: NextFunction) => {
     const token = readRequestToken(req);
     if (!token) throw new HttpError(401, "يجب تسجيل الدخول");
@@ -93,6 +95,8 @@ export function authenticate(db: Db, jwtSecret: string, branchId?: string) {
       .limit(1);
     if (!user?.isActive || payload.tokenVersion !== user.tokenVersion)
       throw new HttpError(401, "انتهت الجلسة — سجّل الدخول من جديد");
+    if (online && user.role === "cashier")
+      throw new HttpError(401, "لا يملك الكاشير صلاحية الدخول عبر الإنترنت");
     if (branchId) {
       if (user.role === "cashier" && user.branchId !== branchId)
         throw new HttpError(403, "هذا الحساب غير معيّن لهذا الفرع");
