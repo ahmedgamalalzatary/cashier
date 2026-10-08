@@ -23,18 +23,18 @@ sudo docker compose --env-file .env.production COMMAND
 
 The file stays on the VPS and is never committed. It needs exactly these keys:
 
-| Key                  | Meaning                                                                                    |
-| -------------------- | ------------------------------------------------------------------------------------------ |
-| `MYSQL_DATABASE`     | database name (default `cashier`)                                                            |
-| `MYSQL_USER`         | application database user (default `cashier`)                                                |
-| `MYSQL_PASSWORD`     | password of that user                                                                       |
-| `MYSQL_ROOT_PASSWORD`| root password of the container                                                              |
-| `DATABASE_URL`       | `mysql://<MYSQL_USER>:<MYSQL_PASSWORD>@mysql:3306/<MYSQL_DATABASE>` — host `mysql`, the Compose service |
-| `JWT_SECRET`         | at least 32 characters, random, not the example value                                        |
-| `CORS_ORIGIN`        | exactly `https://cashier.biscofa.tech`                                                       |
-| `ADMIN_NAME`         | display name of the super-admin                                                              |
-| `ADMIN_USERNAME`     | super-admin username                                                                         |
-| `ADMIN_PASSWORD`     | super-admin password                                                                         |
+| Key                   | Meaning                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------- |
+| `MYSQL_DATABASE`      | database name (default `cashier`)                                                                       |
+| `MYSQL_USER`          | application database user (default `cashier`)                                                           |
+| `MYSQL_PASSWORD`      | password of that user                                                                                   |
+| `MYSQL_ROOT_PASSWORD` | root password of the container                                                                          |
+| `DATABASE_URL`        | `mysql://<MYSQL_USER>:<MYSQL_PASSWORD>@mysql:3306/<MYSQL_DATABASE>` — host `mysql`, the Compose service |
+| `JWT_SECRET`          | at least 32 characters, random, not the example value                                                   |
+| `CORS_ORIGIN`         | exactly `https://cashier.biscofa.tech`                                                                  |
+| `ADMIN_NAME`          | display name of the super-admin                                                                         |
+| `ADMIN_USERNAME`      | super-admin username                                                                                    |
+| `ADMIN_PASSWORD`      | super-admin password                                                                                    |
 
 `PORT` and `TRUST_PROXY` are fixed by Compose (`4000`, `true`). The old
 `EXTERNAL_ORDERS_*` and `EXTERNAL_CATALOG_ENABLED` keys are no longer read by
@@ -86,7 +86,7 @@ Then, once the site answers, drop the leftover containers by name — Compose no
 longer knows those service names and answers `no such service`:
 
 ```bash
-docker rm -f cashier-app-web-1 cashier-app-api-1 cashier-app-cache-worker-1
+sudo docker rm -f cashier-app-web-1 cashier-app-api-1 cashier-app-cache-worker-1
 sudo docker image prune
 ```
 
@@ -141,13 +141,6 @@ location / {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 }
-```
-
-Then validate and reload:
-
-```bash
-sudo nginx -t
-sudo systemctl reload nginx
 ```
 
 Then validate and reload:
@@ -304,7 +297,7 @@ unset MYSQL_ROOT_PASSWORD
 
 ```bash
 sudo docker system df
-sudo docker du -sh /var/lib/docker
+sudo du -sh /var/lib/docker
 sudo docker builder prune
 sudo docker image prune
 ```

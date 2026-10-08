@@ -11,7 +11,7 @@ Everything it stores (settings, database, logs) lives in `C:\ProgramData\Cashier
 shared by every Windows user of the PC. Each Windows user installs the app once;
 only one of them can have Cashier open at a time. The first start creates the
 database with random passwords and an unconfigured PC says "This PC is not linked
-yet". The online updater is a separate next step.
+yet". The app updates itself from GitHub releases (see "Publishing a release").
 
 On every start the app brings the database to its own version before serving:
 a new database gets its tables; when an installed update brings database changes,
