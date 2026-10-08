@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* The shared components in packages/web-core are transpiled from source outside
+   this app, so Tailwind never scans them on its own. Without this, every utility
+   only those components use is missing from the built CSS and the pages render
+   unstyled, so both apps declare the same source here. */
+@source "../../../../packages/web-core/src";
+
 :root {
   --paper: #f7f4ef;
   --surface: #ffffff;
