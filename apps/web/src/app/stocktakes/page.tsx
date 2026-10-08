@@ -96,7 +96,7 @@ export default function StocktakesPage() {
       setActive(
         await startStocktake({
           warehouse,
-          categoryId: categoryId ? Number(categoryId) : null,
+          categoryId: categoryId ? categoryId : null,
           note: note.trim() || null,
         }),
       ),
@@ -127,7 +127,7 @@ export default function StocktakesPage() {
         throw new Error("أكمل بيانات التسوية وسببها");
       await createManualAdjustment({
         warehouse,
-        itemId: Number(manualItem),
+        itemId: manualItem,
         countedQuantity: Number(manualCount),
         note: manualNote.trim(),
       });

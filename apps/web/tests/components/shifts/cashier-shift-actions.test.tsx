@@ -106,7 +106,7 @@ describe("cashier shift actions used by Home and POS", () => {
     await actionModal(render(null, changed)).props.onSubmit({
       actualCash: 120,
     });
-    expect(api).toHaveBeenCalledWith("/api/shifts/41/close", {
+    expect(api).toHaveBeenCalledWith("/api/shifts/00000000-0000-7000-8000-000000000029/close", {
       method: "POST",
       body: '{"actualCash":120}',
     });

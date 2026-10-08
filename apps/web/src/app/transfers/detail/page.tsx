@@ -24,7 +24,8 @@ function TransferDetailView() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    getTransfer(Number(id))
+    if (!id) return;
+    getTransfer(id)
       .then(setTransfer)
       .catch((caught) =>
         setError(
@@ -33,6 +34,7 @@ function TransferDetailView() {
       );
   }, [id]);
 
+  if (!id) return <ErrorBanner>لم يتم تحديد السجل</ErrorBanner>;
   if (error) return <ErrorBanner>{error}</ErrorBanner>;
   if (!transfer) return <LoadingState label="جارِ تحميل التحويل…" />;
 

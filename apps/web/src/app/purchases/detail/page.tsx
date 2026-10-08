@@ -33,7 +33,8 @@ function PurchaseDetailView() {
 
   const load = useCallback(async () => {
     try {
-      setInvoice(await getPurchase(Number(id)));
+      if (!id) throw new Error("لم يتم تحديد السجل");
+      setInvoice(await getPurchase(id));
       setError("");
     } catch (caught) {
       setError(

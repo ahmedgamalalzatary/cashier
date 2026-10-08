@@ -1,12 +1,12 @@
 import type { Item, ItemType } from "@cashier/shared";
 import { api } from "@cashier/web-core/lib/api";
 
-type IdResponse = { id: number };
+type IdResponse = { id: string };
 type OkResponse = { ok: true };
 
 export type ItemSaveBody = {
   name?: string;
-  categoryId?: number;
+  categoryId?: string;
   type?: ItemType;
   sellingPrice?: number | null;
   stockUnit?: string;
@@ -27,18 +27,18 @@ export function createItem(body: ItemSaveBody) {
   });
 }
 
-export function updateItem(id: number, body: ItemSaveBody) {
+export function updateItem(id: string, body: ItemSaveBody) {
   return api<OkResponse>(`/api/items/${id}`, {
     method: "PUT",
     body: JSON.stringify(body),
   });
 }
 
-export function deactivateItem(id: number) {
+export function deactivateItem(id: string) {
   return api<OkResponse>(`/api/items/${id}`, { method: "DELETE" });
 }
 
-export function reactivateItem(id: number) {
+export function reactivateItem(id: string) {
   return api<OkResponse>(`/api/items/${id}`, {
     method: "PUT",
     body: JSON.stringify({ isActive: true }),

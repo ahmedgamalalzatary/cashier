@@ -66,7 +66,7 @@ export function ExpenseEntryForm({
     try {
       await createExpense({
         clientRequestId: requestId,
-        categoryId: Number(categoryId),
+        categoryId: categoryId,
         amount: Number(amount),
         expenseDate: isAdmin ? expenseDate : undefined,
         note: note.trim() || null,

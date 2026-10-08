@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../src/lib/api";
 import {
@@ -32,12 +33,12 @@ describe("users service", () => {
     };
     const updateBody = { name: "Evening cashier" };
     await createUser(createBody);
-    await updateUser(3, updateBody);
+    await updateUser(testId(3), updateBody);
     expect(request).toHaveBeenNthCalledWith(1, "/api/users", {
       method: "POST",
       body: JSON.stringify(createBody),
     });
-    expect(request).toHaveBeenNthCalledWith(2, "/api/users/3", {
+    expect(request).toHaveBeenNthCalledWith(2, "/api/users/00000000-0000-7000-8000-000000000003", {
       method: "PUT",
       body: JSON.stringify(updateBody),
     });
@@ -46,8 +47,8 @@ describe("users service", () => {
   it("changes account state", async () => {
     const body: UserSaveBody = { isActive: false };
 
-    await setUserActive(3, false);
-    expect(request).toHaveBeenCalledWith("/api/users/3", {
+    await setUserActive(testId(3), false);
+    expect(request).toHaveBeenCalledWith("/api/users/00000000-0000-7000-8000-000000000003", {
       method: "PUT",
       body: JSON.stringify(body),
     });

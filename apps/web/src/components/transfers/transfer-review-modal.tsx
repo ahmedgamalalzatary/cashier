@@ -23,14 +23,14 @@ export function TransferReviewModal({
   onClose,
   onSaved,
 }: {
-  requestId: number;
+  requestId: string;
   isAdmin: boolean;
   mainStock: InventoryStockRow[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [request, setRequest] = useState<TransferRequestDetail | null>(null);
-  const [quantities, setQuantities] = useState<Record<number, string>>({});
+  const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");

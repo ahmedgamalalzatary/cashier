@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   AUTH_CHANGED_EVENT,
@@ -62,7 +63,7 @@ function browserWithLegacyTokenSession(token: string) {
       getItem: vi.fn(() =>
         JSON.stringify({
           token,
-          user: { id: 1, name: "Admin", role: "admin" },
+          user: { id: testId(1), name: "Admin", role: "admin" },
         }),
       ),
       removeItem: vi.fn(),
@@ -110,7 +111,7 @@ function browserWithUser(exp: number) {
     localStorage: {
       getItem: vi.fn(() =>
         JSON.stringify({
-          user: { id: 1, name: "Admin", role: "admin" },
+          user: { id: testId(1), name: "Admin", role: "admin" },
           exp,
         }),
       ),
@@ -133,7 +134,7 @@ describe("tokenless persisted session", () => {
 
     writeSession({
       token: tokenWithExpiration(Math.floor(Date.now() / 1000) + 60),
-      user: { id: 1, name: "Admin", role: "admin", isSuperAdmin: false },
+      user: { id: testId(1), name: "Admin", role: "admin", isSuperAdmin: false },
     });
 
     const persisted = JSON.parse(
@@ -143,7 +144,7 @@ describe("tokenless persisted session", () => {
       SESSION_KEY,
       expect.any(String),
     );
-    expect(persisted.user).toMatchObject({ id: 1, role: "admin" });
+    expect(persisted.user).toMatchObject({ id: testId(1), role: "admin" });
     expect(persisted).not.toHaveProperty("token");
   });
 

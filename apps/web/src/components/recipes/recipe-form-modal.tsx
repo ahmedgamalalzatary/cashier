@@ -76,7 +76,7 @@ export function RecipeFormModal({
     (item) => item.type === "prepared",
   );
 
-  async function selectCreatedItem(lineKey: number, savedId: number) {
+  async function selectCreatedItem(lineKey: number, savedId: string) {
     let rows: Item[];
     try {
       rows = await onItemsChanged();
@@ -369,7 +369,7 @@ function SelectField({
   );
 }
 
-function recipeUsesItem(recipe: Recipe | null, itemId: number) {
+function recipeUsesItem(recipe: Recipe | null, itemId: string) {
   if (!recipe) return false;
   return (
     recipe.outputItemId === itemId ||

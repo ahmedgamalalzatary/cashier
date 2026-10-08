@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { OrderDetail } from "@cashier/shared";
@@ -5,9 +6,9 @@ import { OrderReceipt } from "../../../src/components/pos/order-receipt";
 import { formatMoney } from "@cashier/web-core/lib/format";
 
 const order: OrderDetail = {
-  id: 1,
+  id: testId(1),
   orderNumber: "POS-20260720-ABC12345",
-  cashierId: 2,
+  cashierId: testId(2),
   cashierName: "سارة",
   shiftId: null,
   subtotal: "80.00",
@@ -23,7 +24,7 @@ const order: OrderDetail = {
   createdAt: "2026-07-20T10:00:00.000Z",
   lines: [
     {
-      id: 3,
+      id: testId(3),
       type: "external_product",
       recipeId: null,
       recipeSizeId: null,
@@ -39,7 +40,7 @@ const order: OrderDetail = {
       hasStockDeficit: false,
       modifiers: [
         {
-          id: 1,
+          id: testId(1),
           externalModifierGroupId: 10,
           externalModifierOptionId: 11,
           groupName: "إضافات",
@@ -51,11 +52,11 @@ const order: OrderDetail = {
       allocations: [],
     },
     {
-      id: 4,
+      id: testId(4),
       type: "item",
       recipeId: null,
       recipeSizeId: null,
-      itemId: 8,
+      itemId: testId(8),
       externalProductId: null,
       externalSizeId: null,
       productName: "مياه",
@@ -91,7 +92,7 @@ describe("order receipt", () => {
   it("renders the final row of a 100-line printable receipt", () => {
     const lines = Array.from({ length: 100 }, (_, index) => ({
       ...order.lines[1],
-      id: index + 100,
+      id: testId(index + 100),
       productName: `منتج-${index + 1}`,
     }));
 

@@ -4,7 +4,7 @@ import { formatMoney, sumDecimalValues } from "@cashier/web-core/lib/format";
 
 export type OrderFilters = {
   query: string;
-  cashierId: number | null;
+  cashierId: string | null;
   /** Cairo calendar day, `YYYY-MM-DD`; empty means every day. */
   day: string;
 };
@@ -62,7 +62,7 @@ export function orderMargin(order: Pick<OrderSummary, "total" | "totalCost">) {
 
 /** The cashiers present in the list, so the filter offers only real choices. */
 export function orderCashiers(orders: OrderSummary[]) {
-  const byId = new Map<number, string>();
+  const byId = new Map<string, string>();
   for (const order of orders) {
     if (!byId.has(order.cashierId)) byId.set(order.cashierId, order.cashierName);
   }

@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import PosPage from "../../../src/app/pos/page";
@@ -18,14 +19,14 @@ vi.mock("react", async (original) => {
               lastSuccessfulSyncAt: null,
               syncError: null,
               localCategories: [
-                { id: 1, name: "مشروبات", parentId: null },
-                { id: 2, name: "قهوة", parentId: 1 },
+                { id: testId(1), name: "مشروبات", parentId: null },
+                { id: testId(2), name: "قهوة", parentId: testId(1) },
               ],
               localProducts: [
                 {
-                  id: 9,
+                  id: testId(9),
                   name: "تركي سنجل",
-                  categoryId: 2,
+                  categoryId: testId(2),
                   sellingPrice: "35.00",
                   stockUnit: "فنجان",
                 },
@@ -39,7 +40,7 @@ vi.mock("react", async (original) => {
   };
 });
 vi.mock("@cashier/web-core/components/auth/auth-provider", () => ({
-  useAuth: () => ({ user: { id: 9, role: "cashier", name: "Cashier" } }),
+  useAuth: () => ({ user: { id: testId(9), role: "cashier", name: "Cashier" } }),
 }));
 vi.mock(
   "@/components/shifts/cashier-shift-controls",

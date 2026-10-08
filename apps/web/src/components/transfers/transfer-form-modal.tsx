@@ -43,7 +43,7 @@ export function TransferFormModal({
   mode: "request" | "direct";
   items: InventoryStockRow[];
   mainStock: InventoryStockRow[];
-  initialInvoiceId?: number;
+  initialInvoiceId?: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -67,7 +67,7 @@ export function TransferFormModal({
   const [invoiceError, setInvoiceError] = useState("");
   // the invoice the applied lines came from, so the API can cap them to what
   // the invoice still owes the cafe
-  const [appliedInvoiceId, setAppliedInvoiceId] = useState<number | null>(null);
+  const [appliedInvoiceId, setAppliedInvoiceId] = useState<string | null>(null);
   const stockByItem = useMemo(
     () => new Map(mainStock.map((row) => [row.itemId, row])),
     [mainStock],
@@ -107,7 +107,7 @@ export function TransferFormModal({
     if (!id) return;
     setInvoiceLoading(true);
     try {
-      const invoice = await getPurchase(Number(id));
+      const invoice = await getPurchase(id);
       setInvoiceRows(invoiceTransferRows(invoice.lines, mainStock));
     } catch (caught) {
       setInvoiceError(
@@ -119,7 +119,7 @@ export function TransferFormModal({
   }
 
   function updateInvoiceRow(
-    itemId: number,
+    itemId: string,
     changes: Partial<InvoiceTransferRow>,
   ) {
     setInvoiceRows((current) =>
@@ -137,7 +137,7 @@ export function TransferFormModal({
     // hand-entered lines and then claim invoice quantities for items the
     // invoice never bought
     setLines(applied);
-    setAppliedInvoiceId(Number(invoiceId));
+    setAppliedInvoiceId(invoiceId);
     setTab("manual");
   }
 
@@ -404,13 +404,13 @@ className={`rounded-xl border border-line p-3 ${
             <div className="max-h-[48vh] space-y-3 overflow-y-auto pe-1">
               {lines.map((line, index) => {
                 const item = activeItems.find(
-                  (candidate) => candidate.itemId === Number(line.itemId),
+                  (candidate) => candidate.itemId === line.itemId,
                 );
-                const stock = stockByItem.get(Number(line.itemId));
+                const stock = stockByItem.get(line.itemId);
                 const usedItemIds = new Set(
                   lines
                     .filter((candidate) => candidate.key !== line.key)
-                    .map((candidate) => Number(candidate.itemId)),
+                    .map((candidate) => candidate.itemId),
                 );
                 return (
                   <div

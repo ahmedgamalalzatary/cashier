@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it, vi } from "vitest";
 import { api } from "@cashier/web-core/lib/api";
 import {
@@ -13,11 +14,11 @@ describe("stocktakes service", () => {
   it("sends the stocktake lifecycle to its API endpoints", async () => {
     vi.mocked(api).mockResolvedValue({} as never);
     await startStocktake({ warehouse: "main", categoryId: null, note: null });
-    await updateStocktakeCounts(4, [{ itemId: 2, countedQuantity: 3 }]);
-    await confirmStocktake(4, "جرد شهري");
+    await updateStocktakeCounts(testId(4), [{ itemId: testId(2), countedQuantity: 3 }]);
+    await confirmStocktake(testId(4), "جرد شهري");
     await createManualAdjustment({
       warehouse: "cafe",
-      itemId: 2,
+      itemId: testId(2),
       countedQuantity: 3,
       note: "تصحيح عد",
     });
@@ -28,12 +29,12 @@ describe("stocktakes service", () => {
     );
     expect(api).toHaveBeenNthCalledWith(
       2,
-      "/api/stocktakes/4/counts",
+      "/api/stocktakes/00000000-0000-7000-8000-000000000004/counts",
       expect.objectContaining({ method: "PUT" }),
     );
     expect(api).toHaveBeenNthCalledWith(
       3,
-      "/api/stocktakes/4/confirm",
+      "/api/stocktakes/00000000-0000-7000-8000-000000000004/confirm",
       expect.objectContaining({ method: "POST" }),
     );
     expect(api).toHaveBeenNthCalledWith(

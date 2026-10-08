@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import type { Supplier } from "@cashier/shared";
 import {
@@ -6,7 +7,7 @@ import {
 } from "../../src/models/supplier-model";
 
 const supplier: Supplier = {
-  id: 1,
+  id: testId(1),
   name: "Supplier",
   phone: null,
   address: null,

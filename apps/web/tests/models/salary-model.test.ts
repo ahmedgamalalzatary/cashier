@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import type { SalaryMonthEmployee } from "@cashier/shared";
 import { formatMoney } from "@cashier/web-core/lib/format";
@@ -9,7 +10,7 @@ import {
 const row = (
   over: Partial<SalaryMonthEmployee> = {},
 ): SalaryMonthEmployee => ({
-  employeeId: 1,
+  employeeId: testId(1),
   employeeName: "أحمد",
   isActive: true,
   payRate: "5000.00",

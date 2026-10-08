@@ -69,13 +69,13 @@ export function purchaseRequestBody(input: {
 }): PurchaseCreateBody {
   return {
     clientRequestId: input.clientRequestId,
-    supplierId: Number(input.supplierId),
+    supplierId: input.supplierId,
     invoiceNumber: input.invoiceNumber.trim() || null,
     purchasedAt: input.purchasedAt,
     paidAmount: input.paidAmount,
     notes: input.notes.trim() || null,
     lines: input.lines.map((line) => ({
-      itemId: Number(line.itemId),
+      itemId: line.itemId,
       quantity: Number(line.quantity),
       unitMode: line.unitMode,
       unitPrice: Number(line.unitPrice),

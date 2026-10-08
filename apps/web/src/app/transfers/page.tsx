@@ -82,11 +82,10 @@ function TransfersView() {
     if (isAdmin && requestedDirect) return "direct";
     return requestedNew === "request" ? "request" : null;
   });
-  const [directInvoiceId] = useState<number | null>(() => {
-    const invoiceId = Number(requestedInvoice);
-    return isAdmin && invoiceId > 0 ? invoiceId : null;
+  const [directInvoiceId] = useState<string | null>(() => {
+    return isAdmin && requestedInvoice ? requestedInvoice : null;
   });
-  const [reviewingId, setReviewingId] = useState<number | null>(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);

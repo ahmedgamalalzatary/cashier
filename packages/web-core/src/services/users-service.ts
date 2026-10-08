@@ -1,7 +1,7 @@
 import type { ManagedUser, Role } from "@cashier/shared";
 import { api } from "@cashier/web-core/lib/api";
 
-type IdResponse = { id: number };
+type IdResponse = { id: string };
 type OkResponse = { ok: true };
 
 export type UserSaveBody = {
@@ -23,13 +23,13 @@ export function createUser(body: UserSaveBody) {
   });
 }
 
-export function updateUser(id: number, body: UserSaveBody) {
+export function updateUser(id: string, body: UserSaveBody) {
   return api<OkResponse>(`/api/users/${id}`, {
     method: "PUT",
     body: JSON.stringify(body),
   });
 }
 
-export function setUserActive(id: number, isActive: boolean) {
+export function setUserActive(id: string, isActive: boolean) {
   return updateUser(id, { isActive });
 }

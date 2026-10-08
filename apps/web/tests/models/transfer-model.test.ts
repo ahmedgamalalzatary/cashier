@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import type { InventoryStockRow, PurchaseInvoiceLine } from "@cashier/shared";
 import {
@@ -10,11 +11,11 @@ import {
 } from "../../src/models/transfer-model";
 
 function invoiceLine(
-  overrides: Partial<PurchaseInvoiceLine> & { itemId: number },
+  overrides: Partial<PurchaseInvoiceLine> & { itemId: string },
 ): PurchaseInvoiceLine {
   return {
     id: overrides.itemId,
-    itemCode: overrides.itemId,
+    itemCode: 3,
     itemName: `صنف ${overrides.itemId}`,
     quantity: "1.000",
     unitMode: "stock",
@@ -29,12 +30,12 @@ function invoiceLine(
   };
 }
 
-function stockRow(itemId: number, quantity: string): InventoryStockRow {
+function stockRow(itemId: string, quantity: string): InventoryStockRow {
   return {
     itemId,
-    code: itemId,
+    code: 3,
     name: `صنف ${itemId}`,
-    categoryId: 1,
+    categoryId: testId(1),
     categoryName: "تصنيف",
     type: "raw",
     stockUnit: "كجم",
@@ -54,16 +55,16 @@ describe("transfer model", () => {
         clientRequestId: "11111111-1111-4111-8111-111111111111",
         notes: "  للوردية  ",
         lines: [
-          { key: 1, itemId: "3", quantity: "2.500" },
-          { key: 2, itemId: "7", quantity: "1" },
+          { key: 1, itemId: testId(3), quantity: "2.500" },
+          { key: 2, itemId: testId(7), quantity: "1" },
         ],
       }),
     ).toEqual({
       clientRequestId: "11111111-1111-4111-8111-111111111111",
       notes: "للوردية",
       lines: [
-        { itemId: 3, quantity: 2.5 },
-        { itemId: 7, quantity: 1 },
+        { itemId: testId(3), quantity: 2.5 },
+        { itemId: testId(7), quantity: 1 },
       ],
     });
   });
@@ -72,26 +73,26 @@ describe("transfer model", () => {
     expect(
       transferDirectBody({
         notes: "  مباشر  ",
-        lines: [{ key: 1, itemId: "3", quantity: "2.500" }],
+        lines: [{ key: 1, itemId: testId(3), quantity: "2.500" }],
       }),
     ).toEqual({
       notes: "مباشر",
-      lines: [{ itemId: 3, quantity: 2.5 }],
+      lines: [{ itemId: testId(3), quantity: 2.5 }],
     });
   });
 
   it("merges repeated invoice lines for the same item", () => {
     const rows = invoiceTransferRows(
       [
-        invoiceLine({ itemId: 3, stockQuantity: "2.000" }),
-        invoiceLine({ itemId: 3, stockQuantity: "1.500" }),
+        invoiceLine({ itemId: testId(3), stockQuantity: "2.000" }),
+        invoiceLine({ itemId: testId(3), stockQuantity: "1.500" }),
       ],
-      [stockRow(3, "10.000")],
+      [stockRow(testId(3), "10.000")],
     );
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
-      itemId: 3,
+      itemId: testId(3),
       invoiceQuantity: 3.5,
       quantity: "3.5",
       clamped: false,
@@ -101,8 +102,8 @@ describe("transfer model", () => {
 
   it("clamps a line to the stock left in the main warehouse and flags it", () => {
     const [row] = invoiceTransferRows(
-      [invoiceLine({ itemId: 3, stockQuantity: "8.000" })],
-      [stockRow(3, "2.500")],
+      [invoiceLine({ itemId: testId(3), stockQuantity: "8.000" })],
+      [stockRow(testId(3), "2.500")],
     );
 
     expect(row).toMatchObject({
@@ -116,8 +117,8 @@ describe("transfer model", () => {
 
   it("leaves items with no remaining stock unselected", () => {
     const [row] = invoiceTransferRows(
-      [invoiceLine({ itemId: 3, stockQuantity: "8.000" })],
-      [stockRow(3, "0.000")],
+      [invoiceLine({ itemId: testId(3), stockQuantity: "8.000" })],
+      [stockRow(testId(3), "0.000")],
     );
 
     expect(row).toMatchObject({
@@ -130,7 +131,7 @@ describe("transfer model", () => {
 
   it("treats an item missing from main stock as unavailable", () => {
     const [row] = invoiceTransferRows(
-      [invoiceLine({ itemId: 9, stockQuantity: "4.000" })],
+      [invoiceLine({ itemId: testId(9), stockQuantity: "4.000" })],
       [],
     );
 
@@ -139,8 +140,8 @@ describe("transfer model", () => {
 
   it("refuses a deactivated item the manual picker could not offer", () => {
     const [row] = invoiceTransferRows(
-      [invoiceLine({ itemId: 3, stockQuantity: "2.000" })],
-      [{ ...stockRow(3, "5.000"), isActive: false }],
+      [invoiceLine({ itemId: testId(3), stockQuantity: "2.000" })],
+      [{ ...stockRow(testId(3), "5.000"), isActive: false }],
     );
 
     expect(row).toMatchObject({
@@ -154,15 +155,15 @@ describe("transfer model", () => {
   it("turns the selected rows into keyed transfer lines", () => {
     const rows = invoiceTransferRows(
       [
-        invoiceLine({ itemId: 3, stockQuantity: "2.000" }),
-        invoiceLine({ itemId: 7, stockQuantity: "1.000" }),
+        invoiceLine({ itemId: testId(3), stockQuantity: "2.000" }),
+        invoiceLine({ itemId: testId(7), stockQuantity: "1.000" }),
       ],
-      [stockRow(3, "10.000"), stockRow(7, "10.000")],
+      [stockRow(testId(3), "10.000"), stockRow(testId(7), "10.000")],
     );
     rows[1].selected = false;
 
     expect(selectedTransferLines(rows, 4)).toEqual([
-      { key: 4, itemId: "3", quantity: "2" },
+      { key: 4, itemId: testId(3), quantity: "2" },
     ]);
   });
 
@@ -170,12 +171,12 @@ describe("transfer model", () => {
     const [row] = invoiceTransferRows(
       [
         invoiceLine({
-          itemId: 3,
+          itemId: testId(3),
           stockQuantity: "20.000",
           transferredToCafeQuantity: "5.000",
         }),
       ],
-      [stockRow(3, "50.000")],
+      [stockRow(testId(3), "50.000")],
     );
 
     expect(row).toMatchObject({
@@ -193,12 +194,12 @@ describe("transfer model", () => {
     const [row] = invoiceTransferRows(
       [
         invoiceLine({
-          itemId: 3,
+          itemId: testId(3),
           stockQuantity: "20.000",
           transferredToCafeQuantity: "18.000",
         }),
       ],
-      [stockRow(3, "1.500")],
+      [stockRow(testId(3), "1.500")],
     );
 
     expect(row).toMatchObject({
@@ -213,12 +214,12 @@ describe("transfer model", () => {
     const [row] = invoiceTransferRows(
       [
         invoiceLine({
-          itemId: 3,
+          itemId: testId(3),
           stockQuantity: "20.000",
           transferredToCafeQuantity: "20.000",
         }),
       ],
-      [stockRow(3, "10.000")],
+      [stockRow(testId(3), "10.000")],
     );
 
     expect(row).toMatchObject({
@@ -232,17 +233,17 @@ describe("transfer model", () => {
     const [row] = invoiceTransferRows(
       [
         invoiceLine({
-          itemId: 3,
+          itemId: testId(3),
           stockQuantity: "2.000",
           transferredToCafeQuantity: "0.400",
         }),
         invoiceLine({
-          itemId: 3,
+          itemId: testId(3),
           stockQuantity: "1.500",
           transferredToCafeQuantity: "0.400",
         }),
       ],
-      [stockRow(3, "10.000")],
+      [stockRow(testId(3), "10.000")],
     );
 
     // the cafe already holds 0.8 of this item from this invoice
@@ -257,13 +258,13 @@ describe("transfer model", () => {
     expect(
       transferDirectBody({
         notes: "  مباشر  ",
-        purchaseInvoiceId: 12,
-        lines: [{ key: 1, itemId: "3", quantity: "2.500" }],
+        purchaseInvoiceId: testId(12),
+        lines: [{ key: 1, itemId: testId(3), quantity: "2.500" }],
       }),
     ).toEqual({
       notes: "مباشر",
-      purchaseInvoiceId: 12,
-      lines: [{ itemId: 3, quantity: 2.5 }],
+      purchaseInvoiceId: testId(12),
+      lines: [{ itemId: testId(3), quantity: 2.5 }],
     });
   });
 
@@ -271,11 +272,11 @@ describe("transfer model", () => {
     expect(
       transferDirectBody({
         notes: "  ",
-        lines: [{ key: 1, itemId: "3", quantity: "1" }],
+        lines: [{ key: 1, itemId: testId(3), quantity: "1" }],
       }),
     ).toEqual({
       notes: null,
-      lines: [{ itemId: 3, quantity: 1 }],
+      lines: [{ itemId: testId(3), quantity: 1 }],
     });
   });
 
@@ -283,8 +284,8 @@ describe("transfer model", () => {
     expect(newTransferLine(5)).toEqual({ key: 5, itemId: "", quantity: "" });
     expect(
       transferTotalQuantity([
-        { key: 1, itemId: "3", quantity: "2.5" },
-        { key: 2, itemId: "7", quantity: "1" },
+        { key: 1, itemId: testId(3), quantity: "2.5" },
+        { key: 2, itemId: testId(7), quantity: "1" },
       ]),
     ).toBe(3.5);
   });

@@ -29,12 +29,12 @@ export function RefundOrderModal({
   onClose,
   onSaved,
 }: {
-  orderId: number;
+  orderId: string;
   onClose: () => void;
   onSaved: (refund: RefundDetail) => void;
 }) {
   const [order, setOrder] = useState<OrderDetail | null>(null);
-  const [draft, setDraft] = useState<Record<number, RefundDraftLine>>({});
+  const [draft, setDraft] = useState<Record<string, RefundDraftLine>>({});
   const [reason, setReason] = useState("");
   const [clientRequestId, setClientRequestId] = useState(() =>
     crypto.randomUUID(),

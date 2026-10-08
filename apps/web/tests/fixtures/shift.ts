@@ -1,11 +1,12 @@
+import { testId } from "@cashier/shared/test-support";
 import type { Shift } from "@cashier/shared";
 
 export function shiftFixture(overrides: Partial<Shift> = {}): Shift {
   return {
-    id: 41,
+    id: testId(41),
     status: "open",
-    cashierUserId: 9,
-    employeeId: 3,
+    cashierUserId: testId(9),
+    employeeId: testId(3),
     cashierName: "Cashier One",
     openingFloat: "100.00",
     openedAt: "2026-09-27T08:00:00Z",

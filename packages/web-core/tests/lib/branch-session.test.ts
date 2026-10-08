@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AuthUser } from "@cashier/shared";
 import {
@@ -14,7 +15,7 @@ describe("branch selection", () => {
     "retains the selected workspace and notifies once when storage %s fails",
     (failure) => {
       const user: AuthUser = {
-        id: failure === "read" ? 101 : 102,
+        id: failure === "read" ? testId(101) : testId(102),
         name: "Admin",
         role: "admin",
         isSuperAdmin: false,
@@ -23,7 +24,7 @@ describe("branch selection", () => {
         localStorage: {
           getItem: () => {
             if (failure === "read") throw new Error("Storage unavailable");
-            return "1";
+            return testId(1);
           },
           setItem: () => {
             if (failure === "write") throw new Error("Storage full");
@@ -31,16 +32,16 @@ describe("branch selection", () => {
         },
       });
       vi.stubGlobal("window", browser);
-      const observed: number[] = [];
+      const observed: string[] = [];
       const unsubscribe = subscribeToBranchChanges(user.id, () => {
         observed.push(selectedBranchId(user)!);
       });
 
       try {
-        expect(() => saveSelectedBranch(user.id, 7)).not.toThrow();
-        expect(selectedBranchId(user)).toBe(7);
-        saveSelectedBranch(user.id, 7);
-        expect(observed).toEqual([7]);
+        expect(() => saveSelectedBranch(user.id, testId(7))).not.toThrow();
+        expect(selectedBranchId(user)).toBe(testId(7));
+        saveSelectedBranch(user.id, testId(7));
+        expect(observed).toEqual([testId(7)]);
       } finally {
         unsubscribe();
       }
@@ -50,7 +51,7 @@ describe("branch selection", () => {
   it("keeps an already saved branch unchanged without notifying", () => {
     const browser = Object.assign(new EventTarget(), {
       localStorage: {
-        getItem: () => "7",
+        getItem: () => testId(7),
         setItem: () => {
           throw new Error("An unchanged branch must not be written");
         },
@@ -60,18 +61,18 @@ describe("branch selection", () => {
     let notifications = 0;
     browser.addEventListener(BRANCH_CHANGED_EVENT, () => notifications++);
 
-    saveSelectedBranch(103, 7);
+    saveSelectedBranch(testId(103), testId(7));
     expect(notifications).toBe(0);
   });
 
   it("adopts a cross-tab branch change after a failed local save", () => {
     const user: AuthUser = {
-      id: 104,
+      id: testId(104),
       name: "Admin",
       role: "admin",
       isSuperAdmin: false,
     };
-    let stored = "1";
+    let stored = testId(1);
     const browser = Object.assign(new EventTarget(), {
       localStorage: {
         getItem: () => stored,
@@ -81,18 +82,18 @@ describe("branch selection", () => {
       },
     });
     vi.stubGlobal("window", browser);
-    saveSelectedBranch(user.id, 7);
-    const observed: number[] = [];
+    saveSelectedBranch(user.id, testId(7));
+    const observed: string[] = [];
     const unsubscribe = subscribeToBranchChanges(user.id, () => {
       observed.push(selectedBranchId(user)!);
     });
 
     try {
-      stored = "9";
+      stored = testId(9);
       browser.dispatchEvent(
-        Object.assign(new Event("storage"), { key: "cashier.branch.104" }),
+        Object.assign(new Event("storage"), { key: `cashier.branch.${user.id}` }),
       );
-      expect(observed).toEqual([9]);
+      expect(observed).toEqual([testId(9)]);
     } finally {
       unsubscribe();
     }

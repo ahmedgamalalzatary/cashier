@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, buildHeaders } from "../../src/lib/api";
 import { SESSION_KEY, writeSession } from "../../src/lib/auth";
@@ -25,7 +26,7 @@ describe("buildHeaders", () => {
     async (protocol) => {
       const storage = new Map<string, string>();
       const user = {
-        id: 1,
+        id: testId(1),
         name: "Admin",
         role: "admin" as const,
         isSuperAdmin: false,
@@ -64,8 +65,8 @@ describe("buildHeaders", () => {
   it.each(["branch", "account"])(
     "rejects a response after the %s changes",
     async (change) => {
-      let userId = 11,
-        branchId = 7;
+      let userId = testId(11),
+        branchId = testId(7);
       vi.stubGlobal("window", {
         localStorage: {
           getItem: (key: string) =>
@@ -92,26 +93,26 @@ describe("buildHeaders", () => {
         ),
       );
       const pending = api("/api/orders");
-      if (change === "branch") branchId = 8;
-      else userId = 12;
-      complete({ ok: true, json: async () => [{ id: 99 }] });
+      if (change === "branch") branchId = testId(8);
+      else userId = testId(12);
+      complete({ ok: true, json: async () => [{ id: testId(99) }] });
       await expect(pending).rejects.toThrow("تم تغيير الحساب أو الفرع");
     },
   );
   it.each([
-    { role: "admin", branchId: null, expected: "7" },
-    { role: "cashier", branchId: 3, expected: "3" },
+    { role: "admin", branchId: null, expected: testId(7) },
+    { role: "cashier", branchId: testId(3), expected: testId(3) },
   ])(
     "sends the correct workspace for a $role",
     async ({ role, branchId, expected }) => {
       const stored = {
-        user: { id: 11, name: "Workspace user", role, branchId },
+        user: { id: testId(11), name: "Workspace user", role, branchId },
         exp: Math.floor(Date.now() / 1000) + 60,
       };
       vi.stubGlobal("window", {
         localStorage: {
           getItem: (key: string) =>
-            key === SESSION_KEY ? JSON.stringify(stored) : "7",
+            key === SESSION_KEY ? JSON.stringify(stored) : testId(7),
           removeItem: vi.fn(),
         },
       });
@@ -127,13 +128,13 @@ describe("buildHeaders", () => {
 
   it("keeps login and branch discovery independent of the selected workspace", async () => {
     const stored = {
-      user: { id: 11, name: "Admin", role: "admin", branchId: null },
+      user: { id: testId(11), name: "Admin", role: "admin", branchId: null },
       exp: Math.floor(Date.now() / 1000) + 60,
     };
     vi.stubGlobal("window", {
       localStorage: {
         getItem: (key: string) =>
-          key === SESSION_KEY ? JSON.stringify(stored) : "7",
+          key === SESSION_KEY ? JSON.stringify(stored) : testId(7),
         removeItem: vi.fn(),
       },
     });
@@ -189,7 +190,7 @@ describe("buildHeaders", () => {
 
   it("sends the HttpOnly cookie instead of a stored bearer token", async () => {
     const stored = {
-      user: { id: 1, name: "Admin", role: "admin" },
+      user: { id: testId(1), name: "Admin", role: "admin" },
       exp: Math.floor(Date.now() / 1000) + 60,
     };
     vi.stubGlobal("window", {

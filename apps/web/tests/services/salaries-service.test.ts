@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@cashier/web-core/lib/api", () => ({ api: vi.fn() }));
 import { api } from "@cashier/web-core/lib/api";
@@ -9,10 +10,10 @@ describe("salaries service", () => {
     vi.mocked(api).mockResolvedValue({});
     await getSalaryMonth("2026-09");
     expect(api).toHaveBeenCalledWith("/api/salaries?month=2026-09");
-    await paySalary(4, "2026-09");
+    await paySalary(testId(4), "2026-09");
     expect(api).toHaveBeenCalledWith("/api/salaries/payments", {
       method: "POST",
-      body: JSON.stringify({ employeeId: 4, month: "2026-09" }),
+      body: JSON.stringify({ employeeId: testId(4), month: "2026-09" }),
     });
   });
 });

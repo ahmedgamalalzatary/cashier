@@ -1,9 +1,10 @@
+import { testId } from "@cashier/shared/test-support";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import PosPage from "../../../src/app/pos/page";
 
 vi.mock("@cashier/web-core/components/auth/auth-provider", () => ({
-  useAuth: () => ({ user: { id: 9, role: "cashier", name: "Cashier" } }),
+  useAuth: () => ({ user: { id: testId(9), role: "cashier", name: "Cashier" } }),
 }));
 vi.mock(
   "@/components/shifts/cashier-shift-controls",

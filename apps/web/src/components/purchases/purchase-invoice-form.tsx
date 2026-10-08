@@ -72,7 +72,7 @@ export function PurchaseInvoiceForm() {
         );
         setCategories(categoryRows);
         // preselect only a supplier that is actually selectable
-        const requested = Number(requestedSupplierId);
+        const requested = requestedSupplierId;
         if (
           requestedSupplierId &&
           activeSuppliers.some((supplier) => supplier.id === requested)
@@ -103,7 +103,7 @@ export function PurchaseInvoiceForm() {
         : 0;
   const dueAmount = Math.max(0, total - paidAmount);
 
-  async function reloadSuppliers(selectId?: number) {
+  async function reloadSuppliers(selectId?: string) {
     try {
       const rows = await listSuppliers();
       setSuppliers(rows.filter((supplier) => supplier.isActive));
@@ -140,7 +140,7 @@ export function PurchaseInvoiceForm() {
   }
 
   function selectItem(line: PurchaseLineForm, itemId: string) {
-    const item = itemMap.get(Number(itemId));
+    const item = itemMap.get(itemId);
     updateLine(line.key, {
       itemId,
       unitMode: item?.purchaseUnit ? "purchase" : "stock",
@@ -257,12 +257,12 @@ export function PurchaseInvoiceForm() {
                 // lines are newest-first, so number them from the bottom up to
                 // keep each line's number stable as new ones are added on top
                 const lineNumber = lines.length - index;
-                const item = itemMap.get(Number(line.itemId));
+                const item = itemMap.get(line.itemId);
                 const amounts = purchaseLineAmounts(line, item);
                 const selectedElsewhere = new Set(
                   lines
                     .filter((candidate) => candidate.key !== line.key)
-                    .map((candidate) => Number(candidate.itemId)),
+                    .map((candidate) => candidate.itemId),
                 );
                 return (
                   <div
@@ -299,7 +299,7 @@ export function PurchaseInvoiceForm() {
                           .filter(
                             (candidate) =>
                               !selectedElsewhere.has(candidate.id) ||
-                              candidate.id === Number(line.itemId),
+                              candidate.id === line.itemId,
                           )
                           .map((candidate) => ({
                             value: candidate.id,

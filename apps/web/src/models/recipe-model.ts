@@ -52,11 +52,11 @@ export function recipeRequestBody(form: RecipeForm): RecipeBody {
   return {
     type: "prepared",
     name: form.name.trim(),
-    categoryId: Number(form.categoryId),
-    outputItemId: Number(form.outputItemId),
+    categoryId: form.categoryId,
+    outputItemId: form.outputItemId,
     baseYield: Number(form.baseYield),
     ingredients: form.ingredients.map((ingredient) => ({
-      itemId: Number(ingredient.itemId),
+      itemId: ingredient.itemId,
       quantity: Number(ingredient.quantity),
     })),
   };
@@ -70,7 +70,7 @@ export function recipeFormFromRecipe(recipe: Recipe): RecipeForm {
     outputItemId: String(recipe.outputItemId),
     baseYield: recipe.baseYield,
     ingredients: recipe.ingredients.map((ingredient, index) => ({
-      key: ingredient.id || index,
+      key: index + 1,
       itemId: String(ingredient.itemId),
       quantity: ingredient.requiredQuantity,
     })),

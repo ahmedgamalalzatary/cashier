@@ -5,7 +5,7 @@ import type {
 } from "@cashier/shared";
 import { api } from "@cashier/web-core/lib/api";
 
-type IdResponse = { id: number };
+type IdResponse = { id: string };
 type OkResponse = { ok: true };
 
 export type SupplierSaveBody = {
@@ -26,7 +26,7 @@ export function listSuppliers() {
   return api<Supplier[]>("/api/suppliers");
 }
 
-export function getSupplierStatement(id: number) {
+export function getSupplierStatement(id: string) {
   return api<{
     supplier: Supplier;
     payments: SupplierPayment[];
@@ -41,25 +41,25 @@ export function createSupplier(body: SupplierSaveBody) {
   });
 }
 
-export function updateSupplier(id: number, body: SupplierSaveBody) {
+export function updateSupplier(id: string, body: SupplierSaveBody) {
   return api<OkResponse>(`/api/suppliers/${id}`, {
     method: "PUT",
     body: JSON.stringify(body),
   });
 }
 
-export function deactivateSupplier(id: number) {
+export function deactivateSupplier(id: string) {
   return api<OkResponse>(`/api/suppliers/${id}`, { method: "DELETE" });
 }
 
-export function reactivateSupplier(id: number) {
+export function reactivateSupplier(id: string) {
   return api<OkResponse>(`/api/suppliers/${id}`, {
     method: "PUT",
     body: JSON.stringify({ isActive: true }),
   });
 }
 
-export function recordSupplierPayment(id: number, body: SupplierPaymentBody) {
+export function recordSupplierPayment(id: string, body: SupplierPaymentBody) {
   return api<IdResponse>(`/api/suppliers/${id}/payments`, {
     method: "POST",
     body: JSON.stringify(body),

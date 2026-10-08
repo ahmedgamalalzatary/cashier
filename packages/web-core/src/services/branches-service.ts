@@ -8,12 +8,12 @@ export const createBranch = (name: string) =>
     body: JSON.stringify({ name }),
   });
 export const updateBranch = (
-  id: number,
+  id: string,
   changes: { name?: string; isActive?: boolean },
 ) =>
   api<Branch>(`/api/branches/${id}`, {
     method: "PUT",
     body: JSON.stringify(changes),
   });
-export const archiveBranch = (id: number) =>
+export const archiveBranch = (id: string) =>
   api<Branch>(`/api/branches/${id}`, { method: "DELETE" });

@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import type { Recipe } from "@cashier/shared";
 import {
@@ -13,35 +14,35 @@ describe("recipe model", () => {
     const form = {
       ...emptyPreparedRecipeForm(),
       ingredients: [
-        { key: 1, itemId: "7", quantity: "2.5" },
-        { key: 2, itemId: "8", quantity: "1.25" },
+        { key: 1, itemId: testId(7), quantity: "2.5" },
+        { key: 2, itemId: testId(8), quantity: "1.25" },
       ],
     };
 
-    expect(selectRecipeOutputItem(form, "7")).toMatchObject({
-      outputItemId: "7",
+    expect(selectRecipeOutputItem(form, testId(7))).toMatchObject({
+      outputItemId: testId(7),
       ingredients: [
         { key: 1, itemId: "", quantity: "" },
-        { key: 2, itemId: "8", quantity: "1.25" },
+        { key: 2, itemId: testId(8), quantity: "1.25" },
       ],
     });
   });
   it("builds prepared-recipe request bodies from editable forms", () => {
     const prepared = emptyPreparedRecipeForm();
     prepared.name = " شربات ";
-    prepared.categoryId = "3";
-    prepared.outputItemId = "8";
+    prepared.categoryId = testId(3);
+    prepared.outputItemId = testId(8);
     prepared.baseYield = "2";
-    prepared.ingredients[0].itemId = "5";
+    prepared.ingredients[0].itemId = testId(5);
     prepared.ingredients[0].quantity = "1";
 
     expect(recipeRequestBody(prepared)).toEqual({
       type: "prepared",
       name: "شربات",
-      categoryId: 3,
-      outputItemId: 8,
+      categoryId: testId(3),
+      outputItemId: testId(8),
       baseYield: 2,
-      ingredients: [{ itemId: 5, quantity: 1 }],
+      ingredients: [{ itemId: testId(5), quantity: 1 }],
     });
   });
 
@@ -63,8 +64,8 @@ describe("recipe model", () => {
     const [ingredient] = scalePreparationIngredients(
       [
         {
-          id: 1,
-          itemId: 2,
+          id: testId(1),
+          itemId: testId(2),
           itemCode: 2,
           itemName: "مكوّن",
           itemType: "raw",

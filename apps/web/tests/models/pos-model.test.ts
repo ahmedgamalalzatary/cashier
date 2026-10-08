@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import type { CurrentShift, ExternalProduct } from "@cashier/shared";
 import * as posModel from "../../src/models/pos-model";
@@ -42,7 +43,7 @@ const product: ExternalProduct = {
       nameEn: "Large",
       price: "100.00",
       isDefault: true,
-      ingredients: [{ itemId: 1, quantity: "0.020" }],
+      ingredients: [{ itemId: testId(1), quantity: "0.020" }],
     },
   ],
   modifierGroups: [
@@ -59,7 +60,7 @@ const product: ExternalProduct = {
           nameEn: "Extra shot",
           extraPrice: "15.00",
           stockEffect: "mapped",
-          ingredients: [{ itemId: 1, quantity: "0.010" }],
+          ingredients: [{ itemId: testId(1), quantity: "0.010" }],
         },
       ],
     },
@@ -73,9 +74,9 @@ const nowMs = Date.parse("2026-08-18T09:00:00Z");
 describe("POS model", () => {
   it("adds a local product independently of an imported product with the same id", () => {
     const item = {
-      id: 9,
+      id: testId(9),
       name: "تركي سنجل",
-      categoryId: 2,
+      categoryId: testId(2),
       sellingPrice: "35.00",
       stockUnit: "فنجان",
     };
@@ -102,35 +103,35 @@ describe("POS model", () => {
         quantity: 1,
         modifiers: [],
       },
-      { type: "item", itemId: 9, quantity: 2 },
+      { type: "item", itemId: testId(9), quantity: 2 },
     ]);
   });
 
   it("browses main-category descendants and a selected subcategory, with search", () => {
     const categories = [
-      { id: 1, name: "مشروبات", parentId: null },
-      { id: 2, name: "قهوة", parentId: 1 },
-      { id: 3, name: "حلويات", parentId: null },
+      { id: testId(1), name: "مشروبات", parentId: null },
+      { id: testId(2), name: "قهوة", parentId: testId(1) },
+      { id: testId(3), name: "حلويات", parentId: null },
     ];
     const items = [
       {
-        id: 10,
+        id: testId(10),
         name: "تركي",
-        categoryId: 2,
+        categoryId: testId(2),
         sellingPrice: "35.00",
         stockUnit: "فنجان",
       },
       {
-        id: 11,
+        id: testId(11),
         name: "شاي",
-        categoryId: 1,
+        categoryId: testId(1),
         sellingPrice: "30.00",
         stockUnit: "كوب",
       },
       {
-        id: 12,
+        id: testId(12),
         name: "كيك",
-        categoryId: 3,
+        categoryId: testId(3),
         sellingPrice: "80.00",
         stockUnit: "قطعة",
       },
@@ -138,21 +139,21 @@ describe("POS model", () => {
     expect(
       posModel
         .filterLocalCatalog(items, categories, {
-          mainCategoryId: 1,
+          mainCategoryId: testId(1),
           subCategoryId: null,
           query: "",
         })
         .map((item) => item.id),
-    ).toEqual([10, 11]);
+    ).toEqual([testId(10), testId(11)]);
     expect(
       posModel
         .filterLocalCatalog(items, categories, {
-          mainCategoryId: 1,
-          subCategoryId: 2,
+          mainCategoryId: testId(1),
+          subCategoryId: testId(2),
           query: "",
         })
         .map((item) => item.id),
-    ).toEqual([10]);
+    ).toEqual([testId(10)]);
     expect(
       posModel
         .filterLocalCatalog(items, categories, {
@@ -161,14 +162,14 @@ describe("POS model", () => {
           query: " كيك ",
         })
         .map((item) => item.id),
-    ).toEqual([12]);
+    ).toEqual([testId(12)]);
   });
   it("sends local resale lines with their identity and charges their selling price", () => {
     const cart = [
       {
         key: "item:9",
         type: "item" as const,
-        itemId: 9,
+        itemId: testId(9),
         productName: "تركي سنجل",
         sizeName: null,
         quantity: 2,
@@ -177,7 +178,7 @@ describe("POS model", () => {
       },
     ];
     expect(orderPayload(cart as never, { type: null, value: 0 }, 100)).toEqual({
-      lines: [{ type: "item", itemId: 9, quantity: 2 }],
+      lines: [{ type: "item", itemId: testId(9), quantity: 2 }],
       discount: null,
       cashReceived: 100,
     });
@@ -391,12 +392,12 @@ describe("POS model", () => {
   });
 
   it("recognizes only the cashier's own open shift", () => {
-    const shift = { cashierUserId: 5 } as unknown as CurrentShift;
-    const cashier = { id: 5, role: "cashier" };
+    const shift = { cashierUserId: testId(5) } as unknown as CurrentShift;
+    const cashier = { id: testId(5), role: "cashier" };
 
     expect(isOwnOpenShift(shift, cashier)).toBe(true);
-    expect(isOwnOpenShift(shift, { id: 6, role: "cashier" })).toBe(false);
-    expect(isOwnOpenShift(shift, { id: 5, role: "admin" })).toBe(false);
+    expect(isOwnOpenShift(shift, { id: testId(6), role: "cashier" })).toBe(false);
+    expect(isOwnOpenShift(shift, { id: testId(5), role: "admin" })).toBe(false);
     expect(isOwnOpenShift(null, cashier)).toBe(false);
     expect(isOwnOpenShift(shift, null)).toBe(false);
   });

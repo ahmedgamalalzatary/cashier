@@ -59,7 +59,7 @@ export default function SalariesPage() {
     setError("");
     try {
       const body = {
-        employeeId: Number(employeeId),
+        employeeId: employeeId,
         amount: Number(amount),
         entryDate,
         note: note.trim() || null,

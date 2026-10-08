@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import type { OrderSummary } from "@cashier/shared";
 import { formatMoney } from "@cashier/web-core/lib/format";
@@ -12,9 +13,9 @@ import {
 function order(overrides: Partial<OrderSummary> & Pick<OrderSummary, "id">) {
   return {
     orderNumber: `ORD-${overrides.id}`,
-    cashierId: 1,
+    cashierId: testId(1),
     cashierName: "أحمد",
-    shiftId: 1,
+    shiftId: testId(1),
     subtotal: "100.00",
     discountType: null,
     discountValue: null,
@@ -33,12 +34,12 @@ function order(overrides: Partial<OrderSummary> & Pick<OrderSummary, "id">) {
 
 describe("filterOrders", () => {
   const orders = [
-    order({ id: 1, orderNumber: "ORD-0001", cashierId: 1, cashierName: "أحمد" }),
-    order({ id: 2, orderNumber: "ORD-0002", cashierId: 2, cashierName: "منى" }),
+    order({ id: testId(1), orderNumber: "ORD-0001", cashierId: testId(1), cashierName: "أحمد" }),
+    order({ id: testId(2), orderNumber: "ORD-0002", cashierId: testId(2), cashierName: "منى" }),
     order({
-      id: 3,
+      id: testId(3),
       orderNumber: "ORD-0003",
-      cashierId: 1,
+      cashierId: testId(1),
       cashierName: "أحمد",
       createdAt: "2026-08-03T07:00:00.000Z",
     }),
@@ -60,7 +61,7 @@ describe("filterOrders", () => {
   });
 
   it("keeps only the chosen cashier", () => {
-    expect(filterOrders(orders, { ...all, cashierId: 1 })).toEqual([
+    expect(filterOrders(orders, { ...all, cashierId: testId(1) })).toEqual([
       orders[0],
       orders[2],
     ]);
@@ -74,7 +75,7 @@ describe("filterOrders", () => {
 
   it("reads a late-night order as the Cairo day, not the UTC day", () => {
     // 01:00 Cairo on 2026-08-03 is still 2026-08-02 in UTC
-    const late = order({ id: 4, createdAt: "2026-08-02T22:00:00.000Z" });
+    const late = order({ id: testId(4), createdAt: "2026-08-02T22:00:00.000Z" });
     expect(filterOrders([late], { ...all, day: "2026-08-03" })).toEqual([late]);
   });
 
@@ -82,7 +83,7 @@ describe("filterOrders", () => {
     expect(
       filterOrders(orders, {
         query: "أحمد",
-        cashierId: 1,
+        cashierId: testId(1),
         day: "2026-08-02",
       }),
     ).toEqual([orders[0]]);
@@ -92,8 +93,8 @@ describe("filterOrders", () => {
 describe("ordersTotals", () => {
   it("counts the orders and sums their money without float drift", () => {
     const totals = ordersTotals([
-      order({ id: 1, total: "10.10", discountAmount: "0.20" }),
-      order({ id: 2, total: "20.20", discountAmount: "0.10" }),
+      order({ id: testId(1), total: "10.10", discountAmount: "0.20" }),
+      order({ id: testId(2), total: "20.20", discountAmount: "0.10" }),
     ]);
     expect(totals.count).toBe(2);
     expect(totals.sales).toBe(formatMoney("30.30"));
@@ -101,7 +102,7 @@ describe("ordersTotals", () => {
   });
 
   it("counts in the same Arabic-Indic digits as the money beside it", () => {
-    expect(ordersTotals([order({ id: 1 }), order({ id: 2 })]).countLabel).toBe(
+    expect(ordersTotals([order({ id: testId(1) }), order({ id: testId(2) })]).countLabel).toBe(
       "٢",
     );
   });
@@ -131,7 +132,7 @@ describe("splitOrderNumber", () => {
 describe("orderMargin", () => {
   it("reads profit as what is left of the total after cost", () => {
     const margin = orderMargin(
-      order({ id: 1, total: "30.30", totalCost: "10.10" }),
+      order({ id: testId(1), total: "30.30", totalCost: "10.10" }),
     );
     expect(margin.cost).toBe(formatMoney("10.10"));
     expect(margin.profit).toBe(formatMoney("20.20"));
@@ -139,7 +140,7 @@ describe("orderMargin", () => {
 
   it("reports a loss when the cost ran past the total", () => {
     const margin = orderMargin(
-      order({ id: 1, total: "5.00", totalCost: "7.50" }),
+      order({ id: testId(1), total: "5.00", totalCost: "7.50" }),
     );
     expect(margin.profit).toBe(formatMoney("-2.50"));
   });
@@ -149,13 +150,13 @@ describe("orderCashiers", () => {
   it("lists each cashier once, by first appearance", () => {
     expect(
       orderCashiers([
-        order({ id: 1, cashierId: 2, cashierName: "منى" }),
-        order({ id: 2, cashierId: 1, cashierName: "أحمد" }),
-        order({ id: 3, cashierId: 2, cashierName: "منى" }),
+        order({ id: testId(1), cashierId: testId(2), cashierName: "منى" }),
+        order({ id: testId(2), cashierId: testId(1), cashierName: "أحمد" }),
+        order({ id: testId(3), cashierId: testId(2), cashierName: "منى" }),
       ]),
     ).toEqual([
-      { id: 2, name: "منى" },
-      { id: 1, name: "أحمد" },
+      { id: testId(2), name: "منى" },
+      { id: testId(1), name: "أحمد" },
     ]);
   });
 });

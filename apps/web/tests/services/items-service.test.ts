@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@cashier/web-core/lib/api";
 import {
@@ -24,27 +25,27 @@ describe("items service", () => {
   });
 
   it("creates and updates items", async () => {
-    const createBody = { name: "Milk", categoryId: 2 };
+    const createBody = { name: "Milk", categoryId: testId(2) };
     const updateBody = { name: "Whole milk" };
     await createItem(createBody);
-    await updateItem(9, updateBody);
+    await updateItem(testId(9), updateBody);
     expect(request).toHaveBeenNthCalledWith(1, "/api/items", {
       method: "POST",
       body: JSON.stringify(createBody),
     });
-    expect(request).toHaveBeenNthCalledWith(2, "/api/items/9", {
+    expect(request).toHaveBeenNthCalledWith(2, "/api/items/00000000-0000-7000-8000-000000000009", {
       method: "PUT",
       body: JSON.stringify(updateBody),
     });
   });
 
   it("deactivates and reactivates items", async () => {
-    await deactivateItem(9);
-    await reactivateItem(10);
-    expect(request).toHaveBeenNthCalledWith(1, "/api/items/9", {
+    await deactivateItem(testId(9));
+    await reactivateItem(testId(10));
+    expect(request).toHaveBeenNthCalledWith(1, "/api/items/00000000-0000-7000-8000-000000000009", {
       method: "DELETE",
     });
-    expect(request).toHaveBeenNthCalledWith(2, "/api/items/10", {
+    expect(request).toHaveBeenNthCalledWith(2, "/api/items/00000000-0000-7000-8000-00000000000a", {
       method: "PUT",
       body: JSON.stringify({ isActive: true }),
     });

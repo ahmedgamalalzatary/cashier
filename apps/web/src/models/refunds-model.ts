@@ -13,8 +13,8 @@ const emptyDraftEntry: RefundDraftLine = {
 };
 
 export function refundDraftEntry(
-  draft: Record<number, RefundDraftLine>,
-  lineId: number,
+  draft: Record<string, RefundDraftLine>,
+  lineId: string,
 ): RefundDraftLine {
   return draft[lineId] ?? emptyDraftEntry;
 }

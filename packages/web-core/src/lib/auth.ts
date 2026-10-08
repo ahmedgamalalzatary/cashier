@@ -1,5 +1,6 @@
 import type { AuthUser, Role, Session } from "@cashier/shared";
 import { ADMIN_PATHS } from "./navigation";
+import { isUuid } from "./uuid";
 export type { AuthUser, Role, Session } from "@cashier/shared";
 
 export const SESSION_KEY = "cashier.session";
@@ -37,7 +38,7 @@ export function readSession(): PersistedSession | null {
       window.localStorage.getItem(SESSION_KEY) ?? "null",
     ) as PersistedSession | null;
     if (
-      !value?.user?.id ||
+      !isUuid(value?.user?.id) ||
       !["admin", "cashier"].includes(value.user.role) ||
       typeof value.exp !== "number" ||
       !Number.isFinite(value.exp) ||
@@ -48,7 +49,11 @@ export function readSession(): PersistedSession | null {
     }
     return value;
   } catch {
-    window.localStorage.removeItem(SESSION_KEY);
+    try {
+      window.localStorage.removeItem(SESSION_KEY);
+    } catch {
+      // Inaccessible storage still means there is no usable browser session.
+    }
     return null;
   }
 }

@@ -10,13 +10,13 @@ export type CreateWasteBody = {
   clientRequestId: string;
   warehouse: "main" | "cafe";
   target:
-    | { type: "item"; itemId: number }
+    | { type: "item"; itemId: string }
     | {
         type: "external_product";
         externalProductId: number;
         externalSizeId: number | null;
       }
-    | { type: "recipe"; recipeId: number; recipeSizeId: number };
+    | { type: "recipe"; recipeId: string; recipeSizeId: string };
   quantity: number;
   reason: WasteReason;
   note: string | null;
@@ -24,7 +24,7 @@ export type CreateWasteBody = {
 
 export const getWasteCatalog = () => api<WasteCatalog>("/api/waste/catalog");
 export const listWaste = () => api<WasteSummary[]>("/api/waste");
-export const getWaste = (id: number) => api<WasteDetail>(`/api/waste/${id}`);
+export const getWaste = (id: string) => api<WasteDetail>(`/api/waste/${id}`);
 export const createWaste = (body: CreateWasteBody) =>
   api<WasteDetail>("/api/waste", {
     method: "POST",

@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import type { Item } from "@cashier/shared";
 import {
@@ -8,10 +9,10 @@ import {
 } from "../../src/models/purchase-model";
 
 const item: Item = {
-  id: 4,
+  id: testId(4),
   code: 4,
   name: "بن",
-  categoryId: 1,
+  categoryId: testId(1),
   categoryName: "خامات",
   type: "raw",
   sellingPrice: null,
@@ -31,7 +32,7 @@ describe("purchase form model", () => {
       purchaseLineAmounts(
         {
           key: 1,
-          itemId: "4",
+          itemId: testId(4),
           quantity: "2",
           unitMode: "purchase",
           unitPrice: "300",
@@ -45,7 +46,7 @@ describe("purchase form model", () => {
     expect(
       purchaseLineAmounts({
         key: 1,
-        itemId: "4",
+        itemId: testId(4),
         quantity: "0.005",
         unitMode: "stock",
         unitPrice: "803",
@@ -56,7 +57,7 @@ describe("purchase form model", () => {
       purchaseTotal([
         {
           key: 1,
-          itemId: "4",
+          itemId: testId(4),
           quantity: "0.005",
           unitMode: "stock",
           unitPrice: "803",
@@ -68,14 +69,14 @@ describe("purchase form model", () => {
   it("sends each line's to-cafe amount, blank as zero", () => {
     const body = purchaseRequestBody({
       clientRequestId: "11111111-1111-4111-8111-111111111111",
-      supplierId: "7",
+      supplierId: testId(7),
       invoiceNumber: "",
       purchasedAt: "2026-07-19",
       paidAmount: 0,
       notes: "",
       lines: [
-        { ...newPurchaseLine(1), itemId: "4", quantity: "2", unitPrice: "1", toCafeQuantity: "1.5" },
-        { ...newPurchaseLine(2), itemId: "5", quantity: "1", unitPrice: "1" },
+        { ...newPurchaseLine(1), itemId: testId(4), quantity: "2", unitPrice: "1", toCafeQuantity: "1.5" },
+        { ...newPurchaseLine(2), itemId: testId(5), quantity: "1", unitPrice: "1" },
       ],
     });
 
@@ -85,14 +86,14 @@ describe("purchase form model", () => {
   it("sums invoice lines and builds the API request", () => {
     const first = {
       ...newPurchaseLine(1),
-      itemId: "4",
+      itemId: testId(4),
       quantity: "2",
       unitMode: "purchase" as const,
       unitPrice: "300",
     };
     const second = {
       ...newPurchaseLine(2),
-      itemId: "5",
+      itemId: testId(5),
       quantity: "1",
       unitPrice: "50",
     };
@@ -101,7 +102,7 @@ describe("purchase form model", () => {
     expect(
       purchaseRequestBody({
         clientRequestId: "11111111-1111-4111-8111-111111111111",
-        supplierId: "7",
+        supplierId: testId(7),
         invoiceNumber: " ",
         purchasedAt: "2026-07-19",
         paidAmount: 100,
@@ -110,13 +111,13 @@ describe("purchase form model", () => {
       }),
     ).toMatchObject({
       clientRequestId: "11111111-1111-4111-8111-111111111111",
-      supplierId: 7,
+      supplierId: testId(7),
       invoiceNumber: null,
       paidAmount: 100,
       notes: null,
       lines: [
-        { itemId: 4, quantity: 2, unitMode: "purchase", unitPrice: 300 },
-        { itemId: 5, quantity: 1, unitMode: "stock", unitPrice: 50 },
+        { itemId: testId(4), quantity: 2, unitMode: "purchase", unitPrice: 300 },
+        { itemId: testId(5), quantity: 1, unitMode: "stock", unitPrice: 50 },
       ],
     });
   });

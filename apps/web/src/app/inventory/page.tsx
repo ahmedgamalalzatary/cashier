@@ -92,7 +92,7 @@ function InventoryView() {
   const [adjustingBusy, setAdjustingBusy] = useState(false);
   const [adjustingError, setAdjustingError] = useState("");
   const [query, setQuery] = useState("");
-  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [state, setState] = useState<StockFilter>(() =>
     requestedState === "low" || (isAdmin && requestedState === "inactive")
       ? requestedState
@@ -407,7 +407,7 @@ function InventoryView() {
           value={categoryId ?? ""}
           onChange={(event) =>
             setCategoryId(
-              event.target.value ? Number(event.target.value) : null,
+              event.target.value || null,
             )
           }
           className="input w-auto"

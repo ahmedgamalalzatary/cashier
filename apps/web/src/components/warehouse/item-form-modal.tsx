@@ -43,7 +43,7 @@ export function ItemFormModal({
   item: Item | null;
   categories?: Category[];
   onClose: () => void;
-  onSaved: (savedId: number) => void;
+  onSaved: (savedId: string) => void;
 }) {
   const [form, setForm] = useState(
     item
@@ -141,7 +141,7 @@ export function ItemFormModal({
     const purchaseUnit = form.purchaseUnit.trim() || null;
     const body = {
       name: form.name,
-      categoryId: Number(form.categoryId),
+      categoryId: form.categoryId,
       type: form.type,
       sellingPrice: form.type === "resale" ? Number(form.sellingPrice) : null,
       stockUnit: form.stockUnit,

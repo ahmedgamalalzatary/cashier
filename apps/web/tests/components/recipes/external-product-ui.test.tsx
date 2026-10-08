@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { ExternalProduct } from "@cashier/shared";
@@ -153,16 +154,16 @@ describe("ExternalProductCard", () => {
           sizes: [
             {
               ...product.sizes[0]!,
-              ingredients: [{ itemId: 7, quantity: "0.020" }],
+              ingredients: [{ itemId: testId(7), quantity: "0.020" }],
             },
           ],
         }}
         items={[
           {
-            id: 7,
+            id: testId(7),
             code: 7,
             name: "قديم",
-            categoryId: 1,
+            categoryId: testId(1),
             categoryName: "خامات",
             type: "raw",
             sellingPrice: null,

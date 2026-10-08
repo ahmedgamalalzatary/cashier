@@ -87,7 +87,7 @@ export default function CategoriesPage() {
     () => categories.filter((c) => c.parentId === null),
     [categories],
   );
-  const subsOf = (id: number) => categories.filter((c) => c.parentId === id);
+  const subsOf = (id: string) => categories.filter((c) => c.parentId === id);
 
   return (
     <div>

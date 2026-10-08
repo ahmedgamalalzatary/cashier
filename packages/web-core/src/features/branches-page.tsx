@@ -27,7 +27,7 @@ import {
 
 export function BranchesPage() {
   const { branch, branches, selectBranch, refresh } = useBranch();
-  const [form, setForm] = useState<{ id?: number; name: string } | null>(null);
+  const [form, setForm] = useState<{ id?: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [archiving, setArchiving] = useState<Branch | null>(null);

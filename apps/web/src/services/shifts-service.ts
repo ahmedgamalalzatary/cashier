@@ -18,14 +18,14 @@ export const openShift = (openingFloat: number) =>
     body: JSON.stringify({ openingFloat }),
   });
 
-export const closeShift = (id: number, actualCash: number) =>
+export const closeShift = (id: string, actualCash: number) =>
   api<Shift>(`/api/shifts/${id}/close`, {
     method: "POST",
     body: JSON.stringify({ actualCash }),
   });
 
 export const adminCloseShift = (
-  id: number,
+  id: string,
   body: { actualCash: number; note: string },
 ) =>
   api<Shift>(`/api/shifts/${id}/admin-close`, {
@@ -33,14 +33,14 @@ export const adminCloseShift = (
     body: JSON.stringify(body),
   });
 
-export const reopenShift = (id: number, note: string) =>
+export const reopenShift = (id: string, note: string) =>
   api<Shift>(`/api/shifts/${id}/reopen`, {
     method: "POST",
     body: JSON.stringify({ note }),
   });
 
 export const correctShift = (
-  id: number,
+  id: string,
   body: { openingFloat?: number; actualCash?: number; note: string },
 ) =>
   api<Shift>(`/api/shifts/${id}/correction`, {

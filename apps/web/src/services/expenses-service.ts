@@ -9,7 +9,7 @@ export const createExpenseCategory = (name: string) =>
     body: JSON.stringify({ name }),
   });
 export const updateExpenseCategory = (
-  id: number,
+  id: string,
   body: { name?: string; isActive?: boolean },
 ) =>
   api<ExpenseCategory>(`/api/expenses/categories/${id}`, {
@@ -19,7 +19,7 @@ export const updateExpenseCategory = (
 export const listExpenses = () => api<ExpenseSummary[]>("/api/expenses");
 export const createExpense = (body: {
   clientRequestId: string;
-  categoryId: number;
+  categoryId: string;
   amount: number;
   expenseDate?: string;
   note: string | null;

@@ -93,8 +93,8 @@ export function WasteEntryForm({
       type === "recipe"
         ? {
             type: "recipe",
-            recipeId: Number(idText),
-            recipeSizeId: Number(sizeText),
+            recipeId: idText,
+            recipeSizeId: sizeText,
           }
         : type === "product"
           ? {
@@ -102,7 +102,7 @@ export function WasteEntryForm({
               externalProductId: Number(idText),
               externalSizeId: Number(sizeText) || null,
             }
-          : { type: "item", itemId: Number(idText) };
+          : { type: "item", itemId: idText };
     setSaving(true);
     setError("");
     try {

@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import type { ReactElement, ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,7 +14,7 @@ const hooks = vi.hoisted(() => ({
   state: [] as unknown[],
   cursor: 0,
   effect: null as null | (() => void | (() => void)),
-  branch: { id: 1, name: "Main Branch" },
+  branch: { id: "00000000-0000-7000-8000-000000000001", name: "Main Branch" },
 }));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
@@ -117,13 +118,13 @@ describe("report loading and printing", () => {
   beforeEach(() => {
     hooks.state.length = 0;
     hooks.effect = null;
-    hooks.branch = { id: 1, name: "Main Branch" };
+    hooks.branch = { id: testId(1), name: "Main Branch" };
     vi.mocked(getReports).mockReset();
     vi.mocked(cairoCalendarDate).mockReturnValue("2026-09-27");
   });
   it("hides the previous branch's figures while a new branch report is loading", async () => {
     await loaded();
-    hooks.branch = { id: 2, name: "Other Branch" };
+    hooks.branch = { id: testId(2), name: "Other Branch" };
     const html = renderToStaticMarkup(render());
     expect(html).not.toContain("2026-09-01 — 2026-09-10");
     expect(html).not.toContain("حسب اليوم");
@@ -173,11 +174,11 @@ describe("report loading and printing", () => {
   it("renders operational quantities, staff and costs", async () => {
     const data = reportsFixture();
     data.operations.transfers = [
-      { id: 4, createdByName: "Transfer Staff", totalCost: "14.00" },
+      { id: testId(4), createdByName: "Transfer Staff", totalCost: "14.00" },
     ];
     data.operations.preparations = [
       {
-        id: 7,
+        id: testId(7),
         recipeName: "Dough",
         preparedByName: "Prep Staff",
         totalCost: "8.00",
@@ -197,7 +198,7 @@ describe("report loading and printing", () => {
     const data = reportsFixture();
     data.sales.byShift = [
       {
-        shiftId: 1,
+        shiftId: testId(1),
         cashierName: "Cashier",
         status: "closed",
         actualCash: null,

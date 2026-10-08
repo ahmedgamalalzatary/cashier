@@ -3,9 +3,9 @@ import type { Category } from "@cashier/shared";
 export function categoryUpdateBody(
   name: string,
   parentId: string,
-  currentParentId: number | null,
+  currentParentId: string | null,
 ) {
-  const selectedParentId = parentId ? Number(parentId) : null;
+  const selectedParentId = parentId ? parentId : null;
   return {
     name: name.trim(),
     ...(selectedParentId !== currentParentId
@@ -16,8 +16,8 @@ export function categoryUpdateBody(
 
 export function categoryParentOptions(
   categories: Category[],
-  editingId: number,
-  currentParentId?: number | null,
+  editingId: string,
+  currentParentId?: string | null,
 ) {
   return categories.filter(
     (category) =>

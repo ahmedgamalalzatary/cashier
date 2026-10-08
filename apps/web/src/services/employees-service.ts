@@ -26,30 +26,30 @@ export function employeeSalaryPayload(
 export const listEmployees = () => api<Employee[]>("/api/employees");
 
 export const createEmployee = (body: EmployeeSaveBody) =>
-  api<{ id: number }>("/api/employees", {
+  api<{ id: string }>("/api/employees", {
     method: "POST",
     body: JSON.stringify(body),
   });
 
-export const updateEmployee = (id: number, body: EmployeeSaveBody) =>
+export const updateEmployee = (id: string, body: EmployeeSaveBody) =>
   api<{ ok: true }>(`/api/employees/${id}`, {
     method: "PUT",
     body: JSON.stringify(body),
   });
 
-export const deactivateEmployee = (id: number) =>
+export const deactivateEmployee = (id: string) =>
   api<void>(`/api/employees/${id}`, { method: "DELETE" });
 
-export const grantCashierAccess = (id: number, body: CashierAccessBody) =>
-  api<{ userId: number }>(`/api/employees/${id}/cashier-access`, {
+export const grantCashierAccess = (id: string, body: CashierAccessBody) =>
+  api<{ userId: string }>(`/api/employees/${id}/cashier-access`, {
     method: "POST",
     body: JSON.stringify(body),
   });
 
-export const revokeCashierAccess = (id: number) =>
+export const revokeCashierAccess = (id: string) =>
   api<void>(`/api/employees/${id}/cashier-access`, { method: "DELETE" });
 
-export const resetCashierPassword = (id: number, password: string) =>
+export const resetCashierPassword = (id: string, password: string) =>
   api<{ ok: true }>(`/api/employees/${id}/cashier-password`, {
     method: "PUT",
     body: JSON.stringify({ password }),

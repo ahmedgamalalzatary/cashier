@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@cashier/web-core/lib/api";
 import {
@@ -21,21 +22,21 @@ describe("employees service", () => {
     const access = { username: "ahmed", password: "secret123" };
     await listEmployees();
     await createEmployee(employee);
-    await updateEmployee(4, employee);
-    await grantCashierAccess(4, access);
-    await revokeCashierAccess(4);
-    await deactivateEmployee(4);
+    await updateEmployee(testId(4), employee);
+    await grantCashierAccess(testId(4), access);
+    await revokeCashierAccess(testId(4));
+    await deactivateEmployee(testId(4));
 
     expect(request.mock.calls).toEqual([
       ["/api/employees"],
       ["/api/employees", { method: "POST", body: JSON.stringify(employee) }],
-      ["/api/employees/4", { method: "PUT", body: JSON.stringify(employee) }],
+      ["/api/employees/00000000-0000-7000-8000-000000000004", { method: "PUT", body: JSON.stringify(employee) }],
       [
-        "/api/employees/4/cashier-access",
+        "/api/employees/00000000-0000-7000-8000-000000000004/cashier-access",
         { method: "POST", body: JSON.stringify(access) },
       ],
-      ["/api/employees/4/cashier-access", { method: "DELETE" }],
-      ["/api/employees/4", { method: "DELETE" }],
+      ["/api/employees/00000000-0000-7000-8000-000000000004/cashier-access", { method: "DELETE" }],
+      ["/api/employees/00000000-0000-7000-8000-000000000004", { method: "DELETE" }],
     ]);
   });
 

@@ -15,7 +15,7 @@ export function OrderPicker({
   onPick,
 }: {
   orders: OrderSummary[];
-  onPick: (orderId: number) => void;
+  onPick: (orderId: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const visibleOrders = useMemo(

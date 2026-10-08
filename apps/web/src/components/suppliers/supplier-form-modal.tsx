@@ -24,7 +24,7 @@ export function SupplierFormModal({
 }: {
   supplier: Supplier | null;
   onClose: () => void;
-  onSaved: (savedId: number) => void;
+  onSaved: (savedId: string) => void;
 }) {
   const [form, setForm] = useState(
     supplier

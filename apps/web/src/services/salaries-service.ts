@@ -3,27 +3,27 @@ import { api } from "@cashier/web-core/lib/api";
 export const getSalaryMonth = (month: string) =>
   api<SalaryMonth>(`/api/salaries?month=${encodeURIComponent(month)}`);
 export const createSalaryAdvance = (body: {
-  employeeId: number;
+  employeeId: string;
   amount: number;
   entryDate: string;
   note: string | null;
 }) =>
-  api<{ id: number }>("/api/salaries/advances", {
+  api<{ id: string }>("/api/salaries/advances", {
     method: "POST",
     body: JSON.stringify(body),
   });
 export const createSalaryAdjustment = (body: {
-  employeeId: number;
+  employeeId: string;
   type: "bonus" | "deduction";
   amount: number;
   entryDate: string;
   note: string | null;
 }) =>
-  api<{ id: number }>("/api/salaries/adjustments", {
+  api<{ id: string }>("/api/salaries/adjustments", {
     method: "POST",
     body: JSON.stringify(body),
   });
-export const paySalary = (employeeId: number, month: string) =>
+export const paySalary = (employeeId: string, month: string) =>
   api<SalaryPayment>("/api/salaries/payments", {
     method: "POST",
     body: JSON.stringify({ employeeId, month }),

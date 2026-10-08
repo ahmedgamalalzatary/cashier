@@ -7,13 +7,13 @@ import { api } from "@cashier/web-core/lib/api";
 
 export type PurchaseCreateBody = {
   clientRequestId: string;
-  supplierId: number;
+  supplierId: string;
   invoiceNumber: string | null;
   purchasedAt: string;
   paidAmount: number;
   notes: string | null;
   lines: Array<{
-    itemId: number;
+    itemId: string;
     quantity: number;
     unitMode: PurchaseUnitMode;
     unitPrice: number;
@@ -25,12 +25,12 @@ export function listPurchases() {
   return api<PurchaseInvoiceSummary[]>("/api/purchases");
 }
 
-export function getPurchase(id: number) {
+export function getPurchase(id: string) {
   return api<PurchaseInvoiceDetail>(`/api/purchases/${id}`);
 }
 
 export function createPurchase(body: PurchaseCreateBody) {
-  return api<{ id: number }>("/api/purchases", {
+  return api<{ id: string }>("/api/purchases", {
     method: "POST",
     body: JSON.stringify(body),
   });

@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@cashier/web-core/lib/api";
 import {
@@ -17,19 +18,19 @@ describe("waste service", () => {
     const body = {
       clientRequestId: "8f345091-c497-4b8b-b4f3-a8ebdc47dd31",
       warehouse: "cafe" as const,
-      target: { type: "item" as const, itemId: 2 },
+      target: { type: "item" as const, itemId: testId(2) },
       quantity: 1,
       reason: "damaged" as const,
       note: null,
     };
     await getWasteCatalog();
     await listWaste();
-    await getWaste(4);
+    await getWaste(testId(4));
     await createWaste(body);
     expect(vi.mocked(api).mock.calls).toEqual([
       ["/api/waste/catalog"],
       ["/api/waste"],
-      ["/api/waste/4"],
+      ["/api/waste/00000000-0000-7000-8000-000000000004"],
       ["/api/waste", { method: "POST", body: JSON.stringify(body) }],
     ]);
   });

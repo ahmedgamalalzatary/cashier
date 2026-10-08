@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -116,7 +117,7 @@ describe("auth provider logout", () => {
 
 describe("auth provider session refresh", () => {
   const freshUser = {
-    id: 1,
+    id: testId(1),
     name: "Super",
     role: "admin",
     branchId: null,
@@ -126,7 +127,7 @@ describe("auth provider session refresh", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     readSessionMock.mockReturnValue({
-      user: { id: 1, name: "Super", role: "admin" },
+      user: { id: testId(1), name: "Super", role: "admin" },
     });
     currentUserMock.mockResolvedValue(freshUser);
   });
@@ -153,11 +154,11 @@ describe("auth provider session refresh", () => {
     // the mount-time request is in flight when the user logs out and someone
     // else logs in, so the stored session no longer holds this user
     readSessionMock.mockReturnValueOnce({
-      user: { id: 1, name: "Super", role: "admin" },
+      user: { id: testId(1), name: "Super", role: "admin" },
     });
     currentUserMock.mockImplementation(async () => {
       readSessionMock.mockReturnValue({
-        user: { id: 2, name: "Other", role: "admin" },
+        user: { id: testId(2), name: "Other", role: "admin" },
       });
       return freshUser;
     });
@@ -172,7 +173,7 @@ describe("auth provider session refresh", () => {
 
   it("discards the response when the session was cleared while in flight", async () => {
     readSessionMock.mockReturnValueOnce({
-      user: { id: 1, name: "Super", role: "admin" },
+      user: { id: testId(1), name: "Super", role: "admin" },
     });
     currentUserMock.mockImplementation(async () => {
       readSessionMock.mockReturnValue(null);

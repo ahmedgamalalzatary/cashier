@@ -7,10 +7,10 @@ import { api } from "@cashier/web-core/lib/api";
 
 export type CreateRefundBody = {
   clientRequestId: string;
-  orderId: number;
+  orderId: string;
   reason: string;
   lines: Array<{
-    orderLineId: number;
+    orderLineId: string;
     quantity: number;
     stockAction: RefundStockAction | null;
   }>;
@@ -20,12 +20,12 @@ export function listRefunds() {
   return api<RefundSummary[]>("/api/refunds");
 }
 
-export function getRefund(id: number) {
+export function getRefund(id: string) {
   return api<RefundDetail>(`/api/refunds/${id}`);
 }
 
-export function getRefundedQuantities(orderId: number) {
-  return api<Array<{ orderLineId: number; refundedQuantity: string }>>(
+export function getRefundedQuantities(orderId: string) {
+  return api<Array<{ orderLineId: string; refundedQuantity: string }>>(
     `/api/refunds/order/${orderId}/quantities`,
   );
 }

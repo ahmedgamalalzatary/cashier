@@ -21,11 +21,11 @@ import {
 import { listBranches } from "../../services/branches-service";
 import { Button } from "@cashier/web-core/components/ui/button";
 
-type Scope = { ownerId: number; branches: Branch[]; selectedId: number };
+type Scope = { ownerId: string; branches: Branch[]; selectedId: string };
 type BranchContextValue = {
   branch: Branch;
   branches: Branch[];
-  selectBranch(id: number): void;
+  selectBranch(id: string): void;
   refresh(): Promise<void>;
 };
 const Context = createContext<BranchContextValue | null>(null);
@@ -35,7 +35,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [scope, setScope] = useState<Scope | null>(null);
   const [error, setError] = useState<{
-    ownerId: number;
+    ownerId: string;
     message: string;
   } | null>(null);
   const sequence = useRef(0);
@@ -119,7 +119,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  const selectBranch = (id: number) => {
+  const selectBranch = (id: string) => {
     if (
       user.role !== "admin" ||
       id === scope.selectedId ||

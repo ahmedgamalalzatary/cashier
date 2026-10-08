@@ -8,11 +8,11 @@ export function confirmReasonFor(
 }
 
 export function countedLinesFromDraft(
-  lines: Array<{ itemId: number; countedQuantity: unknown }>,
+  lines: Array<{ itemId: string; countedQuantity: unknown }>,
 ):
-  | { ok: true; lines: Array<{ itemId: number; countedQuantity: number }> }
+  | { ok: true; lines: Array<{ itemId: string; countedQuantity: number }> }
   | { ok: false } {
-  const parsed: Array<{ itemId: number; countedQuantity: number }> = [];
+  const parsed: Array<{ itemId: string; countedQuantity: number }> = [];
   for (const line of lines) {
     const value = line.countedQuantity;
     if (value === null || value === undefined) return { ok: false };

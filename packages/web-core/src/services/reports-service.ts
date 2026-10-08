@@ -1,7 +1,7 @@
 import { api } from "@cashier/web-core/lib/api";
 export type ReportRow = Record<string, string | number | null>;
 export type ReportsData = {
-  range: { from: string; to: string; branchId: number; generatedAt: string };
+  range: { from: string; to: string; branchId: string; generatedAt: string };
   sales: Record<
     "byDay" | "byProduct" | "byCategory" | "byShift" | "byCashier",
     ReportRow[]

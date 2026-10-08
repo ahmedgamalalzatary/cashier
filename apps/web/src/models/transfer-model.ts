@@ -12,7 +12,7 @@ export type TransferLineForm = {
 
 /** one transferable item derived from a purchase invoice */
 export type InvoiceTransferRow = {
-  itemId: number;
+  itemId: string;
   code: number;
   name: string;
   stockUnit: string;
@@ -38,7 +38,7 @@ export function invoiceTransferRows(
   mainStock: InventoryStockRow[],
 ): InvoiceTransferRow[] {
   const available = new Map(mainStock.map((row) => [row.itemId, row]));
-  const merged = new Map<number, InvoiceTransferRow>();
+  const merged = new Map<string, InvoiceTransferRow>();
   for (const line of lines) {
     // an invoice may bill the same item twice (different units or prices),
     // but a transfer accepts each item once
@@ -110,7 +110,7 @@ export function transferRequestBody(input: {
     clientRequestId: input.clientRequestId,
     notes: input.notes.trim() || null,
     lines: input.lines.map((line) => ({
-      itemId: Number(line.itemId),
+      itemId: line.itemId,
       quantity: Number(line.quantity),
     })),
   };
@@ -118,7 +118,7 @@ export function transferRequestBody(input: {
 
 export function transferDirectBody(input: {
   notes: string;
-  purchaseInvoiceId?: number | null;
+  purchaseInvoiceId?: string | null;
   lines: TransferLineForm[];
 }): TransferDirectBody {
   return {
@@ -126,7 +126,7 @@ export function transferDirectBody(input: {
     // only an invoice-sourced transfer may claim quantities against an invoice
     ...(input.purchaseInvoiceId ? { purchaseInvoiceId: input.purchaseInvoiceId } : {}),
     lines: input.lines.map((line) => ({
-      itemId: Number(line.itemId),
+      itemId: line.itemId,
       quantity: Number(line.quantity),
     })),
   };

@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { shiftFixture } from "../../fixtures/shift";
@@ -11,7 +12,7 @@ vi.mock("react", async (original) => ({
   useState: useStateMock,
 }));
 vi.mock("@cashier/web-core/components/auth/auth-provider", () => ({
-  useAuth: () => ({ user: { id: 1, role: "admin" } }),
+  useAuth: () => ({ user: { id: testId(1), role: "admin" } }),
 }));
 vi.mock(
   "@/components/shifts/shift-action-modal",
@@ -78,7 +79,7 @@ describe("shift administration and history", () => {
           status: "closed",
           events: [
             {
-              id: 1,
+              id: testId(1),
               action: "auto_close",
               actorUserId: null,
               note: null,
@@ -106,7 +107,7 @@ describe("shift administration and history", () => {
     stateValues([
       [
         shiftFixture(),
-        shiftFixture({ id: 42, cashierUserId: 10, cashierName: "Cashier Two" }),
+        shiftFixture({ id: testId(42), cashierUserId: testId(10), cashierName: "Cashier Two" }),
       ],
       0,
       false,
@@ -123,8 +124,8 @@ describe("shift administration and history", () => {
       {
         summary: null,
         openShifts: [
-          { id: 41, cashierName: "Cashier One", sales: "20.00" },
-          { id: 42, cashierName: "Cashier Two", sales: "40.00" },
+          { id: testId(41), cashierName: "Cashier One", sales: "20.00" },
+          { id: testId(42), cashierName: "Cashier Two", sales: "40.00" },
         ],
         stock: [],
       },
@@ -145,9 +146,9 @@ describe("shift administration and history", () => {
           overShort: "0.00",
           events: [
             {
-              id: 1,
+              id: testId(1),
               action: "admin_close",
-              actorUserId: 1,
+              actorUserId: testId(1),
               note: "Cashier left early",
               openingFloat: "100.00",
               actualCash: "120.00",

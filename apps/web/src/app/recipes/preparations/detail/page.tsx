@@ -30,7 +30,8 @@ function PreparationDetailView() {
 
   useEffect(() => {
     let cancelled = false;
-    getPreparation(Number(id))
+    if (!id) return;
+    getPreparation(id)
       .then((row) => {
         if (!cancelled) setPreparation(row);
       })
@@ -47,6 +48,7 @@ function PreparationDetailView() {
     };
   }, [id]);
 
+  if (!id) return <ErrorBanner>لم يتم تحديد السجل</ErrorBanner>;
   if (error) return <ErrorBanner>{error}</ErrorBanner>;
   if (!preparation)
     return <LoadingState label="جارِ تحميل وثيقة التحضير…" />;

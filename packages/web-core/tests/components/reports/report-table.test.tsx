@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ReportTable } from '../../../src/components/reports/report-table';
@@ -160,7 +161,7 @@ describe("uncounted cash", () => {
         title="Shift over/short"
         rows={[
           {
-            shiftId: 1,
+            shiftId: testId(1),
             expectedCash: "500.00",
             actualCash: null,
             overShort: null,
@@ -183,7 +184,7 @@ describe("uncounted cash", () => {
     const markup = renderToStaticMarkup(
       <ReportTable
         title="Shift over/short"
-        rows={[{ shiftId: 1, actualCash: "900.00", overShort: "400.00" }]}
+        rows={[{ shiftId: testId(1), actualCash: "900.00", overShort: "400.00" }]}
         columns={[{ key: "actualCash", label: "Actual", kind: "uncountedMoney" }]}
       />,
     );

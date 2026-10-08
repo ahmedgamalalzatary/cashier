@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import type { Category, InventoryStockRow } from "@cashier/shared";
 import {
@@ -8,19 +9,19 @@ import {
 } from "../../src/models/warehouse-model";
 
 const categories: Category[] = [
-  { id: 1, name: "خامات", parentId: null, isActive: true, createdAt: "" },
-  { id: 2, name: "مشروبات", parentId: null, isActive: true, createdAt: "" },
-  { id: 3, name: "قهوة", parentId: 2, isActive: true, createdAt: "" },
-  { id: 4, name: "قديم", parentId: null, isActive: false, createdAt: "" },
-  { id: 5, name: "قديم فارغ", parentId: null, isActive: false, createdAt: "" },
+  { id: testId(1), name: "خامات", parentId: null, isActive: true, createdAt: "" },
+  { id: testId(2), name: "مشروبات", parentId: null, isActive: true, createdAt: "" },
+  { id: testId(3), name: "قهوة", parentId: testId(2), isActive: true, createdAt: "" },
+  { id: testId(4), name: "قديم", parentId: null, isActive: false, createdAt: "" },
+  { id: testId(5), name: "قديم فارغ", parentId: null, isActive: false, createdAt: "" },
 ];
 
 const rows: InventoryStockRow[] = [
   {
-    itemId: 1,
+    itemId: testId(1),
     code: 1,
     name: "بن برازيلي",
-    categoryId: 3,
+    categoryId: testId(3),
     categoryName: "قهوة",
     type: "raw",
     stockUnit: "كجم",
@@ -32,10 +33,10 @@ const rows: InventoryStockRow[] = [
     isNegativeStock: false,
   },
   {
-    itemId: 2,
+    itemId: testId(2),
     code: 2,
     name: "أكواب ورق",
-    categoryId: 1,
+    categoryId: testId(1),
     categoryName: "خامات",
     type: "resale",
     stockUnit: "قطعة",
@@ -47,10 +48,10 @@ const rows: InventoryStockRow[] = [
     isNegativeStock: false,
   },
   {
-    itemId: 3,
+    itemId: testId(3),
     code: 3,
     name: "مخزون قديم",
-    categoryId: 4,
+    categoryId: testId(4),
     categoryName: "قديم",
     type: "raw",
     stockUnit: "كجم",
@@ -67,7 +68,7 @@ describe("warehouse view model", () => {
   it("allows active sub-categories and active main categories without children", () => {
     expect(
       eligibleItemCategories(categories).map((category) => category.id),
-    ).toEqual([1, 3]);
+    ).toEqual([testId(1), testId(3)]);
   });
 
   it("filters by Arabic search, category, and low-stock state", () => {
@@ -76,12 +77,12 @@ describe("warehouse view model", () => {
         rows,
         {
           query: "برازيلي",
-          categoryId: 3,
+          categoryId: testId(3),
           state: "low",
         },
         categories,
       ).map((row) => row.itemId),
-    ).toEqual([1]);
+    ).toEqual([testId(1)]);
     expect(
       filterStockRows(
         rows,
@@ -95,18 +96,18 @@ describe("warehouse view model", () => {
     expect(
       filterStockRows(
         rows,
-        { query: "", categoryId: 2, state: "all" },
+        { query: "", categoryId: testId(2), state: "all" },
         categories,
       ).map((row) => row.itemId),
-    ).toEqual([1]);
+    ).toEqual([testId(1)]);
   });
 
   it("offers inactive categories too so visible stock remains filterable", () => {
     expect(categoryFilterOptions(categories, rows)).toEqual([
-      { id: 1, label: "خامات" },
-      { id: 2, label: "مشروبات" },
-      { id: 3, label: "مشروبات ← قهوة" },
-      { id: 4, label: "قديم (موقوف)" },
+      { id: testId(1), label: "خامات" },
+      { id: testId(2), label: "مشروبات" },
+      { id: testId(3), label: "مشروبات ← قهوة" },
+      { id: testId(4), label: "قديم (موقوف)" },
     ]);
   });
 

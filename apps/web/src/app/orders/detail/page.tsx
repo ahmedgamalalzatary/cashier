@@ -52,7 +52,8 @@ function OrderDetailView() {
 
   const load = useCallback(async () => {
     try {
-      setOrder(await getOrder(Number(id)));
+      if (!id) throw new Error("لم يتم تحديد السجل");
+      setOrder(await getOrder(id));
       setError("");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "تعذر تحميل الطلب");

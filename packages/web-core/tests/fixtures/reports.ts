@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import type { ReportsData } from '@cashier/web-core/services/reports-service';
 
 export function reportsFixture(): ReportsData {
@@ -5,7 +6,7 @@ export function reportsFixture(): ReportsData {
     range: {
       from: "2026-09-01",
       to: "2026-09-10",
-      branchId: 1,
+      branchId: testId(1),
       generatedAt: "2026-09-10T12:00:00Z",
     },
     sales: {

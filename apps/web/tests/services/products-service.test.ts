@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@cashier/web-core/lib/api";
 import {
@@ -19,7 +20,7 @@ describe("products service", () => {
       pagination: { totalPages: 1 },
     } as never);
     const setup = {
-      baseIngredients: [{ itemId: 2, quantity: 0.25 }],
+      baseIngredients: [{ itemId: testId(2), quantity: 0.25 }],
       sizes: [],
       modifiers: [
         { externalModifierOptionId: 8, stockEffect: "none" as const },

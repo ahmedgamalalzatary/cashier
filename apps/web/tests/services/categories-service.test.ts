@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@cashier/web-core/lib/api";
 import {
@@ -39,20 +40,20 @@ describe("categories service", () => {
   });
 
   it("updates a category", async () => {
-    await updateCategory(4, { name: "Coffee", parentId: 2 });
-    expect(request).toHaveBeenCalledWith("/api/categories/4", {
+    await updateCategory(testId(4), { name: "Coffee", parentId: testId(2) });
+    expect(request).toHaveBeenCalledWith("/api/categories/00000000-0000-7000-8000-000000000004", {
       method: "PUT",
-      body: JSON.stringify({ name: "Coffee", parentId: 2 }),
+      body: JSON.stringify({ name: "Coffee", parentId: testId(2) }),
     });
   });
 
   it("deactivates and reactivates a category", async () => {
-    await deactivateCategory(4);
-    await reactivateCategory(5);
-    expect(request).toHaveBeenNthCalledWith(1, "/api/categories/4", {
+    await deactivateCategory(testId(4));
+    await reactivateCategory(testId(5));
+    expect(request).toHaveBeenNthCalledWith(1, "/api/categories/00000000-0000-7000-8000-000000000004", {
       method: "DELETE",
     });
-    expect(request).toHaveBeenNthCalledWith(2, "/api/categories/5", {
+    expect(request).toHaveBeenNthCalledWith(2, "/api/categories/00000000-0000-7000-8000-000000000005", {
       method: "PUT",
       body: JSON.stringify({ isActive: true }),
     });

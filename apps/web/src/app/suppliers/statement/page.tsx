@@ -37,7 +37,8 @@ function SupplierStatementView() {
 
   const load = useCallback(async () => {
     try {
-      setData(await getSupplierStatement(Number(id)));
+      if (!id) throw new Error("لم يتم تحديد السجل");
+      setData(await getSupplierStatement(id));
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "تعذر تحميل كشف الحساب");

@@ -76,7 +76,7 @@ export default function OrdersPage() {
     () =>
       filterOrders(orders, {
         query,
-        cashierId: cashierId ? Number(cashierId) : null,
+        cashierId: cashierId ? cashierId : null,
         day,
       }),
     [orders, query, cashierId, day],

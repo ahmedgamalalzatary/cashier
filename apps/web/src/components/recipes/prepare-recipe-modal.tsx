@@ -17,7 +17,7 @@ export function PrepareRecipeModal({
 }: {
   recipe: PreparedRecipe;
   onClose: () => void;
-  onSaved: (preparationId: number) => void;
+  onSaved: (preparationId: string) => void;
 }) {
   const [quantity, setQuantity] = useState(recipe.baseYield);
   const [notes, setNotes] = useState("");

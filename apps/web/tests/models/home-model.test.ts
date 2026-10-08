@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import type {
   InventoryStockRow,
@@ -20,8 +21,8 @@ import {
 function shift(overrides: Partial<Shift> & Pick<Shift, "id">): Shift {
   return {
     status: "closed",
-    cashierUserId: 1,
-    employeeId: 1,
+    cashierUserId: testId(1),
+    employeeId: testId(1),
     cashierName: "أحمد",
     openingFloat: "200.00",
     openedAt: "2026-08-02T08:00:00.000Z",
@@ -48,10 +49,10 @@ function shift(overrides: Partial<Shift> & Pick<Shift, "id">): Shift {
 
 function stockRow(overrides: Partial<InventoryStockRow>): InventoryStockRow {
   return {
-    itemId: 1,
+    itemId: testId(1),
     code: 1,
     name: "بن",
-    categoryId: 1,
+    categoryId: testId(1),
     categoryName: "قهوة",
     type: "raw",
     stockUnit: "كجم",
@@ -74,9 +75,9 @@ const noAttention = {
 
 function request(status: TransferRequestSummary["status"]) {
   return {
-    id: 1,
-    requestedBy: 1,
-    shiftId: 1,
+    id: testId(1),
+    requestedBy: testId(1),
+    shiftId: testId(1),
     requestedByName: "أحمد",
     notes: null,
     status,
@@ -107,14 +108,14 @@ describe("home view model", () => {
 
   it("only exposes a drawer the signed-in user may look inside", () => {
     expect(openShiftOf(null)).toBeNull();
-    const open = shift({ id: 4, status: "open" });
+    const open = shift({ id: testId(4), status: "open" });
     expect(openShiftOf(open)).toBe(open);
   });
 
   it("prints the open shift as receipt lines", () => {
     const lines = shiftTapeLines(
       shift({
-        id: 4,
+        id: testId(4),
         status: "open",
         totals: {
           ordersCount: 3,
@@ -139,15 +140,15 @@ describe("home view model", () => {
 
   it("never sets a separator against Arabic-Indic digits, which reads as one", () => {
     const labels = [
-      ...shiftTapeLines(shift({ id: 4, status: "open" })),
-      ...dayTape([shift({ id: 4 })]).lines,
+      ...shiftTapeLines(shift({ id: testId(4), status: "open" })),
+      ...dayTape([shift({ id: testId(4) })]).lines,
     ].map((line) => line.label);
     const supplierLabel = attentionItems({
       ...noAttention,
       role: "admin",
       suppliers: [
         {
-          id: 1,
+          id: testId(1),
           name: "مورد",
           phone: null,
           address: null,
@@ -169,7 +170,7 @@ describe("home view model", () => {
   it("totals only the shifts opened on the given Cairo day", () => {
     const shifts = [
       shift({
-        id: 1,
+        id: testId(1),
         openedAt: "2026-08-02T06:00:00.000Z",
         totals: {
           ordersCount: 4,
@@ -182,7 +183,7 @@ describe("home view model", () => {
         },
       }),
       shift({
-        id: 2,
+        id: testId(2),
         openedAt: "2026-08-02T14:00:00.000Z",
         totals: {
           ordersCount: 6,
@@ -194,7 +195,7 @@ describe("home view model", () => {
           wasteEntries: 0,
         },
       }),
-      shift({ id: 3, openedAt: "2026-08-01T14:00:00.000Z" }),
+      shift({ id: testId(3), openedAt: "2026-08-01T14:00:00.000Z" }),
     ];
     const day = dayTape(shifts, "2026-08-02");
     expect(day.shiftCount).toBe(2);
@@ -207,7 +208,7 @@ describe("home view model", () => {
 
   it("counts a shift opened late on a Cairo evening as that Cairo day", () => {
     // 22:30 UTC on the 1st is 00:30 on the 2nd in Cairo
-    const late = shift({ id: 9, openedAt: "2026-08-01T22:30:00.000Z" });
+    const late = shift({ id: testId(9), openedAt: "2026-08-01T22:30:00.000Z" });
     expect(dayTape([late], "2026-08-02").shiftCount).toBe(1);
   });
 
@@ -216,14 +217,14 @@ describe("home view model", () => {
       ...noAttention,
       role: "admin",
       cafeStock: [
-        stockRow({ itemId: 1, isLowStock: true }),
-        stockRow({ itemId: 2, isNegativeStock: true }),
+        stockRow({ itemId: testId(1), isLowStock: true }),
+        stockRow({ itemId: testId(2), isNegativeStock: true }),
       ],
-      mainStock: [stockRow({ itemId: 3, isLowStock: true })],
+      mainStock: [stockRow({ itemId: testId(3), isLowStock: true })],
       requests: [request("pending"), request("rejected")],
       suppliers: [
         {
-          id: 1,
+          id: testId(1),
           name: "مورد",
           phone: null,
           address: null,

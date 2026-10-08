@@ -21,7 +21,7 @@ export type PosCartLine = {
   unitPrice: string;
   modifiers: PosModifierSelection[];
 } & (
-  | { type: "item"; itemId: number }
+  | { type: "item"; itemId: string }
   | {
       type: "external_product";
       externalProductId: number;
@@ -67,8 +67,8 @@ export function filterLocalCatalog(
   products: LocalSaleProduct[],
   categories: PosCatalog["localCategories"],
   filters: {
-    mainCategoryId: number | null;
-    subCategoryId: number | null;
+    mainCategoryId: string | null;
+    subCategoryId: string | null;
     query: string;
   },
 ) {
@@ -271,7 +271,7 @@ export function filterCatalog(
 
 export function isOwnOpenShift(
   shift: CurrentShift | null,
-  user: { id: number; role: string } | null | undefined,
+  user: { id: string; role: string } | null | undefined,
 ): boolean {
   if (!user || user.role !== "cashier") return false;
   if (shift === null) return false;

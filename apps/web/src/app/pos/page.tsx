@@ -83,8 +83,8 @@ export default function PosPage() {
   const [catalogSource, setCatalogSource] = useState<"local" | "external">(
     "local",
   );
-  const [mainCategoryId, setMainCategoryId] = useState<number | null>(null);
-  const [subCategoryId, setSubCategoryId] = useState<number | null>(null);
+  const [mainCategoryId, setMainCategoryId] = useState<string | null>(null);
+  const [subCategoryId, setSubCategoryId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [selecting, setSelecting] = useState<ExternalProduct | null>(null);
   const [discountType, setDiscountType] = useState<OrderDiscountType | null>(
@@ -96,17 +96,17 @@ export default function PosPage() {
   // (rendering must stay pure) and re-check it every minute.
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [receipt, setReceipt] = useState<OrderDetail | null>(null);
-  const [autoPrintOrderId, setAutoPrintOrderId] = useState<number | null>(null);
+  const [autoPrintOrderId, setAutoPrintOrderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [refreshingCatalog, setRefreshingCatalog] = useState(false);
   const [refundPicking, setRefundPicking] = useState(false);
-  const [refundingOrderId, setRefundingOrderId] = useState<number | null>(null);
+  const [refundingOrderId, setRefundingOrderId] = useState<string | null>(null);
   const [wasting, setWasting] = useState(false);
   const [expensing, setExpensing] = useState(false);
   const [error, setError] = useState("");
   // Cafe stock is information only on POS (T4): it never blocks a sale.
-  const [cafeStock, setCafeStock] = useState<Map<number, InventoryStockRow>>(
+  const [cafeStock, setCafeStock] = useState<Map<string, InventoryStockRow>>(
     () => new Map(),
   );
   const checkoutAttempt = useRef<{
@@ -330,7 +330,7 @@ export default function PosPage() {
     }
   }
 
-  async function openReceipt(id: number) {
+  async function openReceipt(id: string) {
     try {
       setReceipt(await getOrder(id));
     } catch (caught) {

@@ -21,7 +21,7 @@ import { getRefund, listRefunds } from "@/services/refunds-service";
 export default function RefundsPage() {
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [refunds, setRefunds] = useState<RefundSummary[]>([]);
-  const [refundingOrderId, setRefundingOrderId] = useState<number | null>(null);
+  const [refundingOrderId, setRefundingOrderId] = useState<string | null>(null);
   const [detail, setDetail] = useState<RefundDetail | null>(null);
   const [error, setError] = useState("");
 

@@ -1,3 +1,4 @@
+import { testId } from "@cashier/shared/test-support";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@cashier/web-core/lib/api";
 import {
@@ -19,12 +20,12 @@ describe("orders service", () => {
       products: [],
       categories: [],
       pagination: { currentPage: 1, totalPages: 1 },
-      localCategories: [{ id: 1, name: "مشروبات", parentId: null }],
+      localCategories: [{ id: testId(1), name: "مشروبات", parentId: null }],
       localProducts: [
         {
-          id: 9,
+          id: testId(9),
           name: "تركي سنجل",
-          categoryId: 1,
+          categoryId: testId(1),
           sellingPrice: "35.00",
           stockUnit: "فنجان",
         },
@@ -60,14 +61,14 @@ describe("orders service", () => {
     await listCatalog();
     await listOrders();
     await listExternalOrders();
-    await getOrder(7);
+    await getOrder(testId(7));
     await createOrder(body);
 
     expect(mockedApi.mock.calls).toEqual([
       ["/api/products?all=true&pos=true"],
       ["/api/orders"],
       ["/api/orders/external"],
-      ["/api/orders/7"],
+      ["/api/orders/00000000-0000-7000-8000-000000000007"],
       ["/api/orders", { method: "POST", body: JSON.stringify(body) }],
     ]);
   });

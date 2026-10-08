@@ -10,7 +10,7 @@ import { api } from "@cashier/web-core/lib/api";
 export type CreateOrderBody = {
   clientRequestId: string;
   lines: Array<
-    | { type: "item"; itemId: number; quantity: number }
+    | { type: "item"; itemId: string; quantity: number }
     | {
         type: "external_product";
         externalProductId: number;
@@ -52,7 +52,7 @@ export function listExternalOrders(
   );
 }
 
-export function getOrder(id: number) {
+export function getOrder(id: string) {
   return api<OrderDetail>(`/api/orders/${id}`);
 }
 

@@ -130,7 +130,7 @@ export function ProductStockSetupModal({
     );
   }
 
-  async function selectCreatedItem(rowKey: string, savedId: number) {
+  async function selectCreatedItem(rowKey: string, savedId: string) {
     let rows: Item[];
     try {
       rows = await onItemsChanged();
@@ -470,7 +470,7 @@ function IngredientRows({
 
 function requestRows(rows: IngredientRow[]) {
   return rows.map((row) => ({
-    itemId: Number(row.itemId),
+    itemId: row.itemId,
     quantity: Number(row.quantity),
   }));
 }

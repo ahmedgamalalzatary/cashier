@@ -1,13 +1,15 @@
 import type { AuthUser } from "@cashier/shared";
+import { isUuid } from "./uuid";
 
 export const BRANCH_CHANGED_EVENT = "cashier:branch-changed";
-const keyFor = (userId: number) => `cashier.branch.${userId}`;
+const keyFor = (userId: string) => `cashier.branch.${userId}`;
 // Keep the current page's selection usable even if browser storage fails.
-const pageSelections = new Map<number, number>();
+const pageSelections = new Map<string, string>();
 
 export function selectedBranchId(user: AuthUser | undefined) {
   if (!user) return undefined;
-  if (user.role === "cashier") return user.branchId ?? 1;
+  if (user.role === "cashier")
+    return isUuid(user.branchId) ? user.branchId : undefined;
   const pageSelection = pageSelections.get(user.id);
   if (pageSelection !== undefined) return pageSelection;
   try {
@@ -15,18 +17,17 @@ export function selectedBranchId(user: AuthUser | undefined) {
       typeof window === "undefined"
         ? null
         : window.localStorage.getItem(keyFor(user.id));
-    const id = value === null ? 1 : Number(value);
-    return Number.isSafeInteger(id) && id > 0 ? id : 1;
+    return isUuid(value) ? value : undefined;
   } catch {
-    return 1;
+    return undefined;
   }
 }
 
-export function saveSelectedBranch(userId: number, branchId: number) {
+export function saveSelectedBranch(userId: string, branchId: string) {
   let current = pageSelections.get(userId);
   if (current === undefined) {
     try {
-      current = Number(window.localStorage.getItem(keyFor(userId)));
+      current = window.localStorage.getItem(keyFor(userId)) ?? undefined;
     } catch {
       // The in-memory selection below still enables workspace changes.
     }
@@ -41,7 +42,7 @@ export function saveSelectedBranch(userId: number, branchId: number) {
   window.dispatchEvent(new Event(BRANCH_CHANGED_EVENT));
 }
 
-export function subscribeToBranchChanges(userId: number, listener: () => void) {
+export function subscribeToBranchChanges(userId: string, listener: () => void) {
   const onStorage = (event: StorageEvent) => {
     if (event.key === keyFor(userId) || event.key === null) {
       pageSelections.delete(userId);
