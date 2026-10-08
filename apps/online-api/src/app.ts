@@ -6,6 +6,7 @@ import {
   createAdminsModule,
   createLinkCodesModule,
   createAuthModule,
+  createDevicesModule,
   createBranchesManagementModule,
   createReportsModule,
   errorHandler,
@@ -44,6 +45,8 @@ export function createApp(
   });
 
   app.use("/api/auth", createAuthModule(db, jwtSecret, onlineAccess));
+  // Shop PCs sign in with their device token, never an admin session.
+  app.use("/api/device", createDevicesModule(db));
   app.use(
     "/api/branches",
     authenticate(db, jwtSecret, onlineAccess),
