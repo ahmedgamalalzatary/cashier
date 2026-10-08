@@ -1,5 +1,5 @@
 import type { Db } from "@cashier/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { branches } from "@cashier/db";
 import { withBranch } from "@cashier/db";
 import {
@@ -37,11 +37,19 @@ export async function refreshActiveBranches(
   signal?: AbortSignal,
   onError: (branchId: string, error: unknown) => void = (id, error) =>
     console.error(`Cache refresh failed for branch ${id}`, error),
+  localBranchId?: string,
 ) {
   const active = await db
     .select({ id: branches.id })
     .from(branches)
-    .where(eq(branches.isActive, true))
+    .where(
+      and(
+        eq(branches.isActive, true),
+        localBranchId === undefined
+          ? undefined
+          : eq(branches.id, localBranchId),
+      ),
+    )
     .orderBy(branches.id);
   // A refresh service holds one lease connection; finish each workspace before
   // moving to the next. A failed workspace does not stop the remaining ones.

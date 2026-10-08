@@ -8,7 +8,12 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { login as loginRequest, logout as logoutRequest, currentUser } from "../../services/auth-service";
+import type { Role } from "@cashier/shared";
+import {
+  login as loginRequest,
+  logout as logoutRequest,
+  currentUser,
+} from "../../services/auth-service";
 import {
   canOpenPath,
   loginPathFor,
@@ -24,7 +29,7 @@ import {
 
 type AuthContextValue = {
   user: AuthUser | null;
-  login(username: string, password: string): Promise<void>;
+  login(username: string, password: string, role: Role): Promise<void>;
   logout(): Promise<void>;
 };
 
@@ -67,8 +72,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       router.replace("/");
   }, [pathname, router, session]);
 
-  async function login(username: string, password: string) {
-    const next = await loginRequest(username, password);
+  async function login(username: string, password: string, role: Role) {
+    const next = await loginRequest(username, password, role);
     writeSession(next);
     setSession(readSession());
     router.replace(postLoginPath(window.location.search, next.user.role));

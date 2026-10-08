@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const loginInput = z.object({
+  role: z.enum(["admin", "cashier"]),
   username: z.string().trim().min(1).max(100),
   password: z.string().min(1).max(255),
 });

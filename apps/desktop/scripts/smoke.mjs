@@ -21,14 +21,16 @@ if (
   !["localhost", "127.0.0.1", "[::1]"].includes(database.hostname)
 )
   throw new Error("Smoke tests require a local *_test database.");
-const testPool = mysql.createPool({ uri: source.DATABASE_URL, timezone: "Z" });
-try {
-  await migrate(drizzle(testPool), {
-    migrationsFolder: path.join(root, "packages/db/drizzle"),
-  });
-} finally {
-  await testPool.end();
-}
+const scratchName = `cashier_desktop_smoke_${process.pid}_${Date.now()}_test`;
+const scratchUrl = new URL(database);
+scratchUrl.pathname = `/${scratchName}`;
+const testPool = mysql.createPool({ uri: scratchUrl.href, timezone: "Z" });
+const { uuidv7 } = await import(
+  pathToFileURL(path.join(root, "packages/db/dist/uuid.js"))
+);
+const branchId = uuidv7();
+let ownerConnection;
+let ownsDatabase = false;
 const runtime = path.join(desktop, "src-tauri/runtime");
 const manifest = JSON.parse(
   fs.readFileSync(path.join(runtime, "manifest.json"), "utf8"),
@@ -48,6 +50,19 @@ function bounded(promise, label) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 try {
+  ownerConnection = await mysql.createConnection(source.DATABASE_URL);
+  // CREATE (without IF NOT EXISTS) proves ownership before any later cleanup.
+  await ownerConnection.query("CREATE DATABASE ?? CHARACTER SET utf8mb4", [
+    scratchName,
+  ]);
+  ownsDatabase = true;
+  await migrate(drizzle(testPool), {
+    migrationsFolder: path.join(root, "packages/db/drizzle"),
+  });
+  await testPool.query("INSERT INTO branches (id, name) VALUES (?, ?)", [
+    branchId,
+    "Desktop smoke branch",
+  ]);
   for (const filename of ["api.mjs", "manifest.json"])
     fs.copyFileSync(
       path.join(runtime, filename),
@@ -67,7 +82,8 @@ try {
   fs.writeFileSync(
     settings,
     Object.entries({
-      DATABASE_URL: source.DATABASE_URL,
+      DATABASE_URL: scratchUrl.href,
+      BRANCH_ID: branchId,
       JWT_SECRET: "desktop-smoke-test-secret-over-32-characters",
       ADMIN_USERNAME: "desktop-smoke-admin",
       ADMIN_PASSWORD: "desktop-smoke-password",
@@ -150,6 +166,7 @@ try {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
+      role: "admin",
       username: "desktop-smoke-admin",
       password: "desktop-smoke-password",
     }),
@@ -163,17 +180,41 @@ try {
   const user = await me.json();
   assert.equal(user.id, session.user.id);
   assert.equal(user.role, "admin");
+  const localBranches = await fetch(base + "/api/branches", {
+    headers: { Authorization: `Bearer ${session.token}` },
+  });
+  assert.equal(localBranches.status, 200);
+  assert.deepEqual(
+    (await localBranches.json()).map((row) => row.id),
+    [branchId],
+  );
+  const mismatched = await fetch(base + "/api/categories", {
+    headers: {
+      Authorization: `Bearer ${session.token}`,
+      "X-Branch-Id": uuidv7(),
+    },
+  });
+  assert.equal(mismatched.status, 403);
   child.stdin.end();
   const result = await bounded(exited, "Parent-pipe shutdown");
   assert.equal(result.code, 0, stderr);
   await assert.rejects(fetch(base + "/health"));
   console.log(
-    "Bundled runtime verified outside the repository: no system Node/dependencies required; offline startup, all CORS origins, login, and clean shutdown passed.",
+    "Bundled runtime verified on a fresh owned database outside the repository: offline startup, all CORS origins, role login, branch pinning, and clean shutdown passed.",
   );
 } finally {
   if (child && !finished) {
     child.kill();
     await bounded(exited, "Child cleanup");
+  }
+  try {
+    await testPool.end();
+    if (ownsDatabase) {
+      assert.match(scratchName, /^cashier_desktop_smoke_\d+_\d+_test$/);
+      await ownerConnection.query("DROP DATABASE ??", [scratchName]);
+    }
+  } finally {
+    await ownerConnection?.end();
   }
   assert.ok(
     directory.startsWith(path.join(os.tmpdir(), "cashier-runtime-smoke-")),

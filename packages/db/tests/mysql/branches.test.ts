@@ -78,14 +78,21 @@ describe("branch workspaces", () => {
       .select({ branchId: externalCatalogSync.branchId })
       .from(externalCatalogSync)
       .orderBy(externalCatalogSync.branchId);
-    expect(rows.map((row) => row.branchId)).toEqual([testId(1), active.body.id]);
+    expect(rows.map((row) => row.branchId)).toEqual([
+      testId(1),
+      active.body.id,
+    ]);
   });
   it("retains the existing workspace as Main Branch", async () => {
     const auth = await loginAs(app, "admin");
     const response = await request(app).get("/api/branches").set(auth);
     expect(response.status).toBe(200);
     expect(response.body).toContainEqual(
-      expect.objectContaining({ id: testId(1), name: "الفرع الرئيسي", isActive: true }),
+      expect.objectContaining({
+        id: testId(1),
+        name: "الفرع الرئيسي",
+        isActive: true,
+      }),
     );
   });
 
@@ -96,7 +103,11 @@ describe("branch workspaces", () => {
       .set(auth)
       .send({ name: "فرع المعادي" });
     expect(created.status).toBe(201);
-    expect(created.body.id).toEqual(expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));
+    expect(created.body.id).toEqual(
+      expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      ),
+    );
     const id = created.body.id as string;
 
     const renamed = await request(app)
@@ -352,7 +363,11 @@ describe("branch workspaces", () => {
       .expect(201);
     const login = await request(app)
       .post("/api/auth/login")
-      .send({ username: "other-cashier", password: "secret123" })
+      .send({
+        role: "cashier",
+        username: "other-cashier",
+        password: "secret123",
+      })
       .expect(200);
     expect(login.body.user.branchId).toBe(branch.body.id);
     const cashier = { Authorization: `Bearer ${login.body.token}` };
@@ -412,7 +427,11 @@ describe("branch workspaces", () => {
       .expect(200);
     await request(app)
       .post("/api/auth/login")
-      .send({ username: "archived-cashier", password: "secret123" })
+      .send({
+        role: "cashier",
+        username: "archived-cashier",
+        password: "secret123",
+      })
       .expect(401);
     const retained = await request(app)
       .get("/api/employees")
@@ -636,7 +655,11 @@ describe("branch workspaces", () => {
       .get("/api/transfers")
       .set(other)
       .expect(200);
-    expect(transfer.body.transferId).toEqual(expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));
+    expect(transfer.body.transferId).toEqual(
+      expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      ),
+    );
     expect(transfers.body.map((row: { id: string }) => row.id)).toEqual([
       transfer.body.transferId,
     ]);

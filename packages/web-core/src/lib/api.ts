@@ -46,7 +46,11 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    if (res.status === 401 && path !== "/api/auth/login") writeSession(null);
+    if (
+      (res.status === 401 && path !== "/api/auth/login") ||
+      (res.status === 403 && path === "/api/auth/me")
+    )
+      writeSession(null);
     throw new Error(body?.error ?? "حدث خطأ غير متوقع");
   }
   const body = await res.json();

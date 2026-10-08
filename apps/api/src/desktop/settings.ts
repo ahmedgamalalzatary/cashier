@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { parse } from "dotenv";
 import { parseRuntimeEnv } from "../env.js";
 import { getAdminSeedConfig } from "@cashier/db";
+import { z } from "zod";
 
 export const desktopOrigins = [
   "http://localhost:3000",
@@ -14,6 +15,9 @@ export function loadDesktopSettings(filename: string) {
   if (!fs.existsSync(filename))
     throw new Error(`Desktop settings are missing: ${filename}`);
   const source = parse(fs.readFileSync(filename));
+  const selectedBranch = z.string().uuid().safeParse(source.BRANCH_ID);
+  if (!selectedBranch.success)
+    throw new Error("BRANCH_ID must be the UUID of this PC's branch");
   const syncSwitch = source.DESKTOP_SYNC_ENABLED ?? "true";
   if (!["true", "false"].includes(syncSwitch))
     throw new Error("DESKTOP_SYNC_ENABLED must be true or false");
@@ -38,5 +42,10 @@ export function loadDesktopSettings(filename: string) {
   const host = new URL(environment.DATABASE_URL).hostname;
   if (!["localhost", "127.0.0.1", "[::1]"].includes(host))
     throw new Error("Desktop DATABASE_URL must point to a local MySQL server");
-  return { environment, admin: getAdminSeedConfig(source), syncEnabled };
+  return {
+    environment,
+    admin: getAdminSeedConfig(source),
+    syncEnabled,
+    branchId: selectedBranch.data,
+  };
 }

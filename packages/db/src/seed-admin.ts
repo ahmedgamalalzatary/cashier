@@ -1,8 +1,8 @@
-import bcrypt from 'bcryptjs';
-import { count, eq, sql } from 'drizzle-orm';
-import type { RowDataPacket } from 'mysql2/promise';
-import type { Db } from './client.js';
-import { users } from './schema.js';
+import bcrypt from "bcryptjs";
+import { and, count, eq, sql } from "drizzle-orm";
+import type { RowDataPacket } from "mysql2/promise";
+import type { Db } from "./client.js";
+import { users } from "./schema.js";
 
 export type AdminSeedConfig = {
   name: string;
@@ -10,9 +10,9 @@ export type AdminSeedConfig = {
   password: string;
 };
 
-type SeedHandle = Db | Parameters<Parameters<Db['transaction']>[0]>[0];
+type SeedHandle = Db | Parameters<Parameters<Db["transaction"]>[0]>[0];
 
-const ADMIN_SEED_LOCK = 'cashier:admin-seed';
+const ADMIN_SEED_LOCK = "cashier:admin-seed";
 const ADMIN_SEED_LOCK_TIMEOUT_S = 10;
 
 export async function seedAdmin(db: SeedHandle, admin: AdminSeedConfig) {
@@ -26,23 +26,24 @@ export async function seedAdmin(db: SeedHandle, admin: AdminSeedConfig) {
         name: admin.name,
         username: admin.username,
         passwordHash,
-        role: 'admin',
+        role: "admin",
+        branchId: null,
         isActive: true,
         isSuperAdmin: true,
         tokenVersion: sql`${users.tokenVersion} + 1`,
       })
       .where(eq(users.id, existingAdmin.id));
-    return 'updated' as const;
+    return "updated" as const;
   }
 
   await db.insert(users).values({
     name: admin.name,
     username: admin.username,
     passwordHash,
-    role: 'admin',
+    role: "admin",
     isSuperAdmin: true,
   });
-  return 'created' as const;
+  return "created" as const;
 }
 
 // The configured super-admin is resolved without ever guessing between several
@@ -53,14 +54,8 @@ async function findSuperAdmin(db: SeedHandle, username: string) {
   const [usernameOwner] = await db
     .select()
     .from(users)
-    .where(eq(users.username, username))
+    .where(and(eq(users.username, username), eq(users.role, "admin")))
     .limit(1);
-
-  if (usernameOwner && usernameOwner.role !== 'admin') {
-    throw new Error(
-      `Cannot seed admin: username "${username}" belongs to another user`,
-    );
-  }
 
   const [flagged] = await db
     .select()
@@ -83,7 +78,7 @@ async function findSuperAdmin(db: SeedHandle, username: string) {
   const existingAdmins = await db
     .select()
     .from(users)
-    .where(eq(users.role, 'admin'))
+    .where(eq(users.role, "admin"))
     .orderBy(users.id)
     .limit(2);
   return existingAdmins.length === 1 ? existingAdmins[0] : null;
@@ -110,13 +105,13 @@ export async function syncConfiguredAdmin(db: Db, admin: AdminSeedConfig) {
   if (lockRows[0]?.acquired !== 1) {
     connection.release();
     throw new Error(
-      'Cannot sync admin: timed out waiting for the admin seed lock',
+      "Cannot sync admin: timed out waiting for the admin seed lock",
     );
   }
   try {
     return await db.transaction((tx) => runSync(tx, admin));
   } finally {
-    await connection.query('SELECT RELEASE_LOCK(?)', [ADMIN_SEED_LOCK]);
+    await connection.query("SELECT RELEASE_LOCK(?)", [ADMIN_SEED_LOCK]);
     connection.release();
   }
 }
@@ -125,13 +120,13 @@ async function runSync(tx: SeedHandle, admin: AdminSeedConfig) {
   const [{ total }] = await tx.select({ total: count() }).from(users);
   if (total === 0) {
     await seedAdmin(tx, admin);
-    return 'created' as const;
+    return "created" as const;
   }
 
   const existing = await findSuperAdmin(tx, admin.username);
   if (!existing) {
     await seedAdmin(tx, admin);
-    return 'created' as const;
+    return "created" as const;
   }
 
   const passwordChanged = !(await bcrypt.compare(
@@ -139,16 +134,14 @@ async function runSync(tx: SeedHandle, admin: AdminSeedConfig) {
     existing.passwordHash,
   ));
   const needsForce =
-    existing.role !== 'admin' ||
-    !existing.isActive ||
-    !existing.isSuperAdmin;
+    existing.role !== "admin" || !existing.isActive || !existing.isSuperAdmin;
   if (
     !passwordChanged &&
     !needsForce &&
     existing.name === admin.name &&
     existing.username === admin.username
   ) {
-    return 'unchanged' as const;
+    return "unchanged" as const;
   }
 
   await tx
@@ -156,7 +149,8 @@ async function runSync(tx: SeedHandle, admin: AdminSeedConfig) {
     .set({
       name: admin.name,
       username: admin.username,
-      role: 'admin',
+      role: "admin",
+      branchId: null,
       isActive: true,
       isSuperAdmin: true,
       ...(passwordChanged
@@ -167,5 +161,5 @@ async function runSync(tx: SeedHandle, admin: AdminSeedConfig) {
         : {}),
     })
     .where(eq(users.id, existing.id));
-  return 'updated' as const;
+  return "updated" as const;
 }

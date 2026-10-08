@@ -1,11 +1,40 @@
 import { testId } from "@cashier/shared/test-support";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, buildHeaders } from "../../src/lib/api";
-import { SESSION_KEY, writeSession } from "../../src/lib/auth";
+import { readSession, SESSION_KEY, writeSession } from "../../src/lib/auth";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("buildHeaders", () => {
+  it("clears a session when the PC no longer allows its account", async () => {
+    const storage = new Map([
+      [
+        SESSION_KEY,
+        JSON.stringify({
+          user: { id: testId(701), name: "Removed admin", role: "admin" },
+          exp: Math.floor(Date.now() / 1000) + 60,
+        }),
+      ],
+    ]);
+    vi.stubGlobal(
+      "window",
+      Object.assign(new EventTarget(), {
+        localStorage: {
+          getItem: (key: string) => storage.get(key) ?? null,
+          removeItem: (key: string) => storage.delete(key),
+        },
+      }),
+    );
+    vi.stubGlobal(
+      "fetch",
+      async () =>
+        new Response(JSON.stringify({ error: "Branch access removed" }), {
+          status: 403,
+        }),
+    );
+    await expect(api("/api/auth/me")).rejects.toThrow("Branch access removed");
+    expect(readSession()).toBeNull();
+  });
   it("uses the API port supplied by the desktop runtime instead of the web deployment URL", async () => {
     vi.stubGlobal("window", {
       __TAURI_INTERNALS__: {},

@@ -18,6 +18,7 @@ function settings(overrides: Record<string, string> = {}) {
   directories.push(directory);
   const filename = path.join(directory, "settings.env");
   const values = {
+    BRANCH_ID: "019a1234-5678-7000-8000-000000000001",
     DATABASE_URL: "mysql://cashier:password@localhost:3306/cashier",
     JWT_SECRET: "a-desktop-secret-with-more-than-32-characters",
     ADMIN_USERNAME: "admin",
@@ -38,6 +39,16 @@ function settings(overrides: Record<string, string> = {}) {
 }
 
 describe("desktop settings", () => {
+  it("requires an explicit UUID branch before starting the local PC", () => {
+    for (const BRANCH_ID of ["", "1", "not-a-branch"]) {
+      expect(() => loadDesktopSettings(settings({ BRANCH_ID }))).toThrow(
+        "BRANCH_ID",
+      );
+    }
+    expect(loadDesktopSettings(settings()).branchId).toBe(
+      "019a1234-5678-7000-8000-000000000001",
+    );
+  });
   it("does not require upstream credentials when synchronization is disabled", () => {
     expect(() =>
       loadDesktopSettings(

@@ -40,10 +40,13 @@ describe("user management", () => {
 
     expect(
       (
-        await request(app()).post("/api/auth/login").send({
-          username: "evening-admin",
-          password: "secret-456",
-        })
+        await request(app())
+          .post("/api/auth/login")
+          .send({
+            role: "admin",
+            username: "evening-admin",
+            password: "secret-456",
+          })
       ).status,
     ).toBe(200);
   });
@@ -63,10 +66,13 @@ describe("user management", () => {
     expect(updated.status).toBe(200);
     expect(
       (
-        await request(app()).post("/api/auth/login").send({
-          username: "manager-two",
-          password: "secret123",
-        })
+        await request(app())
+          .post("/api/auth/login")
+          .send({
+            role: "admin",
+            username: "manager-two",
+            password: "secret123",
+          })
       ).status,
     ).toBe(401);
 
@@ -80,10 +86,13 @@ describe("user management", () => {
     ).toBe(200);
     expect(
       (
-        await request(app()).post("/api/auth/login").send({
-          username: "manager-two",
-          password: "replacement-789",
-        })
+        await request(app())
+          .post("/api/auth/login")
+          .send({
+            role: "admin",
+            username: "manager-two",
+            password: "replacement-789",
+          })
       ).status,
     ).toBe(200);
   });
@@ -168,10 +177,9 @@ describe("user management", () => {
     expect(duplicate.status).toBe(409);
 
     await createUser("cashier", "other");
-    const cashierLogin = await request(app()).post("/api/auth/login").send({
-      username: "other",
-      password: "secret123",
-    });
+    const cashierLogin = await request(app())
+      .post("/api/auth/login")
+      .send({ role: "cashier", username: "other", password: "secret123" });
     const cashierAuthorization = {
       Authorization: `Bearer ${cashierLogin.body.token}`,
     };
@@ -190,15 +198,12 @@ describe("user management", () => {
     ).toBe(200);
     expect(
       (
-        await request(app())
-          .post("/api/users")
-          .set(authorization)
-          .send({
-            name: "محاولة",
-            username: "blocked",
-            password: "secret-456",
-            role: "admin",
-          })
+        await request(app()).post("/api/users").set(authorization).send({
+          name: "محاولة",
+          username: "blocked",
+          password: "secret-456",
+          role: "admin",
+        })
       ).status,
     ).toBe(403);
     expect(

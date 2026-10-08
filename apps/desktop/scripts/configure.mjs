@@ -8,6 +8,7 @@ import { URL } from "node:url";
 const root = path.resolve(import.meta.dirname, "../../..");
 const require = createRequire(path.join(root, "apps/api/package.json"));
 const { parse } = require("dotenv");
+const { z } = require("zod");
 const option = (name) => {
   const index = process.argv.indexOf(name);
   if (index < 0) return undefined;
@@ -45,7 +46,12 @@ if (fs.existsSync(filename)) {
     )
   )
     throw new Error("Desktop settings require local MySQL.");
+  if (!z.string().uuid().safeParse(source.BRANCH_ID).success)
+    throw new Error(
+      "Configure BRANCH_ID with the UUID of this PC's branch before importing settings.",
+    );
   const keys = [
+    "BRANCH_ID",
     "DATABASE_URL",
     "JWT_SECRET",
     "ADMIN_NAME",

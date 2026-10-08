@@ -17,7 +17,11 @@ describe("AuthService credential work", () => {
     );
 
     await expect(
-      service.login({ username: "missing", password: "guess" }),
+      service.login({
+        role: "cashier",
+        username: "missing",
+        password: "guess",
+      }),
     ).rejects.toMatchObject({ status: 401 });
     expect(compare).toHaveBeenCalledOnce();
     expect(bcrypt.getRounds(compare.mock.calls[0][1])).toBe(10);
@@ -49,6 +53,7 @@ describe("AuthService credential work", () => {
     );
 
     const pending = service.login({
+      role: "cashier",
       username: "inactive",
       password: "secret123",
     });
@@ -88,9 +93,45 @@ const activeUser = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("AuthService login outcomes", () => {
+  it("rejects a local admin who is not assigned to this PC's branch", async () => {
+    const repo = {
+      findByUsername: async () => activeUser({ role: "admin", branchId: null }),
+      isAdminAssigned: async () => false,
+    } as unknown as AuthRepository;
+    const service = new AuthService(
+      repo,
+      JWT_SECRET,
+      async () => true,
+      "019a1234-5678-7000-8000-000000000001",
+    );
+    await expect(
+      service.login({
+        username: "admin",
+        password: "secret123",
+        role: "admin",
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+  });
 
-
-
+  it("rejects a cashier from another branch on the local PC", async () => {
+    const repo = {
+      findByUsername: async () =>
+        activeUser({ branchId: "019a1234-5678-7000-8000-000000000002" }),
+    } as unknown as AuthRepository;
+    const service = new AuthService(
+      repo,
+      JWT_SECRET,
+      async () => true,
+      "019a1234-5678-7000-8000-000000000001",
+    );
+    await expect(
+      service.login({
+        username: "cashier",
+        password: "secret123",
+        role: "cashier",
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+  });
   it("returns a token and safe profile for valid credentials", async () => {
     const repo = {
       findByUsername: vi.fn().mockResolvedValue(activeUser()),
@@ -102,6 +143,7 @@ describe("AuthService login outcomes", () => {
     );
 
     const session = await service.login({
+      role: "cashier",
       username: "cashier",
       password: "secret123",
     });
@@ -130,14 +172,14 @@ describe("AuthService login outcomes", () => {
       JWT_SECRET,
       vi.fn().mockResolvedValue(false),
     )
-      .login({ username: "missing", password: "guess" })
+      .login({ role: "cashier", username: "missing", password: "guess" })
       .catch((error: unknown) => error);
     const wrongFailure = await new AuthService(
       wrongPasswordRepo,
       JWT_SECRET,
       vi.fn().mockResolvedValue(false),
     )
-      .login({ username: "cashier", password: "guess" })
+      .login({ role: "cashier", username: "cashier", password: "guess" })
       .catch((error: unknown) => error);
 
     expect(unknownFailure).toMatchObject({ status: 401 });

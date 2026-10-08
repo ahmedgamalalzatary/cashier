@@ -1,8 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Db } from "@cashier/db";
-import { users } from "@cashier/db";
+import { adminBranches, branches, users } from "@cashier/db";
 import { HttpError } from "./error.js";
 import type { AuthUser } from "@cashier/shared";
 import { toAuthUser } from "../modules/auth/auth-user.js";
@@ -72,7 +72,7 @@ export function readRequestToken(req: Request) {
   return header?.startsWith("Bearer ") ? header.slice(7) : undefined;
 }
 
-export function authenticate(db: Db, jwtSecret: string) {
+export function authenticate(db: Db, jwtSecret: string, branchId?: string) {
   return async (req: Request, _res: Response, next: NextFunction) => {
     const token = readRequestToken(req);
     if (!token) throw new HttpError(401, "يجب تسجيل الدخول");
@@ -80,7 +80,8 @@ export function authenticate(db: Db, jwtSecret: string) {
     let payload: AuthToken;
     try {
       payload = jwt.verify(token, jwtSecret) as AuthToken;
-      if (!idParam.safeParse(payload.id).success) throw new Error("Invalid session ID");
+      if (!idParam.safeParse(payload.id).success)
+        throw new Error("Invalid session ID");
     } catch {
       throw new HttpError(401, "انتهت الجلسة — سجّل الدخول من جديد");
     }
@@ -92,7 +93,33 @@ export function authenticate(db: Db, jwtSecret: string) {
       .limit(1);
     if (!user?.isActive || payload.tokenVersion !== user.tokenVersion)
       throw new HttpError(401, "انتهت الجلسة — سجّل الدخول من جديد");
-
+    if (branchId) {
+      if (user.role === "cashier" && user.branchId !== branchId)
+        throw new HttpError(403, "هذا الحساب غير معيّن لهذا الفرع");
+      if (user.role === "cashier") {
+        const [branch] = await db
+          .select()
+          .from(branches)
+          .where(eq(branches.id, branchId))
+          .limit(1);
+        if (!branch?.isActive)
+          throw new HttpError(403, "الفرع مؤرشف؛ لا يمكن تسجيل الدخول");
+      }
+      if (user.role === "admin" && !user.isSuperAdmin) {
+        const [assignment] = await db
+          .select()
+          .from(adminBranches)
+          .where(
+            and(
+              eq(adminBranches.adminUserId, user.id),
+              eq(adminBranches.branchId, branchId),
+            ),
+          )
+          .limit(1);
+        if (!assignment)
+          throw new HttpError(403, "هذا الحساب غير معيّن لهذا الفرع");
+      }
+    }
     req.user = toAuthUser(user);
     next();
   };

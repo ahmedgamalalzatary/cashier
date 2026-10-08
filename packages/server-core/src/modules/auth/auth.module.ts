@@ -1,12 +1,12 @@
-import type { Db } from '@cashier/db';
-import { AuthRepository } from './auth.repository.js';
-import { AuthService } from './auth.service.js';
-import { AuthController } from './auth.controller.js';
-import { authRouter } from './auth.router.js';
+import type { Db } from "@cashier/db";
+import { AuthRepository } from "./auth.repository.js";
+import { AuthService } from "./auth.service.js";
+import { AuthController } from "./auth.controller.js";
+import { authRouter } from "./auth.router.js";
 
-export function createAuthModule(db: Db, jwtSecret: string) {
+export function createAuthModule(db: Db, jwtSecret: string, branchId?: string) {
   const repository = new AuthRepository(db);
-  const service = new AuthService(repository, jwtSecret);
+  const service = new AuthService(repository, jwtSecret, undefined, branchId);
   const controller = new AuthController(service);
-  return authRouter(controller, db, jwtSecret);
+  return authRouter(controller, db, jwtSecret, branchId);
 }

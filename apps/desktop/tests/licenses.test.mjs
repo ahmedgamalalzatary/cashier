@@ -27,10 +27,16 @@ const collect = (root, inputs) =>
 
 test("collects one license per bundled package", (t) => {
   const { root, write } = tree(t);
-  write("node_modules/drizzle-orm/package.json", '{"name":"drizzle-orm","version":"0.44.0"}');
+  write(
+    "node_modules/drizzle-orm/package.json",
+    '{"name":"drizzle-orm","version":"0.44.0"}',
+  );
   write("node_modules/drizzle-orm/LICENSE", "drizzle license");
   write("node_modules/drizzle-orm/index.js", "");
-  write("node_modules/other/package.json", '{"name":"other","version":"1.0.0"}');
+  write(
+    "node_modules/other/package.json",
+    '{"name":"other","version":"1.0.0"}',
+  );
   write("node_modules/other/LICENSE.md", "other license");
 
   assert.deepEqual(

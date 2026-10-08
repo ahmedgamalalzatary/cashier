@@ -5,6 +5,7 @@ import { Coffee, LockKeyhole } from "lucide-react";
 import { useAuth } from "../components/auth/auth-provider";
 import { Button } from "../components/ui/button";
 import { Field } from "../components/ui/field";
+import { SelectField } from "../components/ui/select-field";
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -17,7 +18,11 @@ export function LoginPage() {
     setLoading(true);
     const data = new FormData(event.currentTarget);
     try {
-      await login(String(data.get("username")), String(data.get("password")));
+      await login(
+        String(data.get("username")),
+        String(data.get("password")),
+        data.get("role") === "admin" ? "admin" : "cashier",
+      );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "تعذر تسجيل الدخول");
       setLoading(false);
@@ -34,9 +39,14 @@ export function LoginPage() {
         </div>
         <div className="relative max-w-md pb-10">
           <p className="mb-4 text-sm font-medium text-accent">بداية الوردية</p>
-          <h1 className="text-4xl font-bold leading-tight">كل شيء جاهز،<br />ابدأ من هنا.</h1>
+          <h1 className="text-4xl font-bold leading-tight">
+            كل شيء جاهز،
+            <br />
+            ابدأ من هنا.
+          </h1>
           <p className="mt-5 max-w-sm leading-7 text-sidebar-ink">
-            سجّل الدخول للوصول إلى نقطة البيع وإدارة المخزون والورديات حسب صلاحيتك.
+            سجّل الدخول للوصول إلى نقطة البيع وإدارة المخزون والورديات حسب
+            صلاحيتك.
           </p>
         </div>
       </section>
@@ -44,20 +54,58 @@ export function LoginPage() {
       <section className="grid place-items-center px-5 py-10 sm:px-10">
         <div className="w-full max-w-md">
           <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <span className="grid size-11 place-items-center rounded-xl bg-sidebar text-accent"><Coffee /></span>
+            <span className="grid size-11 place-items-center rounded-xl bg-sidebar text-accent">
+              <Coffee />
+            </span>
             <span className="text-xl font-bold">نظام الكافيه</span>
           </div>
           <div className="receipt-card rounded-2xl border border-line bg-surface p-7 shadow-[0_18px_50px_rgba(43,33,24,0.08)] sm:p-9">
             <div className="mb-7">
-              <div className="mb-4 grid size-11 place-items-center rounded-xl bg-primary/10 text-primary"><LockKeyhole className="size-5" /></div>
+              <div className="mb-4 grid size-11 place-items-center rounded-xl bg-primary/10 text-primary">
+                <LockKeyhole className="size-5" />
+              </div>
               <h2 className="text-2xl font-bold">تسجيل الدخول</h2>
-              <p className="mt-2 text-sm text-muted">أدخل بيانات حسابك للمتابعة.</p>
+              <p className="mt-2 text-sm text-muted">
+                أدخل بيانات حسابك للمتابعة.
+              </p>
             </div>
             <form className="space-y-5" onSubmit={submit}>
-              <Field label="اسم المستخدم" name="username" autoComplete="username" required autoFocus />
-              <Field label="كلمة المرور" name="password" type="password" autoComplete="current-password" required />
-              {error && <p role="alert" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
-              <Button type="submit" disabled={loading} className="w-full justify-center py-2.5">
+              <SelectField
+                label="نوع الحساب"
+                name="role"
+                defaultValue="cashier"
+                required
+              >
+                <option value="cashier">كاشير</option>
+                <option value="admin">مدير</option>
+              </SelectField>
+              <Field
+                label="اسم المستخدم"
+                name="username"
+                autoComplete="username"
+                required
+                autoFocus
+              />
+              <Field
+                label="كلمة المرور"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+              />
+              {error && (
+                <p
+                  role="alert"
+                  className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger"
+                >
+                  {error}
+                </p>
+              )}
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full justify-center py-2.5"
+              >
                 {loading ? "جاري الدخول…" : "دخول"}
               </Button>
             </form>

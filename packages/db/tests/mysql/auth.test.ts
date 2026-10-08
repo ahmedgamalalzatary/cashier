@@ -24,10 +24,10 @@ describe("authentication", () => {
     await createUser("admin");
     const unknown = await request(app())
       .post("/api/auth/login")
-      .send({ username: "unknown", password: "secret123" });
+      .send({ role: "admin", username: "unknown", password: "secret123" });
     const wrong = await request(app())
       .post("/api/auth/login")
-      .send({ username: "admin", password: "wrong" });
+      .send({ role: "admin", username: "admin", password: "wrong" });
     expect(unknown.status).toBe(401);
     expect(wrong.status).toBe(401);
     expect(unknown.body.error).toBe(wrong.body.error);
@@ -101,8 +101,8 @@ describe("authentication", () => {
     const login = await request(app())
       .post("/api/auth/login")
       .send(credentials);
-    const cookie = (login.headers["set-cookie"] ?? []).find(
-      (entry: string) => entry.startsWith("cashier.token="),
+    const cookie = (login.headers["set-cookie"] ?? []).find((entry: string) =>
+      entry.startsWith("cashier.token="),
     );
     expect(cookie).toBeTypeOf("string");
 
@@ -168,12 +168,8 @@ describe("role protection", () => {
       (await request(app()).get("/api/purchases").set(authorization)).status,
     ).toBe(403);
     expect(
-      (
-        await request(app())
-          .post("/api/purchases")
-          .set(authorization)
-          .send({})
-      ).status,
+      (await request(app()).post("/api/purchases").set(authorization).send({}))
+        .status,
     ).toBe(403);
   });
 

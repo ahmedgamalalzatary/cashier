@@ -12,7 +12,9 @@ describe("employees", () => {
     const authorization = await loginAs(app(), "cashier");
 
     const response = await request(app())
-      .post("/api/employees/00000000-0000-7000-8000-000000000001/cashier-access")
+      .post(
+        "/api/employees/00000000-0000-7000-8000-000000000001/cashier-access",
+      )
       .set(authorization)
       .send({ username: "forbidden", password: "secret123" });
 
@@ -80,7 +82,7 @@ describe("employees", () => {
     expect(granted.status).toBe(201);
     const login = await request(app())
       .post("/api/auth/login")
-      .send({ username: "mona", password: "secret123" });
+      .send({ role: "cashier", username: "mona", password: "secret123" });
     expect(login.status).toBe(200);
     expect(login.body.user).toMatchObject({
       id: granted.body.userId,
@@ -116,7 +118,7 @@ describe("employees", () => {
     expect(revoked.status).toBe(204);
     const login = await request(app())
       .post("/api/auth/login")
-      .send({ username: "salma", password: "secret123" });
+      .send({ role: "cashier", username: "salma", password: "secret123" });
     expect(login.status).toBe(401);
     const listed = await request(app())
       .get("/api/employees")
@@ -155,7 +157,7 @@ describe("employees", () => {
     expect(restored.body.userId).toBe(firstGrant.body.userId);
     const login = await request(app())
       .post("/api/auth/login")
-      .send({ username: "yasser", password: "newsecret123" });
+      .send({ role: "cashier", username: "yasser", password: "newsecret123" });
     expect(login.status).toBe(200);
   });
 
@@ -182,7 +184,7 @@ describe("employees", () => {
     expect(updated.status).toBe(200);
     const login = await request(app())
       .post("/api/auth/login")
-      .send({ username: "renamed", password: "secret123" });
+      .send({ role: "cashier", username: "renamed", password: "secret123" });
     expect(login.body.user.name).toBe("اسم جديد");
   });
 
@@ -214,7 +216,7 @@ describe("employees", () => {
       .send({ username: "sally", password: "secret123" });
     const login = await request(app())
       .post("/api/auth/login")
-      .send({ username: "sally", password: "secret123" });
+      .send({ role: "cashier", username: "sally", password: "secret123" });
     const cashierAuthorization = {
       Authorization: `Bearer ${login.body.token}`,
     };
@@ -227,18 +229,20 @@ describe("employees", () => {
 
     expect(
       (
-        await request(app()).post("/api/auth/login").send({
-          username: "sally",
-          password: "secret123",
-        })
+        await request(app())
+          .post("/api/auth/login")
+          .send({ role: "cashier", username: "sally", password: "secret123" })
       ).status,
     ).toBe(401);
     expect(
       (
-        await request(app()).post("/api/auth/login").send({
-          username: "sally",
-          password: "new-secret-456",
-        })
+        await request(app())
+          .post("/api/auth/login")
+          .send({
+            role: "cashier",
+            username: "sally",
+            password: "new-secret-456",
+          })
       ).status,
     ).toBe(200);
     expect(
@@ -274,7 +278,7 @@ describe("employees", () => {
       .send({ username: "busy", password: "secret123" });
     const login = await request(app())
       .post("/api/auth/login")
-      .send({ username: "busy", password: "secret123" });
+      .send({ role: "cashier", username: "busy", password: "secret123" });
     await request(app())
       .post("/api/shifts/open")
       .set({ Authorization: `Bearer ${login.body.token}` })
@@ -315,7 +319,7 @@ describe("employees", () => {
       (
         await request(app())
           .post("/api/auth/login")
-          .send({ username: "former", password: "secret123" })
+          .send({ role: "cashier", username: "former", password: "secret123" })
       ).status,
     ).toBe(401);
   });

@@ -25,6 +25,10 @@ function fixture(t) {
 }
 test("imports only application settings into the user-data folder", (t) => {
   const { source, destination } = fixture(t);
+  fs.appendFileSync(
+    source,
+    'BRANCH_ID="019a1234-5678-7000-8000-000000000001"\n',
+  );
   const result = spawnSync(
     process.execPath,
     [script, "--source", source, "--directory", destination],
@@ -41,8 +45,22 @@ test("imports only application settings into the user-data folder", (t) => {
     ),
   );
   assert.ok(!settings.includes("UNRELATED_SETTING"));
+  assert.ok(
+    settings.includes('BRANCH_ID="019a1234-5678-7000-8000-000000000001"'),
+  );
   assert.ok(!result.stdout.includes("private-password"));
   assert.ok(!result.stdout.includes("local-admin-password"));
+});
+test("rejects a missing branch instead of selecting a branch automatically", (t) => {
+  const { source, destination } = fixture(t);
+  const result = spawnSync(
+    process.execPath,
+    [script, "--source", source, "--directory", destination],
+    { encoding: "utf8" },
+  );
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /BRANCH_ID/);
+  assert.ok(!fs.existsSync(path.join(destination, "settings.env")));
 });
 test("a second import preserves the user's edited settings", (t) => {
   const { source, destination } = fixture(t);

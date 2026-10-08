@@ -27,13 +27,13 @@ describe("auth routes", () => {
     } as unknown as AuthService;
     const app = appWithStubs(new RealAuthController(service));
 
-    const loggedIn = await request(app).post("/login").send({
-      username: "cashier",
-      password: "secret123",
-    });
+    const loggedIn = await request(app)
+      .post("/login")
+      .send({ role: "cashier", username: "cashier", password: "secret123" });
     expect(loggedIn.status).toBe(200);
     expect(loggedIn.body).toEqual(session);
     expect(service.login).toHaveBeenCalledWith({
+      role: "cashier",
       username: "cashier",
       password: "secret123",
     });
@@ -50,10 +50,9 @@ describe("auth routes", () => {
     } as unknown as AuthService;
     const app = appWithStubs(new RealAuthController(service));
 
-    const badBody = await request(app).post("/login").send({
-      username: "   ",
-      password: "secret123",
-    });
+    const badBody = await request(app)
+      .post("/login")
+      .send({ role: "cashier", username: "   ", password: "secret123" });
     expect(badBody.status).toBe(400);
     expect(service.login).not.toHaveBeenCalled();
 

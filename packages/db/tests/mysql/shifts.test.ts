@@ -51,7 +51,7 @@ async function createCashier(
     .send({ username, password: "secret123" });
   const login = await request(app())
     .post("/api/auth/login")
-    .send({ username, password: "secret123" });
+    .send({ role: "cashier", username, password: "secret123" });
   return {
     employeeId: employee.body.id as string,
     userId: access.body.userId as string,
@@ -73,7 +73,9 @@ describe("shifts", () => {
 
     expect(response.status).toBe(201);
     expect(response.body).toMatchObject({
-      id: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
+      id: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      ),
       status: "open",
       cashierUserId: cashier.userId,
       employeeId: cashier.employeeId,
@@ -147,7 +149,11 @@ describe("shifts", () => {
       .set(firstCashier.adminAuthorization);
     expect(
       dashboard.body.openShifts.map((shift: { id: string }) => shift.id).sort(),
-    ).toEqual(responses.filter((response) => response.status === 201).map((response) => response.body.id));
+    ).toEqual(
+      responses
+        .filter((response) => response.status === 201)
+        .map((response) => response.body.id),
+    );
   });
 
   it("rejects duplicate concurrent shifts for the same cashier account", async () => {
@@ -334,14 +340,16 @@ describe("shifts", () => {
       first.adminAuthorization,
     );
     await db.insert(shifts).values(
-      testBranchValues(Array.from({ length: 105 }, (_, index) => ({
-        cashierUserId: first.userId,
-        employeeId: first.employeeId,
-        status: "closed" as const,
-        openingFloat: "0.00",
-        openedAt: new Date(Date.UTC(2026, 0, 1, 0, index)),
-        closedAt: new Date(Date.UTC(2026, 0, 1, 0, index + 1)),
-      }))),
+      testBranchValues(
+        Array.from({ length: 105 }, (_, index) => ({
+          cashierUserId: first.userId,
+          employeeId: first.employeeId,
+          status: "closed" as const,
+          openingFloat: "0.00",
+          openedAt: new Date(Date.UTC(2026, 0, 1, 0, index)),
+          closedAt: new Date(Date.UTC(2026, 0, 1, 0, index + 1)),
+        })),
+      ),
     );
     await request(app())
       .post("/api/shifts/open")
@@ -382,14 +390,16 @@ describe("shifts", () => {
   it("returns all of today's shifts for Home even beyond the history page size", async () => {
     const cashier = await createCashier();
     await db.insert(shifts).values(
-      testBranchValues(Array.from({ length: 105 }, () => ({
-        cashierUserId: cashier.userId,
-        employeeId: cashier.employeeId,
-        status: "closed" as const,
-        openingFloat: "0.00",
-        openedAt: new Date(),
-        closedAt: new Date(),
-      }))),
+      testBranchValues(
+        Array.from({ length: 105 }, () => ({
+          cashierUserId: cashier.userId,
+          employeeId: cashier.employeeId,
+          status: "closed" as const,
+          openingFloat: "0.00",
+          openedAt: new Date(),
+          closedAt: new Date(),
+        })),
+      ),
     );
     const today = await request(app())
       .get("/api/shifts/today")
@@ -405,63 +415,85 @@ describe("shifts", () => {
       "Second",
       first.adminAuthorization,
     );
-    const [category] = await db.insert(categories).values(testBranchValues({ name: "Stock" })).$returningId();
-    const [item] = await db.insert(items).values(testBranchValues({
-      code: nextTestItemCode(),
-      name: "Beans",
-      categoryId: category.id,
-      type: "raw",
-      stockUnit: "kg",
-    })).$returningId();
-    const [batch] = await db.insert(stockBatches).values(testBranchValues({
-      itemId: item.id,
-      warehouse: "cafe",
-      initialQuantity: "10.000",
-      remainingQuantity: "10.000",
-      unitCost: "2.000000",
-      receivedAt: new Date(),
-      sourceType: "transfer_in",
-    })).$returningId();
-    await db.insert(stockMovements).values(testBranchValues({
-      itemId: item.id,
-      warehouse: "cafe",
-      batchId: batch.id,
-      movementType: "transfer_in",
-      quantity: "10.000",
-      unitCost: "2.000000",
-      occurredAt: new Date(),
-    }));
-    await db.insert(externalCategories).values(testBranchValues({
-      externalId: 3,
-      nameAr: "Drinks",
-      nameEn: "Drinks",
-      displayOrder: 1,
-      isActive: true,
-      isVisible: true,
-      isCurrent: true,
-      syncedAt: new Date(),
-    }));
-    await db.insert(externalProducts).values(testBranchValues({
-      externalId: 9,
-      externalCategoryId: 3,
-      nameAr: "Coffee",
-      nameEn: "Coffee",
-      price: "20.00",
-      calories: 0,
-      pointsReward: 0,
-      isAvailable: true,
-      isVisible: true,
-      isCurrent: true,
-      syncedAt: new Date(),
-    }));
-    await db.insert(externalProductIngredients).values(testBranchValues({
-      externalProductId: 9,
-      itemId: item.id,
-      quantity: "0.020",
-    }));
+    const [category] = await db
+      .insert(categories)
+      .values(testBranchValues({ name: "Stock" }))
+      .$returningId();
+    const [item] = await db
+      .insert(items)
+      .values(
+        testBranchValues({
+          code: nextTestItemCode(),
+          name: "Beans",
+          categoryId: category.id,
+          type: "raw",
+          stockUnit: "kg",
+        }),
+      )
+      .$returningId();
+    const [batch] = await db
+      .insert(stockBatches)
+      .values(
+        testBranchValues({
+          itemId: item.id,
+          warehouse: "cafe",
+          initialQuantity: "10.000",
+          remainingQuantity: "10.000",
+          unitCost: "2.000000",
+          receivedAt: new Date(),
+          sourceType: "transfer_in",
+        }),
+      )
+      .$returningId();
+    await db.insert(stockMovements).values(
+      testBranchValues({
+        itemId: item.id,
+        warehouse: "cafe",
+        batchId: batch.id,
+        movementType: "transfer_in",
+        quantity: "10.000",
+        unitCost: "2.000000",
+        occurredAt: new Date(),
+      }),
+    );
+    await db.insert(externalCategories).values(
+      testBranchValues({
+        externalId: 3,
+        nameAr: "Drinks",
+        nameEn: "Drinks",
+        displayOrder: 1,
+        isActive: true,
+        isVisible: true,
+        isCurrent: true,
+        syncedAt: new Date(),
+      }),
+    );
+    await db.insert(externalProducts).values(
+      testBranchValues({
+        externalId: 9,
+        externalCategoryId: 3,
+        nameAr: "Coffee",
+        nameEn: "Coffee",
+        price: "20.00",
+        calories: 0,
+        pointsReward: 0,
+        isAvailable: true,
+        isVisible: true,
+        isCurrent: true,
+        syncedAt: new Date(),
+      }),
+    );
+    await db.insert(externalProductIngredients).values(
+      testBranchValues({
+        externalProductId: 9,
+        itemId: item.id,
+        quantity: "0.020",
+      }),
+    );
     const [expenseCategory] = await db
       .insert(expenseCategories)
-      .values(testBranchValues({ name: "Cleaning" })).$returningId();
+      .values(testBranchValues({ name: "Cleaning" }))
+      .$returningId();
     for (const [index, cashier] of [first, second].entries()) {
       const opened = await request(app())
         .post("/api/shifts/open")
@@ -633,20 +665,22 @@ describe("shifts", () => {
       .post("/api/shifts/open")
       .set(cashier.authorization)
       .send({ openingFloat: 500 });
-    await db.insert(orders).values(testBranchValues({
-      orderNumber: "POS-SHIFT-TOTAL",
-      clientRequestId: "39bd97c9-7d85-4408-a4f8-b0ae4b3328e8",
-      requestFingerprint: "a".repeat(64),
-      cashierId: cashier.userId,
-      shiftId: opened.body.id,
-      subtotal: "80.00",
-      discountType: "fixed",
-      discountValue: "8.00",
-      discountAmount: "8.00",
-      total: "72.00",
-      cashReceived: "100.00",
-      changeAmount: "28.00",
-    }));
+    await db.insert(orders).values(
+      testBranchValues({
+        orderNumber: "POS-SHIFT-TOTAL",
+        clientRequestId: "39bd97c9-7d85-4408-a4f8-b0ae4b3328e8",
+        requestFingerprint: "a".repeat(64),
+        cashierId: cashier.userId,
+        shiftId: opened.body.id,
+        subtotal: "80.00",
+        discountType: "fixed",
+        discountValue: "8.00",
+        discountAmount: "8.00",
+        total: "72.00",
+        cashReceived: "100.00",
+        changeAmount: "28.00",
+      }),
+    );
 
     const current = await request(app())
       .get("/api/shifts/current")
@@ -1150,7 +1184,12 @@ describe("shift auto-close across branches", () => {
       .set(admin)
       .send({ name: "Fresh shift branch" })
       .expect(201);
-    const fresh = await createCashier("worker-branch-fresh", "Fresh", admin, freshBranch.body.id);
+    const fresh = await createCashier(
+      "worker-branch-fresh",
+      "Fresh",
+      admin,
+      freshBranch.body.id,
+    );
     const freshShift = await openShiftAt(fresh, 1);
     const firstExpired = await openShiftAt(first, 17);
     const secondExpired = await openShiftAt(second, 18);
@@ -1179,7 +1218,8 @@ describe("shift auto-close across branches", () => {
       select: () => ({
         from: () => ({
           where: () => ({
-            orderBy: () => Promise.resolve([{ id: testId(1) }, { id: testId(2) }]),
+            orderBy: () =>
+              Promise.resolve([{ id: testId(1) }, { id: testId(2) }]),
           }),
         }),
       }),

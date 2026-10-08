@@ -1,4 +1,9 @@
-import { it, testBranchValues } from "../support/ids.js";
+import {
+  it,
+  TEST_BRANCH_ID,
+  testId,
+  testBranchValues,
+} from "../support/ids.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -6,7 +11,7 @@ import { afterEach, describe, expect, vi } from "vitest";
 import { db } from "../support/api-setup.js";
 import { loadTestEnvironment } from "../support/index.js";
 import { startDesktopApi } from "../../../../apps/api/src/desktop/runtime.js";
-import { employees, users, shifts } from "@cashier/db";
+import { branches, employees, users, shifts } from "@cashier/db";
 import { eq } from "drizzle-orm";
 
 const directories: string[] = [];
@@ -22,7 +27,7 @@ afterEach(async () => {
   }
 });
 
-async function start(sync = false) {
+async function start(sync = false, branchId = TEST_BRANCH_ID) {
   const directory = fs.mkdtempSync(
     path.join(os.tmpdir(), "cashier-desktop-db-"),
   );
@@ -40,6 +45,7 @@ async function start(sync = false) {
   fs.writeFileSync(
     settings,
     Object.entries({
+      BRANCH_ID: branchId,
       DATABASE_URL: loadTestEnvironment(),
       JWT_SECRET: "desktop-test-secret-more-than-32-characters",
       ADMIN_USERNAME: "desktop-test-admin",
@@ -62,22 +68,56 @@ async function start(sync = false) {
 }
 
 describe("owned desktop API", () => {
+  it("rejects a database belonging to another configured branch", async () => {
+    await expect(start(false, testId(901))).rejects.toThrow(
+      "configured BRANCH_ID",
+    );
+  });
+  it("rejects a multi-branch database before serving requests", async () => {
+    await db.insert(branches).values({ id: testId(901), name: "Other branch" });
+    await expect(start()).rejects.toThrow("configured BRANCH_ID");
+  });
   it("closes expired shifts without any UI request when external sync is disabled", async () => {
-    const [employee] = await db.insert(employees).values(testBranchValues({ name: "Expired desktop shift" })).$returningId();
-    const [cashier] = await db.insert(users).values(testBranchValues({
-      employeeId: employee.id, name: "Desktop cashier", username: "desktop-expired",
-      passwordHash: "unused", role: "cashier",
-    })).$returningId();
-    const [shift] = await db.insert(shifts).values(testBranchValues({
-      cashierUserId: cashier.id, employeeId: employee.id,
-      openedAt: new Date(Date.now() - 17 * 3_600_000), openingFloat: "100.00", openSlot: 1,
-    })).$returningId();
+    const [employee] = await db
+      .insert(employees)
+      .values(testBranchValues({ name: "Expired desktop shift" }))
+      .$returningId();
+    const [cashier] = await db
+      .insert(users)
+      .values(
+        testBranchValues({
+          employeeId: employee.id,
+          name: "Desktop cashier",
+          username: "desktop-expired",
+          passwordHash: "unused",
+          role: "cashier",
+        }),
+      )
+      .$returningId();
+    const [shift] = await db
+      .insert(shifts)
+      .values(
+        testBranchValues({
+          cashierUserId: cashier.id,
+          employeeId: employee.id,
+          openedAt: new Date(Date.now() - 17 * 3_600_000),
+          openingFloat: "100.00",
+          openSlot: 1,
+        }),
+      )
+      .$returningId();
     await start(false);
-    await vi.waitFor(async () => {
-      const [row] = await db.select().from(shifts).where(eq(shifts.id, shift.id));
-      expect(row.status).toBe("closed");
-      expect(row.actualCash).toBeNull();
-    }, { timeout: 1_000 });
+    await vi.waitFor(
+      async () => {
+        const [row] = await db
+          .select()
+          .from(shifts)
+          .where(eq(shifts.id, shift.id));
+        expect(row.status).toBe("closed");
+        expect(row.actualCash).toBeNull();
+      },
+      { timeout: 1_000 },
+    );
   });
   it("starts independently, logs in without cookies, and stops its local listener", async () => {
     const runtime = await start();
@@ -92,6 +132,7 @@ describe("owned desktop API", () => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        role: "admin",
         username: "desktop-test-admin",
         password: "desktop-test-password",
       }),

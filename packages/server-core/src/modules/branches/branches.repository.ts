@@ -18,6 +18,7 @@ import {
   externalProductSizes,
   externalModifierGroups,
   externalModifierOptions,
+  adminBranches,
 } from "@cashier/db";
 import type { BranchInput, BranchUpdateInput } from "./branches.schemas.js";
 
@@ -29,9 +30,18 @@ export class BranchesRepository {
       action(new BranchesRepository(tx as unknown as Db)),
     );
   }
-  list(branchId?: string) {
-    return this.db.select().from(branches)
-      .where(branchId === undefined ? undefined : eq(branches.id, branchId))
+  list(branchId?: string, adminUserId?: string) {
+    return this.db
+      .select()
+      .from(branches)
+      .where(
+        and(
+          branchId === undefined ? undefined : eq(branches.id, branchId),
+          adminUserId === undefined
+            ? undefined
+            : sql`EXISTS (SELECT 1 FROM ${adminBranches} WHERE ${adminBranches.branchId} = ${branches.id} AND ${adminBranches.adminUserId} = ${adminUserId})`,
+        ),
+      )
       .orderBy(asc(branches.id));
   }
   async get(id: string) {
@@ -58,7 +68,10 @@ export class BranchesRepository {
     return !!row;
   }
   async create(input: BranchInput) {
-    const [result] = await this.db.insert(branches).values(input).$returningId();
+    const [result] = await this.db
+      .insert(branches)
+      .values(input)
+      .$returningId();
     return result.id;
   }
   async copyCatalog(branchId: string) {

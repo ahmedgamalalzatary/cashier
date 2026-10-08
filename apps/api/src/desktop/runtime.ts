@@ -4,7 +4,13 @@ import { hostname } from "node:os";
 import type { Server } from "node:http";
 import type { RowDataPacket } from "mysql2/promise";
 import { createApp } from "../app.js";
-import { closeDb, createDb, syncConfiguredAdmin, type Db } from "@cashier/db";
+import {
+  branches,
+  closeDb,
+  createDb,
+  syncConfiguredAdmin,
+  type Db,
+} from "@cashier/db";
 import {
   createCacheRefreshService,
   refreshActiveBranches,
@@ -38,7 +44,8 @@ export async function startDesktopApi(
   manifestFile: string,
   signal: AbortSignal,
 ) {
-  const { environment, admin, syncEnabled } = loadDesktopSettings(settingsFile);
+  const { environment, admin, syncEnabled, branchId } =
+    loadDesktopSettings(settingsFile);
   const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8")) as {
     schemaCreatedAt: number;
   };
@@ -51,12 +58,18 @@ export async function startDesktopApi(
   signal.addEventListener("abort", stopWorker, { once: true });
   try {
     await verifyDesktopSchema(db, manifest.schemaCreatedAt);
+    const localBranches = await db.select({ id: branches.id }).from(branches);
+    if (localBranches.length !== 1 || localBranches[0].id !== branchId)
+      throw new Error(
+        "Desktop database must contain only the configured BRANCH_ID",
+      );
     await syncConfiguredAdmin(db, admin);
     signal.throwIfAborted();
     const app = createApp(db, {
       jwtSecret: environment.JWT_SECRET,
       corsOrigins: environment.CORS_ORIGIN,
       trustProxy: false,
+      branchId,
     });
     server = await new Promise<Server>((resolve, reject) => {
       const listener = app.listen(0, "127.0.0.1", () => resolve(listener));
@@ -76,7 +89,14 @@ export async function startDesktopApi(
         workerShutdown.signal,
       );
       worker = runRefreshLoop(
-        () => refreshActiveBranches(db, refresh, workerShutdown.signal),
+        () =>
+          refreshActiveBranches(
+            db,
+            refresh,
+            workerShutdown.signal,
+            undefined,
+            branchId,
+          ),
         workerShutdown.signal,
       );
     }

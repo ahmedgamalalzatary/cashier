@@ -14,10 +14,15 @@ export class AuthService {
     private repo: AuthRepository,
     private jwtSecret: string,
     private comparePassword: ComparePassword = bcrypt.compare,
+    private localBranchId?: string,
   ) {}
 
-  async login({ username, password }: LoginInput) {
-    const user = await this.repo.findByUsername(username);
+  async login({ username, password, role }: LoginInput) {
+    const user = await this.repo.findByUsername(
+      username,
+      role,
+      this.localBranchId,
+    );
     // same error for unknown user and wrong password — no username probing
     const invalid = new HttpError(401, "اسم المستخدم أو كلمة المرور غير صحيحة");
     const ok = await this.comparePassword(
@@ -31,6 +36,17 @@ export class AuthService {
       (user.role === "cashier" && !user.branchIsActive)
     )
       throw invalid;
+    if (
+      this.localBranchId &&
+      (user.role === "cashier"
+        ? user.branchId !== this.localBranchId
+        : !user.isSuperAdmin &&
+          !(await this.repo.isAdminAssigned(user.id, this.localBranchId)))
+    )
+      throw new HttpError(
+        403,
+        "هذا الحساب غير مسموح له بالدخول إلى فرع هذا الجهاز",
+      );
     const authUser = toAuthUser(user);
     return {
       token: signToken(authUser, user.tokenVersion, this.jwtSecret),

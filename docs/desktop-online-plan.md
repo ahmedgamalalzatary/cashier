@@ -147,10 +147,10 @@ Status: ☐ todo · ◐ in progress · ☑ done. Write the date when done.
 |                      | 3.3 move login + users/branches management UI                     | ☑      | 2026-10-07 | merged with 3.2: reports needs `branch-provider`            |
 | 4 Schema reset       | 4.1 UUID helper + custom column type + tests                      | ☑      | 2026-10-07 | UUIDv7 + ASCII column; isolated lint/typecheck/build and 19 unit tests green |
 |                      | 4.2 schema: all ids → UUID, new tables, one shift per branch      | ☑      | 2026-10-07 | 54 tables; DB scope moved from 4.4; 26 unit + 7 MySQL tests green |
-|                      | 4.3 baseline migration reset                                      | ☐      |            |                                                           |
-|                      | 4.4 api modules + zod schemas + shared types → string ids         | ☐      |            |                                                           |
-|                      | 4.5 web → string ids                                              | ☐      |            |                                                           |
-|                      | 4.6 login rule: admin must be assigned to the branch              | ☐      |            |                                                           |
+|                      | 4.3 baseline migration reset                                      | ☑      | 2026-10-07 | Dev/test/VPS reset verified; 9 MySQL + 5 checkpoint tests green |
+|                      | 4.4 api modules + zod schemas + shared types → string ids         | ☑      | 2026-10-08 | API/shared UUID conversion; 415 unit + 252 API MySQL tests; backend smoke green |
+|                      | 4.5 web → string ids                                              | ☑      | 2026-10-08 | 223 web + 102 web-core tests; lint/typecheck and static/standalone builds pass |
+|                      | 4.6 login rule: admin must be assigned to the branch              | ☑      | 2026-10-08 | Explicit role, current assignments and PC pin; all workspace checks and fresh-DB desktop smoke pass; committed |
 | 5 Bundled MySQL      | 5.1 fetch + trim MySQL noinstall ZIP in `prepare.mjs`             | ☐      |            |                                                           |
 |                      | 5.2 Rust: init data dir, start/stop `mysqld`, health wait         | ☐      |            |                                                           |
 |                      | 5.3 auto backup + auto migrate on start                           | ☐      |            |                                                           |
@@ -270,10 +270,11 @@ branch; separate branches may each have a cashier named `ali`. Admin usernames a
 unique globally. Admin and cashier accounts may share a username. The functional admin
 index enforces uniqueness despite nullable admin `branch_id`, without generated sync columns.
 
-Verification uses `pnpm --filter @cashier/db test:schema`: generate SQL into a temporary
-directory, install it in a newly created local `cashier_schema42_<pid>_test` database,
-exercise the schema, and remove only that owned scratch database. Existing databases,
-repository migrations and desktop migration checkpoints are left for 4.3.
+4.2 verification used `pnpm --filter @cashier/db test:schema` to generate SQL into a
+temporary directory and install it in an owned scratch database. From 4.3 onward,
+that command applies the repository migrations to a newly created local
+`cashier_schema43_<pid>_test` database, exercises the schema, then removes only that
+owned scratch database. It does not reset the configured development/test databases.
 
 
 
@@ -295,8 +296,45 @@ MySQL's primary-key identifier limit on ingredient mappings. No repository migra
 reset, existing-database wipe, API/web/login completion or desktop checkpoint change
 is included in this slice.
 
-**4.3 Baseline reset.** Delete `drizzle/0000…0045` + meta, generate a fresh `0000_baseline`.
+**4.3 Baseline reset.** Delete `drizzle/0000…0046` + meta, generate a fresh `0000_baseline`.
 Wipe dev, test and VPS databases (D15). Update the desktop migration checkpoint.
+
+**4.3 completed (2026-10-07):** replaced the 47 old SQL
+files and their 47 metadata files with generated `0000_baseline.sql`,
+`meta/0000_snapshot.json` and `meta/_journal.json` using
+`pnpm --filter @cashier/db db:generate --name baseline`. No schema/API behavior was
+changed. The new checkpoint is `1791405602054`; desktop preparation derives it from
+the journal and was regenerated. Desktop tests now use the current journal instead
+of a stale 0045 timestamp, and explicitly reject the old 0046 checkpoint.
+
+The owner reconfirmed demo-data resets. Local `cashier`, `cashier_test` and
+`cashier_api_test` were checked for active connections, reset individually and
+migrated, preserving their database character set/collation. Each has 54 application
+tables and exactly one migration at the new checkpoint. DB lint/typecheck/build,
+26 DB unit tests, nine real-MySQL baseline tests and five desktop checkpoint tests
+pass. The actual desktop readiness function also accepts the generated manifest
+against all three databases and rejects the old checkpoint. Baseline tests cover
+safe reapplication and empty-database admin bootstrap without an invented branch.
+
+VPS project confirmed as `/root/cashier`; the old database was `cashier`, with 50
+total tables and checkpoint `1790525178748`. The owner uploaded the exact three-file
+baseline ZIP, verified its SHA-256, extracted it under `/root/cashier-phase4/drizzle`,
+pulled existing repository updates, and built only the migration image. The owner
+stopped `web`, `api`, `cache-worker`, reset only `cashier` while preserving its
+character set/collation, then applied the new baseline by mounting that folder
+read-only at `/app/packages/db/drizzle` in the migration container. VPS verification
+returned 54 application tables and exactly one migration at `1791405602054`.
+
+The MySQL volume was retained. Application services remain stopped; do not restart
+the numeric-ID runtime against UUID tables. The migration image was built before
+mounting the new baseline for this run, so the next normal deployment must include
+the committed 4.3 repository files and rebuild the migration image. No API deployment
+was performed. Full API/MySQL fixture conversion and end-to-end desktop smoke remain
+dependent on 4.4–4.6; they are not added to this slice. The three future slice stashes
+are unchanged. The owner authorized two commits, excluding all documentation:
+`b3019b9` contains only migration SQL/JSON changes; `3bddd4d` contains the two
+baseline/checkpoint test changes. At that point `backup-main` pointed to `b3019b9`,
+as requested, and `main` to `3bddd4d`. Documentation was outside those commits.
 
 **4.4 API.** Every zod `z.coerce.number()` id param/body → `z.string().uuid()`; route params;
 `X-Branch-Id` validation in `middleware/branch.ts` (regex is `^[1-9]\d*$` today);
@@ -305,11 +343,139 @@ The DB-side explicit UUID scope and removal of `branchColumn().default(1)` land 
 online always uses an explicit branch.
 `packages/shared/src/types.ts` id types → `string`.
 
+**4.4 completed (2026-10-08; seven focused commits):** applied only stash
+`f05ee7e0f1b6dad94f4b91add997f06e191b403e` without dropping it. API modules,
+shared response types and server-core ID validation now use UUID strings for local
+business keys. External catalog/order IDs, amounts, quantities, item codes and
+bookkeeping counters stay numeric. Repository inserts return app-generated UUIDs
+through `$returningId()`; branch headers and JWT user IDs reject counter IDs.
+
+Corrected the restored draft's UUID fixtures without removing accounting or
+validation coverage: numeric/malformed ID rejection remains explicit; fixture setup
+hooks receive an explicit test branch; raw SQL fixtures supply UUID keys and branch
+IDs. Shift tests cover one concurrent winner in a branch, independent branches,
+reopen conflicts with any cashier, consecutive-cashier accounting and expired/fresh
+shifts across separate branches. MySQL caught the external-cache lock name exceeding
+64 characters after adding a UUID; its shorter prefix retains distinct branch locks.
+
+Green targeted checks: API/DB/server-core lint, typecheck and build; shared typecheck
+and build; 415 API unit tests, 252 API-facing MySQL tests, 43 server-core tests,
+26 DB unit plus 25 DB MySQL tests, six shared tests, desktop runtime preparation and
+bundled backend smoke (offline startup, login, CORS and clean shutdown). Full web
+and phase-wide acceptance waits for 4.5/4.6. Username disambiguation and admin seed
+collision handling are recorded with 4.6; no role selection, assignment checks or
+desktop branch pinning was pulled into 4.4. No web/desktop-settings source changed.
+The temporary `.phase4-fixtures.cjs` converter was removed after comparing its blob
+with the preserved stash; it will not be committed. All three stash objects remain
+unchanged. The owner subsequently authorized committing 4.4 in focused groups:
+`87e3d51` shared contracts/fixtures; `8b4a477` server-core; `12222b8` catalog;
+`a413cea` stock/suppliers; `977931d` staff/payroll; `bc28ad9` checkout/shifts;
+`6f796e4` external workers. All 156 intended files were compared with the verified
+working tree; committed contents match. Documentation was left uncommitted, and
+`backup-main` initially stayed at the first 4.3 commit. Subsequent owner-authorized
+fresh CodeRabbit reviews covered `b3019b9` to `a413cea` (95 files), then `a413cea`
+to `6f796e4` (63 files), sequentially. Both published zero findings but returned
+`completed_with_warnings` / "Review completed with unverified findings"; this is
+not a clean-review claim. Returned file lists matched both Git ranges exactly.
+After each boundary move requested by the owner, `backup-main` matched `main`
+at `6f796e4` at the end of the 4.4 reviews. Raw outputs and coverage proof are recorded in the handoff. No push
+or VPS restart occurred.
+
 **4.5 Web.** Number parsing of ids (`Number(id)`, `parseInt`) → strings; `branch-session.ts`.
 
-**4.6 Login rule (D3).** Today `selectBranch` only restricts cashiers; any admin can open any
+**4.5 completed (2026-10-08; commit `9746c46`):** restored only stash
+`1ad62d17f7fd8a913bebb421f691c9a0210afa3e` with `apply`, retaining all three
+original stashes. Web forms, service payloads, filters, maps, refunds and branch
+selection preserve local UUID strings. External catalog/order/size/modifier IDs,
+item codes, amounts, quantities and UI row counters remain numeric.
+
+Baseline web tests passed (213 web, 86 web-core), but typechecks and the web build
+failed on the expected remaining numeric-ID contracts. Corrected the restored
+draft's stale numeric fixtures, accidentally converted external IDs and a hoisted
+report fixture that used an import before initialization. Missing-query guards
+show a readable Arabic error without requesting an invented ID; two guards render
+the error directly to satisfy React effect lint. Browser profiles reject numeric,
+numeric-text and malformed user IDs; cashier branch selection rejects old counter
+IDs. Session reads return signed out when browser storage is inaccessible.
+The latter gaps were reproduced by failing tests before their fixes.
+
+Targeted verification passes: 223 web tests, 102 web-core tests, each workspace's
+lint/typecheck, and web builds in both static export and standalone modes. Tests
+cover UUID detail navigation, missing query IDs, branch restoration/switching,
+empty branch lists, stale sessions, storage failures and existing cross-tab/late
+response behavior. Web-core lint exits successfully but prints Next's missing
+`pages` directory configuration notice; its existing shared-package ESLint
+configuration is unchanged. No backend, schema, migration, desktop settings,
+role-choice or branch-assignment changes were made. The owner then requested fresh
+verification and a commit: both workspace lint/typechecks/tests and both build modes
+passed again, and `9746c46` contains exactly the 102 verified web/web-core paths.
+Committed contents were compared against the working files after newline
+normalization. Documentation and the owner's cleanup-plan deletion remain outside
+the commit; all three stashes are unchanged. No push or VPS action occurred.
+At the end of 4.5, 4.6 and full phase acceptance were still pending.
+
+**4.6 Login rule (D3).** At the start of this phase, `selectBranch` only restricted cashiers; any admin could open any
 branch. New rule: on the PC, login is allowed only for super-admin, admins assigned to the
 PC's branch, and that branch's cashiers. All requests are pinned to the PC's branch.
+
+**4.6 completed and committed (2026-10-08):** restored only the 23 code paths from
+stash `3c4c8c917d4f7426b021fa6c68abe5cd6ad33e82`, excluding its obsolete plan
+edits. Retained the stash; resolved four whitespace conflicts without reverting
+4.4/4.5 work. Login now requires an explicit Admin/Cashier choice. Account lookup
+filters role and the PC's branch; an unpinned development API rejects ambiguous
+same-name cashiers. Admin seed lookup ignores cashier username owners, preserves
+those accounts, repairs the configured super-admin to a NULL branch and still
+rejects a collision with another global admin.
+
+Desktop settings/import require UUID `BRANCH_ID`; startup checks exactly one
+matching branch before serving requests. Regular admins need a current assignment;
+super-admins are exempt from assignment but cannot override the PC branch. A removed
+assignment or archived cashier branch rejects existing local sessions, including
+`/me`; its denied response clears the UI session. Branch discovery returns only the
+PC branch and local branch-management writes are blocked. External refreshes stay
+pinned and skip archived branches on every tick. No online applications, account
+pull, link screen or Phase 5 work was added.
+
+Regression tests first reproduced ignored roles, unrestricted/removed assignments,
+cross-branch access, seed clashes, worker selection and stale UI sessions. Login
+callers/fixtures were updated without removing their original credential, cookie,
+accounting or revocation coverage. A pre-existing formatting issue in two calls
+in `apps/desktop/tests/licenses.test.mjs` was corrected solely to pass the required
+desktop format check. Existing PC settings are preserved; enter the matching
+BRANCH_ID manually there until Phase 9 fills it. `.env.example`, desktop README,
+settings example and system specs document the rule.
+
+**Phase 4 acceptance verified:** sequential workspace checks passed across all
+seven packages: lint where defined, typechecks, shared/DB/server-core/API builds,
+static and standalone web builds, desktop format/Clippy/Cargo checks and tests.
+Tests: 416 API unit + 265 API MySQL; 26 DB unit + 31 DB MySQL; 49 server-core;
+223 web; 107 web-core; six shared; 12 desktop scripts + six Rust tests.
+The freshly rebuilt bundled desktop smoke uses a newly created owned scratch DB,
+applies the repository baseline, supplies one fixture branch, and passes offline
+startup, all CORS origins, explicit-role login, branch pinning and parent-pipe
+shutdown. It drops only its scratch DB. Web-core lint retains its non-failing
+Next `pages` directory configuration notice. An early standalone build was blocked
+by Next's lock after the first build exceeded its tool wait; the final static and
+standalone runs both completed successfully in sequence.
+
+All three original stashes remain intact. No branch move, push, VPS action or
+development-database reset occurred. Phase 4 is complete; later phases require a
+new owner request.
+
+**Owner-requested full workspace re-verification (2026-10-08, before any 4.6
+commit):** all seven workspaces were checked individually and sequentially,
+including their defined lint/typecheck/build/test commands. All 1,141 tests pass.
+Shared packages were freshly built; API dependency builds and both consuming web
+builds pass. The integrated `pnpm build:desktop` graph also completed all seven
+tasks successfully, producing `Cashier_0.2.1_x64-setup.exe` (24.89 MiB).
+The newly prepared bundled backend then passed the fresh owned-database smoke
+again. This verifies an installer build; no version bump, publication or VPS
+deployment occurred. The owner then authorized committing 4.6: its 42 verified
+code/configuration paths were committed, with each committed blob compared to the
+verified working copy. The owner subsequently requested adding this plan, so the
+same 4.6 commit was amended to include this file only. The handoff, system specs,
+desktop README and pre-existing cleanup-plan deletion remain outside the commit.
+`backup-main` remains at `6f796e4`; `main` includes the completed 4.5 and 4.6 commits.
 
 **Traps**
 
@@ -525,7 +691,8 @@ Rules:
 | `JWT_SECRET`                         | changed in 5 | random 48 bytes, written on first start if missing                                                                                                        |
 | `ADMIN_NAME/USERNAME/PASSWORD`       | removed in 9 | the super-admin now arrives by accounts pull. `desktop/settings.ts` stops calling `getAdminSeedConfig`, and the desktop runtime stops calling `seedAdmin` |
 | `ONLINE_API_URL`                     | added in 9   | baked into the build (`https://<vps-domain>/api`), may be overridden in the file                                                                          |
-| `DEVICE_TOKEN`, `BRANCH_ID`          | added in 9   | written by the link screen                                                                                                                                |
+| `BRANCH_ID`                          | added in 4.6 | Owner-approved early setting: enter the UUID manually; Phase 9's link screen will populate it automatically                                              |
+| `DEVICE_TOKEN`                       | added in 9   | written by the link screen                                                                                                                                |
 | `DESKTOP_SYNC_ENABLED`, `EXTERNAL_*` | unchanged    | means **external orders/catalog** sync only, not backup upload. Same values on every PC (Q3)                                                              |
 
 `pnpm configure:desktop` and `settings.example.env` must follow every change in this table.

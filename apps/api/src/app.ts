@@ -34,11 +34,13 @@ export type AppOptions = {
   jwtSecret: string;
   corsOrigins: string[];
   trustProxy?: boolean;
+  /** Desktop pins every authenticated request to its configured branch. */
+  branchId?: string;
 };
 
 export function createApp(
   db: Db,
-  { jwtSecret, corsOrigins, trustProxy = false }: AppOptions,
+  { jwtSecret, corsOrigins, trustProxy = false, branchId }: AppOptions,
 ) {
   const app = express();
   app.set("trust proxy", trustProxy ? 1 : false);
@@ -55,13 +57,17 @@ export function createApp(
     res.json({ ok: true });
   });
 
-  app.use("/api/auth", createAuthModule(db, jwtSecret));
+  app.use("/api/auth", createAuthModule(db, jwtSecret, branchId));
   app.use(
     "/api/branches",
-    authenticate(db, jwtSecret),
-    createBranchesModule(db),
+    authenticate(db, jwtSecret, branchId),
+    createBranchesModule(db, branchId),
   );
-  app.use("/api", authenticate(db, jwtSecret), selectBranch(db));
+  app.use(
+    "/api",
+    authenticate(db, jwtSecret, branchId),
+    selectBranch(db, branchId),
+  );
   // Commit expiry before a cashier write enters its own transaction. A rejected
   // sale/refund/etc. must not roll the system's shift close back with it.
   const shiftExpiry = new ShiftsService(new ShiftsRepository(db));

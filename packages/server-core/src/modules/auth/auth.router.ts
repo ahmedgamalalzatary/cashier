@@ -8,10 +8,11 @@ export function authRouter(
   controller: AuthController,
   db: Db,
   jwtSecret: string,
+  branchId?: string,
 ) {
   const router = Router();
   router.post("/login", createLoginRateLimiter(), controller.login);
   router.post("/logout", controller.logout);
-  router.get("/me", authenticate(db, jwtSecret), controller.me);
+  router.get("/me", authenticate(db, jwtSecret, branchId), controller.me);
   return router;
 }

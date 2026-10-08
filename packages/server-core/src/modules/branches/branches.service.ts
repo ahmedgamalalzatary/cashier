@@ -5,9 +5,13 @@ import type { BranchInput, BranchUpdateInput } from "./branches.schemas.js";
 
 export class BranchesService {
   constructor(private repo: BranchesRepository) {}
-  list(actor: AuthUser) {
-    if (actor.role === "cashier" && !actor.branchId) throw new HttpError(401, "حساب الكاشير غير مرتبط بفرع");
-    return this.repo.list(actor.role === "cashier" ? actor.branchId! : undefined);
+  list(actor: AuthUser, branchId?: string) {
+    if (actor.role === "cashier" && !actor.branchId)
+      throw new HttpError(401, "حساب الكاشير غير مرتبط بفرع");
+    return this.repo.list(
+      branchId ?? (actor.role === "cashier" ? actor.branchId! : undefined),
+      actor.role === "admin" && !actor.isSuperAdmin ? actor.id : undefined,
+    );
   }
   async create(input: BranchInput) {
     try {
