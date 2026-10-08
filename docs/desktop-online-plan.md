@@ -83,26 +83,29 @@ Shift: lives in the database, so closing, crashing or updating never ends it.
 
 ## 2. Owner decisions (final)
 
-| ID  | Decision                                                                                                                                                    |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | One device per branch. One open shift per branch (replaces today's several shifts per branch).                                                              |
-| D2  | Each PC stores **only its own branch**. Admins on a PC see only that branch.                                                                                |
-| D3  | An admin can log in on a PC only if assigned to that PC's branch; otherwise rejected.                                                                       |
-| D4  | Online: super-admin sees everything; admin sees only assigned branches; super-admin can assign one admin to many branches. Cashiers have no online access.  |
-| D5  | Super-admin comes from `.env.production`, seeded on every online-api start, pushed to every PC when online.                                                 |
-| D6  | Admins and branches are created/assigned **online** by super-admin; PCs download the admins assigned to their branch (incl. password changes and removals). |
-| D7  | Cashiers and employees are created **locally** and uploaded like any other data.                                                                            |
-| D8  | The online copy gets **everything** (all tables). Sync is one-way: PC → online. No two-way sync.                                                            |
-| D9  | IDs move from counters to UUIDs (decided despite the size of the change).                                                                                   |
-| D10 | Upload every 15 minutes when online + an "Upload now" button.                                                                                               |
-| D11 | MySQL is **bundled** inside the installer. The `.exe` alone must be enough.                                                                                 |
-| D12 | First launch must be online once to link the PC to its branch with a one-time code.                                                                         |
-| D13 | Accepted risk: an admin removed online can still log in on an offline PC until it reconnects.                                                               |
-| D14 | Updates: forced on app open; optional button while running; offline → app works.                                                                            |
-| D15 | Beta, demo data only: databases may be wiped and migrations reset. No data migration needed.                                                                |
-| D16 | Deploy order for releases that change the database: **VPS first, then desktop release**.                                                                    |
-| D17 | The uploader runs **on the PC** inside the desktop runtime next to the external-orders worker. No separate `apps/worker`.                                   |
-| D18 | Code-signing certificate (Windows "unknown publisher" warning) is handled by the owner later. Out of scope.                                                 |
+| ID  | Decision                                                                                                                                                                                                                                                                                                                |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | One device per branch. One open shift per branch (replaces today's several shifts per branch).                                                                                                                                                                                                                          |
+| D2  | Each PC stores **only its own branch**. Admins on a PC see only that branch.                                                                                                                                                                                                                                            |
+| D3  | An admin can log in on a PC only if assigned to that PC's branch; otherwise rejected.                                                                                                                                                                                                                                   |
+| D4  | Online: super-admin sees everything; admin sees only assigned branches; super-admin can assign one admin to many branches. Cashiers have no online access.                                                                                                                                                              |
+| D5  | Super-admin comes from `.env.production`, seeded on every online-api start, pushed to every PC when online.                                                                                                                                                                                                             |
+| D6  | Admins and branches are created/assigned **online** by super-admin; PCs download the admins assigned to their branch (incl. password changes and removals).                                                                                                                                                             |
+| D7  | Cashiers and employees are created **locally** and uploaded like any other data.                                                                                                                                                                                                                                        |
+| D8  | The online copy gets **everything** (all tables). Sync is one-way: PC → online. No two-way sync.                                                                                                                                                                                                                        |
+| D9  | IDs move from counters to UUIDs (decided despite the size of the change).                                                                                                                                                                                                                                               |
+| D10 | Upload every 15 minutes when online + an "Upload now" button.                                                                                                                                                                                                                                                           |
+| D11 | MySQL is **bundled** inside the installer. The `.exe` alone must be enough.                                                                                                                                                                                                                                             |
+| D12 | First launch must be online once to link the PC to its branch with a one-time code.                                                                                                                                                                                                                                     |
+| D13 | Accepted risk: an admin removed online can still log in on an offline PC until it reconnects.                                                                                                                                                                                                                           |
+| D14 | Updates: forced on app open; optional button while running; offline → app works.                                                                                                                                                                                                                                        |
+| D15 | Beta, demo data only: databases may be wiped and migrations reset. No data migration needed.                                                                                                                                                                                                                            |
+| D16 | Deploy order for releases that change the database: **VPS first, then desktop release**.                                                                                                                                                                                                                                |
+| D17 | The uploader runs **on the PC** inside the desktop runtime next to the external-orders worker. No separate `apps/worker`.                                                                                                                                                                                               |
+| D18 | Code-signing certificate (Windows "unknown publisher" warning) is handled by the owner later. Out of scope.                                                                                                                                                                                                             |
+| D19 | One database per PC, shared by every Windows user: settings, database, logs and backups live in `C:\ProgramData\Cashier`. The app stays a per-user install (no admin prompt on install or update); each Windows user runs `setup.exe` once. Only one Windows user can have Cashier open at a time (decided 2026-10-08). |
+| D20 | The GitHub repository is public; installed PCs download updates from its GitHub Releases (`latest.json`) with no token (decided 2026-10-08).                                                                                                                                                                            |
+| D21 | Each update downloads the whole installer (~43 MB at 0.2.2); acceptable for the shops (decided 2026-10-08).                                                                                                                                                                                                             |
 
 ### Proposed technical decisions (implementer may change only with owner approval)
 
@@ -117,14 +120,14 @@ Shift: lives in the database, so closing, crashing or updating never ends it.
 
 ### Owner answers to the open questions
 
-| ID  | Question                                                                                                                                                                             | Answer                                                                                                                                                                          |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q1  | Username clashes: a local cashier "ali" (offline) vs an online admin "ali".                                                                                                          | Same username is allowed. The login screen has an **Admin / Cashier** choice, so no password rule is needed (see Q5).                                                           |
-| Q2  | Does the VPS stop running the old cashier (`api`, `web`, `cache-worker`)?                                                                                                            | Yes. The VPS only runs `mysql`, `migrate`, `online-api`, `online-web`.                                                                                                          |
-| Q3  | External online orders (`EXTERNAL_ORDERS_*`): one account or one per branch?                                                                                                         | One account for all branches. Same `EXTERNAL_ORDERS_*` values on every PC.                                                                                                      |
-| Q4  | MySQL is GPL. Is bundling it OK?                                                                                                                                                     | Yes, owner accepts.                                                                                                                                                             |
-| Q5  | Owner proposed "same username, password must differ". That leaks passwords: a branch admin who gets "password already used" when creating cashier "ali" learns admin ali's password. | **Answered 2026-10-07:** same username allowed; login screen has an **Admin / Cashier** choice. No password rule. Needed by Phase 4.                                            |
-| Q6  | `docs/cleanup-plan.md` phases 5A (shift auto-close), 6, 7, 8, 9 have no matching commits yet. Finish them before Phase 1 here, or after Phase 11?                                    | **Answered 2026-10-07:** finish 5A before Phase 4 (it changes shift rules that Phase 4 also changes); 6–9 (web restyle) after Phase 3 so they land in the shared packages once. |
+| ID  | Question                                                                                                                                                                             | Answer                                                                                                                                                                                                                                                                                                                                                                                         |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | Username clashes: a local cashier "ali" (offline) vs an online admin "ali".                                                                                                          | Same username is allowed. The login screen has an **Admin / Cashier** choice, so no password rule is needed (see Q5).                                                                                                                                                                                                                                                                          |
+| Q2  | Does the VPS stop running the old cashier (`api`, `web`, `cache-worker`)?                                                                                                            | Yes. The VPS only runs `mysql`, `migrate`, `online-api`, `online-web`.                                                                                                                                                                                                                                                                                                                         |
+| Q3  | External online orders (`EXTERNAL_ORDERS_*`): one account or one per branch?                                                                                                         | One account for all branches. Same `EXTERNAL_ORDERS_*` values on every PC.                                                                                                                                                                                                                                                                                                                     |
+| Q4  | MySQL is GPL. Is bundling it OK?                                                                                                                                                     | Yes, owner accepts.                                                                                                                                                                                                                                                                                                                                                                            |
+| Q5  | Owner proposed "same username, password must differ". That leaks passwords: a branch admin who gets "password already used" when creating cashier "ali" learns admin ali's password. | **Answered 2026-10-07:** same username allowed; login screen has an **Admin / Cashier** choice. No password rule. Needed by Phase 4.                                                                                                                                                                                                                                                           |
+| Q6  | `docs/cleanup-plan.md` phases 5A (shift auto-close), 6, 7, 8, 9 have no matching commits yet. Finish them before Phase 1 here, or after Phase 11?                                    | **Answered 2026-10-07:** finish 5A before Phase 4 (it changes shift rules that Phase 4 also changes); 6–9 (web restyle) after Phase 3 so they land in the shared packages once.                                                                                                                                                                                                                |
 | Q7  | `seed-admin.ts` bumps the super-admin `tokenVersion` on **every** start, so every online-api restart logs the super-admin out online and (after the next accounts pull) on every PC. | **Already fixed** in `eec7eed`. Boot paths (`apps/api/src/index.ts`, `desktop/runtime.ts`) call `syncConfiguredAdmin`, which revokes sessions only when the password actually changed; a name/flag/active fix keeps sessions. `seedAdmin` (unconditional bump) is only reached by the manual `db:seed` full reset. Covered by `packages/db/tests/mysql/seed-admin.test.ts`. Needed by Phase 7. |
 
 ---
@@ -133,47 +136,47 @@ Shift: lives in the database, so closing, crashing or updating never ends it.
 
 Status: ☐ todo · ◐ in progress · ☑ done. Write the date when done.
 
-| Phase                | Slice                                                             | Status | Done on    | Notes                                                     |
-| -------------------- | ----------------------------------------------------------------- | ------ | ---------- | --------------------------------------------------------- |
-| 1 DB package         | 1.1 create `packages/db`, move schema/client/branch-context/seeds | ☑      | 2026-10-07 | `HttpError` moved to the package; api re-exports it       |
-|                      | 1.2 move migrations + drizzle config, api uses package            | ☑      | 2026-10-07 | `db:*` scripts live in `packages/db`; api keeps `db:seed` |
-|                      | 1.3 desktop prepare/smoke + Docker files use package              | ☑      | 2026-10-07 | all MySQL tests now live in `packages/db/tests/mysql`     |
-| 2 Server core        | 2.1 `packages/server-core`: middleware (error, validation, auth)  | ☑      | 2026-10-07 | `branch` scoping moved too (both APIs need it)          |
-|                      | 2.2 move auth module                                              | ☑      | 2026-10-07 | 4 unit tests moved with the code                        |
-|                      | 2.3 move reports module                                           | ☑      | 2026-10-07 | `cairoMidnight` is shared with the shifts module        |
-|                      | 2.4 move users/branches modules whole                             | ☑      | 2026-10-07 | 3 unit tests moved with the code                        |
-| 3 Web core           | 3.1 `packages/web-core`: api client, auth/session, ui primitives  | ☑      | 2026-10-07 | `navigation.ts` moved too (`canOpenPath` needs `ADMIN_PATHS`) |
-|                      | 3.2 move reports page/components/model/service                    | ☑      | 2026-10-07 | page body → `features/reports-page.tsx`; route is thin     |
-|                      | 3.3 move login + users/branches management UI                     | ☑      | 2026-10-07 | merged with 3.2: reports needs `branch-provider`            |
-| 4 Schema reset       | 4.1 UUID helper + custom column type + tests                      | ☑      | 2026-10-07 | UUIDv7 + ASCII column; isolated lint/typecheck/build and 19 unit tests green |
-|                      | 4.2 schema: all ids → UUID, new tables, one shift per branch      | ☑      | 2026-10-07 | 54 tables; DB scope moved from 4.4; 26 unit + 7 MySQL tests green |
-|                      | 4.3 baseline migration reset                                      | ☑      | 2026-10-07 | Dev/test/VPS reset verified; 9 MySQL + 5 checkpoint tests green |
-|                      | 4.4 api modules + zod schemas + shared types → string ids         | ☑      | 2026-10-08 | API/shared UUID conversion; 415 unit + 252 API MySQL tests; backend smoke green |
-|                      | 4.5 web → string ids                                              | ☑      | 2026-10-08 | 223 web + 102 web-core tests; lint/typecheck and static/standalone builds pass |
-|                      | 4.6 login rule: admin must be assigned to the branch              | ☑      | 2026-10-08 | Explicit role, current assignments and PC pin; all workspace checks and fresh-DB desktop smoke pass; committed |
-| 5 Bundled MySQL      | 5.1 fetch + trim MySQL noinstall ZIP in `prepare.mjs`             | ☐      |            |                                                           |
-|                      | 5.2 Rust: init data dir, start/stop `mysqld`, health wait         | ☐      |            |                                                           |
-|                      | 5.3 auto backup + auto migrate on start                           | ☐      |            |                                                           |
-|                      | 5.4 installer/uninstaller keep data; smoke test on clean VM       | ☐      |            |                                                           |
-| 6 Updater + releases | 6.1 signing keys + updater plugin config                          | ☐      |            |                                                           |
-|                      | 6.2 forced check on open with 5s fallback                         | ☐      |            |                                                           |
-|                      | 6.3 optional mid-session update button                            | ☐      |            |                                                           |
-|                      | 6.4 GitHub Actions release workflow                               | ☐      |            |                                                           |
-| 7 Online apps + VPS  | 7.1 `apps/online-api` (auth, reports, scoping)                    | ☐      |            |                                                           |
-|                      | 7.2 `apps/online-web` (login + reports)                           | ☐      |            |                                                           |
-|                      | 7.3 Docker compose + Nginx + runbook                              | ☐      |            |                                                           |
-| 8 Admin management   | 8.1 branches CRUD (super-admin)                                   | ☐      |            |                                                           |
-|                      | 8.2 admins CRUD + multi-branch assignment                         | ☐      |            |                                                           |
-|                      | 8.3 device link codes                                             | ☐      |            |                                                           |
-| 9 Link + accounts    | 9.1 online `POST /device/link`, device token                      | ☐      |            |                                                           |
-|                      | 9.2 desktop first-launch link screen                              | ☐      |            |                                                           |
-|                      | 9.3 accounts pull (on start + every 15 min)                       | ☐      |            |                                                           |
-| 10 Upload sync       | 10.1 outbox table + trigger generator + tests                     | ☐      |            |                                                           |
-|                      | 10.2 online ingest endpoint (idempotent)                          | ☐      |            |                                                           |
-|                      | 10.3 PC uploader worker (15 min) + "Upload now" + status          | ☐      |            |                                                           |
-|                      | 10.4 full resend tool (recovery)                                  | ☐      |            |                                                           |
-| 11 Release v1        | 11.1 end-to-end: 2 PCs → online, offline/online cycles            | ☐      |            |                                                           |
-|                      | 11.2 docs + runbooks + system-specs                               | ☐      |            |                                                           |
+| Phase                | Slice                                                             | Status | Done on    | Notes                                                                                                                                         |
+| -------------------- | ----------------------------------------------------------------- | ------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 DB package         | 1.1 create `packages/db`, move schema/client/branch-context/seeds | ☑      | 2026-10-07 | `HttpError` moved to the package; api re-exports it                                                                                           |
+|                      | 1.2 move migrations + drizzle config, api uses package            | ☑      | 2026-10-07 | `db:*` scripts live in `packages/db`; api keeps `db:seed`                                                                                     |
+|                      | 1.3 desktop prepare/smoke + Docker files use package              | ☑      | 2026-10-07 | all MySQL tests now live in `packages/db/tests/mysql`                                                                                         |
+| 2 Server core        | 2.1 `packages/server-core`: middleware (error, validation, auth)  | ☑      | 2026-10-07 | `branch` scoping moved too (both APIs need it)                                                                                                |
+|                      | 2.2 move auth module                                              | ☑      | 2026-10-07 | 4 unit tests moved with the code                                                                                                              |
+|                      | 2.3 move reports module                                           | ☑      | 2026-10-07 | `cairoMidnight` is shared with the shifts module                                                                                              |
+|                      | 2.4 move users/branches modules whole                             | ☑      | 2026-10-07 | 3 unit tests moved with the code                                                                                                              |
+| 3 Web core           | 3.1 `packages/web-core`: api client, auth/session, ui primitives  | ☑      | 2026-10-07 | `navigation.ts` moved too (`canOpenPath` needs `ADMIN_PATHS`)                                                                                 |
+|                      | 3.2 move reports page/components/model/service                    | ☑      | 2026-10-07 | page body → `features/reports-page.tsx`; route is thin                                                                                        |
+|                      | 3.3 move login + users/branches management UI                     | ☑      | 2026-10-07 | merged with 3.2: reports needs `branch-provider`                                                                                              |
+| 4 Schema reset       | 4.1 UUID helper + custom column type + tests                      | ☑      | 2026-10-07 | UUIDv7 + ASCII column; isolated lint/typecheck/build and 19 unit tests green                                                                  |
+|                      | 4.2 schema: all ids → UUID, new tables, one shift per branch      | ☑      | 2026-10-07 | 54 tables; DB scope moved from 4.4; 26 unit + 7 MySQL tests green                                                                             |
+|                      | 4.3 baseline migration reset                                      | ☑      | 2026-10-07 | Dev/test/VPS reset verified; 9 MySQL + 5 checkpoint tests green                                                                               |
+|                      | 4.4 api modules + zod schemas + shared types → string ids         | ☑      | 2026-10-08 | API/shared UUID conversion; 415 unit + 252 API MySQL tests; backend smoke green                                                               |
+|                      | 4.5 web → string ids                                              | ☑      | 2026-10-08 | 223 web + 102 web-core tests; lint/typecheck and static/standalone builds pass                                                                |
+|                      | 4.6 login rule: admin must be assigned to the branch              | ☑      | 2026-10-08 | Explicit role, current assignments and PC pin; all workspace checks and fresh-DB desktop smoke pass; committed                                |
+| 5 Bundled MySQL      | 5.1 fetch + trim MySQL noinstall ZIP in `prepare.mjs`             | ☑      | 2026-10-08 | 8.4.11 pinned (SHA-256 from MD5-verified ZIP); app-local VC++ DLLs; bundle 92 MB, installer 26.1 → 43.3 MB                                    |
+|                      | 5.2 Rust: init data dir, start/stop `mysqld`, health wait         | ☑      | 2026-10-08 | Shared `C:\ProgramData\Cashier` (D19); 10 Rust + API/DB tests; real first start shows "not linked"                                            |
+|                      | 5.3 auto backup + auto migrate on start                           | ☑      | 2026-10-08 | Migrations bundled in `runtime/migrations`; 13 unit + 6 real-MySQL upgrade tests; real app built a fresh DB                                   |
+|                      | 5.4 installer/uninstaller keep data; smoke test on clean VM       | ☑      | 2026-10-08 | Owner: clean PC shows "not linked"; dev PC GUI test passed (admin, cashier, selling); data kept across crash/reinstall/uninstall; 8.4 upgrade |
+| 6 Updater + releases | 6.1 signing keys + updater plugin config                          | ☑      | 2026-10-08 | Owner key in `C:\Users\Admin\.tauri` (backed up offline); local builds stay unsigned; 3 config tests                                          |     |
+|                      | 6.2 forced check on open with 5s fallback                         | ☐      |            |                                                                                                                                               |
+|                      | 6.3 optional mid-session update button                            | ☐      |            |                                                                                                                                               |
+|                      | 6.4 GitHub Actions release workflow                               | ☐      |            |                                                                                                                                               |
+| 7 Online apps + VPS  | 7.1 `apps/online-api` (auth, reports, scoping)                    | ☐      |            |                                                                                                                                               |
+|                      | 7.2 `apps/online-web` (login + reports)                           | ☐      |            |                                                                                                                                               |
+|                      | 7.3 Docker compose + Nginx + runbook                              | ☐      |            |                                                                                                                                               |
+| 8 Admin management   | 8.1 branches CRUD (super-admin)                                   | ☐      |            |                                                                                                                                               |
+|                      | 8.2 admins CRUD + multi-branch assignment                         | ☐      |            |                                                                                                                                               |
+|                      | 8.3 device link codes                                             | ☐      |            |                                                                                                                                               |
+| 9 Link + accounts    | 9.1 online `POST /device/link`, device token                      | ☐      |            |                                                                                                                                               |
+|                      | 9.2 desktop first-launch link screen                              | ☐      |            |                                                                                                                                               |
+|                      | 9.3 accounts pull (on start + every 15 min)                       | ☐      |            |                                                                                                                                               |
+| 10 Upload sync       | 10.1 outbox table + trigger generator + tests                     | ☐      |            |                                                                                                                                               |
+|                      | 10.2 online ingest endpoint (idempotent)                          | ☐      |            |                                                                                                                                               |
+|                      | 10.3 PC uploader worker (15 min) + "Upload now" + status          | ☐      |            |                                                                                                                                               |
+|                      | 10.4 full resend tool (recovery)                                  | ☐      |            |                                                                                                                                               |
+| 11 Release v1        | 11.1 end-to-end: 2 PCs → online, offline/online cycles            | ☐      |            |                                                                                                                                               |
+|                      | 11.2 docs + runbooks + system-specs                               | ☐      |            |                                                                                                                                               |
 
 ---
 
@@ -232,7 +235,7 @@ Move to a React package consumed by both Next apps:
 Route files (`app/*/page.tsx`) stay as thin wrappers that render a component from
 `packages/web-core/src/features`. The package ships TypeScript source, has no build step, and
 is listed in `transpilePackages`. Imports inside the package are relative: a `@/` alias would
-resolve against the *consuming* app and silently point at the wrong directory.
+resolve against the _consuming_ app and silently point at the wrong directory.
 
 **Trap:** Next must transpile the package (`transpilePackages`). Desktop is a static export
 (`output: "export"`), so moved code must stay client-only (no server actions, no route handlers).
@@ -275,8 +278,6 @@ temporary directory and install it in an owned scratch database. From 4.3 onward
 that command applies the repository migrations to a newly created local
 `cashier_schema43_<pid>_test` database, exercises the schema, then removes only that
 owned scratch database. It does not reset the configured development/test databases.
-
-
 
 - Every `int().autoincrement()` id and every FK column → UUID. Keep the existing
   `(branch_id, id)` unique indexes and composite FKs.
@@ -488,31 +489,152 @@ desktop README and pre-existing cleanup-plan deletion remain outside the commit.
 
 ### Phase 5: Bundled MySQL (desktop)
 
-- `prepare.mjs`: download the official **MySQL 8.4 LTS Windows noinstall ZIP** (pin version +
-  SHA-256), keep only `bin/mysqld.exe`, `bin/mysqladmin.exe`, `bin/mysqldump.exe`, required DLLs and
-  `share/`. Cache it like the Node binary. Add the license file.
-- Rust (`backend.rs` pattern): data dir `%LOCALAPPDATA%\com.cashier.desktop\mysql`;
-  first start → `mysqld --initialize-insecure`, then create user + random password saved in
-  `settings.env`; every start → `mysqld` on loopback, a free port, `--skip-name-resolve`;
-  wait until it is ready; then start Node with the derived `DATABASE_URL`.
+**Scope clarified with the owner (2026-10-08).** Keep the four slices; start with **5.1 only**.
+Linking, the branch row and accounts still arrive in **Phase 9**. Phase 5 delivers a MySQL that
+installs, initializes, runs, backs up and migrates by itself. It does **not** make a fresh install
+able to sell on its own (see acceptance).
+
+**5.1 Fetch and trim.** `prepare.mjs`: download the official **MySQL 8.4 LTS Windows noinstall
+ZIP** (pin version + SHA-256), keep only `bin/mysqld.exe`, `bin/mysqladmin.exe`,
+`bin/mysqldump.exe`, `bin/mysql.exe` (the client, required to **restore** SQL backups), the DLLs
+they need and `share/`. Cache it like the Node binary. Add the license file.
+
+**5.2 Own the server process** (`backend.rs` pattern):
+
+- Shared folder `C:\ProgramData\Cashier` (D19). The first app to create it does so under a
+  temporary name, grants Windows `Users` modify rights, then renames it, so every Windows user can
+  use it. A lock file stops a second Windows user from opening Cashier at the same time. Data dir
+  `C:\ProgramData\Cashier\mysql`. Every start → `mysqld` bound to
+  `127.0.0.1` only, a free port, `--skip-name-resolve`; wait until it is ready; then start Node with
+  the derived `DATABASE_URL`.
+- **First-time initialization is atomic, and credentials are saved first.** Order:
+
+  ```
+  1. generate credentials → write settings.env safely (temp file + rename)
+  2. initialize MySQL in a temporary folder next to the data dir, using those credentials
+  3. rename the temporary folder to the final data dir (only now is the database "real")
+  ```
+
+  A leftover temporary folder (power cut, crash) is deleted and initialization starts again,
+  reusing the **already saved** credentials. Never reuse a half-built data dir.
+
+  | Found on start                                     | Action                                                                                       |
+  | -------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+  | Credentials saved, no final data dir               | Initialize again with the **same** credentials                                               |
+  | Final data dir exists, credentials missing/corrupt | **Stop** with a plain recovery message. Never generate new credentials, never re-initialize. |
+  | Final data dir + matching credentials              | Normal start                                                                                 |
+
+- **No passwordless account may survive initialization.** `--initialize-insecure` leaves `root`
+  without a password; before normal operation, either give `root` a random password or lock it
+  (`ALTER USER 'root'@'localhost' ACCOUNT LOCK`) once a separate maintenance account exists.
+  Create the app user `cashier` with privileges on the Cashier database only.
+- Generate credentials **once** (random, ≥ 32 characters), store them in `settings.env`, reuse them
+  on every later start. Never regenerate them while a data dir exists.
+- **Never put a password on a command line** (`mysqld`, `mysqladmin`, `mysqldump`, `mysql`):
+  other programs on the PC can read process command lines. Pass credentials through a temporary
+  options file (`--defaults-extra-file`) readable only by the current user, deleted after use.
+- Never write passwords to `backend.log`, error dialogs or test output.
 - Shutdown order: Node first, then `mysqladmin shutdown` (graceful), then the Job object kills
   anything left.
-- On start, before migrations: `mysqldump` to `…\backups\<version>-<time>.sql` (keep the last 5),
-  then apply migrations automatically. Replaces today's "migrations do not match" refusal
-  (`apps/api/src/desktop/runtime.ts:22-31`), which stays only for a database **newer** than the app.
+
+**5.3 Backup, then migrate** (replaces today's "migrations do not match" refusal in
+`apps/api/src/desktop/runtime.ts`; that refusal stays only for a database **newer** than the app):
+
+```
+start mysqld ─► pending migrations? ──no──► start API
+                      │yes
+                      ▼
+               free disk ok? ─no─► stop, show error, API not started
+                      ▼
+               mysqldump → backups\pre-<from>-to-<to>-<time>.sql.partial
+               verified? (exit 0 + "-- Dump completed" footer) ─no─► stop, show error
+                      ▼ rename .partial → .sql
+               migrate ─failed─► stop, show error naming the backup file; API not started
+                      ▼ ok
+               start API; mark this backup "last known good"
+```
+
+- A brand-new empty database (no tables) gets its schema **without** a backup (nothing to lose); if
+  that fails, its tables are dropped so the next start begins clean.
+- Migration files ship in the installer (`runtime/migrations`, copied from `packages/db/drizzle` by
+  `prepare.mjs`); the API reports `busy` so the shell keeps waiting during a long update.
+- Back up **only when migrations are pending**, not on every start. Daily restarts must not push
+  the pre-upgrade backup out of the retention list.
+- Retention: keep the newest 5 verified backups, **and always keep** the last known-good
+  pre-upgrade backup until a later upgrade succeeds. Failed attempts never delete a backup, and
+  `.partial` files never count as backups.
+- MySQL cannot roll back a half-applied migration (DDL commits immediately). Recovery is
+  restoring the backup, so restore is part of this slice (see tests).
+- If backup or migration fails, the business API **does not start**. The window shows a plain
+  message and the log has the details.
+- **Failed-upgrade marker.** Right after the backup is verified and **before** migrating, write
+  `upgrade-in-progress.json` (from-checkpoint, to-checkpoint, app version, backup path) next to
+  the data dir, safely (temp file + rename). Delete it only after the migration succeeds.
+- **Next launch with the marker present:** no new backup (it would capture a half-migrated
+  database and could replace the real recovery point), no new migration attempt, API not started.
+  Show "The last update failed" with a **Restore backup** action.
+- **Restore backup:** recreate the Cashier database from the backup named in the marker with
+  `mysql.exe` (credentials via options file), verify it reached the from-checkpoint, then change
+  the marker's state to `restored` (it keeps the failed app version and the backup path). The
+  database is now on the **old** version while the app is still the **new** one, so the app keeps
+  waiting: the fix is a corrected release. With a `restored` marker, the **same** app version stays
+  blocked ("install the corrected version"); a **different** version backs up, migrates normally
+  and deletes the marker only after its migration succeeds. Phase 6's forced update check runs on
+  open **before** the database and API start, so the corrected release installs and migrates
+  cleanly. Never retry the same failed migration on the same app version.
+- The backup named in the marker is never deleted by retention while the marker exists.
+
+**Settings and existing installs**
+
 - `pnpm configure:desktop` and `settings.example.env` lose `DATABASE_URL` (now automatic).
+- Existing PCs pointing at a separately installed MySQL: start a **fresh bundled database** and
+  leave the old database untouched. Its records are **not** imported (D15, demo data). If an old
+  `DATABASE_URL` is still in `settings.env`, ignore it and write one line to `backend.log`; do not
+  crash. Document this in `apps/desktop/README.md`.
+- A fresh bundled database has no branch, and startup requires the configured `BRANCH_ID` to be
+  the only branch (`runtime.ts`). Until Phase 9, an unconfigured install must show a plain
+  "This PC is not linked yet" message instead of today's technical error. Phase 9 replaces that
+  message with the link screen.
+- **Developer/test setup only:** extend `pnpm configure:desktop` (or a test script) to write
+  `BRANCH_ID` and the admin settings and create that one branch in the bundled database. It is
+  never shipped in the installer. **No production default branch and no default login
+  credentials**, ever.
 
 **Traps**
 
 - MySQL needs the **Microsoft Visual C++ Redistributable**. Bundle the redistributable in
   the NSIS installer or verify the DLLs ship in the ZIP; test on a clean Windows VM.
 - Never put the data dir under `Program Files` (not writable, removed on uninstall).
-- The NSIS uninstaller must not delete `%LOCALAPPDATA%\com.cashier.desktop`.
+- The NSIS uninstaller must not delete `C:\ProgramData\Cashier`.
 - Port collisions with a user's own MySQL on 3306: always use a free loopback port.
 - Installer size grows (~100–200 MB after trimming). Measure it.
 
-**Acceptance:** fresh Windows VM, install only `setup.exe`, app opens, sells, survives
-close/reopen with an open shift, survives killing the process from Task Manager.
+**Tests (write first)**
+
+- Initialization: interrupted first start leaves no usable half-built dir; next start recovers.
+- Security: after initialization, passwordless login as `root` fails; the `cashier` user cannot
+  read other databases; no password appears in process arguments or in `backend.log`.
+- Credentials: second start reuses the stored credentials; crash between saving credentials and
+  renaming the data dir → next start re-initializes with the same credentials; existing data dir
+  with missing/corrupt credentials → stops with the recovery message and changes nothing.
+- Failed upgrade: marker written before migrating and removed on success; with the marker
+  present, the next start makes no backup and no migration; Restore brings the database back to
+  the from-checkpoint and clears the marker; the marker's backup survives retention.
+- Backup/migrate: no pending migration → no backup; failed dump → API not started, no migration;
+  failed migration → API not started, backup kept; retention never deletes the last known-good
+  backup across repeated failed starts.
+- Restore: restore the newest backup into a **separate scratch database** and compare row counts
+  and a few known records with the source.
+- Old `DATABASE_URL` present → ignored, logged, app still starts on the bundled database.
+
+**Acceptance**
+
+- Clean Windows VM, install only `setup.exe`: MySQL initializes and runs automatically; the app
+  shows "This PC is not linked yet" (no crash, no technical error).
+- A **configured test install** (developer setup above): log in, open a shift, sell, close and
+  reopen the app with the shift still open, kill the process from Task Manager and restart
+  without data loss.
+- Upgrade with a pending migration: verified backup created, migration applied, app starts.
 
 ### Phase 6: Updater + release pipeline
 
@@ -520,7 +642,8 @@ close/reopen with an open shift, survives killing the process from Task Manager.
   `tauri.conf.json`; private key + password as GitHub secrets
   `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. **Losing the private key
   means installed apps can never update again.** Store a backup offline.
-- `tauri.conf.json`: `bundle.createUpdaterArtifacts: true`;
+- `tauri.conf.json` holds `plugins.updater` (pubkey, endpoint, install mode). `bundle.createUpdaterArtifacts: true`
+  is passed **only by the release workflow** (`--config`), so local `pnpm build:desktop` needs no private key;
   `plugins.updater.endpoints: ["https://github.com/ahmedgamalalzatary/cashier/releases/latest/download/latest.json"]`;
   `plugins.updater.windows.installMode: "passive"`. (Repo is public, so no token is needed.)
 - Rust `lib.rs`: on open, before starting the backend, `updater.check()` with a 5 s timeout.
@@ -682,18 +805,19 @@ Rules:
 - Cashier login data (`users` cashier rows, password hash included) goes up so online has a full
   backup, but online login rejects `role = 'cashier'`.
 
-### 7.2 PC settings (`%APPDATA%\com.cashier.desktop\settings.env`)
+### 7.2 PC settings (`C:\ProgramData\Cashier\settings.env`, shared by all Windows users, D19)
 
-| Key                                  | Phase        | Source                                                                                                                                                    |
-| ------------------------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                       | removed in 5 | built by the app from the bundled MySQL (`MYSQL_PORT` chosen per start, `MYSQL_PASSWORD` generated once)                                                  |
-| `MYSQL_PASSWORD`                     | added in 5   | random, written on first start                                                                                                                            |
-| `JWT_SECRET`                         | changed in 5 | random 48 bytes, written on first start if missing                                                                                                        |
-| `ADMIN_NAME/USERNAME/PASSWORD`       | removed in 9 | the super-admin now arrives by accounts pull. `desktop/settings.ts` stops calling `getAdminSeedConfig`, and the desktop runtime stops calling `seedAdmin` |
-| `ONLINE_API_URL`                     | added in 9   | baked into the build (`https://<vps-domain>/api`), may be overridden in the file                                                                          |
-| `BRANCH_ID`                          | added in 4.6 | Owner-approved early setting: enter the UUID manually; Phase 9's link screen will populate it automatically                                              |
-| `DEVICE_TOKEN`                       | added in 9   | written by the link screen                                                                                                                                |
-| `DESKTOP_SYNC_ENABLED`, `EXTERNAL_*` | unchanged    | means **external orders/catalog** sync only, not backup upload. Same values on every PC (Q3)                                                              |
+| Key                                  | Phase        | Source                                                                                                                                                                       |
+| ------------------------------------ | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                       | removed in 5 | built by the app from the bundled MySQL (`MYSQL_PORT` chosen per start, `MYSQL_PASSWORD` generated once). An old value left in the file is ignored and logged once (Phase 5) |
+| `MYSQL_PASSWORD`                     | added in 5   | random (≥ 32 characters), written once on first start, reused afterwards; never logged, never passed on a command line                                                       |
+| MySQL `root` / maintenance secret    | added in 5   | random password or locked `root` (Phase 5.2); same storage and logging rules as `MYSQL_PASSWORD`                                                                             |
+| `JWT_SECRET`                         | changed in 5 | random 48 bytes, written on first start if missing                                                                                                                           |
+| `ADMIN_NAME/USERNAME/PASSWORD`       | removed in 9 | the super-admin now arrives by accounts pull. `desktop/settings.ts` stops calling `getAdminSeedConfig`, and the desktop runtime stops calling `seedAdmin`                    |
+| `ONLINE_API_URL`                     | added in 9   | baked into the build (`https://<vps-domain>/api`), may be overridden in the file                                                                                             |
+| `BRANCH_ID`                          | added in 4.6 | Owner-approved early setting: enter the UUID manually; Phase 9's link screen will populate it automatically                                                                  |
+| `DEVICE_TOKEN`                       | added in 9   | written by the link screen                                                                                                                                                   |
+| `DESKTOP_SYNC_ENABLED`, `EXTERNAL_*` | unchanged    | means **external orders/catalog** sync only, not backup upload. Same values on every PC (Q3)                                                                                 |
 
 `pnpm configure:desktop` and `settings.example.env` must follow every change in this table.
 
@@ -752,14 +876,14 @@ reports (shared), admins page + branches page + link code generation + devices/l
 
 ### 7.7 Tests and commands
 
-| Area | Command | Where tests live |
-| --- | --- | --- |
-| DB package (after Phase 1) | `pnpm --filter @cashier/db test` (DB unit + DB MySQL tests), `pnpm --filter @cashier/db db:generate` | `packages/db/tests/**` |
-| API | `pnpm --filter @cashier/api test` (API unit + API-facing MySQL tests) | `apps/api/tests/**` and the 24 API-facing files in `packages/db/tests/mysql` |
-| Server core (after Phase 2) | `pnpm --filter @cashier/server-core test` | `packages/server-core/tests/**` |
-| Online API | `pnpm --filter @cashier/online-api test` | `apps/online-api/tests/**` |
-| Web / online-web | `pnpm --filter @cashier/web test`, `pnpm --filter @cashier/online-web test` | `*/tests/**` |
-| Desktop | `pnpm test:desktop`, `pnpm lint:desktop`, `pnpm typecheck:desktop`, `pnpm smoke:desktop` | `apps/desktop/tests`, Rust `#[cfg(test)]` |
+| Area                        | Command                                                                                              | Where tests live                                                             |
+| --------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| DB package (after Phase 1)  | `pnpm --filter @cashier/db test` (DB unit + DB MySQL tests), `pnpm --filter @cashier/db db:generate` | `packages/db/tests/**`                                                       |
+| API                         | `pnpm --filter @cashier/api test` (API unit + API-facing MySQL tests)                                | `apps/api/tests/**` and the 24 API-facing files in `packages/db/tests/mysql` |
+| Server core (after Phase 2) | `pnpm --filter @cashier/server-core test`                                                            | `packages/server-core/tests/**`                                              |
+| Online API                  | `pnpm --filter @cashier/online-api test`                                                             | `apps/online-api/tests/**`                                                   |
+| Web / online-web            | `pnpm --filter @cashier/web test`, `pnpm --filter @cashier/online-web test`                          | `*/tests/**`                                                                 |
+| Desktop                     | `pnpm test:desktop`, `pnpm lint:desktop`, `pnpm typecheck:desktop`, `pnpm smoke:desktop`             | `apps/desktop/tests`, Rust `#[cfg(test)]`                                    |
 
 All MySQL test files stay in `packages/db/tests/mysql`. DB's `vitest.mysql.config.ts`
 runs `seed-admin.test.ts` and `timezone.test.ts`; `vitest.api-mysql.config.ts` runs

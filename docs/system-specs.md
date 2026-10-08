@@ -45,7 +45,7 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 
 #### Admin accounts (super-admin)
 
-- The **super-admin** is the admin account defined by server settings (`ADMIN_NAME` / `ADMIN_USERNAME` / `ADMIN_PASSWORD`). On every API start the boot sync forces its name, username, `admin` role, active state, and super-admin flag; it only re-hashes the password and revokes sessions when the configured password no longer matches. If the configured username is taken by a cashier, boot fails with a clear conflict error.
+- The **super-admin** is the admin account defined by server settings (`ADMIN_NAME` / `ADMIN_USERNAME` / `ADMIN_PASSWORD`). On every API start the boot sync forces its name, username, `admin` role, NULL branch, active state, and super-admin flag; it only re-hashes the password and revokes sessions when the configured password no longer matches. A cashier may share its username and is left unchanged. Renaming the configured super-admin to another global admin's username still fails with a clear conflict error.
 - The super-admin can create, edit, deactivate, and reset the password of other admins. He cannot edit his own account in the app — his data comes from server settings.
 - A **regular admin** (created by the super-admin) has the same business powers as the super-admin but cannot manage any admin account — not others, not himself. The Users page is read-only for him.
 - Nobody changes his own password in the app: the super-admin's comes from server settings, a regular admin's is set by the super-admin, and a cashier's is set by an admin from the employee record (an explicit reset is available for an active cashier account).
@@ -65,6 +65,24 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 
 #### Branch API
 
+**Desktop/online Phase 4 login and branch rules supersede the earlier unrestricted
+admin/default-Main-Branch rules above:** login explicitly chooses `admin` or `cashier`.
+Admin usernames are global; cashier usernames are unique within their branch;
+the two roles may share a username. The PC reads a required UUID `BRANCH_ID` from
+its settings and rejects a database containing zero, different or multiple branches.
+Every local business request uses that branch, including requests without a header.
+The super-admin is exempt from assignment checks, but cannot select another branch
+on the PC. Other admins need a current assignment; cashiers need that branch and
+an active branch row. Assignment removal or branch archive blocks the affected
+existing local sessions; a denied `/me` response clears the browser profile.
+
+Local branch discovery returns only the configured branch, and branch-management
+writes there are forbidden. Admins retain archived history; archived writes remain
+blocked. The unpinned development API uses explicit UUID selections, filters regular
+admins' branch lists/access by assignment, and rejects ambiguous same-name cashier
+login. Online provisioning and the final branch-management permissions arrive in
+Phases 7–9; Phase 4 does not implement those online apps or invent a default branch.
+
 | Request                                        | Behavior                                           |
 | ---------------------------------------------- | -------------------------------------------------- |
 | `GET /api/branches`                            | Admin: every branch; cashier: assigned branch only |
@@ -73,7 +91,11 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 | `DELETE /api/branches/:id`                     | Admin archives it and revokes its cashier sessions |
 | `PUT /api/branches/:id` `{ "isActive": true }` | Admin restores it                                  |
 
-Business endpoints select the workspace with `X-Branch-Id`. Admin defaults to Main Branch when no header is sent; a cashier defaults to its assigned branch and gets 403 for any other. Invalid IDs return 400, missing branches 404, and writes into an archived workspace 409. Auth and branch-management endpoints do not depend on the selection.
+Business endpoints use UUID `X-Branch-Id`. On the PC the configured branch takes
+precedence, and a differing header returns 403. On the unpinned development API,
+an admin must supply a branch; a cashier defaults to its assigned UUID. Invalid
+IDs return 400, missing branches 404, and archived writes 409. Auth and branch
+discovery do not depend on the selected header, but enforce the PC's account access.
 
 #### Branch rollout
 
@@ -380,7 +402,8 @@ Desktop/online Phase 4 schema rules:
 - Branch scope is explicit; database helpers do not invent a default branch. Admin
   `users.branch_id` is NULL; cashiers require their branch's UUID. Cashier usernames
   are unique within a branch, admin usernames globally, and the two roles may share a
-  username. Account lookup and seed integration are completed in the remaining Phase 4 slices.
+  username. Explicit-role account lookup, local assignment enforcement and role-aware
+  seed integration are completed in Phase 4.6.
 - `admin_branches` stores admin-to-branch assignments. `devices` permits one linked
   device per branch. `link_codes` stores code hashes, expiry and usage times.
 - `sync_outbox` stores ordered local change records with a numeric auto-increment

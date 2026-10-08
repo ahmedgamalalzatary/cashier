@@ -42,5 +42,16 @@
       "icons/icon.ico"
     ],
     "android": { "debugApplicationIdSuffix": ".debug" }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJCOENEQThFRkE5QUM1RTkKUldUcHhacjZqdHFNSzJZRUMyenp1UHpFWjFiNkNLamJvRytxWXFoZTVrcHYxbVoxZXhaUVVtWDEK",
+      "endpoints": [
+        "https://github.com/ahmedgamalalzatary/cashier/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }
