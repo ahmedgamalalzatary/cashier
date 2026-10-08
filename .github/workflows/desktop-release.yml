@@ -1,0 +1,72 @@
+# Builds, signs and publishes the Windows installer when a desktop-vX.Y.Z tag
+# is pushed (plan 6.4). Installed PCs read latest.json from the newest release.
+# Release order for database changes: deploy the VPS first, then tag (D16).
+name: Desktop release
+
+on:
+  push:
+    tags: ["desktop-v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Tag must match the desktop version
+        shell: bash
+        run: |
+          version=$(node -p "require('./apps/desktop/package.json').version")
+          if [ "$GITHUB_REF_NAME" != "desktop-v${version}" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match the desktop version ${version}. Run pnpm version:desktop first."
+            exit 1
+          fi
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      # This Node is bundled into the installer as the local API runtime.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.14.0
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      # The pinned MySQL ZIP (~270 MB); prepare.mjs verifies it either way.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/desktop/.cache/mysql
+          key: mysql-${{ hashFiles('apps/desktop/scripts/mysql.mjs') }}
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the web export and the desktop runtime
+        run: pnpm turbo run @cashier/web#build @cashier/desktop#prepare:desktop --concurrency=1
+
+      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # action-v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: apps/desktop
+          tauriScript: pnpm tauri
+          args: --config src-tauri/tauri.release.conf.json
+          tagName: desktop-v__VERSION__
+          releaseName: Cashier v__VERSION__
+          releaseBody: Download Cashier_*_x64-setup.exe below. Installed PCs update automatically.
+          releaseDraft: false
+          prerelease: false

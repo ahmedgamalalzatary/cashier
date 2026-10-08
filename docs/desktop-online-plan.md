@@ -161,7 +161,7 @@ Status: ☐ todo · ◐ in progress · ☑ done. Write the date when done.
 | 6 Updater + releases | 6.1 signing keys + updater plugin config                          | ☑      | 2026-10-08 | Owner key in `C:\Users\Admin\.tauri` (backed up offline); local builds stay unsigned; 3 config tests                                          |     |
 |                      | 6.2 forced check on open with 5s fallback                         | ☑      | 2026-10-08 | Local rehearsal with a test key: 0.2.2 → 0.2.3 installed and reopened itself; offline ready in 4 s; dev builds skip; download limit 20 min    |     |
 |                      | 6.3 optional mid-session update button                            | ☑      | 2026-10-08 | Rehearsal: banner appeared while open; button → clean close (MySQL SHUTDOWN) → install → reopened as 0.2.3 in ~12 s                           |     |
-|                      | 6.4 GitHub Actions release workflow                               | ☐      |            |                                                                                                                                               |
+|                      | 6.4 GitHub Actions release workflow                               | ◐      |            | Workflow written, all actions pinned, 6 updater tests; waiting for secrets + first real release                                               |     |
 | 7 Online apps + VPS  | 7.1 `apps/online-api` (auth, reports, scoping)                    | ☐      |            |                                                                                                                                               |
 |                      | 7.2 `apps/online-web` (login + reports)                           | ☐      |            |                                                                                                                                               |
 |                      | 7.3 Docker compose + Nginx + runbook                              | ☐      |            |                                                                                                                                               |
@@ -660,9 +660,15 @@ start mysqld ─► pending migrations? ──no──► start API
 
 ```powershell
 pnpm version:desktop patch           # bumps all 4 version files together
-# commit, then:
-git tag desktop-v0.2.2; git push --follow-tags   # CI builds, signs, publishes setup.exe + latest.json
+# commit, then (a plain tag is never sent by --follow-tags, so push it by name):
+git push origin main
+git tag desktop-v0.2.3
+git push origin desktop-v0.2.3       # CI builds, signs, publishes setup.exe + latest.json
 ```
+
+The workflow refuses a tag that does not match `apps/desktop/package.json`. It signs with the
+repository secrets `TAURI_SIGNING_PRIVATE_KEY` (contents of the owner's `cashier.key`) and
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`; signing is enabled only by `src-tauri/tauri.release.conf.json`.
 
 **Traps**
 

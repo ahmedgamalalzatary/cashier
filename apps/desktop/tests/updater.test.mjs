@@ -29,3 +29,52 @@ test("local installer builds need no private key", () => {
   // signed update files are produced only by the release workflow
   assert.equal(config.bundle.createUpdaterArtifacts, undefined);
 });
+
+const releaseConfig = path.resolve(
+  import.meta.dirname,
+  "../src-tauri/tauri.release.conf.json",
+);
+const workflowFile = path.resolve(
+  import.meta.dirname,
+  "../../../.github/workflows/desktop-release.yml",
+);
+
+test("only the release build signs update files", () => {
+  assert.deepEqual(JSON.parse(fs.readFileSync(releaseConfig, "utf8")), {
+    bundle: { createUpdaterArtifacts: true },
+  });
+});
+
+test("a desktop-v tag builds, signs and publishes the release", () => {
+  const workflow = fs.readFileSync(workflowFile, "utf8");
+  assert.match(workflow, /tags:\s*\[\s*"desktop-v\*"\s*\]/);
+  assert.match(workflow, /runs-on: windows-latest/);
+  assert.match(workflow, /contents: write/);
+  // the tag must name the version being built
+  assert.match(workflow, /desktop-v\$\{version\}/);
+  assert.match(
+    workflow,
+    /args: --config src-tauri\/tauri\.release\.conf\.json/,
+  );
+  assert.match(workflow, /tagName: desktop-v__VERSION__/);
+  // a draft is invisible to releases/latest, so installed PCs would never see it
+  assert.match(workflow, /releaseDraft: false/);
+  assert.match(workflow, /prerelease: false/);
+  for (const secret of [
+    "TAURI_SIGNING_PRIVATE_KEY",
+    "TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
+  ])
+    assert.ok(
+      workflow.includes(`${secret}: \${{ secrets.${secret} }}`),
+      `${secret} is passed from the repository secrets`,
+    );
+});
+
+test("every workflow action is pinned to an exact commit", () => {
+  const uses = [
+    ...fs.readFileSync(workflowFile, "utf8").matchAll(/uses: (\S+)/g),
+  ].map((match) => match[1]);
+  assert.ok(uses.length >= 5);
+  for (const action of uses)
+    assert.match(action, /^[\w.-]+\/[\w.-]+@[0-9a-f]{40}$/);
+});
