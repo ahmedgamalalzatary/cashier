@@ -261,6 +261,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@cashier/shared':
+        specifier: workspace:*
+        version: link:../shared
       bcryptjs:
         specifier: ^3.0.2
         version: 3.0.3
@@ -277,9 +280,6 @@ importers:
         specifier: ^14.0.2
         version: 14.0.2
     devDependencies:
-      '@cashier/shared':
-        specifier: workspace:*
-        version: link:../shared
       '@types/express':
         specifier: ^5.0.1
         version: 5.0.6
