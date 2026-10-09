@@ -82,12 +82,19 @@ export async function requestLink({
 /**
  * Writes the branch and the device token into settings.env, keeping every
  * other line. The file is replaced in one step, so it is never half written.
+ *
+ * A PC that never chose also gets background syncing turned off. The settings
+ * loader defaults it to on, which then demands upstream credentials that a new
+ * PC does not have; an installation that configured syncing keeps its choice.
  */
 export function saveLink(
   settingsFile: string,
   link: { branchId: string; deviceToken: string },
 ) {
-  const values = { BRANCH_ID: link.branchId, DEVICE_TOKEN: link.deviceToken };
+  const values: Record<string, string> = {
+    BRANCH_ID: link.branchId,
+    DEVICE_TOKEN: link.deviceToken,
+  };
   const kept = fs
     .readFileSync(settingsFile, "utf8")
     .split(/\r?\n/)
@@ -95,6 +102,8 @@ export function saveLink(
       const key = line.split("=", 1)[0]?.trim();
       return line.trim() !== "" && !(key in values);
     });
+  if (!kept.some((line) => line.split("=", 1)[0]?.trim() === "DESKTOP_SYNC_ENABLED"))
+    values.DESKTOP_SYNC_ENABLED = "false";
   const lines = [
     ...kept,
     ...Object.entries(values).map(([key, value]) => `${key}="${value}"`),

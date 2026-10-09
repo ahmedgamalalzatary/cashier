@@ -18,22 +18,26 @@ export function WorkspaceBar() {
         {user?.role === "admin" ? (
           <label className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-muted">الفرع الحالي</span>
-            <select
-              aria-label="الفرع الحالي"
-              value={branch.id}
-              onChange={(event) => selectBranch(event.target.value)}
-              className="max-w-full rounded-lg border border-line bg-surface px-3 py-2 font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-            >
-              {branches.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.name}
-                  {row.isActive ? "" : " (مؤرشف)"}
-                </option>
-              ))}
-            </select>
+            {branch ? (
+              <select
+                aria-label="الفرع الحالي"
+                value={branch.id}
+                onChange={(event) => selectBranch(event.target.value)}
+                className="max-w-full rounded-lg border border-line bg-surface px-3 py-2 font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              >
+                {branches.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.name}
+                    {row.isActive ? "" : " (مؤرشف)"}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-muted">لا يوجد فرع</span>
+            )}
           </label>
         ) : (
-          <strong className="truncate">{branch.name}</strong>
+          <strong className="truncate">{branch?.name}</strong>
         )}
       </div>
       {user?.role === "admin" && (
@@ -44,7 +48,7 @@ export function WorkspaceBar() {
           إدارة الفروع
         </Link>
       )}
-      {!branch.isActive && (
+      {branch && !branch.isActive && (
         <p
           role="status"
           className="w-full rounded-lg bg-accent/15 px-3 py-2 text-sm"

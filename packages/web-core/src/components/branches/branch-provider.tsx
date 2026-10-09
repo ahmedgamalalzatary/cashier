@@ -19,12 +19,18 @@ import {
   subscribeToBranchChanges,
 } from "@cashier/web-core/lib/branch-session";
 import { listBranches } from "../../services/branches-service";
-import { Button } from "@cashier/web-core/components/ui/button";
 
-type Scope = { ownerId: string; branches: Branch[]; selectedId: string };
-type BranchContextValue = {
-  branch: Branch;
+type Scope = {
+  ownerId: string;
   branches: Branch[];
+  selectedId: string | null;
+};
+type BranchContextValue = {
+  /** The selected branch, or null while the account has none to choose from. */
+  branch: Branch | null;
+  branches: Branch[];
+  /** Why the list could not be loaded, or null when it loaded. */
+  error: string | null;
   selectBranch(id: string): void;
   refresh(): Promise<void>;
 };
@@ -56,9 +62,14 @@ export function BranchProvider({ children }: { children: ReactNode }) {
           : (rows.find((row) => row.id === preferred) ??
             rows.find((row) => row.isActive) ??
             rows[0]);
-      if (!selected) throw new Error("لا يوجد فرع متاح لهذا الحساب");
-      saveSelectedBranch(user.id, selected.id);
-      setScope({ ownerId: user.id, branches: rows, selectedId: selected.id });
+      // An empty list is a real answer: a new online site has no branch yet,
+      // and its super-admin has to be able to reach the page that adds one.
+      if (selected) saveSelectedBranch(user.id, selected.id);
+      setScope({
+        ownerId: user.id,
+        branches: rows,
+        selectedId: selected?.id ?? null,
+      });
       setError(null);
     } catch (cause) {
       if (version !== sequence.current) return;
@@ -81,7 +92,12 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       setScope((previous) => {
         if (previous?.ownerId !== user.id || selected === undefined)
           return previous;
-        return { ...previous, selectedId: selected };
+        return {
+          ...previous,
+          selectedId: previous.branches.some((row) => row.id === selected)
+            ? selected
+            : previous.selectedId,
+        };
       });
       // Discover branches created in another tab before exposing their pages.
       void refresh().catch(() => undefined);
@@ -94,36 +110,29 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   }, [user, refresh, invalidateRequests]);
 
   if (!user) return children;
-  const branch =
-    scope?.ownerId === user.id && scope.selectedId === selectedBranchId(user)
-      ? scope.branches.find((row) => row.id === scope.selectedId)
-      : undefined;
-  if (!branch || !scope) {
-    const message = error?.ownerId === user.id ? error.message : null;
+  const message = error?.ownerId === user.id ? error.message : null;
+  // Only the very first load gates the page; after that the shell around it
+  // (navigation, signing out) must stay reachable whatever the list says.
+  const loaded = scope?.ownerId === user.id;
+  if (!loaded && !message) {
     return (
       <div className="grid min-h-screen place-items-center bg-paper p-6">
-        {message ? (
-          <div className="space-y-4 text-center">
-            <p role="alert" className="text-danger">
-              {message}
-            </p>
-            <Button onClick={() => void refresh().catch(() => undefined)}>
-              إعادة المحاولة
-            </Button>
-          </div>
-        ) : (
-          <p role="status" className="text-muted">
-            جارٍ تحميل الفرع…
-          </p>
-        )}
+        <p role="status" className="text-muted">
+          جارٍ تحميل الفرع…
+        </p>
       </div>
     );
   }
+  const branches = loaded ? scope.branches : [];
+  const branch = loaded
+    ? branches.find((row) => row.id === scope.selectedId) ?? null
+    : null;
   const selectBranch = (id: string) => {
     if (
       user.role !== "admin" ||
+      !loaded ||
       id === scope.selectedId ||
-      !scope.branches.some((row) => row.id === id)
+      !branches.some((row) => row.id === id)
     )
       return;
     saveSelectedBranch(user.id, id);
@@ -132,10 +141,12 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   };
   return (
     <Context.Provider
-      value={{ branch, branches: scope.branches, selectBranch, refresh }}
+      value={{ branch, branches, error: message, selectBranch, refresh }}
     >
       {/* Switching workspaces resets forms, carts, and in-flight page state. */}
-      <Fragment key={`${user.id}:${branch.id}`}>{children}</Fragment>
+      <Fragment key={`${user.id}:${scope?.selectedId ?? "none"}`}>
+        {children}
+      </Fragment>
     </Context.Provider>
   );
 }

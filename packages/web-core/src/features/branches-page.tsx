@@ -93,7 +93,7 @@ export function BranchesPage() {
         <div className="flex items-center gap-3">
           <Building2 className="size-5 text-primary" />
           <span className="font-semibold">{row.name}</span>
-          {row.id === branch.id && <Badge tone="neutral">الفرع الحالي</Badge>}
+          {row.id === branch?.id && <Badge tone="neutral">الفرع الحالي</Badge>}
         </div>
       ),
     },
@@ -147,7 +147,7 @@ export function BranchesPage() {
             <Button
               variant="ghost"
               size="sm"
-              disabled={busy || row.id === branch.id}
+              disabled={busy || row.id === branch?.id}
               onClick={() => selectBranch(row.id)}
             >
               فتح الفرع

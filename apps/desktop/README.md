@@ -25,6 +25,16 @@ replacement) disconnects the old one. Closing the window closes Cashier.
 `ONLINE_API_URL` in `settings.env` points a test PC at another online site, for
 example `http://127.0.0.1:4001/api` for a local online-api.
 
+Linking also writes `DESKTOP_SYNC_ENABLED=false` unless the file already carries
+that key, so a freshly linked PC starts with background syncing off instead of
+waiting for upstream credentials it does not have. A PC that was configured for
+syncing keeps its own value.
+
+Until the accounts pull lands (Phase 9.3) a linked PC still needs local
+`ADMIN_NAME` / `ADMIN_USERNAME` / `ADMIN_PASSWORD` in `settings.env`; the online
+site does not yet hand the admins down. `pnpm configure:desktop` imports them.
+Without them the app stops with a message naming the missing key.
+
 On every start the app brings the database to its own version before serving:
 a new database gets its tables; when an installed update brings database changes,
 the app first saves a verified backup in `C:\ProgramData\Cashier\backups` (the

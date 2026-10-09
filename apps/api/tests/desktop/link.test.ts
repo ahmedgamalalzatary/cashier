@@ -6,6 +6,7 @@ import {
   DEFAULT_ONLINE_API_URL,
   linkDesktop,
   onlineApiUrl,
+  readSettings,
   requestLink,
   saveLink,
   type LocalBranches,
@@ -124,6 +125,32 @@ describe("saving the link", () => {
     expect(text).toContain(`DEVICE_TOKEN="${TOKEN}"`);
     expect(text.match(/BRANCH_ID=/g)).toHaveLength(1);
     expect(fs.readdirSync(path.dirname(file))).toEqual(["settings.env"]);
+  });
+
+  it("turns background syncing off on a PC that never chose", () => {
+    // A fresh install has no synchronization switch, and the settings loader
+    // defaults it to on, which then demands upstream credentials a new PC
+    // does not have. Linking is where the choice is made.
+    const file = settingsFile(
+      'MYSQL_PASSWORD="secret"\nMYSQL_ROOT_PASSWORD="root"\nJWT_SECRET="x"\n',
+    );
+
+    saveLink(file, { branchId: BRANCH.id, deviceToken: TOKEN });
+
+    expect(readSettings(file).DESKTOP_SYNC_ENABLED).toBe("false");
+  });
+
+  it("leaves a chosen synchronization setting exactly as it was", () => {
+    const file = settingsFile(
+      'DESKTOP_SYNC_ENABLED="true"\nEXTERNAL_ORDERS_BASE_URL="https://orders.example.com"\n',
+    );
+
+    saveLink(file, { branchId: BRANCH.id, deviceToken: TOKEN });
+
+    const text = fs.readFileSync(file, "utf8");
+    expect(readSettings(file).DESKTOP_SYNC_ENABLED).toBe("true");
+    expect(text).toContain('EXTERNAL_ORDERS_BASE_URL="https://orders.example.com"');
+    expect(text.match(/DESKTOP_SYNC_ENABLED=/g)).toHaveLength(1);
   });
 });
 

@@ -118,3 +118,51 @@ describe("desktop settings", () => {
     );
   });
 });
+
+describe("a PC that has just been linked", () => {
+  /** Exactly what the desktop shell writes on a first start, then links. */
+  function justLinked(overrides: Record<string, string | undefined> = {}) {
+    return settings({
+      EXTERNAL_ORDERS_BASE_URL: undefined,
+      EXTERNAL_ORDERS_PHONE_NUMBER: undefined,
+      EXTERNAL_ORDERS_PASSWORD: undefined,
+      DESKTOP_SYNC_ENABLED: "false",
+      ...overrides,
+    });
+  }
+
+  it("starts without upstream credentials, because linking turned syncing off", () => {
+    const loaded = load(justLinked());
+
+    expect(loaded.syncEnabled).toBe(false);
+    expect(loaded.branchId).toBe("019a1234-5678-7000-8000-000000000001");
+    expect(loaded.admin.username).toBe("admin");
+  });
+
+  it("keeps syncing on for a PC that was configured to use it", () => {
+    const loaded = load(
+      settings({
+        DESKTOP_SYNC_ENABLED: "true",
+        EXTERNAL_ORDERS_BASE_URL: "https://orders.example.com",
+        EXTERNAL_ORDERS_PHONE_NUMBER: "01234567890",
+        EXTERNAL_ORDERS_PASSWORD: "external-password",
+      }),
+    );
+
+    expect(loaded.syncEnabled).toBe(true);
+    expect(loaded.environment.EXTERNAL_ORDERS_BASE_URL).toBe(
+      "https://orders.example.com",
+    );
+  });
+
+  it("still asks for upstream credentials when a PC chose syncing without them", () => {
+    expect(() =>
+      load(
+        settings({
+          DESKTOP_SYNC_ENABLED: "true",
+          EXTERNAL_ORDERS_BASE_URL: undefined,
+        }),
+      ),
+    ).toThrow();
+  });
+});

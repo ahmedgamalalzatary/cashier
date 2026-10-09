@@ -14,7 +14,10 @@ const hooks = vi.hoisted(() => ({
   state: [] as unknown[],
   cursor: 0,
   effect: null as null | (() => void | (() => void)),
-  branch: { id: "00000000-0000-7000-8000-000000000001", name: "Main Branch" },
+  branch: {
+    id: "00000000-0000-7000-8000-000000000001",
+    name: "Main Branch",
+  } as { id: string; name: string } | null,
 }));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
@@ -129,6 +132,15 @@ describe("report loading and printing", () => {
     expect(html).not.toContain("2026-09-01 — 2026-09-10");
     expect(html).not.toContain("حسب اليوم");
     expect(action(render(), true).props.disabled).toBe(true);
+  });
+  it("says there is no branch instead of asking for figures it cannot have", () => {
+    hooks.branch = null;
+
+    const html = renderToStaticMarkup(render());
+
+    expect(html).toContain("لا يوجد فرع");
+    expect(html).not.toContain("المبيعات");
+    expect(vi.mocked(getReports)).not.toHaveBeenCalled();
   });
   it("uses the current Cairo month when the page is opened after midnight", () => {
     vi.mocked(cairoCalendarDate).mockReturnValue("2026-10-01");

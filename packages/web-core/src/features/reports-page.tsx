@@ -546,12 +546,16 @@ export function ReportsPage() {
     setData(null);
     setRequest({ from: start, to: end, revision: request.revision + 1 });
   };
+  // No branch means there is nothing to report on; asking anyway would only
+  // produce a failure the reader cannot act on.
+  const branchId = branch?.id ?? null;
   useEffect(() => {
     let cancelled = false;
+    if (!branchId) return;
     getReports(request.from, request.to)
       .then((value) => {
         if (cancelled) return;
-        if (value.range.branchId !== branch.id)
+        if (value.range.branchId !== branchId)
           throw new Error("التقرير لا يخص الفرع الحالي؛ أعد تحميله");
         setData(value);
       })
@@ -564,9 +568,16 @@ export function ReportsPage() {
     return () => {
       cancelled = true;
     };
-  }, [request, branch.id]);
-  const data = loadedData?.range.branchId === branch.id ? loadedData : null;
+  }, [request, branchId]);
+  const data =
+    branchId && loadedData?.range.branchId === branchId ? loadedData : null;
   const visible = useMemo(() => (data ? tables(data, tab) : []), [data, tab]);
+  if (!branch)
+    return (
+      <div className="grid place-items-center py-16 text-center">
+        <p className="text-muted">لا يوجد فرع لعرض تقاريره بعد.</p>
+      </div>
+    );
   return (
     <div className="report-print-root space-y-6">
       <PageHeader
