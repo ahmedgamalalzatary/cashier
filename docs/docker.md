@@ -261,17 +261,32 @@ sudo ss -lntp | grep -E ':(3010|4010)\b'
 Only this Compose project should bind those ports, and both must stay on
 `127.0.0.1`.
 
+## Reading the settings file
+
+`.env.production` is a dotenv file, not a shell script, and `source`ing it is
+wrong for the same reason: Compose reads it with dotenv rules, and a value may
+be quoted, contain spaces, or contain a quote of its own. `grep`/`cut` reading
+is wrong too — it leaves the quotes attached to the value and cannot tell a
+surrounding quote from a quote inside a password.
+
+Read the keys with the helper instead. It prints shell assignments that hold
+exactly the values Compose would use:
+
+```bash
+eval "$(sh scripts/read-prod-env.sh .env.production MYSQL_DATABASE MYSQL_ROOT_PASSWORD)"
+```
+
+It applies the project's Compose defaults for a key the file omits, and fails
+loudly for a key it cannot fill, so a typo can never become an empty password.
+
 ## Database backup
 
 Include `--events` as well as `--routines --triggers` so a dump carries every
-object the restore is expected to bring back. Read the values with `grep`/`cut`
-rather than `source`-ing the file, which is not safe when a value contains
-spaces:
+object the restore is expected to bring back.
 
 ```bash
 mkdir -p backups
-DB=$(grep -E '^MYSQL_DATABASE=' .env.production | cut -d= -f2)
-ROOT_PW=$(grep -E '^MYSQL_ROOT_PASSWORD=' .env.production | cut -d= -f2- | tr -d '"')
+eval "$(sh scripts/read-prod-env.sh .env.production MYSQL_DATABASE MYSQL_ROOT_PASSWORD)"
 ```
 
 ```bash
@@ -281,6 +296,18 @@ sudo docker compose --env-file .env.production exec -T mysql \
   > "backups/cashier-$(date +%F-%H%M%S).sql"
 unset ROOT_PW
 ```
+
+**Check that the dump is complete before relying on it.** `mysqldump` writes
+`-- Dump completed` as its last line, so its absence means the dump was cut
+short and would restore a partial database:
+
+```bash
+tail -n 1 "backups/cashier-$(date +%F-%H%M%S).sql"
+```
+
+That timestamp is the file you just wrote; `ls -t backups/*.sql | head -1`
+names it if you no longer know it. Keep going only if the last line begins
+`-- Dump completed`.
 
 A dump stored only on the same VPS is not a complete backup: copy it off the
 server regularly.
@@ -296,12 +323,10 @@ survives the import. Migrating again then fails on that leftover table, and the
 database is not the state the backup describes. Always drop and recreate the
 target database first, then import into it.
 
-Keep the `mysql_data` volume. The volume holds the database *files*, and
+Keep the `mysql_data` volume. The volume holds the database _files_, and
 dropping the database is the recovery step; deleting the volume is not.
 
-One command at a time, and check each result before continuing. `.env.production`
-is not shell-safe to `source` if any value contains spaces, so read the values
-you need through `grep`/`cut` instead.
+One command at a time, and check each result before continuing.
 
 **1. Stop the services that use the database, and keep a dump of the current
 state so this is reversible:**
@@ -311,9 +336,7 @@ sudo docker compose --env-file .env.production stop online-web online-api
 ```
 
 ```bash
-DB=$(grep -E '^MYSQL_DATABASE=' .env.production | cut -d= -f2)
-ROOT_PW=$(grep -E '^MYSQL_ROOT_PASSWORD=' .env.production | cut -d= -f2- | tr -d '"')
-APP_USER=$(grep -E '^MYSQL_USER=' .env.production | cut -d= -f2)
+eval "$(sh scripts/read-prod-env.sh .env.production MYSQL_DATABASE MYSQL_ROOT_PASSWORD MYSQL_USER)"
 echo "$DB / $APP_USER"
 ```
 
@@ -324,31 +347,44 @@ sudo docker compose --env-file .env.production exec -T mysql \
 unset ROOT_PW
 ```
 
-**2. Replace the database with an empty one of the same character set and
-collation, and give the application user access to it.** Re-read the values each
-step needs, so the password is not left sitting in the shell between commands:
+```bash
+tail -n 1 "backups/before-restore-$(date +%F-%H%M%S).sql"
+```
+
+Do not go on unless the last line begins `-- Dump completed`. This dump is the
+only thing that makes the next step reversible.
+
+**2. Replace the database with an empty one, and give the application user
+access to it.** The character set and collation are read from the database being
+replaced rather than assumed, so the recreated database is the one the dump was
+taken from. Read them **before** the drop, because afterwards they are gone:
 
 ```bash
-DB=$(grep -E '^MYSQL_DATABASE=' .env.production | cut -d= -f2)
-ROOT_PW=$(grep -E '^MYSQL_ROOT_PASSWORD=' .env.production | cut -d= -f2- | tr -d '"')
-APP_USER=$(grep -E '^MYSQL_USER=' .env.production | cut -d= -f2)
+CREATE_SQL=$(sh scripts/database-create-sql.sh .env.production "$DB")
+echo "$CREATE_SQL"
+```
+
+That must print one `CREATE DATABASE` line with a real collation. If it prints
+nothing, stop: the collation could not be read and this step is not safe.
+
+```bash
+eval "$(sh scripts/read-prod-env.sh .env.production MYSQL_DATABASE MYSQL_ROOT_PASSWORD MYSQL_USER)"
 ```
 
 ```bash
 sudo docker compose --env-file .env.production exec -T mysql \
   mysql -u root -p"$ROOT_PW" -e "
     DROP DATABASE IF EXISTS \`$DB\`;
-    CREATE DATABASE \`$DB\` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+    $CREATE_SQL
     GRANT ALL ON \`$DB\`.* TO '$APP_USER'@'%';
     FLUSH PRIVILEGES;"
-unset ROOT_PW APP_USER
+unset ROOT_PW APP_USER CREATE_SQL
 ```
 
 **3. Import the chosen dump into the empty database:**
 
 ```bash
-DB=$(grep -E '^MYSQL_DATABASE=' .env.production | cut -d= -f2)
-ROOT_PW=$(grep -E '^MYSQL_ROOT_PASSWORD=' .env.production | cut -d= -f2- | tr -d '"')
+eval "$(sh scripts/read-prod-env.sh .env.production MYSQL_DATABASE MYSQL_ROOT_PASSWORD)"
 ```
 
 ```bash
@@ -362,25 +398,7 @@ unset ROOT_PW
 half-applied migration is the failure this procedure exists to prevent:
 
 ```bash
-DB=$(grep -E '^MYSQL_DATABASE=' .env.production | cut -d= -f2)
-ROOT_PW=$(grep -E '^MYSQL_ROOT_PASSWORD=' .env.production | cut -d= -f2- | tr -d '"')
-```
-
-```bash
-sudo docker compose --env-file .env.production exec -T mysql \
-  mysql -u root -p"$ROOT_PW" "$DB" -e "
-    SELECT MAX(created_at) AS checkpoint FROM __drizzle_migrations;
-    SELECT table_name FROM information_schema.tables
-      WHERE table_schema = DATABASE() ORDER BY table_name;"
-unset ROOT_PW
-```
-
-Compare the table list against the dump, and the checkpoint against the
-migration the dump was taken at. Then check known rows:
-
-```bash
-DB=$(grep -E '^MYSQL_DATABASE=' .env.production | cut -d= -f2)
-ROOT_PW=$(grep -E '^MYSQL_ROOT_PASSWORD=' .env.production | cut -d= -f2- | tr -d '"')
+eval "$(sh scripts/read-prod-env.sh .env.production MYSQL_DATABASE MYSQL_ROOT_PASSWORD)"
 ```
 
 ```bash
