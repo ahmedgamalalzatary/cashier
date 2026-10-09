@@ -43,11 +43,14 @@ export async function requestLink({
   apiUrl,
   code,
   appVersion,
+  expectedBranchId,
   fetch = globalThis.fetch,
 }: {
   apiUrl: string;
   code: string;
   appVersion: string;
+  /** The branch this PC already holds; online refuses a code for any other. */
+  expectedBranchId?: string;
   fetch?: typeof globalThis.fetch;
 }): Promise<LinkAnswer> {
   let response: Response;
@@ -58,7 +61,9 @@ export async function requestLink({
         "Content-Type": "application/json",
         "X-Cashier-Version": appVersion,
       },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify(
+        expectedBranchId === undefined ? { code } : { code, expectedBranchId },
+      ),
       signal: AbortSignal.timeout(LINK_TIMEOUT_MS),
     });
   } catch {
@@ -154,6 +159,10 @@ export async function linkDesktop({
     apiUrl,
     code,
     appVersion,
+    // Told online before it spends the code, so a code this PC cannot take
+    // never reaches the target branch. An online build too old to know the
+    // field answers as before, and this check still catches that.
+    ...(existing.length === 1 ? { expectedBranchId: existing[0].id } : {}),
     fetch,
   });
   if (existing.length === 1 && existing[0].id !== branch.id)

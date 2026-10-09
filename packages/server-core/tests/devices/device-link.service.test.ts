@@ -39,8 +39,12 @@ function repoWith(code: Code | undefined) {
   } as unknown as DeviceLinkRepository & { tx: typeof tx };
 }
 
-const link = (repo: DeviceLinkRepository, code: string, version?: string) =>
-  new DeviceLinkService(repo, () => NOW).link(code, version);
+const link = (
+  repo: DeviceLinkRepository,
+  code: string,
+  version?: string,
+  expectedBranchId?: string,
+) => new DeviceLinkService(repo, () => NOW).link(code, version, expectedBranchId);
 
 describe("DeviceLinkService.link", () => {
   it("links the PC to the code's branch and hands out a token once", async () => {
@@ -134,6 +138,32 @@ describe("DeviceLinkService.link", () => {
     for (const code of ["", "ABC", "ABCD23450", "ABCD234O"])
       await expect(link(repo, code)).rejects.toMatchObject({ status: 400 });
     expect(repo.transaction).not.toHaveBeenCalled();
+  });
+
+  it("refuses a code made for another branch than the PC already holds, and spends nothing", async () => {
+    const repo = repoWith(validCode);
+
+    const failure = await link(repo, CODE, undefined, testId(21)).catch(
+      (error: unknown) => error,
+    );
+
+    // the same message as any other refusal: the PC learns nothing from the code
+    expect(failure).toMatchObject({
+      status: 400,
+      message: "كود الربط غير صحيح أو منتهي الصلاحية",
+    });
+    expect(repo.tx.markCodeUsed).not.toHaveBeenCalled();
+    expect(repo.tx.replaceDevice).not.toHaveBeenCalled();
+  });
+
+  it("links when the PC already holds exactly the code's branch", async () => {
+    const repo = repoWith(validCode);
+
+    await expect(link(repo, CODE, undefined, branchId)).resolves.toMatchObject({
+      branch: { id: branchId },
+    });
+    expect(repo.tx.markCodeUsed).toHaveBeenCalledWith(sha256(CODE), NOW);
+    expect(repo.tx.replaceDevice).toHaveBeenCalled();
   });
 
   it.each([

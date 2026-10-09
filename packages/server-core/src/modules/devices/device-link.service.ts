@@ -22,7 +22,7 @@ export class DeviceLinkService {
     private now: () => Date = () => new Date(),
   ) {}
 
-  async link(rawCode: string, appVersion?: string) {
+  async link(rawCode: string, appVersion?: string, expectedBranchId?: string) {
     // People type codes from a screen: forgive case, spaces and a dash.
     const code = rawCode.replace(/[\s-]/g, "").toUpperCase();
     if (!CODE_PATTERN.test(code)) throw new HttpError(400, INVALID_CODE);
@@ -40,6 +40,11 @@ export class DeviceLinkService {
         found.expiresAt.getTime() <= at.getTime() ||
         !found.branchIsActive
       )
+        throw new HttpError(400, INVALID_CODE);
+      // A PC that already holds another branch cannot take this code, and
+      // replacing the target branch's PC would revoke a PC that is fine.
+      // Refused here, inside the lock, before anything is spent.
+      if (expectedBranchId !== undefined && found.branchId !== expectedBranchId)
         throw new HttpError(400, INVALID_CODE);
       await repo.markCodeUsed(codeHash, at);
       await repo.replaceDevice(

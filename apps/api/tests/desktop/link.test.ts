@@ -235,6 +235,37 @@ describe("linking this PC", () => {
     expect(fs.readFileSync(file, "utf8")).toBe("");
   });
 
+  it("tells online which branch this PC already holds, so a code for another branch is never spent", async () => {
+    const file = settingsFile("");
+    const sent: unknown[] = [];
+    const fetch = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      sent.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ deviceToken: TOKEN, branch: BRANCH }), {
+        status: 201,
+      });
+    });
+
+    await expect(link(file, localBranches([BRANCH.id]), fetch as never)).resolves.toEqual(BRANCH);
+
+    expect(sent).toEqual([{ code: "ABCD2345", expectedBranchId: BRANCH.id }]);
+  });
+
+  it("says nothing about branches when this PC holds none", async () => {
+    const file = settingsFile("");
+    const sent: unknown[] = [];
+    const fetch = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      sent.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ deviceToken: TOKEN, branch: BRANCH }), {
+        status: 201,
+      });
+    });
+
+    await expect(link(file, localBranches([]), fetch as never)).resolves.toEqual(BRANCH);
+
+    // an older online build must keep seeing exactly what it saw before
+    expect(sent).toEqual([{ code: "ABCD2345" }]);
+  });
+
   it("saves nothing when online refuses the code", async () => {
     const file = settingsFile("");
     const branches = localBranches([]);

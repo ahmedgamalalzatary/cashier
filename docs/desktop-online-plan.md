@@ -855,10 +855,14 @@ Device auth header: `Authorization: Device <token>`. Token = 32 random bytes, ba
 to the PC once; online stores only its SHA-256 in `devices.token_hash`. Revoked or unknown → `401`.
 The PC sends its version in `X-Cashier-Version` (stored as `app_version`). `POST /api/device/link`
 needs no session and answers `201`; wrong codes are limited to 5 per address per 15 min (`429`).
+A PC that already holds a branch also sends `expectedBranchId`; a code made for any other branch is
+refused inside the same locked transaction, before the code is spent or the device replaced, so a
+link the PC cannot accept costs nobody anything. The field is optional: a PC built before it sends
+only `{ code }` and links exactly as before.
 
 | Endpoint                   | Request                                                                                                        | Success                                                                                                                                             | Errors                                                                               |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `POST /api/device/link`    | `{ code }`                                                                                                     | `{ deviceToken, branch: { id, name } }`                                                                                                             | `400` invalid/expired/used code                                                      |
+| `POST /api/device/link`    | `{ code, expectedBranchId? }`                                                                                  | `{ deviceToken, branch: { id, name } }`                                                                                                             | `400` invalid/expired/used code                                                      |
 | `GET /api/device/accounts` | —                                                                                                              | `{ branch, users: [{ id, name, username, passwordHash, role, isSuperAdmin, isActive, tokenVersion }], adminBranches: [{ adminUserId, branchId }] }` | `401`                                                                                |
 | `POST /api/device/ingest`  | `{ appVersion, migrationCheckpoint, rows: [{ seq, table, op: "upsert" \| "delete", pk, row }] }`, gzip, ≤ 2 MB | `{ lastSeq }`                                                                                                                                       | `401`, `409` newer schema than server, `422` row from another branch / unknown table |
 
