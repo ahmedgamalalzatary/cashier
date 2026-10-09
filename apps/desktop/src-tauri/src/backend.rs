@@ -117,13 +117,11 @@ fn parse_event(line: &str) -> Option<Event> {
         }
         "busy" => Some(Event::Busy),
         "restored" => Some(Event::Restored),
-        "linked" => Some(Event::Linked(
-            event
-                .pointer("/branch/name")
-                .and_then(|value| value.as_str())
-                .unwrap_or_default()
-                .to_string(),
-        )),
+        "linked" => event
+            .pointer("/branch/name")
+            .and_then(|value| value.as_str())
+            .filter(|name| !name.trim().is_empty())
+            .map(|name| Event::Linked(name.to_string())),
         "error" => Some(Event::Failed(StartupFailure {
             message: event
                 .get("message")
@@ -409,8 +407,17 @@ fn read_link_result(
             _ => {}
         }
     }
-    let _ = backend.child.wait();
-    result
+    let status = backend.child.wait();
+    if result.is_ok() {
+        match status {
+            Ok(status) if status.success() => result,
+            _ => Err(StartupFailure::plain(
+                "Linking stopped unexpectedly; check backend.log",
+            )),
+        }
+    } else {
+        result
+    }
 }
 
 #[cfg(windows)]
@@ -612,6 +619,61 @@ mod tests {
     }
 
     #[test]
+    fn a_null_or_missing_resume_branch_is_not_a_finished_link() {
+        for line in [
+            r#"{"event":"linked","branch":null}"#,
+            r#"{"event":"linked"}"#,
+            r#"{"event":"linked","branch":{"name":""}}"#,
+            r#"{"event":"linked","branch":{"name":"  "}}"#,
+        ] {
+            assert_eq!(parse_event(line), None);
+        }
+    }
+
+    #[cfg(windows)]
+    fn read_fixture(script: &str) -> Result<Option<String>, StartupFailure> {
+        use std::os::windows::process::CommandExt;
+        let mut bytes = [0u8; 16];
+        getrandom::fill(&mut bytes).unwrap();
+        let suffix: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+        let directory = std::env::temp_dir().join(format!("cashier-link-events-{suffix}"));
+        fs::create_dir(&directory).unwrap();
+        let executable = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("binaries/cashier-node-x86_64-pc-windows-msvc.exe");
+        let mut command = Command::new(executable);
+        command
+            .args(["-e", script])
+            .creation_flags(0x08000000)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped());
+        let result = read_link_result(spawn_owned(command, &directory));
+        assert!(directory.starts_with(std::env::temp_dir()));
+        fs::remove_dir_all(directory).unwrap();
+        result
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_resume_with_no_work_returns_none_through_the_child_event_reader() {
+        assert_eq!(
+            read_fixture("console.log(JSON.stringify({event:'linked',branch:null}))"),
+            Ok(None)
+        );
+        assert_eq!(read_fixture("process.exit(0)"), Ok(None));
+        assert_eq!(
+            read_fixture("console.log(JSON.stringify({event:'linked',branch:{name:'Branch'}}))"),
+            Ok(Some("Branch".into()))
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_failed_link_child_is_not_a_successful_resume() {
+        assert!(read_fixture("process.exit(7)").is_err());
+        assert!(read_fixture("console.log(JSON.stringify({event:'linked',branch:{name:'Branch'}}));process.exit(7)").is_err());
+    }
+
+    #[test]
     fn the_link_code_travels_only_in_the_environment() {
         let command = link_command(
             Path::new("node"),
@@ -646,7 +708,11 @@ mod tests {
             .map(|arg| arg.to_string_lossy().into_owned())
             .collect();
         // a resume that asked for a code could spend a second one
-        assert!(!command.get_envs().any(|(key, _)| key == "CASHIER_LINK_CODE"));
+        assert!(
+            !command
+                .get_envs()
+                .any(|(key, _)| key == "CASHIER_LINK_CODE")
+        );
         assert_eq!(args.last().map(String::as_str), Some("resume-link"));
     }
 }

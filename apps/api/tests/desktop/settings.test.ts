@@ -24,6 +24,7 @@ function settings(overrides: Record<string, string | undefined> = {}) {
   const filename = path.join(directory, "settings.env");
   const values = {
     BRANCH_ID: "019a1234-5678-7000-8000-000000000001",
+    DEVICE_TOKEN: "a-device-token-with-at-least-32-characters",
     JWT_SECRET: "a-desktop-secret-with-more-than-32-characters",
     ADMIN_USERNAME: "admin",
     ADMIN_PASSWORD: "configured-password",
@@ -44,6 +45,29 @@ function settings(overrides: Record<string, string | undefined> = {}) {
 }
 
 describe("desktop settings", () => {
+  it("loads a linked PC without locally configured admin credentials", () => {
+    const loaded = load(
+      settings({
+        ADMIN_USERNAME: undefined,
+        ADMIN_PASSWORD: undefined,
+        DEVICE_TOKEN: "a-device-token-with-at-least-32-characters",
+      }),
+    );
+    expect(loaded.branchId).toBe("019a1234-5678-7000-8000-000000000001");
+    expect(loaded).not.toHaveProperty("admin");
+    expect(loaded).toMatchObject({
+      deviceToken: "a-device-token-with-at-least-32-characters",
+      onlineApiUrl: "https://cashier.biscofa.tech/api",
+    });
+  });
+  it("requires the linked device token and refuses an insecure online address", () => {
+    expect(() => load(settings({ DEVICE_TOKEN: undefined }))).toThrow(
+      "DEVICE_TOKEN",
+    );
+    expect(() =>
+      load(settings({ ONLINE_API_URL: "http://remote.example/api" })),
+    ).toThrow("https");
+  });
   it("requires an explicit UUID branch before starting the local PC", () => {
     for (const BRANCH_ID of ["1", "not-a-branch"]) {
       expect(() => load(settings({ BRANCH_ID }))).toThrow("BRANCH_ID");
@@ -100,7 +124,9 @@ describe("desktop settings", () => {
     ]);
     expect(loaded.environment.TRUST_PROXY).toBe(false);
     expect(loaded.syncEnabled).toBe(false);
-    expect(loaded.admin.username).toBe("admin");
+    expect(loaded.deviceToken).toBe(
+      "a-device-token-with-at-least-32-characters",
+    );
   });
   it("rejects a remote database in a fully local installation", () => {
     expect(() =>
@@ -136,7 +162,9 @@ describe("a PC that has just been linked", () => {
 
     expect(loaded.syncEnabled).toBe(false);
     expect(loaded.branchId).toBe("019a1234-5678-7000-8000-000000000001");
-    expect(loaded.admin.username).toBe("admin");
+    expect(loaded.deviceToken).toBe(
+      "a-device-token-with-at-least-32-characters",
+    );
   });
 
   it("keeps syncing on for a PC that was configured to use it", () => {

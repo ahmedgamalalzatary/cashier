@@ -4,6 +4,8 @@ import type { Db } from "@cashier/db";
 import { createLoginRateLimiter } from "../auth/login-rate-limit.js";
 import { DeviceLinkRepository } from "./device-link.repository.js";
 import { DeviceLinkService } from "./device-link.service.js";
+import { authenticateDevice } from "../../middleware/device-auth.js";
+import { readDeviceAccounts } from "./device-accounts.js";
 
 const linkInput = z.object({
   code: z.string().max(64),
@@ -19,6 +21,9 @@ const linkInput = z.object({
 export function createDevicesModule(db: Db) {
   const router = Router();
   const service = new DeviceLinkService(new DeviceLinkRepository(db));
+  router.get("/accounts", authenticateDevice(db), async (req, res) => {
+    res.json(await readDeviceAccounts(db, req.device!.branchId));
+  });
   router.post(
     "/link",
     createLoginRateLimiter({ identity: () => "device-link" }),

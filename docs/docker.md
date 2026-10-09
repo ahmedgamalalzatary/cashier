@@ -164,6 +164,9 @@ The MySQL volume is retained across builds and container replacements. Compose
 waits for MySQL, runs pending migrations, then starts the API and the site. A
 release that adds a migration must reach the VPS **before** it is pushed to the
 shops (deploy order is in the plan, section 5).
+The same order applies to Phase 9's device endpoints even without a migration:
+deploy `/api/device/accounts` and the link endpoint's `expectedBranchId` check
+before distributing the desktops that depend on them.
 
 ## Super-admin account
 

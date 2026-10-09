@@ -45,7 +45,7 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 
 #### Admin accounts (super-admin)
 
-- The **super-admin** is the admin account defined by server settings (`ADMIN_NAME` / `ADMIN_USERNAME` / `ADMIN_PASSWORD`). On every API start the boot sync forces its name, username, `admin` role, NULL branch, active state, and super-admin flag; it only re-hashes the password and revokes sessions when the configured password no longer matches. A cashier may share its username and is left unchanged. Renaming the configured super-admin to another global admin's username still fails with a clear conflict error.
+- The **super-admin** is the admin account defined by server settings (`ADMIN_NAME` / `ADMIN_USERNAME` / `ADMIN_PASSWORD`). On every online/development API start the boot sync forces its name, username, `admin` role, NULL branch, active state, and super-admin flag; it only re-hashes the password and revokes sessions when the configured password no longer matches. A cashier may share its username and is left unchanged. Renaming the configured super-admin to another global admin's username still fails with a clear conflict error.
 - The super-admin can create, edit, deactivate, and reset the password of other admins. He cannot edit his own account in the app — his data comes from server settings.
 - A **regular admin** (created by the super-admin) has the same business powers as the super-admin but cannot manage any admin account — not others, not himself. The Users page is read-only for him.
 - Nobody changes his own password in the app: the super-admin's comes from server settings, a regular admin's is set by the super-admin, and a cashier's is set by an admin from the employee record (an explicit reset is available for an active cashier account).
@@ -82,6 +82,19 @@ blocked. The unpinned development API uses explicit UUID selections, filters reg
 admins' branch lists/access by assignment, and rejects ambiguous same-name cashier
 login. Online provisioning and the final branch-management permissions arrive in
 Phases 7–9; Phase 4 does not implement those online apps or invent a default branch.
+
+**Phase 9 accounts pull:** each linked PC downloads its own branch row, the
+super-admin, assigned admins, and assignments at startup and every 15 minutes.
+Only bcrypt hashes are downloaded, never plaintext passwords. The PC applies
+the complete snapshot in one transaction, leaves cashiers unchanged, and
+deactivates absent admins while retaining their historical identities. Changes
+to passwords, activation, assignments, and branch archive state take effect
+after a successful pull. Offline starts retain cached access; an admin removed
+online may still sign in offline until the PC reconnects (owner decision D13).
+Desktop `ADMIN_*` settings are ignored and never overwrite downloaded accounts.
+Account pulls run independently of external catalog/order synchronization and
+never block selling on a network request. A new PC needs its first successful
+pull before its online admins can log in locally.
 
 | Request                                        | Behavior                                           |
 | ---------------------------------------------- | -------------------------------------------------- |

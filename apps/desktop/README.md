@@ -21,7 +21,9 @@ someone types it on the PC. Linking needs the internet once (it is valid for 24
 hours and works only once). Cashier then stores the branch in its database and
 writes `BRANCH_ID` and `DEVICE_TOKEN` into `settings.env`, and opens normally;
 later starts work offline. Linking the branch again on another PC (for example a
-replacement) disconnects the old one. Closing the window closes Cashier.
+replacement) disconnects the old one. Closing an idle link window closes Cashier.
+If linking is already running, closing waits for that attempt to finish before
+shutting down MySQL and the link child, so an accepted answer can be saved.
 `ONLINE_API_URL` in `settings.env` points a test PC at another online site, for
 example `http://127.0.0.1:4001/api` for a local online-api.
 
@@ -30,10 +32,16 @@ that key, so a freshly linked PC starts with background syncing off instead of
 waiting for upstream credentials it does not have. A PC that was configured for
 syncing keeps its own value.
 
-Until the accounts pull lands (Phase 9.3) a linked PC still needs local
-`ADMIN_NAME` / `ADMIN_USERNAME` / `ADMIN_PASSWORD` in `settings.env`; the online
-site does not yet hand the admins down. `pnpm configure:desktop` imports them.
-Without them the app stops with a message naming the missing key.
+On startup and every 15 minutes Cashier downloads the branch, the super-admin,
+and admins assigned to this branch, including their password hashes and current
+access settings. Keep a new PC online until this first download finishes so its
+admins can sign in. Later starts use the cached accounts offline; internet
+failures do not block startup or selling. Removed admins lose access on the next
+successful pull, and password changes invalidate their old sessions.
+`ADMIN_*` values are no longer required or imported on the PC; existing values
+are ignored. The online site's `.env.production` still configures the super-admin.
+An unlinked-device response stops further account pulls and is recorded in
+`backend.log`. Re-linking and the upload status screen are separate from accounts pull.
 
 On every start the app brings the database to its own version before serving:
 a new database gets its tables; when an installed update brings database changes,
@@ -50,10 +58,10 @@ workload, Rust with the Windows MSVC toolchain, and WebView2. Restart your
 terminal after installing Rust so Cargo is available on PATH.
 Build tools require Node 20.11 or later; the installed app includes its own Node.
 
-Import the admin settings once. Leave `BRANCH_ID` out of the source `.env` to
-link the PC through the link screen, or set it to a branch UUID to skip linking
-during development; the desktop database must then contain exactly that one
-branch (an empty or multi-branch database is rejected).
+Import application settings once. Leave `BRANCH_ID` out of the source `.env`
+and link the PC through the link screen. An older manually configured branch
+still needs a matching online link code if it has no device token; the linker
+preserves that branch and rejects a code for any other branch.
 
 ```powershell
 pnpm configure:desktop
@@ -150,6 +158,9 @@ through the "Update available" button.
 
 - **Database changes:** if the release adds a migration, deploy the VPS first,
   then push the tag (plan D16).
+- **Device endpoints:** deploy the online accounts endpoint before releasing the
+  Phase 9.3 desktop, even with no migration. The updated link endpoint must also
+  reach the VPS first so it enforces `expectedBranchId` before spending a code.
 - **Wrong tag:** the workflow stops if the tag does not match
   `apps/desktop/package.json`; delete the tag (`git push origin :desktop-vX.Y.Z`
   and `git tag -d desktop-vX.Y.Z`), fix the version, and tag again.
@@ -164,15 +175,14 @@ signing is switched on only by `src-tauri/tauri.release.conf.json` in the workfl
 
 ## Settings and troubleshooting
 
-Startup rejects a database that does not
-match the packaged migration checkpoint. `ADMIN_USERNAME` / `ADMIN_PASSWORD`
-configure the super-admin; `JWT_SECRET` needs at least 32 characters.
+Startup rejects a database that does not match the packaged migration checkpoint.
+`JWT_SECRET` needs at least 32 characters. Desktop admin identities and password
+hashes come from the device-authenticated online accounts endpoint.
 
-`BRANCH_ID` is required and must match the database's sole branch. Existing
-`settings.env` files are preserved by the import command, so installations made
-before this setting was added need it entered manually in that file. Restart
-the app afterward. Do not use a counter such as `1`, or generate an arbitrary
-UUID that has no matching branch row.
+`BRANCH_ID` and `DEVICE_TOKEN` are written by linking. The branch must match the
+database's sole branch; do not use a counter such as `1` or an arbitrary UUID.
+The import command preserves existing settings. A manually configured PC without
+a device token opens the link screen on its next start.
 
 Login requires choosing **Admin** or **Cashier**. Matching usernames across those
 roles are allowed; cashier usernames may also repeat in different branches.
@@ -196,7 +206,7 @@ Startup errors appear in a native dialog. Logs are at
 ## Desktop checks
 
 The bundled runtime smoke test creates a fresh owned scratch database, applies
-the repository baseline, supplies one test branch, and verifies offline startup,
+the repository baseline, supplies one test branch and a cached admin hash, and verifies offline startup,
 explicit-role login, branch pinning and shutdown. It drops only that scratch DB;
 the configured `.env.test` database is not reset by the smoke test.
 

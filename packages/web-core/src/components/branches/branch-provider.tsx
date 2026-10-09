@@ -19,6 +19,7 @@ import {
   subscribeToBranchChanges,
 } from "@cashier/web-core/lib/branch-session";
 import { listBranches } from "../../services/branches-service";
+import { Button } from "../ui/button";
 
 type Scope = {
   ownerId: string;
@@ -59,6 +60,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     if (!user) return;
     const version = ++sequence.current;
+    setError((previous) => (previous?.ownerId === user.id ? null : previous));
     try {
       const rows = await listBranches();
       if (version !== sequence.current) return;
@@ -101,7 +103,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         if (previous?.ownerId !== user.id) return previous;
         if (selected === undefined) return previous;
         if (previous.branches.some((row) => row.id === selected))
-          return { ...previous, selectedId: selected };
+          return { ...previous, selectedId: selected, pending: false };
         // The selected workspace is not in the list this tab already has. If
         // it is simply newer than the list, the refresh will confirm it and
         // the answer must wait; if it no longer exists, the list wins and the
@@ -120,8 +122,8 @@ export function BranchProvider({ children }: { children: ReactNode }) {
 
   if (!user) return children;
   const message = error?.ownerId === user.id ? error.message : null;
-  // Only the very first load gates the page; after that the shell around it
-  // (navigation, signing out) must stay reachable whatever the list says.
+  // Empty lists and failed initial loads keep the global management pages
+  // reachable. An unresolved cross-tab selection has its own recovery view.
   const loaded = scope?.ownerId === user.id;
   if (!loaded && !message) {
     return (
@@ -134,11 +136,10 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   }
   const branches = loaded ? scope.branches : [];
   const branch = loaded
-    ? branches.find((row) => row.id === scope.selectedId) ?? null
+    ? (branches.find((row) => row.id === scope.selectedId) ?? null)
     : null;
-  // Navigation, signing out and the workspace switcher stay reachable; only
-  // the branch-scoped pages wait, because a request made here would carry a
-  // branch this tab is not showing.
+  // Until the requested and displayed branches agree, descendants wait.
+  // Their retry controls are hidden too, so recovery must live here.
   const suspended = loaded && scope.pending;
   const selectBranch = (id: string) => {
     if (
@@ -159,9 +160,18 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       {/* Switching workspaces resets forms, carts, and in-flight page state. */}
       <Fragment key={`${user.id}:${scope?.selectedId ?? "none"}`}>
         {suspended ? (
-          <p role="status" className="p-6 text-muted">
-            جارٍ تحميل الفرع…
-          </p>
+          message ? (
+            <div role="alert" className="space-y-3 p-6">
+              <p className="text-danger">{message}</p>
+              <Button onClick={() => void refresh().catch(() => undefined)}>
+                إعادة المحاولة
+              </Button>
+            </div>
+          ) : (
+            <p role="status" className="p-6 text-muted">
+              جارٍ تحميل الفرع…
+            </p>
+          )
         ) : (
           children
         )}

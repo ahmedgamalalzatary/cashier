@@ -6,6 +6,24 @@ import path from "node:path";
 import { test } from "node:test";
 
 const script = path.resolve(import.meta.dirname, "../scripts/configure.mjs");
+test("imports settings without requiring or importing online admin credentials", (t) => {
+  const { source, destination } = fixture(t);
+  fs.writeFileSync(
+    source,
+    'JWT_SECRET="a-private-secret-at-least-32-characters"\n',
+  );
+  const result = spawnSync(
+    process.execPath,
+    [script, "--source", source, "--directory", destination],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(
+    !fs
+      .readFileSync(path.join(destination, "settings.env"), "utf8")
+      .includes("ADMIN_"),
+  );
+});
 function fixture(t) {
   const directory = fs.mkdtempSync(
     path.join(os.tmpdir(), "cashier-configure-"),
@@ -101,7 +119,7 @@ test("an existing file keeps every line and only gains missing settings", (t) =>
   assert.ok(
     settings.includes('BRANCH_ID="019a1234-5678-7000-8000-000000000001"'),
   );
-  assert.ok(settings.includes('ADMIN_PASSWORD="local-admin-password"'));
+  assert.ok(!settings.includes("ADMIN_PASSWORD"));
   assert.ok(!result.stdout.includes("local-admin-password"));
 
   const again = spawnSync(

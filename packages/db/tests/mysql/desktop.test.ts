@@ -7,7 +7,8 @@ import {
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
+import bcrypt from "bcryptjs";
 import { db } from "../support/api-setup.js";
 import { loadTestEnvironment } from "../support/index.js";
 import { startDesktopApi } from "../../../../apps/api/src/desktop/runtime.js";
@@ -16,6 +17,9 @@ import { eq } from "drizzle-orm";
 
 const directories: string[] = [];
 const running: Awaited<ReturnType<typeof startDesktopApi>>[] = [];
+beforeEach(() => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
+});
 afterEach(async () => {
   for (const runtime of running.splice(0)) await runtime.close();
   vi.unstubAllGlobals();
@@ -28,6 +32,18 @@ afterEach(async () => {
 });
 
 async function start(sync = false, branchId = TEST_BRANCH_ID) {
+  // Offline starts use a previously downloaded account, never a local seed.
+  await db
+    .insert(users)
+    .values({
+      id: testId(902),
+      name: "Desktop owner",
+      username: "desktop-test-admin",
+      passwordHash: bcrypt.hashSync("desktop-test-password", 4),
+      role: "admin",
+      isSuperAdmin: true,
+    })
+    .onDuplicateKeyUpdate({ set: { name: "Desktop owner" } });
   const directory = fs.mkdtempSync(
     path.join(os.tmpdir(), "cashier-desktop-db-"),
   );
@@ -46,9 +62,9 @@ async function start(sync = false, branchId = TEST_BRANCH_ID) {
     settings,
     Object.entries({
       BRANCH_ID: branchId,
+      DEVICE_TOKEN: "desktop-test-device-token-with-32-characters",
+      ONLINE_API_URL: "http://127.0.0.1:1/api",
       JWT_SECRET: "desktop-test-secret-more-than-32-characters",
-      ADMIN_USERNAME: "desktop-test-admin",
-      ADMIN_PASSWORD: "desktop-test-password",
       DESKTOP_SYNC_ENABLED: String(sync),
       EXTERNAL_ORDERS_BASE_URL: "https://offline.example",
       EXTERNAL_ORDERS_PHONE_NUMBER: "01234567890",

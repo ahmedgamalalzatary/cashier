@@ -13,6 +13,13 @@ const options = {
 const untouchedDb = {} as Db;
 
 describe("device link endpoint", () => {
+  it("requires a device token before returning accounts", async () => {
+    const response = await request(createApp(untouchedDb, options)).get(
+      "/api/device/accounts",
+    );
+
+    expect(response.status).toBe(401);
+  });
   it("answers a PC that has no admin session", async () => {
     const response = await request(createApp(untouchedDb, options))
       .post("/api/device/link")

@@ -4,13 +4,7 @@ import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import type { Server } from "node:http";
 import { createApp } from "../app.js";
-import {
-  branches,
-  closeDb,
-  createDb,
-  syncConfiguredAdmin,
-  type Db,
-} from "@cashier/db";
+import { branches, closeDb, createDb, type Db } from "@cashier/db";
 import {
   createCacheRefreshService,
   refreshActiveBranches,
@@ -19,6 +13,11 @@ import { runRefreshLoop } from "../modules/external/worker-loop.js";
 import { loadDesktopSettings } from "./settings.js";
 import { prepareDesktopDatabase } from "./upgrade.js";
 import { runAutoCloseLoop } from "../modules/shifts/auto-close.js";
+import {
+  applyDeviceAccounts,
+  requestDeviceAccounts,
+  runAccountsLoop,
+} from "./accounts.js";
 
 /** Where the desktop shell keeps the bundled MySQL tools and shared data. */
 export type DesktopTools = {
@@ -66,15 +65,14 @@ export async function startDesktopApi(
   databaseUrl: string,
   tools: DesktopTools = { mysqlBin: "", dataDir: process.cwd() },
 ) {
-  const { environment, admin, syncEnabled, branchId } = loadDesktopSettings(
-    settingsFile,
-    databaseUrl,
-  );
+  const { environment, deviceToken, onlineApiUrl, syncEnabled, branchId } =
+    loadDesktopSettings(settingsFile, databaseUrl);
   const manifest = readDesktopManifest(manifestFile);
   const db = createDb(environment.DATABASE_URL);
   let server: Server | undefined;
   let worker = Promise.resolve();
   let shiftWorker = Promise.resolve();
+  let accountsWorker = Promise.resolve();
   const workerShutdown = new AbortController();
   const stopWorker = () => workerShutdown.abort();
   signal.addEventListener("abort", stopWorker, { once: true });
@@ -91,7 +89,6 @@ export async function startDesktopApi(
       throw new Error(
         "Desktop database must contain only the configured BRANCH_ID",
       );
-    await syncConfiguredAdmin(db, admin);
     signal.throwIfAborted();
     const app = createApp(db, {
       jwtSecret: environment.JWT_SECRET,
@@ -104,6 +101,19 @@ export async function startDesktopApi(
       listener.once("error", reject);
     });
     shiftWorker = runAutoCloseLoop(db, workerShutdown.signal);
+    // Network availability never gates serving the local cache. A freshly
+    // linked PC receives its first admin accounts as this first pull completes.
+    accountsWorker = runAccountsLoop(async () => {
+      const snapshot = await requestDeviceAccounts({
+        apiUrl: onlineApiUrl,
+        branchId,
+        deviceToken,
+        appVersion: manifest.version,
+        signal: workerShutdown.signal,
+      });
+      workerShutdown.signal.throwIfAborted();
+      await applyDeviceAccounts(db, branchId, snapshot);
+    }, workerShutdown.signal);
     if (syncEnabled) {
       const refresh = createCacheRefreshService(
         db,
@@ -142,7 +152,7 @@ export async function startDesktopApi(
         const closing = new Promise<void>((resolve) =>
           server!.close(() => resolve()),
         );
-        await Promise.all([closing, worker, shiftWorker]);
+        await Promise.all([closing, worker, shiftWorker, accountsWorker]);
         await closeDb(db);
       },
     };
@@ -151,7 +161,7 @@ export async function startDesktopApi(
     signal.removeEventListener("abort", stopWorker);
     if (server)
       await new Promise<void>((resolve) => server!.close(() => resolve()));
-    await Promise.all([worker, shiftWorker]);
+    await Promise.all([worker, shiftWorker, accountsWorker]);
     await closeDb(db);
     throw error;
   }

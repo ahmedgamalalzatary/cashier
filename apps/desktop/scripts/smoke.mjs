@@ -12,6 +12,7 @@ const desktop = path.join(root, "apps/desktop");
 const require = createRequire(path.join(root, "apps/api/package.json"));
 const { parse } = require("dotenv");
 const mysql = require("mysql2/promise");
+const bcrypt = require("bcryptjs");
 const { drizzle } = require("drizzle-orm/mysql2");
 const { migrate } = require("drizzle-orm/mysql2/migrator");
 const source = parse(fs.readFileSync(path.join(root, ".env.test")));
@@ -63,6 +64,17 @@ try {
     branchId,
     "Desktop smoke branch",
   ]);
+  // Model a previous successful accounts pull: offline startup must use the
+  // downloaded hash and must not need ADMIN_* credentials in settings.env.
+  await testPool.query(
+    "INSERT INTO users (id, name, username, password_hash, role, is_super_admin) VALUES (?, ?, ?, ?, 'admin', true)",
+    [
+      uuidv7(),
+      "Smoke owner",
+      "desktop-smoke-admin",
+      await bcrypt.hash("desktop-smoke-password", 4),
+    ],
+  );
   for (const filename of ["api.mjs", "manifest.json"])
     fs.copyFileSync(
       path.join(runtime, filename),
@@ -83,9 +95,9 @@ try {
     settings,
     Object.entries({
       BRANCH_ID: branchId,
+      DEVICE_TOKEN: "desktop-smoke-device-token-with-32-characters",
+      ONLINE_API_URL: "http://127.0.0.1:1/api",
       JWT_SECRET: "desktop-smoke-test-secret-over-32-characters",
-      ADMIN_USERNAME: "desktop-smoke-admin",
-      ADMIN_PASSWORD: "desktop-smoke-password",
       DESKTOP_SYNC_ENABLED: "true",
       EXTERNAL_CATALOG_ENABLED: "false",
       EXTERNAL_ORDERS_BASE_URL: "https://offline.example",

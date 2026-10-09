@@ -174,8 +174,8 @@ Status: ☐ todo · ◐ in progress · ☑ done. Write the date when done.
 |                      | 8.2 admins CRUD + multi-branch assignment                         | ☑      | 2026-10-08 | Online `/api/admins` super-admin only, never branch-scoped: create with branch set, edit name/username/password/branches in one request and one transaction, deactivate (ends live sessions) and reactivate; archived branches stay assigned; `/admins` screen, super-admin row read-only; no delete by design                             |
 |                      | 8.3 device link codes                                             | ☑      | 2026-10-08 | Online `POST /api/link-codes` super-admin only, open branches only: 8 chars from `ABCDEFGHJKMNPQRSTUVWXYZ23456789`, SHA-256 stored, plaintext returned once and never retrievable, 24 h expiry, a new code cancels the branch's unused ones; `/link-codes` screen with copy-once warning; consuming the code is Phase 9          |
 | 9 Link + accounts    | 9.1 online `POST /device/link`, device token                      | ☑      | 2026-10-09 | `POST /api/device/link` without a session, 5 wrong codes per address per 15 min; code locked, single use, expiry and archived branch all give one 400; token = 32 random bytes, SHA-256 stored; re-link replaces the branch's device (old token 401); `authenticateDevice` (`Device <token>`) records `last_seen_at` + `X-Cashier-Version`; 9 unit + 3 HTTP + 9 MySQL tests |
-|                      | 9.2 desktop first-launch link screen                              | ☐      |            | Unlinked PC: MySQL starts, then the Arabic `link.html` window; Rust runs the bundled Node once (`link-device`, code in `CASHIER_LINK_CODE`), which prepares the database, calls `ONLINE_API_URL` (default `https://cashier.biscofa.tech/api`), saves the branch row, then writes `BRANCH_ID` + `DEVICE_TOKEN`; an interrupted link of the same branch finishes on retry; closing the window stops MySQL cleanly. `configure:desktop` no longer requires `BRANCH_ID`. ADMIN_* stay until 9.3 |
-|                      | 9.3 accounts pull (on start + every 15 min)                       | ☐      |            |                                                                                                                                                                                                                                                                                     |
+|                      | 9.2 desktop first-launch link screen                              | ☑      | 2026-10-09 | Arabic link screen; bundled Node prepares the database and saves the branch + device token. Pending answers resume at startup without another code; closing stops MySQL cleanly. A manually configured branch without a device token links only to its matching branch. Covered by link unit, MySQL, two-database HTTP and native lifecycle tests. |
+|                      | 9.3 accounts pull (on start + every 15 min)                       | ☑      | 2026-10-09 | Device-authenticated branch/admin snapshot; transactional local apply with the sync flag, cashier preservation and removal/password propagation; background startup/15-minute worker with offline cache and abortable requests. Desktop no longer seeds or requires ADMIN_*. TDD unit + real two-database HTTP tests, full repository lint/typecheck/test/build, native tests and bundled-runtime smoke passed. |
 | 10 Upload sync       | 10.1 outbox table + trigger generator + tests                     | ☐      |            |                                                                                                                                                                                                                                                                                     |
 |                      | 10.2 online ingest endpoint (idempotent)                          | ☐      |            |                                                                                                                                                                                                                                                                                     |
 |                      | 10.3 PC uploader worker (15 min) + "Upload now" + status          | ☐      |            |                                                                                                                                                                                                                                                                                     |
@@ -721,6 +721,10 @@ Phase 10); a cashier cannot log in online; the old `api`, `web`, `cache-worker` 
   row, returns `{ branch, deviceToken }`. Re-linking a branch revokes the old device (D1).
 - Desktop first launch (no link in settings): show "Link this PC" screen; requires internet
   (D12). Save `DEVICE_TOKEN` + branch id in `settings.env`; insert the branch row locally.
+  A close requested during linking is deferred until the tracked child settles;
+  starting, closing and finishing share one lock, and send one terminal outcome.
+  A resume with nothing to finish emits no link-success event. The shell accepts
+  success only from a real branch name and a successful child exit.
 - The answer online sends is written to `pending-link.json` (owner-only, next to `settings.env`)
   before the branch row and the settings, because online has already committed and will not answer
   the same code twice. The next start finishes the work from that record instead of asking again,
@@ -731,6 +735,13 @@ Phase 10); a cashier cannot log in online; the old `api`, `web`, `cache-worker` 
   the branch + `admin_branches` rows for this branch + branch row. Apply in one transaction with
   `@cashier_sync_apply = 1`; deactivate local admins that are no longer returned (D6, D13).
   Runs on start (if online) and every 15 min.
+  The complete branch row (including archive state and creation time) is copied.
+  Network requests are bounded to 5 seconds and never gate the local listener;
+  a new PC needs its first successful pull before its online admins can log in.
+  Offline failures leave the cache intact. Invalid snapshots are rejected before
+  writes, identity collisions are refused, and username swaps are applied atomically.
+  A revoked device stops this worker; the reason is recorded in the backend log.
+  `ADMIN_*` are neither required nor seeded by the desktop; old values are ignored.
 
 **Traps:** never download password **plaintext**; the bcrypt hash is what is copied.
 Revoked device token → uploader stops and shows "This PC was unlinked".
@@ -780,6 +791,11 @@ online: one transaction, @cashier_sync_apply=1, FK checks off, upsert/delete in 
 [apps/desktop/README.md](../apps/desktop/README.md).
 
 **Release order when a change touches the database**
+
+Phase 9.3 also requires the online `/api/device/accounts` endpoint to be deployed
+before distributing its desktop build, even though it adds no migration. The
+same online-first order applies to the branch-protecting `expectedBranchId`
+link endpoint; older servers silently ignore that field.
 
 ```
 1. merge  →  2. deploy VPS (migrate runs)  →  3. tag desktop-vX.Y.Z  →  4. PCs update on next open

@@ -123,7 +123,11 @@ export function saveLink(
       const key = line.split("=", 1)[0]?.trim();
       return line.trim() !== "" && !(key in values);
     });
-  if (!kept.some((line) => line.split("=", 1)[0]?.trim() === "DESKTOP_SYNC_ENABLED"))
+  if (
+    !kept.some(
+      (line) => line.split("=", 1)[0]?.trim() === "DESKTOP_SYNC_ENABLED",
+    )
+  )
     values.DESKTOP_SYNC_ENABLED = "false";
   const lines = [
     ...kept,
@@ -219,6 +223,18 @@ export async function linkDesktop({
   // Checked before anything else, so a code is never spent on a PC that
   // cannot take it.
   if (existing.length > 1) throw new Error(OTHER_BRANCH);
+  const configuredBranch = source.BRANCH_ID?.trim() || undefined;
+  if (
+    configuredBranch &&
+    !z.string().uuid().safeParse(configuredBranch).success
+  )
+    throw new Error("BRANCH_ID must be the UUID of this PC's branch");
+  if (
+    configuredBranch &&
+    existing.length === 1 &&
+    existing[0].id !== configuredBranch
+  )
+    throw new Error(OTHER_BRANCH);
   const pending = files.readPending();
   // The settings already carry this link: the last step finished and only the
   // removal of the record was lost.
@@ -231,6 +247,8 @@ export async function linkDesktop({
     throw new Error(ALREADY_LINKED);
   }
   if (pending) {
+    if (configuredBranch && configuredBranch !== pending.branchId)
+      throw new Error(OTHER_BRANCH);
     // Finished earlier and only half applied. Applied now without spending
     // another code, and only where it cannot contradict this PC's own data.
     if (existing.length === 1 && existing[0].id !== pending.branchId)
@@ -249,7 +267,9 @@ export async function linkDesktop({
       name: pending.branchName,
     };
   }
-  if (source.BRANCH_ID?.trim()) throw new Error(ALREADY_LINKED);
+  if (configuredBranch && (source.DEVICE_TOKEN?.trim().length ?? 0) >= 32)
+    throw new Error(ALREADY_LINKED);
+  const expectedBranchId = existing[0]?.id ?? configuredBranch;
   const apiUrl = onlineApiUrl(source);
   const { deviceToken, branch } = await requestLink({
     apiUrl,
@@ -258,14 +278,18 @@ export async function linkDesktop({
     // Told online before it spends the code, so a code this PC cannot take
     // never reaches the target branch. An online build too old to know the
     // field answers as before, and this check still catches that.
-    ...(existing.length === 1 ? { expectedBranchId: existing[0].id } : {}),
+    ...(expectedBranchId ? { expectedBranchId } : {}),
     fetch,
   });
-  if (existing.length === 1 && existing[0].id !== branch.id)
+  if (expectedBranchId && expectedBranchId !== branch.id)
     throw new Error(OTHER_BRANCH);
   // Online has already committed and will not give this answer again, so it is
   // written down before anything local can fail.
-  files.writePending({ branchId: branch.id, branchName: branch.name, deviceToken });
+  files.writePending({
+    branchId: branch.id,
+    branchName: branch.name,
+    deviceToken,
+  });
   await branches.save(branch);
   files.writeLink({ branchId: branch.id, deviceToken });
   files.clearPending();
@@ -302,7 +326,14 @@ export async function resumePendingLink({
     files.clearPending();
     return null;
   }
-  return linkDesktop({ settingsFile, code: "", appVersion: "", branches, fetch, files });
+  return linkDesktop({
+    settingsFile,
+    code: "",
+    appVersion: "",
+    branches,
+    fetch,
+    files,
+  });
 }
 
 export function databaseBranches(db: Db): LocalBranches {

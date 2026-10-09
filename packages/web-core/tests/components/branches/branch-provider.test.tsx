@@ -1,5 +1,10 @@
 import type { AuthUser, Branch } from "@cashier/shared";
-import type { ReactElement } from "react";
+import {
+  Children,
+  isValidElement,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { testId } from "@cashier/shared/test-support";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -83,6 +88,20 @@ async function load() {
   await Promise.resolve();
   await Promise.resolve();
   return render();
+}
+
+function retryButton(
+  node: ReactNode,
+): ReactElement<{ onClick(): void }> | undefined {
+  let found: ReactElement<{ onClick(): void }> | undefined;
+  Children.forEach(node, (child) => {
+    if (!isValidElement<{ children?: ReactNode; onClick?: () => void }>(child))
+      return;
+    if (child.props.children === "إعادة المحاولة" && child.props.onClick)
+      found = child as ReactElement<{ onClick(): void }>;
+    else found ??= retryButton(child.props.children);
+  });
+  return found;
 }
 beforeEach(() => {
   hooks.state = [];
@@ -204,7 +223,9 @@ describe("a workspace another tab selected", () => {
   const anotherTabSelected = (branchId: string) => {
     storage.set(`cashier.branch.${admin.id}`, branchId);
     const event = new Event("storage") as Event & { key: string };
-    Object.defineProperty(event, "key", { value: `cashier.branch.${admin.id}` });
+    Object.defineProperty(event, "key", {
+      value: `cashier.branch.${admin.id}`,
+    });
     window.dispatchEvent(event);
   };
   const settle = async () => {
@@ -263,6 +284,53 @@ describe("a workspace another tab selected", () => {
     expect(failed.props.value.branch).toBeNull();
     expect(renderToStaticMarkup(failed)).not.toContain("Branch content");
     expect(failed.props.value.error).toBe("تعذر تحميل الفروع");
+    expect(renderToStaticMarkup(failed)).toContain("تعذر تحميل الفروع");
+    expect(renderToStaticMarkup(failed)).toContain("إعادة المحاولة");
+  });
+
+  it("retries from the visible suspended state and reveals only the resolved branch", async () => {
+    await load();
+    vi.mocked(listBranches).mockRejectedValue(new Error("تعذر تحميل الفروع"));
+    anotherTabSelected(unknown);
+    await settle();
+    const retry = retryButton(render());
+    expect(retry).toBeDefined();
+    let release!: (value: Branch[]) => void;
+    vi.mocked(listBranches).mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    retry!.props.onClick();
+    await settle();
+    expect(renderToStaticMarkup(render())).toContain("جارٍ تحميل الفرع");
+    expect(renderToStaticMarkup(render())).not.toContain("Branch content");
+    release([...rows, { ...rows[0], id: unknown, name: "New branch" }]);
+    await settle();
+    expect(render().props.value.branch?.id).toBe(unknown);
+    expect(renderToStaticMarkup(render())).toContain("Branch content");
+    expect(render().props.value.error).toBeNull();
+  });
+
+  it("resumes a known selection made while another tab's unknown selection is pending", async () => {
+    await load();
+    let release!: (value: Branch[]) => void;
+    vi.mocked(listBranches)
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+      )
+      .mockRejectedValueOnce(new Error("تعذر تحديث الفروع"));
+    anotherTabSelected(unknown);
+    anotherTabSelected(second);
+    await settle();
+    expect(render().props.value.branch?.id).toBe(second);
+    expect(renderToStaticMarkup(render())).toContain("Branch content");
+    release([...rows, { ...rows[0], id: unknown }]);
+    await settle();
+    expect(render().props.value.branch?.id).toBe(second);
+    expect(storage.get(`cashier.branch.${admin.id}`)).toBe(second);
   });
 });
 
@@ -279,7 +347,9 @@ describe("a branch list that could not be loaded", () => {
   });
 
   it("can be retried from the page that shows the failure", async () => {
-    vi.mocked(listBranches).mockRejectedValueOnce(new Error("تعذر تحميل الفروع"));
+    vi.mocked(listBranches).mockRejectedValueOnce(
+      new Error("تعذر تحميل الفروع"),
+    );
     const failed = (await load()).props.value;
     vi.mocked(listBranches).mockResolvedValue(rows);
 

@@ -50,12 +50,8 @@ const source = parse(
   fs.readFileSync(option("--source") ?? path.join(root, ".env")),
 );
 const pick = (key) => existing[key] ?? source[key];
-if (!pick("ADMIN_USERNAME") || !pick("ADMIN_PASSWORD"))
-  throw new Error(
-    "Configure admin credentials before importing desktop settings.",
-  );
 // Without a branch the PC shows its link screen on the next start (Phase 9);
-// a developer may still preset one to skip linking.
+// a developer may preset one to require a matching link code.
 const branch = pick("BRANCH_ID");
 if (branch && !z.string().uuid().safeParse(branch).success)
   throw new Error(
@@ -65,9 +61,6 @@ const keys = [
   "BRANCH_ID",
   "ONLINE_API_URL",
   "JWT_SECRET",
-  "ADMIN_NAME",
-  "ADMIN_USERNAME",
-  "ADMIN_PASSWORD",
   "EXTERNAL_ORDERS_BASE_URL",
   "EXTERNAL_ORDERS_PHONE_NUMBER",
   "EXTERNAL_ORDERS_PASSWORD",

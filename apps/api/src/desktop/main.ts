@@ -81,7 +81,7 @@ async function resume(settingsFile: string, manifestFile: string) {
       settingsFile,
       branches: databaseBranches(db),
     });
-    emit({ event: "linked", branch });
+    if (branch) emit({ event: "linked", branch });
   } finally {
     await closeDb(db);
   }
@@ -136,9 +136,9 @@ const task =
         ? link(settingsFile, manifestFile)
         : settingsFile && manifestFile
           ? serve(settingsFile, manifestFile)
-        : Promise.reject(
-            new Error("Desktop settings and runtime manifest are required"),
-          );
+          : Promise.reject(
+              new Error("Desktop settings and runtime manifest are required"),
+            );
 void task.catch((error: unknown) => {
   const message =
     error instanceof Error ? error.message : "Desktop API startup failed";

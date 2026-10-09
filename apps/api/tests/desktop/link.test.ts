@@ -150,7 +150,9 @@ describe("saving the link", () => {
 
     const text = fs.readFileSync(file, "utf8");
     expect(readSettings(file).DESKTOP_SYNC_ENABLED).toBe("true");
-    expect(text).toContain('EXTERNAL_ORDERS_BASE_URL="https://orders.example.com"');
+    expect(text).toContain(
+      'EXTERNAL_ORDERS_BASE_URL="https://orders.example.com"',
+    );
     expect(text.match(/DESKTOP_SYNC_ENABLED=/g)).toHaveLength(1);
   });
 });
@@ -194,13 +196,54 @@ describe("linking this PC", () => {
   });
 
   it("refuses a PC that is already linked without asking online", async () => {
-    const file = settingsFile(`BRANCH_ID="${BRANCH.id}"\n`);
+    const file = settingsFile(
+      `BRANCH_ID="${BRANCH.id}"\nDEVICE_TOKEN="${TOKEN}"\n`,
+    );
     const fetch = answer(201, { deviceToken: TOKEN, branch: BRANCH });
 
     await expect(link(file, localBranches([BRANCH.id]), fetch)).rejects.toThrow(
       "مربوط",
     );
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("links a manually configured branch that has no device token yet", async () => {
+    const file = settingsFile(`BRANCH_ID="${BRANCH.id}"\n`);
+    const sent: unknown[] = [];
+    const fetch: typeof globalThis.fetch = async (_url, init) => {
+      sent.push(JSON.parse(String(init?.body)));
+      return Response.json(
+        { deviceToken: TOKEN, branch: BRANCH },
+        { status: 201 },
+      );
+    };
+    await expect(link(file, localBranches([]), fetch)).resolves.toEqual(BRANCH);
+    expect(sent).toEqual([{ code: "ABCD2345", expectedBranchId: BRANCH.id }]);
+    expect(readSettings(file).DEVICE_TOKEN).toBe(TOKEN);
+  });
+
+  it("refuses conflicting preset and stored branches before spending a code", async () => {
+    const file = settingsFile(
+      'BRANCH_ID="019a1234-5678-7000-8000-000000000021"\n',
+    );
+    const fetch = answer(201, { deviceToken: TOKEN, branch: BRANCH });
+    await expect(
+      link(file, localBranches([BRANCH.id]), fetch),
+    ).rejects.toThrow();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("does not resume a saved answer over a different preset branch", async () => {
+    const file = settingsFile(`BRANCH_ID="${BRANCH.id}"\n`);
+    fileLink(file).writePending({
+      branchId: "019a1234-5678-7000-8000-000000000021",
+      branchName: "Other branch",
+      deviceToken: TOKEN,
+    });
+    const held = localBranches([]);
+    await expect(link(file, held)).rejects.toThrow();
+    expect(held.saved).toHaveLength(0);
+    expect(readSettings(file).BRANCH_ID).toBe(BRANCH.id);
   });
 
   it("refuses a database that already holds several branches without asking online", async () => {
@@ -239,14 +282,21 @@ describe("linking this PC", () => {
   it("tells online which branch this PC already holds, so a code for another branch is never spent", async () => {
     const file = settingsFile("");
     const sent: unknown[] = [];
-    const fetch = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
-      sent.push(JSON.parse(String(init?.body)));
-      return new Response(JSON.stringify({ deviceToken: TOKEN, branch: BRANCH }), {
-        status: 201,
-      });
-    });
+    const fetch = vi.fn(
+      async (_url: string | URL | Request, init?: RequestInit) => {
+        sent.push(JSON.parse(String(init?.body)));
+        return new Response(
+          JSON.stringify({ deviceToken: TOKEN, branch: BRANCH }),
+          {
+            status: 201,
+          },
+        );
+      },
+    );
 
-    await expect(link(file, localBranches([BRANCH.id]), fetch as never)).resolves.toEqual(BRANCH);
+    await expect(
+      link(file, localBranches([BRANCH.id]), fetch as never),
+    ).resolves.toEqual(BRANCH);
 
     expect(sent).toEqual([{ code: "ABCD2345", expectedBranchId: BRANCH.id }]);
   });
@@ -254,14 +304,21 @@ describe("linking this PC", () => {
   it("says nothing about branches when this PC holds none", async () => {
     const file = settingsFile("");
     const sent: unknown[] = [];
-    const fetch = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
-      sent.push(JSON.parse(String(init?.body)));
-      return new Response(JSON.stringify({ deviceToken: TOKEN, branch: BRANCH }), {
-        status: 201,
-      });
-    });
+    const fetch = vi.fn(
+      async (_url: string | URL | Request, init?: RequestInit) => {
+        sent.push(JSON.parse(String(init?.body)));
+        return new Response(
+          JSON.stringify({ deviceToken: TOKEN, branch: BRANCH }),
+          {
+            status: 201,
+          },
+        );
+      },
+    );
 
-    await expect(link(file, localBranches([]), fetch as never)).resolves.toEqual(BRANCH);
+    await expect(
+      link(file, localBranches([]), fetch as never),
+    ).resolves.toEqual(BRANCH);
 
     // an older online build must keep seeing exactly what it saw before
     expect(sent).toEqual([{ code: "ABCD2345" }]);
