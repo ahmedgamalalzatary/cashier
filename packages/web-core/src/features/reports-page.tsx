@@ -527,7 +527,7 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
 export function ReportsPage() {
   const today = cairoCalendarDate(),
     monthStart = `${today.slice(0, 7)}-01`;
-  const { branch } = useBranch();
+  const { branch, error: branchError, refresh: refreshBranches } = useBranch();
   const [from, setFrom] = useState(monthStart),
     [to, setTo] = useState(today),
     [tab, setTab] = useState<Tab>("sales");
@@ -575,7 +575,22 @@ export function ReportsPage() {
   if (!branch)
     return (
       <div className="grid place-items-center py-16 text-center">
-        <p className="text-muted">لا يوجد فرع لعرض تقاريره بعد.</p>
+        {branchError ? (
+          // A failed load is not an answer, so it must not read as an account
+          // with no branches: say what happened and let the reader try again.
+          <>
+            <p role="alert">{branchError}</p>
+            <Button
+              className="mt-4"
+              onClick={() => void refreshBranches().catch(() => undefined)}
+            >
+              <RefreshCw className="size-4" />
+              إعادة المحاولة
+            </Button>
+          </>
+        ) : (
+          <p className="text-muted">لا يوجد فرع لعرض تقاريره بعد.</p>
+        )}
       </div>
     );
   return (

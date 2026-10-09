@@ -24,6 +24,13 @@ type Scope = {
   ownerId: string;
   branches: Branch[];
   selectedId: string | null;
+  /**
+   * Another tab selected a workspace this tab has not seen in a finished
+   * load. Until the list catches up there is no single truthful branch, so
+   * branch-scoped content waits rather than showing one workspace while
+   * requests go to another.
+   */
+  pending: boolean;
 };
 type BranchContextValue = {
   /** The selected branch, or null while the account has none to choose from. */
@@ -69,6 +76,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         ownerId: user.id,
         branches: rows,
         selectedId: selected?.id ?? null,
+        pending: false,
       });
       setError(null);
     } catch (cause) {
@@ -90,14 +98,15 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     const unsubscribe = subscribeToBranchChanges(user.id, () => {
       const selected = selectedBranchId(user);
       setScope((previous) => {
-        if (previous?.ownerId !== user.id || selected === undefined)
-          return previous;
-        return {
-          ...previous,
-          selectedId: previous.branches.some((row) => row.id === selected)
-            ? selected
-            : previous.selectedId,
-        };
+        if (previous?.ownerId !== user.id) return previous;
+        if (selected === undefined) return previous;
+        if (previous.branches.some((row) => row.id === selected))
+          return { ...previous, selectedId: selected };
+        // The selected workspace is not in the list this tab already has. If
+        // it is simply newer than the list, the refresh will confirm it and
+        // the answer must wait; if it no longer exists, the list wins and the
+        // refresh picks a workspace this account really has.
+        return { ...previous, selectedId: null, pending: true };
       });
       // Discover branches created in another tab before exposing their pages.
       void refresh().catch(() => undefined);
@@ -127,6 +136,10 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   const branch = loaded
     ? branches.find((row) => row.id === scope.selectedId) ?? null
     : null;
+  // Navigation, signing out and the workspace switcher stay reachable; only
+  // the branch-scoped pages wait, because a request made here would carry a
+  // branch this tab is not showing.
+  const suspended = loaded && scope.pending;
   const selectBranch = (id: string) => {
     if (
       user.role !== "admin" ||
@@ -145,7 +158,13 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     >
       {/* Switching workspaces resets forms, carts, and in-flight page state. */}
       <Fragment key={`${user.id}:${scope?.selectedId ?? "none"}`}>
-        {children}
+        {suspended ? (
+          <p role="status" className="p-6 text-muted">
+            جارٍ تحميل الفرع…
+          </p>
+        ) : (
+          children
+        )}
       </Fragment>
     </Context.Provider>
   );

@@ -200,6 +200,20 @@ fn link_command(
     command
 }
 
+/// The one-off run that finishes a link a previous start accepted. No code is
+/// involved, so none is expected on this path.
+fn resume_command(
+    binary: &Path,
+    runtime: &Path,
+    settings: &Path,
+    data: &Path,
+    database_url: &str,
+) -> Command {
+    let mut command = api_command(binary, runtime, settings, data, database_url);
+    command.arg("resume-link").stdin(Stdio::null());
+    command
+}
+
 fn open_log(data: &Path) -> std::io::Result<fs::File> {
     let log_path = data.join("backend.log");
     if fs::metadata(&log_path).is_ok_and(|metadata| metadata.len() > 5 * 1024 * 1024) {
@@ -354,15 +368,43 @@ pub fn link(
                 data,
             )
         });
+    // the code path always finishes a link, so a missing branch name is a
+    // failure rather than "nothing to do"
+    read_link_result(spawned)?
+        .ok_or_else(|| StartupFailure::plain("Linking stopped unexpectedly; check backend.log"))
+}
+
+/// Finishes a link a previous start accepted from online but did not complete,
+/// so a PC holding a saved answer is never asked for another code.
+pub fn resume_link(
+    runtime: &Path,
+    settings: &Path,
+    data: &Path,
+    database_url: &str,
+) -> Result<Option<String>, StartupFailure> {
+    let spawned = node_binary()
+        .map_err(Box::<dyn std::error::Error>::from)
+        .and_then(|binary| {
+            spawn_owned(
+                resume_command(&binary, runtime, settings, data, database_url),
+                data,
+            )
+        });
+    read_link_result(spawned)
+}
+
+/// A link run reports the branch it finished, or nothing when there was
+/// nothing left to finish.
+fn read_link_result(
+    spawned: Result<Spawned, Box<dyn std::error::Error>>,
+) -> Result<Option<String>, StartupFailure> {
     let (mut backend, output, mut log) =
         spawned.map_err(|error| StartupFailure::plain(&error.to_string()))?;
-    let mut result = Err(StartupFailure::plain(
-        "Linking stopped unexpectedly; check backend.log",
-    ));
+    let mut result = Ok(None);
     for line in BufReader::new(output).lines().map_while(Result::ok) {
         let _ = writeln!(log, "{line}");
         match parse_event(&line) {
-            Some(Event::Linked(name)) => result = Ok(name),
+            Some(Event::Linked(name)) => result = Ok(Some(name)),
             Some(Event::Failed(failure)) => result = Err(failure),
             _ => {}
         }
@@ -588,5 +630,23 @@ mod tests {
         assert!(command.get_envs().any(|(key, value)| {
             key == "CASHIER_LINK_CODE" && value.is_some_and(|value| value == "ABCD2345")
         }));
+    }
+
+    #[test]
+    fn finishing_a_saved_link_runs_without_any_code() {
+        let command = resume_command(
+            Path::new("node"),
+            Path::new("runtime"),
+            Path::new("settings.env"),
+            Path::new("data"),
+            "mysql://local",
+        );
+        let args: Vec<_> = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect();
+        // a resume that asked for a code could spend a second one
+        assert!(!command.get_envs().any(|(key, _)| key == "CASHIER_LINK_CODE"));
+        assert_eq!(args.last().map(String::as_str), Some("resume-link"));
     }
 }

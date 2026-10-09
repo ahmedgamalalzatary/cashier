@@ -1,5 +1,5 @@
 import { closeDb, createDb } from "@cashier/db";
-import { databaseBranches, linkDesktop } from "./link.js";
+import { databaseBranches, linkDesktop, resumePendingLink } from "./link.js";
 import {
   prepareForApp,
   readDesktopManifest,
@@ -62,6 +62,31 @@ async function link(settingsFile: string, manifestFile: string) {
   }
 }
 
+/**
+ * Finishes a link a previous start accepted but did not complete. The shell
+ * calls this before deciding whether to ask for a code, so a PC holding a
+ * saved answer is never asked to spend another one.
+ */
+async function resume(settingsFile: string, manifestFile: string) {
+  const { databaseUrl, mysqlBin, dataDir } = fromShell();
+  const manifest = readDesktopManifest(manifestFile);
+  const db = createDb(databaseUrl);
+  try {
+    await prepareForApp(db, databaseUrl, manifestFile, manifest, {
+      mysqlBin,
+      dataDir,
+      onBusy: () => emit({ event: "busy" }),
+    });
+    const branch = await resumePendingLink({
+      settingsFile,
+      branches: databaseBranches(db),
+    });
+    emit({ event: "linked", branch });
+  } finally {
+    await closeDb(db);
+  }
+}
+
 async function serve(settingsFile: string, manifestFile: string) {
   const shutdown = new AbortController();
   let finish: (() => void) | undefined;
@@ -105,10 +130,12 @@ const [settingsFile, manifestFile, command] = process.argv.slice(2);
 const task =
   command === "restore-backup"
     ? restore()
-    : command === "link-device"
-      ? link(settingsFile, manifestFile)
-      : settingsFile && manifestFile
-        ? serve(settingsFile, manifestFile)
+    : command === "resume-link"
+      ? resume(settingsFile, manifestFile)
+      : command === "link-device"
+        ? link(settingsFile, manifestFile)
+        : settingsFile && manifestFile
+          ? serve(settingsFile, manifestFile)
         : Promise.reject(
             new Error("Desktop settings and runtime manifest are required"),
           );

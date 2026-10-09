@@ -18,6 +18,8 @@ const hooks = vi.hoisted(() => ({
     id: "00000000-0000-7000-8000-000000000001",
     name: "Main Branch",
   } as { id: string; name: string } | null,
+  branchError: null as string | null,
+  refreshBranches: vi.fn(async () => undefined),
 }));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
@@ -39,7 +41,13 @@ vi.mock("react", async (original) => ({
   useMemo: (callback: () => unknown) => callback(),
 }));
 vi.mock("../../../src/components/branches/branch-provider", () => ({
-  useBranch: () => ({ branch: hooks.branch }),
+  useBranch: () => ({
+    branch: hooks.branch,
+    branches: [],
+    error: hooks.branchError,
+    selectBranch: () => undefined,
+    refresh: hooks.refreshBranches,
+  }),
 }));
 vi.mock(
   "../../../src/services/reports-service",
@@ -122,6 +130,8 @@ describe("report loading and printing", () => {
     hooks.state.length = 0;
     hooks.effect = null;
     hooks.branch = { id: testId(1), name: "Main Branch" };
+    hooks.branchError = null;
+    hooks.refreshBranches.mockClear();
     vi.mocked(getReports).mockReset();
     vi.mocked(cairoCalendarDate).mockReturnValue("2026-09-27");
   });
@@ -141,6 +151,23 @@ describe("report loading and printing", () => {
     expect(html).toContain("لا يوجد فرع");
     expect(html).not.toContain("المبيعات");
     expect(vi.mocked(getReports)).not.toHaveBeenCalled();
+  });
+  it("says the branch list could not load, and offers to try again", async () => {
+    hooks.branch = null;
+    hooks.branchError = "تعذر تحميل الفروع";
+
+    const tree = render();
+    const html = renderToStaticMarkup(tree);
+
+    // a failed load is not the same answer as an account with no branches
+    expect(html).toContain("تعذر تحميل الفروع");
+    expect(html).not.toContain("لا يوجد فرع");
+    const retry = nodes(tree).find(
+      (node) => node.type === Button && "onClick" in node.props,
+    );
+    expect(retry).toBeDefined();
+    await (retry!.props.onClick as () => Promise<void>)();
+    expect(hooks.refreshBranches).toHaveBeenCalled();
   });
   it("uses the current Cairo month when the page is opened after midnight", () => {
     vi.mocked(cairoCalendarDate).mockReturnValue("2026-10-01");

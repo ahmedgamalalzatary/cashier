@@ -198,6 +198,74 @@ describe("a signed-in admin whose branch list is empty", () => {
   });
 });
 
+describe("a workspace another tab selected", () => {
+  const unknown = "019a1234-5678-7000-8000-000000000409";
+  /** What another tab writes to localStorage looks like to this tab. */
+  const anotherTabSelected = (branchId: string) => {
+    storage.set(`cashier.branch.${admin.id}`, branchId);
+    const event = new Event("storage") as Event & { key: string };
+    Object.defineProperty(event, "key", { value: `cashier.branch.${admin.id}` });
+    window.dispatchEvent(event);
+  };
+  const settle = async () => {
+    for (let turn = 0; turn < 4; turn++) await Promise.resolve();
+  };
+
+  it("shows nothing branch-scoped while the new selection cannot be resolved", async () => {
+    expect((await load()).props.value.branch?.id).toBe(first);
+    // the branch is real but this tab has not loaded it yet
+    let release!: (rows: Branch[]) => void;
+    vi.mocked(listBranches).mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+
+    anotherTabSelected(unknown);
+    const pending = render();
+
+    // displaying the previous branch here is what let a write reach the
+    // other one, so branch content waits until both sides agree
+    expect(pending.props.value.branch).toBeNull();
+    expect(renderToStaticMarkup(pending)).not.toContain("Branch content");
+
+    release([...rows, { ...rows[0], id: unknown, name: "Other tab" }]);
+    await settle();
+
+    const settled = render();
+    expect(settled.props.value.branch?.id).toBe(unknown);
+    expect(renderToStaticMarkup(settled)).toContain("Branch content");
+  });
+
+  it("keeps a real workspace when the selection it cannot see is gone", async () => {
+    expect((await load()).props.value.branch?.id).toBe(first);
+    // the branch was deleted in the other tab, so it never comes back
+    vi.mocked(listBranches).mockResolvedValue([rows[1]]);
+
+    anotherTabSelected(unknown);
+    await settle();
+
+    const settled = render();
+    expect(settled.props.value.branch?.id).toBe(second);
+    expect(renderToStaticMarkup(settled)).toContain("Branch content");
+  });
+
+  it("stays suspended when the refresh that would resolve it fails", async () => {
+    expect((await load()).props.value.branch?.id).toBe(first);
+    vi.mocked(listBranches).mockRejectedValue(new Error("تعذر تحميل الفروع"));
+
+    anotherTabSelected(unknown);
+    await settle();
+
+    // a failure is not proof the branch is gone, so nothing branch-scoped
+    // renders against a branch that may not exist
+    const failed = render();
+    expect(failed.props.value.branch).toBeNull();
+    expect(renderToStaticMarkup(failed)).not.toContain("Branch content");
+    expect(failed.props.value.error).toBe("تعذر تحميل الفروع");
+  });
+});
+
 describe("a branch list that could not be loaded", () => {
   it("keeps the children and the way out, and says what went wrong", async () => {
     vi.mocked(listBranches).mockRejectedValue(new Error("تعذر تحميل الفروع"));

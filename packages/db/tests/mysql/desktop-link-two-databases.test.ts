@@ -17,6 +17,7 @@ import { authenticateDevice } from "../../../../packages/server-core/src/index.j
 import {
   databaseBranches,
   linkDesktop,
+  resumePendingLink,
 } from "../../../../apps/api/src/desktop/link.js";
 
 /**
@@ -231,6 +232,108 @@ describe("a PC holding one branch tries another branch's code", () => {
 
       expect(await localNames(local)).toEqual([`${target} فرع جديد`]);
       expect(await usedAtOf(code)).not.toBeNull();
+    },
+    60_000,
+  );
+
+  it(
+    "resumes a saved link on start without anyone typing a code",
+    async () => {
+      const local = await pcDatabase();
+      const target = await onlineBranch("فرع الاستئناف");
+      const code = await issueCode(target, "RSUM6789");
+      const file = settingsFile();
+      const record = path.join(path.dirname(file), "pending-link.json");
+      // online accepted and wrote its answer down, then Cashier stopped
+      // before the branch row and the settings were finished
+      const online = await fetch(`${apiUrl}/device/link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      expect(online.status).toBe(201);
+      const answer = (await online.json()) as { deviceToken: string };
+      fs.writeFileSync(
+        record,
+        JSON.stringify({
+          branchId: target,
+          branchName: "فرع الاستئناف",
+          deviceToken: answer.deviceToken,
+        }),
+      );
+
+      // the shell's next start runs this with no code at all
+      const resumed = await resumePendingLink({
+        settingsFile: file,
+        branches: databaseBranches(local),
+      });
+
+      expect(resumed).toMatchObject({ id: target });
+      expect(await localNames(local)).toEqual([`${target} فرع الاستئناف`]);
+      const settings = fs.readFileSync(file, "utf8");
+      expect(settings).toContain(`BRANCH_ID="${target}"`);
+      expect(settings).toContain(`DEVICE_TOKEN="${answer.deviceToken}"`);
+      expect(fs.existsSync(record)).toBe(false);
+      // the code was spent by the attempt that was interrupted, not by the resume
+      expect(await usedAtOf(code)).not.toBeNull();
+    },
+    60_000,
+  );
+
+  it(
+    "reports a start with nothing left to finish",
+    async () => {
+      const local = await pcDatabase();
+      const file = settingsFile();
+      fs.writeFileSync(file, `ONLINE_API_URL="${apiUrl}"\n`);
+
+      await expect(
+        resumePendingLink({
+          settingsFile: file,
+          branches: databaseBranches(local),
+        }),
+      ).resolves.toBeNull();
+      expect(await localNames(local)).toEqual([]);
+    },
+    60_000,
+  );
+
+  it(
+    "clears a record the settings already finished when the start looks",
+    async () => {
+      const local = await pcDatabase();
+      const target = await onlineBranch("فرع منتهٍ");
+      const code = await issueCode(target, "DNEE2345");
+      const file = settingsFile();
+      await linkDesktop({
+        settingsFile: file,
+        code,
+        appVersion: "0.3.0",
+        branches: databaseBranches(local),
+      });
+      // the removal of the record was itself lost: same answer, still on disk
+      const record = path.join(path.dirname(file), "pending-link.json");
+      const written = fs.readFileSync(file, "utf8");
+      const branchId = /BRANCH_ID="([^"]+)"/.exec(written)![1];
+      const deviceToken = /DEVICE_TOKEN="([^"]+)"/.exec(written)![1];
+      fs.writeFileSync(
+        record,
+        JSON.stringify({
+          branchId,
+          branchName: "فرع منتهٍ",
+          deviceToken,
+        }),
+      );
+
+      // the settings already carry the link, so there is nothing to resume
+      await expect(
+        resumePendingLink({
+          settingsFile: file,
+          branches: databaseBranches(local),
+        }),
+      ).resolves.toBeNull();
+      expect(fs.existsSync(record)).toBe(false);
+      expect(await localNames(local)).toEqual([`${target} فرع منتهٍ`]);
     },
     60_000,
   );

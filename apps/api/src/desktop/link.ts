@@ -273,6 +273,38 @@ export async function linkDesktop({
 }
 
 /** This PC's branches table. Online issues codes for open branches only. */
+/**
+ * Finishes a link that a previous start accepted from online but did not
+ * complete. The shell runs this before deciding whether to ask for a code,
+ * so a PC whose answer was already recorded is never asked to spend another
+ * one. Answers null when there is nothing to finish.
+ */
+export async function resumePendingLink({
+  settingsFile,
+  branches,
+  fetch,
+  files = fileLink(settingsFile),
+}: {
+  settingsFile: string;
+  branches: LocalBranches;
+  fetch?: typeof globalThis.fetch;
+  files?: LinkFiles;
+}) {
+  const pending = files.readPending();
+  if (!pending) return null;
+  const source = files.read();
+  // The settings already carry this link, so the last step finished and only
+  // the removal of the record was lost: tidy up and report nothing to do.
+  if (
+    source.BRANCH_ID?.trim() === pending.branchId &&
+    source.DEVICE_TOKEN?.trim() === pending.deviceToken
+  ) {
+    files.clearPending();
+    return null;
+  }
+  return linkDesktop({ settingsFile, code: "", appVersion: "", branches, fetch, files });
+}
+
 export function databaseBranches(db: Db): LocalBranches {
   return {
     list: () => db.select({ id: branches.id }).from(branches),

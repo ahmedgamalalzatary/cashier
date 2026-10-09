@@ -85,6 +85,23 @@ fn start(handle: &tauri::AppHandle, update: &str) -> Result<(), Box<dyn std::err
     let database = mysql::start(&runtime.join("mysql"), &root, &credentials)?;
     let database_url = database.database_url(&credentials);
     if !link::is_linked(&settings) {
+        // A previous start may have been cut short after online accepted but
+        // before the settings were finished. That answer is saved beside them,
+        // so the link is completed here rather than asking for a code that has
+        // already been spent.
+        match backend::resume_link(&runtime, &settings, &root, &database_url) {
+            Ok(Some(branch)) => backend::note(
+                &root,
+                &format!("Finished the link that a previous start left open: {branch}"),
+            ),
+            Ok(None) => {}
+            Err(failure) => backend::note(
+                &root,
+                &format!("Could not finish the saved link: {}", failure.message),
+            ),
+        }
+    }
+    if !link::is_linked(&settings) {
         backend::note(&root, "This PC is not linked yet; showing the link screen");
         if let link::Outcome::Closed =
             link::wait_for_link(handle, &runtime, &settings, &root, &database_url)?
