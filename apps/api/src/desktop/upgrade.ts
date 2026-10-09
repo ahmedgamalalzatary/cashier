@@ -28,6 +28,19 @@ export type UpgradeState = {
 const STATE_FILE = "upgrade-in-progress.json";
 const KEPT_BACKUPS = 5;
 const LAST_KNOWN_GOOD = "last-known-good.txt";
+/**
+ * Written before the first schema change of a brand new database and removed
+ * once the migrations finish. MySQL commits each CREATE TABLE on its own, so a
+ * power cut can leave the tables of a first installation behind with no record
+ * of the migration; only this table says that those tables are ours to discard.
+ */
+const FRESH_MARKER = "__cashier_fresh_bootstrap";
+
+/** What the fresh-installation marker says about this database. */
+export type FreshMarker =
+  | { kind: "none" }
+  | { kind: "damaged" }
+  | { kind: "owned"; expected: number };
 
 export type UpgradePlan =
   { kind: "ready" } | { kind: "fresh" } | { kind: "upgrade"; from: number };
@@ -40,11 +53,17 @@ export function planUpgrade(input: {
   expected: number;
   state: UpgradeState | null;
   appVersion: string;
+  fresh?: FreshMarker;
 }): UpgradePlan {
   const { current, hasTables, known, expected, state, appVersion } = input;
+  const fresh = input.fresh ?? { kind: "none" };
   if (known.at(-1) !== expected)
     throw new DesktopStartupError(
       "This Cashier installation is damaged: its database update files do not match the app. Reinstall Cashier.",
+    );
+  if (fresh.kind === "damaged")
+    throw new DesktopStartupError(
+      "The record of this PC's first database setup is damaged, so Cashier cannot tell which tables are its own. Contact support.",
     );
   if (state?.state === "in-progress")
     throw new DesktopStartupError(
@@ -56,6 +75,9 @@ export function planUpgrade(input: {
       `Cashier ${appVersion} could not update the database, so the backup from before the update was restored. Install the corrected version of Cashier.`,
     );
   if (current === expected) return { kind: "ready" };
+  // Our own unfinished first installation: the tables are worth nothing, so
+  // they are rebuilt rather than treated as somebody else's data.
+  if (fresh.kind === "owned") return { kind: "fresh" };
   if (current === null) {
     if (hasTables)
       throw new DesktopStartupError(
@@ -230,6 +252,64 @@ async function readCheckpoint(db: Db) {
   };
 }
 
+/** Claims an empty database before the first schema change of an install. */
+async function writeFreshMarker(
+  db: Db,
+  databaseName: string,
+  expected: number,
+  appVersion: string,
+) {
+  await db.$client.query(
+    `CREATE TABLE ?? (
+       id int PRIMARY KEY,
+       database_name varchar(64) NOT NULL,
+       expected bigint NOT NULL,
+       app_version varchar(32) NOT NULL
+     )`,
+    [FRESH_MARKER],
+  );
+  await db.$client.query(
+    "INSERT INTO ?? (id, database_name, expected, app_version) VALUES (1, ?, ?, ?)",
+    [FRESH_MARKER, databaseName, expected, appVersion],
+  );
+}
+
+async function dropFreshMarker(db: Db) {
+  await db.$client.query("DROP TABLE IF EXISTS ??", [FRESH_MARKER]);
+}
+
+/**
+ * Identifies whose database this is. A marker naming another database, or one
+ * that cannot be read, proves nothing and is refused rather than acted on.
+ */
+async function readFreshMarker(
+  db: Db,
+  databaseName: string,
+): Promise<FreshMarker> {
+  const [found] = await db.$client.query<RowDataPacket[]>(
+    "SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?",
+    [FRESH_MARKER],
+  );
+  if (found.length === 0) return { kind: "none" };
+  try {
+    const [rows] = await db.$client.query<RowDataPacket[]>(
+      "SELECT database_name, expected, app_version FROM ??",
+      [FRESH_MARKER],
+    );
+    if (rows.length !== 1) return { kind: "damaged" };
+    const expected = Number(rows[0].expected);
+    if (
+      String(rows[0].database_name) !== databaseName ||
+      !Number.isSafeInteger(expected) ||
+      !String(rows[0].app_version)
+    )
+      return { kind: "damaged" };
+    return { kind: "owned", expected };
+  } catch {
+    return { kind: "damaged" };
+  }
+}
+
 async function dropAllTables(db: Db) {
   const connection = await db.$client.getConnection();
   try {
@@ -338,13 +418,20 @@ function pruneBackups(directory: string, keep: string) {
  * served: nothing to do, create a new database, or back up then migrate.
  */
 export async function prepareDesktopDatabase(options: DesktopDatabaseOptions) {
-  const { db, dataDir, expected } = options;
+  const { db, dataDir, expected, databaseUrl } = options;
+  const databaseName = decodeURIComponent(new URL(databaseUrl).pathname.slice(1));
   const { current, hasTables } = await readCheckpoint(db);
+  let fresh = await readFreshMarker(db, databaseName);
   let state = readUpgradeState(dataDir);
   // the migration finished but Cashier stopped before clearing the record
   if (state?.state === "in-progress" && current === state.to) {
     writeUpgradeState(dataDir, null);
     state = null;
+  }
+  // likewise for a first installation whose migrations completed
+  if (fresh.kind === "owned" && current === expected) {
+    await dropFreshMarker(db);
+    fresh = { kind: "none" };
   }
   if (current === expected && state?.state !== "in-progress") {
     if (state) writeUpgradeState(dataDir, null);
@@ -363,20 +450,27 @@ export async function prepareDesktopDatabase(options: DesktopDatabaseOptions) {
     expected,
     state,
     appVersion: options.appVersion,
+    fresh,
   });
   if (plan.kind === "ready") return;
   options.onBusy?.();
   if (plan.kind === "fresh") {
+    if (fresh.kind === "owned")
+      // our own leftovers from an interrupted first installation
+      await dropAllTables(db);
+    else await writeFreshMarker(db, databaseName, expected, options.appVersion);
     try {
       await migrate(db, { migrationsFolder: options.migrationsFolder });
     } catch (error) {
       console.warn(`Creating the database failed: ${String(error)}`);
       // nothing of value exists yet, so the next start begins clean
       await dropAllTables(db);
+      await dropFreshMarker(db);
       throw new DesktopStartupError(
         "Cashier could not create its database. Details are in backend.log.",
       );
     }
+    await dropFreshMarker(db);
     return;
   }
   const backupDirectory = path.join(dataDir, "backups");

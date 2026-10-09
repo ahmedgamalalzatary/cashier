@@ -98,6 +98,26 @@ describe("desktop database upgrade decision", () => {
   it("refuses an installation whose manifest and migrations disagree", () => {
     expect(() => plan({ expected: 350 })).toThrow("installation");
   });
+  it("refuses tables it cannot recognise as its own first installation", () => {
+    // tables with no migration record and no marker stay somebody else's
+    expect(() => plan({ current: null, hasTables: true })).toThrow(
+      "no record of its updates",
+    );
+  });
+  it("rebuilds the database when its own marker says the install was cut short", () => {
+    expect(
+      plan({
+        current: null,
+        hasTables: true,
+        fresh: { kind: "owned", expected: 300 },
+      }),
+    ).toEqual({ kind: "fresh" });
+  });
+  it("refuses a damaged marker instead of dropping what it cannot vouch for", () => {
+    expect(() =>
+      plan({ current: null, hasTables: true, fresh: { kind: "damaged" } }),
+    ).toThrow("damaged");
+  });
 });
 
 describe("desktop backups", () => {
