@@ -113,6 +113,55 @@ describe("desktop database upgrade decision", () => {
       }),
     ).toEqual({ kind: "fresh" });
   });
+  it("refuses a newer database even when the marker outlived its bootstrap", () => {
+    // The database reached the checkpoint its own marker was written for, so
+    // the first installation finished and only the cleanup was lost. The rows
+    // are real; an older app must refuse them, not wipe them.
+    expect(() =>
+      plan({
+        current: 300,
+        known: [100, 200],
+        expected: 200,
+        fresh: { kind: "owned", expected: 300 },
+      }),
+    ).toThrow("newer version");
+  });
+  it("refuses to rebuild our own leftovers over a newer database", () => {
+    expect(() =>
+      plan({
+        current: 250,
+        known: [100, 200],
+        expected: 200,
+        fresh: { kind: "owned", expected: 300 },
+      }),
+    ).toThrow("newer version");
+  });
+  it("rebuilds when the marker's own checkpoint was never reached", () => {
+    expect(
+      plan({
+        current: 100,
+        fresh: { kind: "owned", expected: 300 },
+      }),
+    ).toEqual({ kind: "fresh" });
+  });
+  it("recovers a claim interrupted before it was recorded", () => {
+    // the marker table exists but the ownership row never landed
+    expect(
+      plan({
+        current: null,
+        hasTables: false,
+        fresh: { kind: "owned", expected: null },
+      }),
+    ).toEqual({ kind: "fresh" });
+  });
+  it("upgrades rather than rebuilds when an unrecorded marker meets a recorded database", () => {
+    // nothing was proved about ownership, so the tables are treated as a
+    // normal installation instead of being destroyed
+    expect(plan({ current: 100, fresh: { kind: "owned", expected: null } })).toEqual({
+      kind: "upgrade",
+      from: 100,
+    });
+  });
   it("refuses a damaged marker instead of dropping what it cannot vouch for", () => {
     expect(() =>
       plan({ current: null, hasTables: true, fresh: { kind: "damaged" } }),

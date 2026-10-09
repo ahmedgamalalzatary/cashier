@@ -141,18 +141,18 @@ const backups = (dataDir: string) =>
     : [];
 
 /** A migration that creates a table and then waits, so the parent can act. */
-const blocking =
-  "CREATE TABLE `bootstrap_probe` (`id` int PRIMARY KEY);\n--> statement-breakpoint\nSELECT SLEEP(120);";
-
 /**
  * One migration that never finishes. The database is left holding its table
  * with no record of the migration at all, which is the state a power cut
  * during a first installation produces.
  */
-function blockingMigrations() {
+function blockingMigrations(probe = "bootstrap_probe") {
   const folder = scratchFolder("cashier-migrations-");
   fs.mkdirSync(path.join(folder, "meta"));
-  fs.writeFileSync(path.join(folder, "0000_base.sql"), blocking);
+  fs.writeFileSync(
+    path.join(folder, "0000_base.sql"),
+    `CREATE TABLE \`${probe}\` (\`id\` int PRIMARY KEY);\n--> statement-breakpoint\nSELECT SLEEP(120);`,
+  );
   fs.writeFileSync(
     path.join(folder, "meta/_journal.json"),
     JSON.stringify({
@@ -194,7 +194,8 @@ function startPreparation(
   fs.writeFileSync(
     script,
     [
-      `const [upgrade, client, databaseUrl, dir, folder, want, bin] = process.argv.slice(2);`,
+      `const [upgrade, client, dir, folder, want, bin] = process.argv.slice(2);`,
+      `const databaseUrl = process.env.CASHIER_TEST_DATABASE_URL;`,
       `const { prepareDesktopDatabase } = await import(\`file:///${upgradeSource}\`);`,
       `const { createDb } = await import(\`file:///${dbSource}\`);`,
       `await prepareDesktopDatabase({ db: createDb(databaseUrl), databaseUrl, mysqlBin: bin, dataDir: dir, migrationsFolder: folder, expected: Number(want), appVersion: "1.0.0" });`,
@@ -207,7 +208,6 @@ function startPreparation(
       script,
       upgradeSource,
       dbSource,
-      url,
       dataDir,
       migrationsFolder,
       String(expected),
@@ -216,8 +216,14 @@ function startPreparation(
     {
       stdio: "ignore",
       windowsHide: true,
-      // the workspace packages resolve to their sources, as the app runs them
-      env: { ...process.env, NODE_OPTIONS: "--conditions=development" },
+      // the workspace packages resolve to their sources, as the app runs them;
+      // the database URL travels in the environment so the password never
+      // appears in the command line, where any local process could read it
+      env: {
+        ...process.env,
+        NODE_OPTIONS: "--conditions=development",
+        CASHIER_TEST_DATABASE_URL: url,
+      },
     },
   );
 }
@@ -470,6 +476,97 @@ describe.skipIf(!fs.existsSync(path.join(mysqlBin, "mysqldump.exe")))(
       await prepare(url, db, dataDir, migrations());
 
       expect(await branchNames(db)).toEqual(["فرع محفوظ"]);
+      expect(await tables(db)).not.toContain("__cashier_fresh_bootstrap");
+    });
+
+    it("keeps a newer database when the marker outlived the app that wrote it", async () => {
+      const { url, db, dataDir } = await fresh();
+      // a newer Cashier completes its installation and writes real rows
+      await prepareDesktopDatabase({
+        db,
+        databaseUrl: url,
+        mysqlBin,
+        dataDir,
+        migrationsFolder: migrations(working),
+        expected: next,
+        appVersion: "2.0.0",
+      });
+      await db.$client.query(
+        "INSERT INTO branches (id, name) VALUES ('019a1234-5678-7000-8000-0000000000ee', 'فرع من إصدار أحدث')",
+      );
+      // and its marker only outlived the cleanup that should have removed it
+      await db.$client.query(
+        "CREATE TABLE __cashier_fresh_bootstrap (id int PRIMARY KEY, database_name varchar(64) NOT NULL, expected bigint NOT NULL, app_version varchar(32) NOT NULL)",
+      );
+      await db.$client.query(
+        `INSERT INTO __cashier_fresh_bootstrap VALUES (1, '${new URL(url).pathname.slice(1)}', ${next}, '2.0.0')`,
+      );
+
+      // an older Cashier opens the same database and must not erase it
+      await expect(prepare(url, db, dataDir, migrations())).rejects.toThrow(
+        "newer version",
+      );
+      expect(await branchNames(db)).toEqual(["فرع من إصدار أحدث"]);
+      expect(await tables(db)).toContain("upgrade_probe");
+    });
+
+    it("upgrades a database whose marker outlived a finished bootstrap", async () => {
+      const { url, db, dataDir } = await fresh();
+      await prepare(url, db, dataDir, migrations());
+      await db.$client.query(
+        "INSERT INTO branches (id, name) VALUES ('019a1234-5678-7000-8000-0000000000ff', 'فرع قبل التحديث')",
+      );
+      await db.$client.query(
+        "CREATE TABLE __cashier_fresh_bootstrap (id int PRIMARY KEY, database_name varchar(64) NOT NULL, expected bigint NOT NULL, app_version varchar(32) NOT NULL)",
+      );
+      await db.$client.query(
+        `INSERT INTO __cashier_fresh_bootstrap VALUES (1, '${new URL(url).pathname.slice(1)}', ${baseline}, '1.0.0')`,
+      );
+
+      await prepareDesktopDatabase({
+        db,
+        databaseUrl: url,
+        mysqlBin,
+        dataDir,
+        migrationsFolder: migrations(working),
+        expected: next,
+        appVersion: "2.0.0",
+      });
+
+      expect(await branchNames(db)).toEqual(["فرع قبل التحديث"]);
+      expect(await tables(db)).toContain("upgrade_probe");
+    });
+
+    it("recovers when the claim was cut short before it was recorded", async () => {
+      const { url, db, dataDir } = await fresh();
+      // the marker table was created but the ownership row never landed
+      await db.$client.query(
+        "CREATE TABLE __cashier_fresh_bootstrap (id int PRIMARY KEY, database_name varchar(64) NOT NULL, expected bigint NOT NULL, app_version varchar(32) NOT NULL)",
+      );
+
+      await prepare(url, db, dataDir, migrations());
+
+      expect(await tables(db)).toEqual(["__drizzle_migrations", "branches"]);
+    });
+
+    it("survives being cut short again while recovering", async () => {
+      const { url, db, dataDir } = await fresh();
+      await interruptFirstInstallation(url, db, dataDir);
+      // the recovery itself is cut short, after it dropped the abandoned
+      // tables and created a replacement table of its own
+      const second = startPreparation(
+        url,
+        dataDir,
+        blockingMigrations("recovery_probe"),
+        baseline,
+      );
+      await waitForTable(db, "recovery_probe", second);
+      await kill(second);
+      expect(await tables(db)).toContain("recovery_probe");
+
+      await prepare(url, db, dataDir, migrations());
+
+      expect(await tables(db)).toEqual(["__drizzle_migrations", "branches"]);
       expect(await tables(db)).not.toContain("__cashier_fresh_bootstrap");
     });
 

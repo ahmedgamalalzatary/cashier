@@ -40,7 +40,12 @@ const FRESH_MARKER = "__cashier_fresh_bootstrap";
 export type FreshMarker =
   | { kind: "none" }
   | { kind: "damaged" }
-  | { kind: "owned"; expected: number };
+  /**
+   * Ours, and rebuilding it is permitted only when `expected` is null (the
+   * claim was never recorded, so nothing had been created yet) or the database
+   * has not yet reached the checkpoint the claim was written for.
+   */
+  | { kind: "owned"; expected: number | null };
 
 export type UpgradePlan =
   { kind: "ready" } | { kind: "fresh" } | { kind: "upgrade"; from: number };
@@ -76,8 +81,24 @@ export function planUpgrade(input: {
     );
   if (current === expected) return { kind: "ready" };
   // Our own unfinished first installation: the tables are worth nothing, so
-  // they are rebuilt rather than treated as somebody else's data.
-  if (fresh.kind === "owned") return { kind: "fresh" };
+  // they are rebuilt rather than treated as somebody else's data. A marker
+  // whose checkpoint the database has already reached is not that: the first
+  // installation finished and only its cleanup was lost, so the rows are real
+  // and no marker may authorise erasing them.
+  const abandoned =
+    fresh.kind === "owned" &&
+    current !== fresh.expected &&
+    (fresh.expected === null
+      ? current === null
+      : current === null || current < fresh.expected);
+  if (abandoned) {
+    // leftovers are still never rebuilt over a database this app cannot read
+    if (current !== null && (!known.includes(current) || current > expected))
+      throw new DesktopStartupError(
+        "The local database was updated by a newer version of Cashier. Install the latest version.",
+      );
+    return { kind: "fresh" };
+  }
   if (current === null) {
     if (hasTables)
       throw new DesktopStartupError(
@@ -248,11 +269,18 @@ async function readCheckpoint(db: Db) {
   }
   return {
     current,
-    hasTables: names.some((name) => name !== "__drizzle_migrations"),
+    hasTables: names.some(
+      (name) =>
+        name !== "__drizzle_migrations" && name !== FRESH_MARKER,
+    ),
   };
 }
 
-/** Claims an empty database before the first schema change of an install. */
+/**
+ * Claims an empty database before the first schema change of an install. The
+ * claim is idempotent, so an interruption part way through it leaves a claim
+ * that the next start can read rather than one it must refuse.
+ */
 async function writeFreshMarker(
   db: Db,
   databaseName: string,
@@ -260,7 +288,7 @@ async function writeFreshMarker(
   appVersion: string,
 ) {
   await db.$client.query(
-    `CREATE TABLE ?? (
+    `CREATE TABLE IF NOT EXISTS ?? (
        id int PRIMARY KEY,
        database_name varchar(64) NOT NULL,
        expected bigint NOT NULL,
@@ -269,7 +297,7 @@ async function writeFreshMarker(
     [FRESH_MARKER],
   );
   await db.$client.query(
-    "INSERT INTO ?? (id, database_name, expected, app_version) VALUES (1, ?, ?, ?)",
+    "INSERT INTO ?? (id, database_name, expected, app_version) VALUES (1, ?, ?, ?) ON DUPLICATE KEY UPDATE database_name = VALUES(database_name), expected = VALUES(expected), app_version = VALUES(app_version)",
     [FRESH_MARKER, databaseName, expected, appVersion],
   );
 }
@@ -296,6 +324,9 @@ async function readFreshMarker(
       "SELECT database_name, expected, app_version FROM ??",
       [FRESH_MARKER],
     );
+    // a claim interrupted between creating and filling it proved nothing, and
+    // nothing can have been built under it yet
+    if (rows.length === 0) return { kind: "owned", expected: null };
     if (rows.length !== 1) return { kind: "damaged" };
     const expected = Number(rows[0].expected);
     if (
@@ -455,10 +486,20 @@ export async function prepareDesktopDatabase(options: DesktopDatabaseOptions) {
   if (plan.kind === "ready") return;
   options.onBusy?.();
   if (plan.kind === "fresh") {
-    if (fresh.kind === "owned")
+    if (fresh.kind === "owned") {
       // our own leftovers from an interrupted first installation
       await dropAllTables(db);
-    else await writeFreshMarker(db, databaseName, expected, options.appVersion);
+      // dropping everything took the claim with it, so it is written again
+      // before anything is created: without it a second cut leaves tables
+      // that belong to nobody and cannot be rebuilt
+      await writeFreshMarker(
+        db,
+        databaseName,
+        expected,
+        options.appVersion,
+      );
+    } else
+      await writeFreshMarker(db, databaseName, expected, options.appVersion);
     try {
       await migrate(db, { migrationsFolder: options.migrationsFolder });
     } catch (error) {
