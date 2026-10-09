@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { adminBranches, branches } from "@cashier/db";
+import { adminBranches, branches, users } from "@cashier/db";
 import request from "supertest";
 import { describe, expect } from "vitest";
 import { it, testId } from "../support/ids.js";
@@ -370,5 +370,43 @@ describe("online admin management", () => {
       .expect(200);
 
     expect((await signIn()).status).toBe(200);
+  });
+
+  it("refuses a password past bcrypt's 72 bytes and leaves the account alone", async () => {
+    const owner = await loginAsAdmin("owner", { isSuperAdmin: true });
+    const created = await request(onlineApp)
+      .post("/api/admins")
+      .set(owner)
+      .send({ name: "مدير", username: "byte-limit", password: "secret123" })
+      .expect(201);
+    const [before] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, created.body.id));
+
+    // 37 Arabic characters are only 37 long, but 74 bytes
+    const refused = await request(onlineApp)
+      .put(`/api/admins/${created.body.id}`)
+      .set(owner)
+      .send({ password: "ا".repeat(37) })
+      .expect(400);
+    await request(onlineApp)
+      .post("/api/admins")
+      .set(owner)
+      .send({ name: "مدير", username: "byte-limit-2", password: "ا".repeat(37) })
+      .expect(400);
+
+    const [after] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, created.body.id));
+    expect(after.passwordHash).toBe(before.passwordHash);
+    expect(after.tokenVersion).toBe(before.tokenVersion);
+    expect(refused.body.details[0].message).toMatch(/72/);
+    // the password the account already had still signs in
+    await request(onlineApp)
+      .post("/api/auth/login")
+      .send({ role: "admin", username: "byte-limit", password: "secret123" })
+      .expect(200);
   });
 });

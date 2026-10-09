@@ -42,3 +42,53 @@ describe("admin request bodies", () => {
     );
   });
 });
+
+describe("admin passwords and bcrypt's 72-byte limit", () => {
+  // bcrypt hashes only the first 72 bytes, so a longer password and one that
+  // shares those 72 bytes would both sign in.
+  const ascii = (bytes: number) => "a".repeat(bytes);
+  // Arabic letters are two UTF-8 bytes each, so 36 of them are 72 bytes.
+  const arabic = (letters: number) => "ا".repeat(letters);
+
+  it("accepts a password of exactly 72 bytes", () => {
+    expect(
+      adminInput.safeParse({ ...newAdmin, password: ascii(72) }).success,
+    ).toBe(true);
+    expect(
+      adminUpdateInput.safeParse({ password: ascii(72) }).success,
+    ).toBe(true);
+  });
+
+  it("rejects a password longer than 72 bytes", () => {
+    for (const tooLong of [ascii(73), arabic(37)])
+      expect(
+        adminInput.safeParse({ ...newAdmin, password: tooLong }).success,
+      ).toBe(false);
+    expect(adminUpdateInput.safeParse({ password: ascii(73) }).success).toBe(
+      false,
+    );
+  });
+
+  it("counts bytes, not characters, so Arabic and emoji stop sooner", () => {
+    expect(
+      adminInput.safeParse({ ...newAdmin, password: arabic(36) }).success,
+    ).toBe(true);
+    expect(
+      adminInput.safeParse({ ...newAdmin, password: "😀".repeat(18) }).success,
+    ).toBe(true);
+    expect(
+      adminInput.safeParse({ ...newAdmin, password: "😀".repeat(19) }).success,
+    ).toBe(false);
+  });
+
+  it("explains the limit in a message the person can act on", () => {
+    const parsed = adminInput.safeParse({ ...newAdmin, password: ascii(73) });
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues[0].message).toMatch(/72/);
+  });
+
+  it("still allows an edit that carries no password", () => {
+    expect(adminUpdateInput.safeParse({ isActive: false }).success).toBe(true);
+  });
+});

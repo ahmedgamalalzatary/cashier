@@ -49,6 +49,13 @@ async function issueCode(
 const link = (code: string) =>
   request(onlineApp).post("/api/device/link").send({ code });
 
+const linkWithVersion = (code: string, version?: string) => {
+  const pending = request(onlineApp).post("/api/device/link").send({ code });
+  return version === undefined
+    ? pending
+    : pending.set("X-Cashier-Version", version);
+};
+
 const deviceRows = (branchId: string) =>
   db.select().from(devices).where(eq(devices.branchId, branchId));
 
@@ -68,6 +75,36 @@ describe("online device link", () => {
       .from(linkCodes)
       .where(eq(linkCodes.codeHash, sha256("ABCD2345")));
     expect(code.usedAt).not.toBeNull();
+  });
+
+  it("records which version of Cashier the PC runs when it links", async () => {
+    const branchId = await createBranch("فرع إصدار");
+    await issueCode(branchId, "ABCD2345");
+
+    await linkWithVersion("ABCD2345", "0.3.0").expect(201);
+
+    const [device] = await deviceRows(branchId);
+    expect(device.appVersion).toBe("0.3.0");
+  });
+
+  it("keeps an oversized version header to a bounded length", async () => {
+    const branchId = await createBranch("فرع إصدار طويل");
+    await issueCode(branchId, "ABCD2345");
+
+    await linkWithVersion("ABCD2345", "9".repeat(500)).expect(201);
+
+    const [device] = await deviceRows(branchId);
+    expect(device.appVersion).toBe("9".repeat(64));
+  });
+
+  it("links without a version header", async () => {
+    const branchId = await createBranch("فرع بلا إصدار");
+    await issueCode(branchId, "ABCD2345");
+
+    await linkWithVersion("ABCD2345").expect(201);
+
+    const [device] = await deviceRows(branchId);
+    expect(device.appVersion).toBeNull();
   });
 
   it("accepts a code only once", async () => {

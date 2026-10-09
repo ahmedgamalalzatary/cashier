@@ -1,3 +1,5 @@
+import { warnIfPasswordTooLongForBcrypt } from '@cashier/shared';
+
 type SeedEnvironment = Record<string, string | undefined>;
 
 export function getAdminSeedConfig(env: SeedEnvironment) {
@@ -7,6 +9,7 @@ export function getAdminSeedConfig(env: SeedEnvironment) {
 
   if (!username) throw new Error('ADMIN_USERNAME is required in the root .env file');
   if (!password) throw new Error('ADMIN_PASSWORD is required in the root .env file');
+  warnIfPasswordTooLongForBcrypt(password, 'ADMIN_PASSWORD');
 
   return { name, username, password };
 }

@@ -5,6 +5,7 @@ import type { ManagedUser } from "@cashier/shared";
 import { Button } from "@cashier/web-core/components/ui/button";
 import { Field } from "@cashier/web-core/components/ui/field";
 import { Modal } from "@cashier/web-core/components/ui/modal";
+import { passwordTooLongMessage } from "../../lib/password";
 import { userRequestBody, type UserFormState } from "../../models/user-model";
 import { createUser, updateUser } from "../../services/users-service";
 
@@ -35,6 +36,12 @@ export function UserModal({
     event.preventDefault();
     setSaving(true);
     setError("");
+    const tooLong = passwordTooLongMessage(form.password);
+    if (tooLong) {
+      setError(tooLong);
+      setSaving(false);
+      return;
+    }
     try {
       const body = userRequestBody(form, Boolean(user));
       if (user) await updateUser(user.id, body);

@@ -32,4 +32,14 @@ describe("auth schemas", () => {
         .success,
     ).toBe(false);
   });
+
+  it("still accepts a long password so accounts set before the byte limit keep working", () => {
+    // bcrypt only ever used the first 72 bytes of these, and sign-in compares
+    // the same way, so refusing long input here would lock people out of
+    // accounts that were created before passwords were capped.
+    const legacy = "a".repeat(73);
+
+    expect(loginInput.parse({ role: "admin", username: "admin", password: legacy }))
+      .toEqual({ role: "admin", username: "admin", password: legacy });
+  });
 });

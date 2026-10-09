@@ -362,4 +362,34 @@ describe("online admin management screen", () => {
 
     expect(controls.some((label) => label.includes("حذف"))).toBe(false);
   });
+
+  it("refuses a password past bcrypt's 72 bytes before calling the server", async () => {
+    await loaded();
+    const header = rendered(PageHeader)[0].props as { actions?: ReactNode };
+    const addButton = ofType(header.actions, Button).find((button) =>
+      text(button).includes("إضافة مدير"),
+    )!;
+    (addButton.props as { onClick: () => void }).onClick();
+    const modalChildren = () =>
+      (rendered(Modal)[0].props as { children?: ReactNode }).children;
+    for (const [index, value] of [
+      "مدير جديد",
+      "new-manager",
+      // 37 Arabic letters are 74 bytes, though only 37 characters long
+      "ا".repeat(37),
+    ].entries()) {
+      const field = ofType(modalChildren(), Field)[index];
+      (field.props as { onChange: (event: unknown) => void }).onChange({
+        target: { value },
+      });
+    }
+    const [form] = ofType(modalChildren(), "form");
+
+    await (
+      form!.props as { onSubmit: (event: unknown) => void }
+    ).onSubmit({ preventDefault: () => {} });
+
+    expect(calls.createAdmin).not.toHaveBeenCalled();
+    expect(text(render())).toContain("72");
+  });
 });

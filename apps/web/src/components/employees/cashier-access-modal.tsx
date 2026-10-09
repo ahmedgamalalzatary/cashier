@@ -5,6 +5,7 @@ import type { Employee } from "@cashier/shared";
 import { Button } from "@cashier/web-core/components/ui/button";
 import { Field } from "@cashier/web-core/components/ui/field";
 import { Modal } from "@cashier/web-core/components/ui/modal";
+import { passwordTooLongMessage } from "@cashier/web-core/lib/password";
 import { grantCashierAccess } from "@/services/employees-service";
 
 export function CashierAccessModal({
@@ -28,6 +29,12 @@ export function CashierAccessModal({
     event.preventDefault();
     setSaving(true);
     setError("");
+    const tooLong = passwordTooLongMessage(password);
+    if (tooLong) {
+      setError(tooLong);
+      setSaving(false);
+      return;
+    }
     try {
       await grantCashierAccess(employee.id, {
         username: username.trim(),

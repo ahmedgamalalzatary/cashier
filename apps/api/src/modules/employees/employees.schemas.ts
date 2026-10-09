@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { newPassword } from "@cashier/server-core";
 
 const MAX_MONEY = 9_999_999_999.99;
 const MONEY_EPSILON = 1e-9;
@@ -69,11 +70,11 @@ export type EmployeeUpdateInput = z.infer<typeof employeeUpdateInput>;
 
 export const cashierAccessInput = z.object({
   username: z.string().trim().min(1).max(100),
-  password: z.string().min(8).max(255),
+  password: newPassword,
 });
 
 export const cashierPasswordInput = z.object({
-  password: z.string().min(8).max(255),
+  password: newPassword,
 });
 
 export const employeeIdParam = z.string().uuid();

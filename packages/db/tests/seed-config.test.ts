@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { getAdminSeedConfig } from "../src/seed-config.js";
 import { seedAdmin, syncConfiguredAdmin } from "../src/seed-admin.js";
 
@@ -19,13 +19,42 @@ describe("admin seed configuration", () => {
     });
   });
 
-  it("requires a username and a non-empty password", () => {
-    expect(() =>
+it("requires a username and a non-empty password", () => {
+expect(() =>
       getAdminSeedConfig({ ADMIN_PASSWORD: 'strong-password-123' }),
     ).toThrow('ADMIN_USERNAME');
     expect(() =>
       getAdminSeedConfig({ ADMIN_USERNAME: 'admin', ADMIN_PASSWORD: '' }),
     ).toThrow('ADMIN_PASSWORD');
+  });
+
+  it("warns instead of refusing when the configured password is over bcrypt's 72 bytes", () => {
+    // A PC already running with a longer ADMIN_PASSWORD keeps working: bcrypt
+    // only ever hashed the first 72 bytes, and sign-in compares them the same
+    // way. Refusing here would stop the business API from starting.
+    const warnings: string[] = [];
+    vi.spyOn(console, "warn").mockImplementation((message) => {
+      warnings.push(String(message));
+    });
+
+    const config = getAdminSeedConfig({
+      ADMIN_USERNAME: 'admin',
+      ADMIN_PASSWORD: 'a'.repeat(73),
+    });
+
+    expect(config.password).toBe('a'.repeat(73));
+    expect(warnings.join('\n')).toMatch(/72/);
+  });
+
+  it('stays quiet about a password inside the limit', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    getAdminSeedConfig({
+      ADMIN_USERNAME: 'admin',
+      ADMIN_PASSWORD: 'a'.repeat(72),
+    });
+
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 

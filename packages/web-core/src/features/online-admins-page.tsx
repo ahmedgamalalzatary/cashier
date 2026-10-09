@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { Pencil, Plus, ShieldCheck, UserCheck } from "lucide-react";
+import { passwordTooLongMessage } from "../lib/password";
 import { useAuth } from "../components/auth/auth-provider";
 import { useBranch } from "../components/branches/branch-provider";
 import { Badge } from "../components/ui/badge";
@@ -80,6 +81,13 @@ export function OnlineAdminsPage() {
     if (form.id === undefined && form.password.length < 8) {
       setError("كلمة المرور 8 أحرف على الأقل");
       return;
+    }
+    if (form.password) {
+      const tooLong = passwordTooLongMessage(form.password);
+      if (tooLong) {
+        setError(tooLong);
+        return;
+      }
     }
     await run(async () => {
       if (form.id === undefined)

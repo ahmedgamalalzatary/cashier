@@ -49,4 +49,24 @@ describe("user schemas", () => {
       name: "جديد",
     });
   });
+
+  it("refuses a user password longer than bcrypt's 72 bytes", () => {
+    const admin = {
+      name: "مدير",
+      username: "admin",
+      role: "admin",
+    } as const;
+
+    expect(
+      userInput.safeParse({ ...admin, password: "a".repeat(72) }).success,
+    ).toBe(true);
+    expect(
+      userInput.safeParse({ ...admin, password: "a".repeat(73) }).success,
+    ).toBe(false);
+    expect(userUpdateInput.safeParse({ password: "a".repeat(73) }).success).toBe(
+      false,
+    );
+    // an edit without a password is still fine
+    expect(userUpdateInput.safeParse({ isActive: true }).success).toBe(true);
+  });
 });

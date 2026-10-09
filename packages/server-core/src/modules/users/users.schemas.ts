@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { newPassword } from "../../password.js";
 
-const password = z.string().min(8).max(255);
+const password = newPassword;
 const editableFields = z.object({
   name: z.string().trim().min(1).max(191),
   username: z.string().trim().min(1).max(100),

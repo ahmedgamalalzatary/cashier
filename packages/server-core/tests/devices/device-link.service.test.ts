@@ -39,8 +39,8 @@ function repoWith(code: Code | undefined) {
   } as unknown as DeviceLinkRepository & { tx: typeof tx };
 }
 
-const link = (repo: DeviceLinkRepository, code: string) =>
-  new DeviceLinkService(repo, () => NOW).link(code);
+const link = (repo: DeviceLinkRepository, code: string, version?: string) =>
+  new DeviceLinkService(repo, () => NOW).link(code, version);
 
 describe("DeviceLinkService.link", () => {
   it("links the PC to the code's branch and hands out a token once", async () => {
@@ -57,6 +57,49 @@ describe("DeviceLinkService.link", () => {
       branchId,
       sha256(result.deviceToken),
       NOW,
+      undefined,
+    );
+  });
+
+  it("stores the PC's version on the device it creates", async () => {
+    const repo = repoWith(validCode);
+
+    await link(repo, CODE, " 0.3.0 ");
+
+    expect(repo.tx.replaceDevice).toHaveBeenCalledWith(
+      branchId,
+      expect.any(String),
+      NOW,
+      "0.3.0",
+    );
+  });
+
+  it.each([
+    ["no header", undefined],
+    ["only whitespace", "   "],
+  ])("links with %s and stores no version", async (_case, version) => {
+    const repo = repoWith(validCode);
+
+    await link(repo, CODE, version);
+
+    expect(repo.tx.replaceDevice).toHaveBeenCalledWith(
+      branchId,
+      expect.any(String),
+      NOW,
+      undefined,
+    );
+  });
+
+  it("bounds an over-long version so one PC cannot bloat the row", async () => {
+    const repo = repoWith(validCode);
+
+    await link(repo, CODE, "9".repeat(500));
+
+    expect(repo.tx.replaceDevice).toHaveBeenCalledWith(
+      branchId,
+      expect.any(String),
+      NOW,
+      "9".repeat(64),
     );
   });
 

@@ -22,7 +22,7 @@ export class DeviceLinkService {
     private now: () => Date = () => new Date(),
   ) {}
 
-  async link(rawCode: string) {
+  async link(rawCode: string, appVersion?: string) {
     // People type codes from a screen: forgive case, spaces and a dash.
     const code = rawCode.replace(/[\s-]/g, "").toUpperCase();
     if (!CODE_PATTERN.test(code)) throw new HttpError(400, INVALID_CODE);
@@ -30,6 +30,8 @@ export class DeviceLinkService {
     const codeHash = hashCode(code);
     const at = this.now();
     const deviceToken = randomBytes(32).toString("base64url");
+    // Diagnostic only: a missing or odd version must never stop a real link.
+    const version = appVersion?.trim().slice(0, 64) || undefined;
     const branch = await this.repo.transaction(async (repo) => {
       const found = await repo.findCodeForUpdate(codeHash);
       if (
@@ -44,6 +46,7 @@ export class DeviceLinkService {
         found.branchId,
         hashDeviceToken(deviceToken),
         at,
+        version,
       );
       return { id: found.branchId, name: found.branchName };
     });

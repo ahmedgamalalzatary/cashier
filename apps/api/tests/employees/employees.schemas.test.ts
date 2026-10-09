@@ -2,6 +2,7 @@ import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import {
   cashierAccessInput,
+  cashierPasswordInput,
   employeeIdParam,
   employeeInput,
   employeeUpdateInput,
@@ -75,5 +76,26 @@ describe("employee schemas", () => {
     expect(employeeIdParam.safeParse(0).success).toBe(false);
     expect(employeeIdParam.safeParse("abc").success).toBe(false);
     expect(employeeIdParam.parse(testId(5))).toBe(testId(5));
+  });
+
+  it("refuses a cashier password longer than bcrypt's 72 bytes", () => {
+    expect(
+      cashierAccessInput.safeParse({
+        username: "cashier-1",
+        password: "a".repeat(72),
+      }).success,
+    ).toBe(true);
+    expect(
+      cashierAccessInput.safeParse({
+        username: "cashier-1",
+        password: "a".repeat(73),
+      }).success,
+    ).toBe(false);
+    expect(
+      cashierPasswordInput.safeParse({ password: "a".repeat(73) }).success,
+    ).toBe(false);
+    expect(
+      cashierPasswordInput.safeParse({ password: "a".repeat(72) }).success,
+    ).toBe(true);
   });
 });

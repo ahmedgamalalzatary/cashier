@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { newPassword } from "../../password.js";
 
-const password = z.string().min(8).max(255);
+const password = newPassword;
 // A branch ticked twice must not reach the unique admin_branches key twice.
 const branchIds = z
   .array(z.string().uuid())

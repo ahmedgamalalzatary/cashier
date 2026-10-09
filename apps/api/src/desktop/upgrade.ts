@@ -171,23 +171,44 @@ async function withClientOptions<T>(
   }
 }
 
-function run(program: string, args: string[], input?: string) {
-  return new Promise<{ code: number | null; stderr: string }>((resolve) => {
-    const stdin = input ? fs.openSync(input, "r") : "ignore";
-    let stderr = "";
-    const child = spawn(program, args, {
-      stdio: [stdin, "ignore", "pipe"],
-      windowsHide: true,
-    });
-    child.stderr?.on("data", (data: Buffer) => {
-      if (stderr.length < 8_000) stderr += data.toString();
-    });
+/**
+ * Runs a MySQL client program to completion. A program can report a terminal
+ * state more than once (a spawn failure emits `error` and then `close`), and the
+ * descriptor Windows later reuses for something else must not be closed twice,
+ * so the run settles exactly once.
+ */
+export function runClient(
+  program: string,
+  args: string[],
+  input?: string,
+): Promise<{ code: number | null; stderr: string }> {
+  return new Promise((resolve) => {
+    let stdin: number | "ignore" = "ignore";
+    let settled = false;
     const finish = (code: number | null, error?: Error) => {
-      if (typeof stdin === "number") fs.closeSync(stdin);
+      if (settled) return;
+      settled = true;
+      if (typeof stdin === "number") {
+        fs.closeSync(stdin);
+        stdin = "ignore";
+      }
       resolve({ code, stderr: error ? error.message : stderr });
     };
-    child.once("error", (error) => finish(null, error));
-    child.once("close", (code) => finish(code));
+    let stderr = "";
+    try {
+      if (input) stdin = fs.openSync(input, "r");
+      const child = spawn(program, args, {
+        stdio: [stdin, "ignore", "pipe"],
+        windowsHide: true,
+      });
+      child.stderr?.on("data", (data: Buffer) => {
+        if (stderr.length < 8_000) stderr += data.toString();
+      });
+      child.once("error", (error) => finish(null, error));
+      child.once("close", (code) => finish(code));
+    } catch (error) {
+      finish(null, error as Error);
+    }
   });
 }
 
@@ -275,7 +296,7 @@ async function backUp(
   const dumped = await withClientOptions(
     options.databaseUrl,
     (file, database) =>
-      run(path.join(options.mysqlBin, "mysqldump.exe"), [
+      runClient(path.join(options.mysqlBin, "mysqldump.exe"), [
         `--defaults-file=${file}`,
         "--single-transaction",
         "--routines",
@@ -398,7 +419,7 @@ export async function restoreDesktopBackup(options: {
   const restored = await withClientOptions(
     options.databaseUrl,
     (file, database) =>
-      run(
+      runClient(
         path.join(options.mysqlBin, "mysql.exe"),
         [
           `--defaults-file=${file}`,

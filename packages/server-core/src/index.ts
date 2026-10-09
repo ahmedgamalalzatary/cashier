@@ -1,5 +1,6 @@
 export * from "./access.js";
 export * from "./env.js";
+export * from "./password.js";
 export * from "./middleware/error.js";
 export * from "./middleware/validation.js";
 export * from "./middleware/auth.js";

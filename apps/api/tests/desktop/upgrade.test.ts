@@ -1,13 +1,16 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { Db } from "@cashier/db";
 import {
   DesktopStartupError,
   backupsToDelete,
   isCompleteDump,
   planUpgrade,
   readUpgradeState,
+  restoreDesktopBackup,
+  runClient,
   writeUpgradeState,
   type UpgradeState,
 } from "../../src/desktop/upgrade.js";
@@ -33,6 +36,7 @@ const failed: UpgradeState = {
 
 const directories: string[] = [];
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const directory of directories.splice(0)) {
     if (!directory.startsWith(path.join(os.tmpdir(), "cashier-upgrade-")))
       throw new Error("Unexpected test directory");
@@ -134,5 +138,164 @@ describe("desktop backups", () => {
     const directory = scratch();
     fs.writeFileSync(path.join(directory, "upgrade-in-progress.json"), "{");
     expect(() => readUpgradeState(directory)).toThrow(DesktopStartupError);
+  });
+});
+
+/**
+ * Counts the descriptors this code closes, so a second close of a descriptor
+ * Windows has already handed to someone else shows up as a number instead of
+ * only as an uncaught EBADF.
+ */
+function countClosedDescriptors() {
+  const close = vi.spyOn(fs, "closeSync");
+  return () => close.mock.calls.filter(([fd]) => typeof fd === "number").length;
+}
+
+const node = process.execPath;
+const script = (source: string) => [node, ["-e", source]] as const;
+
+describe("running a MySQL client program", () => {
+  const withBackup = () => {
+    const directory = scratch();
+    const input = path.join(directory, "backup.sql");
+    fs.writeFileSync(input, "SELECT 1;\n");
+    return { directory, input };
+  };
+
+  it("closes the backup descriptor once when the program cannot start", async () => {
+    const { directory, input } = withBackup();
+    const closed = countClosedDescriptors();
+
+    const result = await runClient(
+      path.join(directory, "missing-mysql.exe"),
+      [],
+      input,
+    );
+
+    expect(closed()).toBe(1);
+    expect(result.code).toBeNull();
+    expect(result.stderr).toMatch(/ENOENT/);
+  });
+
+  it("closes the backup descriptor once after a program that ran and failed", async () => {
+    const { input } = withBackup();
+    const closed = countClosedDescriptors();
+    const [program, args] = script(
+      "process.stderr.write('bad dump'); process.exit(3)",
+    );
+
+    const result = await runClient(program, args, input);
+
+    expect(closed()).toBe(1);
+    expect(result).toEqual({ code: 3, stderr: "bad dump" });
+  });
+
+  it("closes the backup descriptor once after a program that succeeded", async () => {
+    const { input } = withBackup();
+    const closed = countClosedDescriptors();
+    const [program, args] = script("process.stdout.write('ignored')");
+
+    const result = await runClient(program, args, input);
+
+    expect(closed()).toBe(1);
+    expect(result).toEqual({ code: 0, stderr: "" });
+  });
+
+  it("reports a program that cannot be opened instead of throwing out of the run", async () => {
+    const { input } = withBackup();
+    const closed = countClosedDescriptors();
+    vi.spyOn(fs, "openSync").mockImplementation(() => {
+      throw new Error("EMFILE: too many open files");
+    });
+
+    const result = await runClient(node, ["-e", ""], input);
+
+    expect(closed()).toBe(0);
+    expect(result).toEqual({ code: null, stderr: "EMFILE: too many open files" });
+  });
+});
+
+describe("restoring the backup taken before a failed update", () => {
+  const dump = "-- MySQL dump\n-- Dump completed on 2026-10-08 10:00:00\n";
+
+  /** A database still at the checkpoint the backup was taken from. */
+  const databaseAt = (from: number) =>
+    ({
+      $client: {
+        query: vi.fn(async (sql: string) =>
+          sql.includes("information_schema")
+            ? [[{ name: "__drizzle_migrations" }], []]
+            : [[{ latest: from }], []],
+        ),
+        getConnection: vi.fn(async () => ({
+          query: vi.fn(async () => [[], []]),
+          release: vi.fn(),
+        })),
+      },
+    }) as unknown as Db;
+
+  const failedUpdate = (backup: string, dataDir: string) =>
+    writeUpgradeState(dataDir, { ...failed, backup });
+
+  /** A bin folder holding a `mysql.exe` that fails the way a missing one does. */
+  const unusableClient = (directory: string) => {
+    const bin = path.join(directory, "bin");
+    fs.mkdirSync(bin);
+    fs.copyFileSync(node, path.join(bin, "mysql.exe"));
+    return bin;
+  };
+
+  it("gives one recoverable error and keeps the backup when the program cannot start", async () => {
+    const directory = scratch();
+    const backup = path.join(directory, "pre-200-to-300.sql");
+    fs.writeFileSync(backup, dump);
+    failedUpdate(backup, directory);
+
+    await expect(
+      restoreDesktopBackup({
+        db: databaseAt(200),
+        databaseUrl: "mysql://cashier:secret@127.0.0.1:3307/cashier_scratch",
+        mysqlBin: path.join(directory, "no-mysql-here"),
+        dataDir: directory,
+      }),
+    ).rejects.toThrow(DesktopStartupError);
+    // an escaping second close would surface here as an unhandled EBADF
+    expect(fs.readFileSync(backup, "utf8")).toBe(dump);
+    expect(readUpgradeState(directory)?.state).toBe("in-progress");
+  });
+
+  it("keeps the recovery marker and backup when the program exits unsuccessfully", async () => {
+    const directory = scratch();
+    const backup = path.join(directory, "pre-200-to-300.sql");
+    fs.writeFileSync(backup, dump);
+    failedUpdate(backup, directory);
+
+    const failure = await restoreDesktopBackup({
+      db: databaseAt(200),
+      databaseUrl: "mysql://cashier:secret@127.0.0.1:3307/cashier_scratch",
+      mysqlBin: unusableClient(directory),
+      dataDir: directory,
+    }).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(DesktopStartupError);
+    expect((failure as DesktopStartupError).canRestore).toBe(true);
+    expect(fs.readFileSync(backup, "utf8")).toBe(dump);
+    expect(readUpgradeState(directory)?.state).toBe("in-progress");
+  });
+
+  it("refuses to restore a backup that mysqldump did not finish", async () => {
+    const directory = scratch();
+    const backup = path.join(directory, "pre-200-to-300.sql");
+    fs.writeFileSync(backup, "-- MySQL dump\nINSERT INTO t VALUES (1");
+    failedUpdate(backup, directory);
+
+    await expect(
+      restoreDesktopBackup({
+        db: databaseAt(200),
+        databaseUrl: "mysql://cashier:secret@127.0.0.1:3307/cashier_scratch",
+        mysqlBin: unusableClient(directory),
+        dataDir: directory,
+      }),
+    ).rejects.toThrow(/missing or incomplete/);
   });
 });

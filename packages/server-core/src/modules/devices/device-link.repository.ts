@@ -36,10 +36,21 @@ export class DeviceLinkRepository {
   }
 
   /** One PC per branch (plan D1): the branch's previous PC loses its token. */
-  async replaceDevice(branchId: string, tokenHash: string, at: Date) {
+  async replaceDevice(
+    branchId: string,
+    tokenHash: string,
+    at: Date,
+    appVersion?: string,
+  ) {
     await this.db.delete(devices).where(eq(devices.branchId, branchId));
     await this.db
       .insert(devices)
-      .values({ branchId, tokenHash, linkedAt: at, lastSeenAt: at });
+      .values({
+        branchId,
+        tokenHash,
+        linkedAt: at,
+        lastSeenAt: at,
+        ...(appVersion ? { appVersion } : {}),
+      });
   }
 }

@@ -19,7 +19,12 @@ export function createDevicesModule(db: Db) {
     createLoginRateLimiter({ identity: () => "device-link" }),
     async (req, res) => {
       const { code } = linkInput.parse(req.body);
-      res.status(201).json(await service.link(code));
+      // Recorded for support only; a PC without it still links.
+      res
+        .status(201)
+        .json(
+          await service.link(code, req.get("X-Cashier-Version") ?? undefined),
+        );
     },
   );
   return router;
