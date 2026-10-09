@@ -234,4 +234,48 @@ describe("a PC holding one branch tries another branch's code", () => {
     },
     60_000,
   );
+
+  it(
+    "says what to do when the answer was lost after online had already committed",
+    async () => {
+      const local = await pcDatabase();
+      const target = await onlineBranch("فرع ضائع");
+      const lost = await issueCode(target, "WXYZ6789");
+      // The real endpoint commits and hands out a token; this PC never sees it.
+      // There is no local record to resume from, and the code is now spent.
+      const lostAnswer = await fetch(`${apiUrl}/device/link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: lost }),
+      });
+      expect(lostAnswer.status).toBe(201);
+
+      const file = settingsFile();
+      await expect(
+        linkDesktop({
+          settingsFile: file,
+          code: lost,
+          appVersion: "0.3.0",
+          branches: databaseBranches(local),
+        }),
+      ).rejects.toThrow("كود ربط جديد");
+
+      // and the honest advice is right: a fresh code is what actually works
+      expect(await localNames(local)).toEqual([]);
+      expect(fs.readFileSync(file, "utf8")).toBe(`ONLINE_API_URL="${apiUrl}"\n`);
+      const replacement = await issueCode(target, "MNPQ2345");
+      await expect(
+        linkDesktop({
+          settingsFile: file,
+          code: replacement,
+          appVersion: "0.3.0",
+          branches: databaseBranches(local),
+        }),
+      ).resolves.toMatchObject({ id: target });
+      // the spent code is still spent; the test never made it reusable
+      expect(await usedAtOf(lost)).not.toBeNull();
+      expect(await usedAtOf(replacement)).not.toBeNull();
+    },
+    60_000,
+  );
 });

@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   DEFAULT_ONLINE_API_URL,
+  fileLink,
   linkDesktop,
   onlineApiUrl,
   readSettings,
@@ -276,5 +277,198 @@ describe("linking this PC", () => {
 
     expect(branches.saved).toEqual([]);
     expect(fs.readFileSync(file, "utf8")).toBe("");
+  });
+});
+
+describe("a link that online accepted but this PC did not finish", () => {
+  const OTHER = { id: "019a1234-5678-7000-8000-000000000021", name: "فرع آخر" };
+  const pendingPath = (file: string) =>
+    path.join(path.dirname(file), "pending-link.json");
+  const writePending = (file: string, value: unknown) =>
+    fs.writeFileSync(pendingPath(file), JSON.stringify(value));
+  /** Any online request would be a bug: the answer is already on disk. */
+  const noOnline: typeof globalThis.fetch = () => {
+    throw new Error("online must not be asked again");
+  };
+
+  it("writes the record before the branch row, so a crash still finds it", async () => {
+    const file = settingsFile("");
+    const seen: (string | null)[] = [];
+    const branches: LocalBranches = {
+      list: async () => [],
+      save: async () => {
+        seen.push(fs.existsSync(pendingPath(file)) ? "recorded" : null);
+      },
+    };
+
+    await linkDesktop({
+      settingsFile: file,
+      code: "ABCD2345",
+      appVersion: "0.3.0",
+      branches,
+      fetch: answer(201, { deviceToken: TOKEN, branch: BRANCH }),
+    });
+
+    expect(seen).toEqual(["recorded"]);
+    // and it is gone once the settings carry the link
+    expect(fs.existsSync(pendingPath(file))).toBe(false);
+  });
+
+  it("finishes the settings on the next start without asking online again", async () => {
+    const file = settingsFile("");
+    writePending(file, {
+      branchId: BRANCH.id,
+      branchName: BRANCH.name,
+      deviceToken: TOKEN,
+    });
+    const branches = localBranches([]);
+
+    await expect(
+      linkDesktop({
+        settingsFile: file,
+        code: "ABCD2345",
+        appVersion: "0.3.0",
+        branches,
+        fetch: noOnline,
+      }),
+    ).resolves.toEqual(BRANCH);
+
+    expect(branches.saved).toEqual([BRANCH]);
+    expect(fs.readFileSync(file, "utf8")).toContain(`DEVICE_TOKEN="${TOKEN}"`);
+    expect(fs.existsSync(pendingPath(file))).toBe(false);
+  });
+
+  it("finishes only the settings when the branch row was already saved", async () => {
+    const file = settingsFile('JWT_SECRET="keep me"\n');
+    writePending(file, {
+      branchId: BRANCH.id,
+      branchName: BRANCH.name,
+      deviceToken: TOKEN,
+    });
+    const branches = localBranches([BRANCH.id]);
+
+    await linkDesktop({
+      settingsFile: file,
+      code: "ABCD2345",
+      appVersion: "0.3.0",
+      branches,
+      fetch: noOnline,
+    });
+
+    // the same branch is only named again, never added twice
+    expect(branches.saved).toEqual([BRANCH]);
+    const settings = fs.readFileSync(file, "utf8");
+    expect(settings).toContain(`BRANCH_ID="${BRANCH.id}"`);
+    // settings this PC already had are kept
+    expect(settings).toContain('JWT_SECRET="keep me"');
+  });
+
+  it("clears a stale record once the settings already carry the link", async () => {
+    const file = settingsFile(
+      `BRANCH_ID="${BRANCH.id}"\nDEVICE_TOKEN="${TOKEN}"\n`,
+    );
+    writePending(file, {
+      branchId: BRANCH.id,
+      branchName: BRANCH.name,
+      deviceToken: TOKEN,
+    });
+
+    await expect(
+      linkDesktop({
+        settingsFile: file,
+        code: "ABCD2345",
+        appVersion: "0.3.0",
+        branches: localBranches([BRANCH.id]),
+        fetch: noOnline,
+      }),
+    ).rejects.toThrow("مربوط");
+    // recognised as finished, then cleaned up rather than left to rot
+    expect(fs.existsSync(pendingPath(file))).toBe(false);
+  });
+
+  it("refuses a record for another branch than this PC holds", async () => {
+    const file = settingsFile("");
+    writePending(file, {
+      branchId: OTHER.id,
+      branchName: OTHER.name,
+      deviceToken: TOKEN,
+    });
+    const branches = localBranches([BRANCH.id]);
+
+    await expect(
+      linkDesktop({
+        settingsFile: file,
+        code: "ABCD2345",
+        appVersion: "0.3.0",
+        branches,
+        fetch: noOnline,
+      }),
+    ).rejects.toThrow("فرعًا آخر");
+
+    expect(branches.saved).toEqual([]);
+    expect(fs.readFileSync(file, "utf8")).toBe("");
+    // kept, so the next start still refuses rather than linking the wrong branch
+    expect(fs.existsSync(pendingPath(file))).toBe(true);
+  });
+
+  it("keeps the record when the settings write fails", async () => {
+    const file = settingsFile("");
+    const branches = localBranches([]);
+    const files = fileLink(file);
+
+    await expect(
+      linkDesktop({
+        settingsFile: file,
+        code: "ABCD2345",
+        appVersion: "0.3.0",
+        branches,
+        fetch: answer(201, { deviceToken: TOKEN, branch: BRANCH }),
+        files: {
+          ...files,
+          writeLink: () => {
+            throw new Error("the disk is full");
+          },
+        },
+      }),
+    ).rejects.toThrow("the disk is full");
+
+    expect(branches.saved).toEqual([BRANCH]);
+    expect(fs.existsSync(pendingPath(file))).toBe(true);
+    expect(fs.readFileSync(file, "utf8")).toBe("");
+  });
+
+  it("never leaves the device token where anyone else can read it", async () => {
+    const file = settingsFile("");
+    let mode = 0;
+    const branches: LocalBranches = {
+      list: async () => [],
+      save: async () => {
+        mode = fs.statSync(pendingPath(file)).mode & 0o777;
+      },
+    };
+
+    await linkDesktop({
+      settingsFile: file,
+      code: "ABCD2345",
+      appVersion: "0.3.0",
+      branches,
+      fetch: answer(201, { deviceToken: TOKEN, branch: BRANCH }),
+    });
+
+    if (process.platform !== "win32") expect(mode).toBe(0o600);
+  });
+
+  it("tells the person a refused code may need replacing", async () => {
+    const file = settingsFile("");
+
+    await expect(
+      linkDesktop({
+        settingsFile: file,
+        code: "ABCD2345",
+        appVersion: "0.3.0",
+        branches: localBranches([]),
+        fetch: answer(400, { error: "كود الربط غير صحيح أو منتهي الصلاحية" }),
+      }),
+    ).rejects.toThrow("كود ربط جديد");
   });
 });

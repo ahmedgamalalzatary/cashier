@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 import { parse } from "dotenv";
 import { z } from "zod";
 import { branches, type Db } from "@cashier/db";
@@ -12,6 +13,18 @@ const OFFLINE =
 const ALREADY_LINKED = "هذا الجهاز مربوط بفرع بالفعل.";
 const OTHER_BRANCH =
   "بيانات هذا الجهاز تخص فرعًا آخر. اطلب كود ربط لذلك الفرع.";
+// Online cannot say why it refused a code, so this stays honest: it may be
+// wrong, expired, or already spent by an attempt whose answer was lost.
+const NEW_CODE =
+  "اطلب كود ربط جديدًا من المدير الرئيسي، لأن الكود المستعمل قد يكون انتهى أو استُهلك من محاولة سابقة.";
+
+/** The link online answered with, held on disk until this PC finishes it. */
+const pendingLink = z.object({
+  branchId: z.string().uuid(),
+  branchName: z.string().min(1),
+  deviceToken: z.string().min(32),
+});
+export type PendingLink = z.infer<typeof pendingLink>;
 
 export function readSettings(settingsFile: string) {
   return parse(fs.readFileSync(settingsFile));
@@ -72,10 +85,13 @@ export async function requestLink({
   const body: unknown = await response.json().catch(() => undefined);
   if (!response.ok) {
     const reason = z.object({ error: z.string() }).safeParse(body);
+    const reason_text = reason.success
+      ? reason.data.error
+      : `تعذر ربط الجهاز (${response.status})`;
+    // A refused code is the one failure a person can act on, and retrying the
+    // same code is exactly what cannot work once it has been spent.
     throw new Error(
-      reason.success
-        ? reason.data.error
-        : `تعذر ربط الجهاز (${response.status})`,
+      response.status === 400 ? `${reason_text} ${NEW_CODE}` : reason_text,
     );
   }
   const parsed = linkAnswer.safeParse(body);
@@ -130,6 +146,54 @@ export type LocalBranches = {
 };
 
 /**
+ * The local files a link touches. Separated so the interruption between each
+ * step can be exercised without pretending the disk is real.
+ */
+export type LinkFiles = {
+  read(): Record<string, string | undefined>;
+  writeLink(link: { branchId: string; deviceToken: string }): void;
+  /** The answer online gave, before this PC acted on it. */
+  readPending(): PendingLink | null;
+  writePending(pending: PendingLink): void;
+  clearPending(): void;
+};
+
+/**
+ * The settings file, and the record of a link that online accepted but this PC
+ * has not finished writing. The record holds a device token, so it is created
+ * readable only by this user, exactly like the other local secrets.
+ */
+export function fileLink(settingsFile: string): LinkFiles {
+  const record = path.join(path.dirname(settingsFile), "pending-link.json");
+  return {
+    read: () => readSettings(settingsFile),
+    writeLink: (link) => saveLink(settingsFile, link),
+    readPending: () => {
+      // Absent is the ordinary case: nothing was ever accepted. A file that is
+      // there but unusable proves nothing, so it is treated the same way.
+      try {
+        const parsed = pendingLink.safeParse(
+          JSON.parse(fs.readFileSync(record, "utf8")),
+        );
+        return parsed.success ? parsed.data : null;
+      } catch {
+        return null;
+      }
+    },
+    writePending: (pending) => {
+      const temporary = `${record}.tmp`;
+      try {
+        fs.writeFileSync(temporary, JSON.stringify(pending), { mode: 0o600 });
+        fs.renameSync(temporary, record);
+      } finally {
+        fs.rmSync(temporary, { force: true });
+      }
+    },
+    clearPending: () => fs.rmSync(record, { force: true }),
+  };
+}
+
+/**
  * Links this PC to its branch (plan Phase 9, D12): online first, then the
  * branch row, then the settings that point to it. A crash between the last two
  * leaves the branch row alone, and linking again with that branch's code
@@ -141,20 +205,52 @@ export async function linkDesktop({
   appVersion,
   branches,
   fetch,
+  files = fileLink(settingsFile),
 }: {
   settingsFile: string;
   code: string;
   appVersion: string;
   branches: LocalBranches;
   fetch?: typeof globalThis.fetch;
+  files?: LinkFiles;
 }) {
-  const source = readSettings(settingsFile);
-  if (source.BRANCH_ID?.trim()) throw new Error(ALREADY_LINKED);
-  const apiUrl = onlineApiUrl(source);
+  const source = files.read();
   const existing = await branches.list();
-  // Checked before asking online, so a code is never spent on a PC that
+  // Checked before anything else, so a code is never spent on a PC that
   // cannot take it.
   if (existing.length > 1) throw new Error(OTHER_BRANCH);
+  const pending = files.readPending();
+  // The settings already carry this link: the last step finished and only the
+  // removal of the record was lost.
+  if (
+    pending &&
+    source.BRANCH_ID?.trim() === pending.branchId &&
+    source.DEVICE_TOKEN?.trim() === pending.deviceToken
+  ) {
+    files.clearPending();
+    throw new Error(ALREADY_LINKED);
+  }
+  if (pending) {
+    // Finished earlier and only half applied. Applied now without spending
+    // another code, and only where it cannot contradict this PC's own data.
+    if (existing.length === 1 && existing[0].id !== pending.branchId)
+      throw new Error(OTHER_BRANCH);
+    await branches.save({
+      id: pending.branchId,
+      name: pending.branchName,
+    });
+    files.writeLink({
+      branchId: pending.branchId,
+      deviceToken: pending.deviceToken,
+    });
+    files.clearPending();
+    return {
+      id: pending.branchId,
+      name: pending.branchName,
+    };
+  }
+  if (source.BRANCH_ID?.trim()) throw new Error(ALREADY_LINKED);
+  const apiUrl = onlineApiUrl(source);
   const { deviceToken, branch } = await requestLink({
     apiUrl,
     code,
@@ -167,8 +263,12 @@ export async function linkDesktop({
   });
   if (existing.length === 1 && existing[0].id !== branch.id)
     throw new Error(OTHER_BRANCH);
+  // Online has already committed and will not give this answer again, so it is
+  // written down before anything local can fail.
+  files.writePending({ branchId: branch.id, branchName: branch.name, deviceToken });
   await branches.save(branch);
-  saveLink(settingsFile, { branchId: branch.id, deviceToken });
+  files.writeLink({ branchId: branch.id, deviceToken });
+  files.clearPending();
   return branch;
 }
 

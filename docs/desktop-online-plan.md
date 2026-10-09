@@ -721,6 +721,12 @@ Phase 10); a cashier cannot log in online; the old `api`, `web`, `cache-worker` 
   row, returns `{ branch, deviceToken }`. Re-linking a branch revokes the old device (D1).
 - Desktop first launch (no link in settings): show "Link this PC" screen; requires internet
   (D12). Save `DEVICE_TOKEN` + branch id in `settings.env`; insert the branch row locally.
+- The answer online sends is written to `pending-link.json` (owner-only, next to `settings.env`)
+  before the branch row and the settings, because online has already committed and will not answer
+  the same code twice. The next start finishes the work from that record instead of asking again,
+  and the record is removed once the settings carry the link. If online committed but the answer
+  never arrived there is nothing to resume from, and the person is told to ask for a new code;
+  making a lost answer recoverable would need an approved idempotency contract.
 - Accounts pull `GET /api/device/accounts` (device token): super-admin + admins assigned to
   the branch + `admin_branches` rows for this branch + branch row. Apply in one transaction with
   `@cashier_sync_apply = 1`; deactivate local admins that are no longer returned (D6, D13).
