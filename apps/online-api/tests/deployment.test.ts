@@ -84,36 +84,74 @@ describe("VPS deployment", () => {
     expect(entry).not.toMatch(/syncConfiguredAdmin\(\s*db,\s*\{\s*\n\s*name:/);
   });
 
-  it("ships the scripts the restore procedure depends on", () => {
+  it("reads the settings inside the container, never from the host", () => {
     const runbook = read("docs/docker.md");
 
-    expect(runbook).toContain("scripts/read-prod-env.sh");
-    expect(runbook).toContain("scripts/database-create-sql.sh");
-    expect(fs.existsSync(path.join(repoRoot, "scripts/read-prod-env.sh"))).toBe(
-      true,
-    );
-    expect(
-      fs.existsSync(path.join(repoRoot, "scripts/database-create-sql.sh")),
-    ).toBe(true);
-  });
-
-  it("does not parse the settings file with grep, cut, or a hard-coded collation", () => {
-    const runbook = read("docs/docker.md");
-
+    // Compose resolved the env file with its own rules already; re-reading it
+    // on the host is how the procedure ended up quoting names and mangling
+    // passwords before a command that drops the database.
+    expect(runbook).toContain("scripts/database-recreate.sh");
+    expect(runbook).not.toMatch(/read-prod-env/);
     expect(runbook).not.toMatch(/grep -E '\^MYSQL_/);
     expect(runbook).not.toMatch(/tr -d/);
+    expect(runbook).toContain('"$MYSQL_ROOT_PASSWORD"');
+    expect(runbook).toContain('"$MYSQL_DATABASE"');
     // a collation typed into the runbook is a claim about every database
     expect(runbook).not.toContain("utf8mb4_0900_ai_ci");
   });
 
-  it("checks that a dump is complete before anything destructive follows", () => {
+  it("verifies the dump it just wrote, not a freshly generated filename", () => {
     const runbook = read("docs/docker.md");
 
-    expect(runbook).toContain("-- Dump completed");
-    const checked = runbook.indexOf("-- Dump completed");
-    const dropped = runbook.indexOf("DROP DATABASE IF EXISTS");
+    expect(runbook).toContain(
+      'SAFETY="backups/before-restore-$(date +%F-%H%M%S).sql"',
+    );
+    expect(runbook).toContain('DUMP="backups/cashier-$(date +%F-%H%M%S).sql"');
+    expect(runbook).toContain('tail -n 1 "$SAFETY"');
+    expect(runbook).toContain('tail -n 1 "$DUMP"');
+    // re-running date names a different file a second later
+    expect(runbook).not.toMatch(/tail -n 1 "backups\/[^"]*\$\(date/);
+  });
+
+  it("reads the collation before dropping, and only a complete dump first", () => {
+    const runbook = read("docs/docker.md");
+    const recreate = read("scripts/database-recreate.sh");
+
+    // the collation must be read while it still exists
+    expect(recreate.indexOf("information_schema.SCHEMATA")).toBeGreaterThan(0);
+    expect(recreate.indexOf("DROP DATABASE")).toBeGreaterThan(
+      recreate.indexOf("information_schema.SCHEMATA"),
+    );
+    // and the safety dump must be verified before the drop is even reached
+    const checked = runbook.indexOf('tail -n 1 "$SAFETY"');
     expect(checked).toBeGreaterThan(0);
-    expect(dropped).toBeGreaterThan(checked);
+    expect(runbook.indexOf("scripts/database-recreate.sh")).toBeGreaterThan(
+      checked,
+    );
+    expect(runbook).toContain("-- Dump completed");
+  });
+
+  it("recreates the database in one place rather than splicing SQL together", () => {
+    const runbook = read("docs/docker.md");
+
+    // reading the collation on the host and passing it back into a container
+    // command needs two levels of quoting, and one wrong quote changes the SQL
+    expect(runbook).toContain("scripts/database-recreate.sh");
+    expect(
+      fs.existsSync(path.join(repoRoot, "scripts/database-recreate.sh")),
+    ).toBe(true);
+    expect(runbook).not.toContain("scripts/database-collation.sh");
+  });
+
+  it("checks the exit code of every step that changes the database", () => {
+    const runbook = read("docs/docker.md");
+
+    // a command that fails quietly is worse than one that fails loudly
+    for (const step of runbook.match(/```bash\n[\s\S]*?```/g) ?? []) {
+      if (!/mysqldump|database-recreate/.test(step)) continue;
+      // the code may report the file alongside it
+      expect(step, `unchecked step:\n${step}`).toMatch(/echo "exit: \$\?/);
+    }
   });
 
   it("builds a self-contained site image that needs no API URL at runtime", () => {

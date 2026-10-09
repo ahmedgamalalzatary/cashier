@@ -261,23 +261,19 @@ sudo ss -lntp | grep -E ':(3010|4010)\b'
 Only this Compose project should bind those ports, and both must stay on
 `127.0.0.1`.
 
-## Reading the settings file
+## Reading the settings
 
-`.env.production` is a dotenv file, not a shell script, and `source`ing it is
-wrong for the same reason: Compose reads it with dotenv rules, and a value may
-be quoted, contain spaces, or contain a quote of its own. `grep`/`cut` reading
-is wrong too — it leaves the quotes attached to the value and cannot tell a
-surrounding quote from a quote inside a password.
+`.env.production` is a dotenv file, not a shell script, so `source`ing it is
+wrong. So is reading it with `grep`/`cut`: that leaves quotes attached to the
+value and cannot tell a quote _around_ a password from a quote _inside_ it, and
+it silently ignores interpolation and the project's own defaults.
 
-Read the keys with the helper instead. It prints shell assignments that hold
-exactly the values Compose would use:
-
-```bash
-eval "$(sh scripts/read-prod-env.sh .env.production MYSQL_DATABASE MYSQL_ROOT_PASSWORD)"
-```
-
-It applies the project's Compose defaults for a key the file omits, and fails
-loudly for a key it cannot fill, so a typo can never become an empty password.
+**Do not read it on the host at all.** Compose has already parsed it with its
+own rules and given the resolved values to the `mysql` container, so every
+command below runs inside that container and uses `$MYSQL_DATABASE`,
+`$MYSQL_USER` and `$MYSQL_ROOT_PASSWORD` from there. Those are the values the
+containers actually run with, so there is nothing on the host to get wrong, no
+name to mistype, and no password in a command line or in your shell history.
 
 ## Database backup
 
@@ -286,28 +282,33 @@ object the restore is expected to bring back.
 
 ```bash
 mkdir -p backups
-eval "$(sh scripts/read-prod-env.sh .env.production MYSQL_DATABASE MYSQL_ROOT_PASSWORD)"
+DUMP="backups/cashier-$(date +%F-%H%M%S).sql"
+echo "$DUMP"
 ```
 
+Keep `$DUMP` in this shell for the next step.
+
 ```bash
-sudo docker compose --env-file .env.production exec -T mysql \
-  mysqldump -u root -p"$ROOT_PW" --single-transaction \
-  --routines --triggers --events "$DB" \
-  > "backups/cashier-$(date +%F-%H%M%S).sql"
-unset ROOT_PW
+sudo docker compose --env-file .env.production exec -T mysql sh -c \
+  'mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" --single-transaction \
+    --routines --triggers --events "$MYSQL_DATABASE"' > "$DUMP"
+echo "exit: $?  file: $DUMP"
 ```
+
+`exit: 0` is the first check. A non-zero exit means the dump did not run to
+completion; stop here.
 
 **Check that the dump is complete before relying on it.** `mysqldump` writes
 `-- Dump completed` as its last line, so its absence means the dump was cut
 short and would restore a partial database:
 
 ```bash
-tail -n 1 "backups/cashier-$(date +%F-%H%M%S).sql"
+tail -n 1 "$DUMP"
 ```
 
-That timestamp is the file you just wrote; `ls -t backups/*.sql | head -1`
-names it if you no longer know it. Keep going only if the last line begins
-`-- Dump completed`.
+Keep going only if that line begins `-- Dump completed`. Check `$DUMP`, the
+variable you set above: a freshly generated filename is a different file as
+soon as the clock ticks over.
 
 A dump stored only on the same VPS is not a complete backup: copy it off the
 server regularly.
@@ -336,23 +337,27 @@ sudo docker compose --env-file .env.production stop online-web online-api
 ```
 
 ```bash
-eval "$(sh scripts/read-prod-env.sh .env.production MYSQL_DATABASE MYSQL_ROOT_PASSWORD MYSQL_USER)"
-echo "$DB / $APP_USER"
+mkdir -p backups
+SAFETY="backups/before-restore-$(date +%F-%H%M%S).sql"
+echo "$SAFETY"
+```
+
+Keep `$SAFETY` in this shell; the next command must check that exact file.
+
+```bash
+sudo docker compose --env-file .env.production exec -T mysql sh -c \
+  'mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" --single-transaction \
+    --routines --triggers --events "$MYSQL_DATABASE"' > "$SAFETY"
+echo "exit: $?  file: $SAFETY"
 ```
 
 ```bash
-sudo docker compose --env-file .env.production exec -T mysql \
-  mysqldump -u root -p"$ROOT_PW" --single-transaction --routines --triggers \
-  --events "$DB" > "backups/before-restore-$(date +%F-%H%M%S).sql"
-unset ROOT_PW
+tail -n 1 "$SAFETY"
 ```
 
-```bash
-tail -n 1 "backups/before-restore-$(date +%F-%H%M%S).sql"
-```
-
-Do not go on unless the last line begins `-- Dump completed`. This dump is the
-only thing that makes the next step reversible.
+Do not go on unless the exit code above was `0` **and** this last line begins
+`-- Dump completed`. This dump is the only thing that makes the next step
+reversible.
 
 **2. Replace the database with an empty one, and give the application user
 access to it.** The character set and collation are read from the database being
@@ -360,54 +365,43 @@ replaced rather than assumed, so the recreated database is the one the dump was
 taken from. Read them **before** the drop, because afterwards they are gone:
 
 ```bash
-CREATE_SQL=$(sh scripts/database-create-sql.sh .env.production "$DB")
-echo "$CREATE_SQL"
+sh scripts/database-recreate.sh .env.production
+echo "exit: $?"
 ```
 
-That must print one `CREATE DATABASE` line with a real collation. If it prints
-nothing, stop: the collation could not be read and this step is not safe.
-
-```bash
-eval "$(sh scripts/read-prod-env.sh .env.production MYSQL_DATABASE MYSQL_ROOT_PASSWORD MYSQL_USER)"
-```
-
-```bash
-sudo docker compose --env-file .env.production exec -T mysql \
-  mysql -u root -p"$ROOT_PW" -e "
-    DROP DATABASE IF EXISTS \`$DB\`;
-    $CREATE_SQL
-    GRANT ALL ON \`$DB\`.* TO '$APP_USER'@'%';
-    FLUSH PRIVILEGES;"
-unset ROOT_PW APP_USER CREATE_SQL
-```
+It prints the character set and collation it read, then the `DROP`, `CREATE`
+and `GRANT`. **Check both lines.** If it stops before the drop with a message
+about the collation, stop and fix the database name in `.env.production` — it
+does not guess a collation. If `exit:` is not `0`, the database is in an
+unknown state and the dump has not been imported; do not continue to step 3.
 
 **3. Import the chosen dump into the empty database:**
 
 ```bash
-eval "$(sh scripts/read-prod-env.sh .env.production MYSQL_DATABASE MYSQL_ROOT_PASSWORD)"
+sudo docker compose --env-file .env.production exec -T mysql sh -c \
+  'mysql -u root -p"$MYSQL_ROOT_PASSWORD" --default-character-set=utf8mb4 "$MYSQL_DATABASE"' \
+  < backups/selected-dump.sql
+echo "exit: $?"
 ```
 
-```bash
-sudo docker compose --env-file .env.production exec -T mysql \
-  mysql -u root -p"$ROOT_PW" --default-character-set=utf8mb4 "$DB" \
-  < backups/selected-dump.sql
-unset ROOT_PW
-```
+A non-zero exit here means the import failed. Do not run the migrations: fix
+the import first, or restore again from `$SAFETY`.
 
 **4. Verify the restore before starting anything.** A leftover table from a
 half-applied migration is the failure this procedure exists to prevent:
 
 ```bash
-eval "$(sh scripts/read-prod-env.sh .env.production MYSQL_DATABASE MYSQL_ROOT_PASSWORD)"
+sudo docker compose --env-file .env.production exec -T mysql sh -c '
+  mysql -u root -p"$MYSQL_ROOT_PASSWORD" --default-character-set=utf8mb4 "$MYSQL_DATABASE" -e "
+    SELECT MAX(created_at) AS checkpoint FROM __drizzle_migrations;
+    SELECT table_name FROM information_schema.tables
+      WHERE table_schema = DATABASE() ORDER BY table_name;
+    SELECT COUNT(*) AS branches FROM branches;
+    SELECT COUNT(*) AS orders FROM orders;"'
 ```
 
-```bash
-sudo docker compose --env-file .env.production exec -T mysql \
-  mysql -u root -p"$ROOT_PW" --default-character-set=utf8mb4 "$DB" -e "
-    SELECT COUNT(*) AS branches FROM branches;
-    SELECT COUNT(*) AS orders FROM orders;"
-unset ROOT_PW
-```
+Compare the table list against the dump, the checkpoint against the migration
+the dump was taken at, and the row counts against what the site last showed.
 
 Only then run the migrations and start the services:
 
