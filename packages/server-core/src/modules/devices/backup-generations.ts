@@ -18,6 +18,9 @@ export async function beginBackupGeneration(db:Db,device:{id:string;branchId:str
   });
 }
 
+/** Rows removed per DELETE when a replacement backup is reconciled. */
+const DELETE_BATCH=500;
+
 /** Reconcile absence only after the client has uploaded its complete snapshot. */
 export async function completeBackupGeneration(db:Db,device:{id:string;branchId:string},generation:number){
   await db.transaction(async tx=>{
@@ -25,17 +28,24 @@ export async function completeBackupGeneration(db:Db,device:{id:string;branchId:
     if(!current) throw new HttpError(401,"This PC was unlinked.");
     if(current.backupGeneration!==generation) throw new BackupGenerationError();
     if(current.backupCompletedAt) return;
-    const versions=await tx.select().from(syncIngestRows).where(eq(syncIngestRows.deviceId,device.id));
-    const owned=new Set(versions.map(row=>`${row.tableName}:${row.rowKey}`));
     await tx.execute(sql`SET @cashier_sync_apply=1`);
     await tx.execute(sql`SET FOREIGN_KEY_CHECKS=0`);
     try {
       for(const table of current.backupReplace ? uploadTables : []){
-        const result=await tx.execute(sql`SELECT ${sql.raw(table.keys.map(quoteIdentifier).join(","))} FROM ${sql.raw(quoteIdentifier(table.name))} WHERE branch_id=${device.branchId}${table.cashiersOnly?sql` AND role='cashier'`:sql``} FOR UPDATE`);
-        const [rows]=result as unknown as [Record<string,unknown>[],unknown];
-        for(const pk of rows){
-          if(!current.backupReplaceAll && !owned.has(`${table.name}:${rowKey(table.name,pk)}`)) continue;
-          await tx.execute(sql`DELETE FROM ${sql.raw(quoteIdentifier(table.name))} WHERE ${sql.join(table.keys.map(key=>sql`${sql.raw(quoteIdentifier(key))}=${pk[key]}`),sql` AND `)}`);
+        const name=sql.raw(quoteIdentifier(table.name));
+        const scope=sql`branch_id=${device.branchId}${table.cashiersOnly?sql` AND role='cashier'`:sql``}`;
+        // A full resend replaces the whole branch: one statement, no row scan.
+        if(current.backupReplaceAll){await tx.execute(sql`DELETE FROM ${name} WHERE ${scope}`);continue;}
+        const versions=await tx.select({rowKey:syncIngestRows.rowKey}).from(syncIngestRows).where(and(eq(syncIngestRows.deviceId,device.id),eq(syncIngestRows.tableName,table.name)));
+        if(!versions.length) continue;
+        const owned=new Set(versions.map(row=>row.rowKey));
+        const [rows]=await tx.execute(sql`SELECT ${sql.raw(table.keys.map(quoteIdentifier).join(","))} FROM ${name} WHERE ${scope} FOR UPDATE`) as unknown as [Record<string,unknown>[],unknown];
+        const absent=rows.filter(pk=>owned.has(rowKey(table.name,pk)));
+        // Rows this device uploaded are removed in batches, not one statement each.
+        const columns=sql.raw(`(${table.keys.map(quoteIdentifier).join(",")})`);
+        for(let start=0;start<absent.length;start+=DELETE_BATCH){
+          const tuples=absent.slice(start,start+DELETE_BATCH).map(pk=>sql`(${sql.join(table.keys.map(key=>sql`${pk[key]}`),sql`,`)})`);
+          await tx.execute(sql`DELETE FROM ${name} WHERE ${columns} IN (${sql.join(tuples,sql`,`)})`);
         }
       }
       if(current.backupReplace){

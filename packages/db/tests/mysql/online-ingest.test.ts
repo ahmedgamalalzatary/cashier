@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { branches, devices, employees, expenseCategories,linkCodes, syncIngestRows } from "@cashier/db";
+import { branches, devices, employees, expenseCategories,linkCodes, syncIngestRows, users } from "@cashier/db";
 import request from "supertest";
 import { beforeEach, describe, expect } from "vitest";
 import { it } from "../support/ids.js";
@@ -156,6 +156,16 @@ describe("online ingest", () => {
     const {branchId,token}=await linkDevice("Owned restore");
     const id=randomUUID();
     await ingest(token,batch([{seq:1,table:"employees",op:"upsert",pk:{id,branch_id:branchId},row:employeeRow(branchId,id,"This device's absent row")}])).expect(200);
+    await db.insert(employees).values({branchId,name:"Earlier PC's history"});
+    const response=await request(onlineApp).post("/api/device/backup-generation").set("Authorization",`Device ${token}`).send({requestId:randomUUID(),minimumGeneration:0,replace:true}).expect(200);
+    await request(onlineApp).post("/api/device/backup-generation/complete").set("Authorization",`Device ${token}`).send({generation:response.body.generation}).expect(200);
+    expect(await employeeNames(branchId)).toEqual(["Earlier PC's history"]);
+  });
+  it("removes every absent device row past one delete batch and keeps unowned history",async()=>{
+    const {branchId,token}=await linkDevice("Many owned rows");
+    const rows=Array.from({length:600},(_,index)=>{const id=randomUUID();return {seq:index+1,table:"employees",op:"upsert" as const,pk:{id,branch_id:branchId},row:employeeRow(branchId,id,`Owned ${index}`)};});
+    await ingest(token,batch(rows.slice(0,300))).expect(200);
+    await ingest(token,batch(rows.slice(300))).expect(200);
     await db.insert(employees).values({branchId,name:"Earlier PC's history"});
     const response=await request(onlineApp).post("/api/device/backup-generation").set("Authorization",`Device ${token}`).send({requestId:randomUUID(),minimumGeneration:0,replace:true}).expect(200);
     await request(onlineApp).post("/api/device/backup-generation/complete").set("Authorization",`Device ${token}`).send({generation:response.body.generation}).expect(200);
@@ -626,23 +636,39 @@ describe("online ingest", () => {
     expect(await employeeNames(mine)).toEqual([]);
   });
 
-  it("refuses a key that collides with a unique column owned elsewhere", async () => {
-    const { branchId: other, token: otherToken } = await linkDevice("مالك الاسم");
-    const { branchId: mine, token: mineToken } = await linkDevice("بائع مكرر");
-    const foreign = randomUUID();
-
+  it("refuses a row that collides with a unique column owned elsewhere", async () => {
+    const { branchId: other, token: otherToken } = await linkDevice("مالك الموظف");
+    const { branchId: mine, token: mineToken } = await linkDevice("حساب مكرر");
+    const employee = randomUUID();
+    const cashier = (branchId: string, id: string, username: string) => ({
+      id,
+      branch_id: branchId,
+      name: username,
+      username,
+      password_hash: "cashier-hash",
+      token_version: 0,
+      role: "cashier",
+      is_active: 1,
+      is_super_admin: 0,
+      created_at: "2026-10-09 12:34:56",
+      employee_id: employee,
+    });
+    const owned = randomUUID();
     await ingest(
       otherToken,
-      batch([{ seq: 1, table: "employees", op: "upsert", pk: { id: foreign, branch_id: other }, row: employeeRow(other, foreign, "اسم فريد") }]),
+      batch([{ seq: 1, table: "users", op: "upsert", pk: { id: owned, branch_id: other }, row: cashier(other, owned, "owner") }]),
     ).expect(200);
 
-    await ingest(
+    // Same key in pk and row, so only users_employee_id_uidx can catch it.
+    const claimed = randomUUID();
+    const response = await ingest(
       mineToken,
-      batch([{ seq: 1, table: "employees", op: "upsert", pk: { id: randomUUID(), branch_id: mine }, row: employeeRow(mine, randomUUID(), "اسم فريد") }]),
+      batch([{ seq: 1, table: "users", op: "upsert", pk: { id: claimed, branch_id: mine }, row: cashier(mine, claimed, "claimer") }]),
     ).expect(422);
 
-    expect(await employeeNames(other)).toEqual(["اسم فريد"]);
-    expect(await employeeNames(mine)).toEqual([]);
+    expect(response.body.error).toBe("الصف المرفوع يتعارض مع صف يخص فرعاً آخر");
+    const holders = await db.select({ branchId: users.branchId }).from(users).where(eq(users.employeeId, employee));
+    expect(holders).toEqual([{ branchId: other }]);
   });
 
   it("rejects extra keys that are not part of the row", async () => {

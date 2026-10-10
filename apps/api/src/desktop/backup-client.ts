@@ -89,6 +89,11 @@ export function createBackupClient(db:Db,directory:string,options:UploadOptions,
       for(let attempt=0;attempt<2;attempt++){
         const {record}=await prepare(attempt>0);
         try {
+          // Saved before the queue rows are deleted, on purpose: if that delete
+          // fails, the next start sees progress the database lacks and safely
+          // resends everything. Saving after it could leave the saved progress
+          // too low, so a later restore would go unnoticed and online would drop
+          // the restored PC's reused sequence numbers.
           const result=await uploadPending(db,{...options,generation:record.generation,onAcknowledged:seqs=>{
             record.acknowledgedSeq=Math.max(record.acknowledgedSeq,...seqs);
             writeRecord(directory,record);

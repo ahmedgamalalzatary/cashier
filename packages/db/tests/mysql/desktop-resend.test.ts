@@ -42,16 +42,22 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  await db.$client.query("SET @cashier_sync_apply = 1");
-  for (const table of [
-    "sync_outbox",
-    "sync_state",
-    "employees",
-    "categories",
-    "users",
-  ])
-    await db.$client.query(`DELETE FROM \`${table}\``);
-  await db.$client.query("SET @cashier_sync_apply = NULL");
+  // The apply flag covers only the connection that set it.
+  const connection = await db.$client.getConnection();
+  try {
+    await connection.query("SET @cashier_sync_apply = 1");
+    for (const table of [
+      "sync_outbox",
+      "sync_state",
+      "employees",
+      "categories",
+      "users",
+    ])
+      await connection.query(`DELETE FROM \`${table}\``);
+  } finally {
+    await connection.query("SET @cashier_sync_apply = NULL");
+    connection.release();
+  }
 });
 
 /** MySQL cannot return an id from an insert, so the row is read back. */
@@ -62,6 +68,22 @@ async function addEmployee(name: string) {
     .from(employees)
     .where(eq(employees.name, name));
   return row;
+}
+
+/** A row written before the capture triggers existed, so nothing queued it. */
+async function addHistoricEmployee(name: string) {
+  // The apply flag covers only the connection that set it.
+  const connection = await db.$client.getConnection();
+  try {
+    await connection.query("SET @cashier_sync_apply = 1");
+    await connection.query(
+      "INSERT INTO employees (id, branch_id, name) VALUES (?, ?, ?)",
+      [uuidv7(), branch, name],
+    );
+  } finally {
+    await connection.query("SET @cashier_sync_apply = NULL");
+    connection.release();
+  }
 }
 
 /** Triggers queue changes too; these tests count only what the tool queues. */
@@ -287,10 +309,7 @@ describe("first backup", () => {
   });
 
   it("queues rows that existed before capture triggers were installed", async () => {
-    // Triggers are silent here, as they were before Phase 10 shipped.
-    await db.$client.query("SET @cashier_sync_apply = 1");
-    await addEmployee("Predates the triggers");
-    await db.$client.query("SET @cashier_sync_apply = NULL");
+    await addHistoricEmployee("Predates the triggers");
     expect(await pendingCount(db)).toBe(0);
 
     await expect(backupClient().client.uploadNow()).rejects.toThrow(/503/);
@@ -299,10 +318,7 @@ describe("first backup", () => {
   });
 
   it("keeps waiting work and adds history on top of it", async () => {
-    // Written before the capture triggers existed, so nothing queued it.
-    await db.$client.query("SET @cashier_sync_apply = 1");
-    await addEmployee("تاريخي");
-    await db.$client.query("SET @cashier_sync_apply = NULL");
+    await addHistoricEmployee("تاريخي");
     // Written after, so the trigger queued it.
     await addEmployee("محفوظ");
     expect(await pendingCount(db)).toBe(1);

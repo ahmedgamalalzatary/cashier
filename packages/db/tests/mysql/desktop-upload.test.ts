@@ -36,10 +36,16 @@ afterAll(async () => {
 let nextSeq = 1;
 beforeEach(async () => {
   nextSeq = 1;
-  await db.$client.query("SET @cashier_sync_apply = 1");
-  await db.$client.query("DELETE FROM sync_outbox");
-  await db.$client.query("DELETE FROM sync_state");
-  await db.$client.query("SET @cashier_sync_apply = NULL");
+  // The apply flag covers only the connection that set it.
+  const connection = await db.$client.getConnection();
+  try {
+    await connection.query("SET @cashier_sync_apply = 1");
+    await connection.query("DELETE FROM sync_outbox");
+    await connection.query("DELETE FROM sync_state");
+  } finally {
+    await connection.query("SET @cashier_sync_apply = NULL");
+    connection.release();
+  }
 });
 
 const addOutboxRow = async (seq?: number, row: Record<string, unknown> = {}) => {

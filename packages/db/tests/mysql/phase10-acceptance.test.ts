@@ -87,23 +87,30 @@ afterAll(async () => {
 
 beforeEach(async () => {
   for (const db of [online, shop]) {
-    await db.$client.query("SET FOREIGN_KEY_CHECKS = 0");
-    await db.$client.query("SET @cashier_sync_apply = 1");
-    for (const table of [
-      "sync_outbox",
-      "sync_state",
-      "sync_ingest_events",
-      "sync_ingest_rows",
-      "sync_ingest_pending",
-      "orders",
-      "employees",
-      "users",
-    ])
-      await db.$client.query(`DELETE FROM \`${table}\``);
-    await db.$client.query("SET @cashier_sync_apply = NULL");
-    await db.$client.query("SET FOREIGN_KEY_CHECKS = 1");
+    // Session flags cover only the connection that set them, so the cleanup
+    // holds one pooled connection and never hands it back changed.
+    const connection = await db.$client.getConnection();
+    try {
+      await connection.query("SET FOREIGN_KEY_CHECKS = 0");
+      await connection.query("SET @cashier_sync_apply = 1");
+      for (const table of [
+        "sync_outbox",
+        "sync_state",
+        "sync_ingest_events",
+        "sync_ingest_rows",
+        "sync_ingest_pending",
+        "orders",
+        "employees",
+        "users",
+      ])
+        await connection.query(`DELETE FROM \`${table}\``);
+    } finally {
+      await connection.query("SET @cashier_sync_apply = NULL");
+      await connection.query("SET FOREIGN_KEY_CHECKS = 1");
+      connection.release();
+    }
   }
-  await online.update(devices).set({backupGeneration:0,backupRequestId:null,backupCompletedAt:null,backupReplace:false});
+  await online.update(devices).set({backupGeneration:0,backupRequestId:null,backupCompletedAt:null,backupReplace:false,backupReplaceAll:false});
 });
 
 /** Sells, the way the shop PC does while offline. */
