@@ -1,4 +1,5 @@
 export * from "./schema.js";
+export * from "./upload-tables.js";
 export * from "./branch-context.js";
 export * from "./http-error.js";
 export * from "./uuid.js";

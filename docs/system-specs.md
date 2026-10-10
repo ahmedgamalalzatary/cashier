@@ -118,21 +118,21 @@ discovery do not depend on the selected header, but enforce the PC's account acc
 
 ### Capability matrix
 
-| Capability                              | Admin | Cashier            |
-| --------------------------------------- | ----- | ------------------ |
-| POS sales, discounts, refunds           | ✔ (no shift, flagged as إداري) | ✔ (own shift) |
-| Open/close shift, shift expenses        | ✘     | ✔ (own shift)      |
-| Force-close, reopen, or correct a shift | ✔     | ✘                  |
-| Transfer requests (cafe → ask main)     | ✔     | ✔ (create request) |
-| Approve transfers / direct transfers    | ✔     | ✘                  |
-| Cafe waste entry                        | ✔     | ✔                  |
-| Main-warehouse waste, stocktake         | ✔     | ✘                  |
-| Items, categories, recipes, prices      | ✔     | ✘                  |
+| Capability                              | Admin                          | Cashier            |
+| --------------------------------------- | ------------------------------ | ------------------ |
+| POS sales, discounts, refunds           | ✔ (no shift, flagged as إداري) | ✔ (own shift)      |
+| Open/close shift, shift expenses        | ✘                              | ✔ (own shift)      |
+| Force-close, reopen, or correct a shift | ✔                              | ✘                  |
+| Transfer requests (cafe → ask main)     | ✔                              | ✔ (create request) |
+| Approve transfers / direct transfers    | ✔                              | ✘                  |
+| Cafe waste entry                        | ✔                              | ✔                  |
+| Main-warehouse waste, stocktake         | ✔                              | ✘                  |
+| Items, categories, recipes, prices      | ✔                              | ✘                  |
 | Application users and roles             | ✔ (super-admin manages admins) | ✘                  |
-| Purchases, suppliers, payments          | ✔     | ✘                  |
-| Employees, salaries, advances           | ✔     | ✘                  |
-| General expenses, expense categories    | ✔     | ✘                  |
-| Reports & dashboard                     | ✔     | ✘                  |
+| Purchases, suppliers, payments          | ✔                              | ✘                  |
+| Employees, salaries, advances           | ✔                              | ✘                  |
+| General expenses, expense categories    | ✔                              | ✘                  |
+| Reports & dashboard                     | ✔                              | ✘                  |
 
 ---
 
@@ -419,8 +419,16 @@ Desktop/online Phase 4 schema rules:
   seed integration are completed in Phase 4.6.
 - `admin_branches` stores admin-to-branch assignments. `devices` permits one linked
   device per branch. `link_codes` stores code hashes, expiry and usage times.
-- `sync_outbox` stores ordered local change records with a numeric auto-increment
-  sequence; `sync_state` has one row (`id = 1`). Their workers arrive in later phases.
+- `sync_outbox` captures every business insert/update/delete in the same transaction,
+  including cashier password hashes; online-owned accounts and bookkeeping are excluded.
+  The session flag `@cashier_sync_apply = 1` suppresses capture during accounts pull/ingest.
+  Keys include branch ownership and composite primary keys; full rows retain nulls and
+  represent DECIMAL values as strings. Recipe-size replacement explicitly clears historical
+  order-line references so foreign-key side effects are captured too.
+- Auto-increment sequence numbers are allocated before commit, so they are not a commit-order
+  cursor. Uploads must retain every unconfirmed row and delete only exact acknowledged
+  sequences from the sent batch. `sync_state` has one row (`id = 1`); its
+  `last_uploaded_seq` is diagnostic only. Ingest/uploader workers arrive in later slices.
 - The three external-ingredient mapping tables have composite primary keys over their
   branch, external target and local item. Existing branch-scoped foreign keys remain enforced.
 

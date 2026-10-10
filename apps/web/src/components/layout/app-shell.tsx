@@ -6,6 +6,7 @@ import { Coffee, Menu } from "lucide-react";
 import { normalizePath } from "@cashier/web-core/lib/auth";
 import { Sidebar } from "./sidebar";
 import { UpdateBanner } from "./update-banner";
+import { BackupCard } from "./backup-card";
 import { WorkspaceBar } from "@cashier/web-core/components/branches/workspace-bar";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -55,6 +56,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
         <div className="mx-auto w-full max-w-[96rem]">
           <UpdateBanner />
+          <BackupCard />
           <WorkspaceBar />
           {children}
         </div>

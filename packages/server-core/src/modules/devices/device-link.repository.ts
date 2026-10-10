@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import type { Db } from "@cashier/db";
-import { branches, devices, linkCodes } from "@cashier/db";
+import { branches, devices, linkCodes, syncIngestEvents, syncIngestRows,syncIngestPending } from "@cashier/db";
 
 export class DeviceLinkRepository {
   constructor(private db: Db) {}
@@ -42,6 +42,23 @@ export class DeviceLinkRepository {
     at: Date,
     appVersion?: string,
   ) {
+    // The departing PC's deduplication state goes with it: its namespace ends
+    // here, and the replacement must start clean rather than inherit another
+    // device's accepted sequences. This is not age-based pruning — it is the
+    // device being removed.
+    const [departing] = await this.db
+      .select({ id: devices.id })
+      .from(devices)
+      .where(eq(devices.branchId, branchId));
+    if (departing) {
+      await this.db.delete(syncIngestPending).where(eq(syncIngestPending.deviceId,departing.id));
+      await this.db
+        .delete(syncIngestEvents)
+        .where(eq(syncIngestEvents.deviceId, departing.id));
+      await this.db
+        .delete(syncIngestRows)
+        .where(eq(syncIngestRows.deviceId, departing.id));
+    }
     await this.db.delete(devices).where(eq(devices.branchId, branchId));
     await this.db
       .insert(devices)

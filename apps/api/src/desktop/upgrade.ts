@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 import type { RowDataPacket } from "mysql2/promise";
 import { migrate } from "drizzle-orm/mysql2/migrator";
 import type { Db } from "@cashier/db";
+import {markBackupForReset} from "./backup-client.js";
 
 /** A startup stop with a plain message; `canRestore` offers "Restore backup". */
 export class DesktopStartupError extends Error {
@@ -550,6 +551,7 @@ export async function restoreDesktopBackup(options: {
     throw new DesktopStartupError(
       `The backup ${state.backup} is missing or incomplete, so it cannot be restored. Contact support.`,
     );
+  markBackupForReset(options.dataDir);
   await dropAllTables(options.db);
   const restored = await withClientOptions(
     options.databaseUrl,

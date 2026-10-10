@@ -1,4 +1,5 @@
 import path from "node:path";
+import fs from "node:fs";
 import { migrate } from "drizzle-orm/mysql2/migrator";
 import mysql, { type Connection, type RowDataPacket } from "mysql2/promise";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -42,6 +43,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   if (!connection || !created) throw new Error("Scratch database is not ready");
   await connection.query("SET FOREIGN_KEY_CHECKS = 0");
+  await connection.query("SET @cashier_sync_apply = 1");
   try {
     for (const table of tables) {
       const name = getTableConfig(table).name;
@@ -50,6 +52,7 @@ beforeEach(async () => {
       await connection.query(`DELETE FROM \`${name}\``);
     }
   } finally {
+    await connection.query("SET @cashier_sync_apply = NULL");
     await connection.query("SET FOREIGN_KEY_CHECKS = 1");
   }
 });
@@ -131,7 +134,7 @@ describe("fresh desktop schema", () => {
     }
   });
 
-  it("reapplying the baseline preserves rows and records only one migration", async () => {
+  it("reapplying migrations preserves rows without duplicate journal entries", async () => {
     const id = await branch("Keep this branch");
     await migrate(db!, { migrationsFolder: path.join(packageRoot, "drizzle") });
     expect(await db!.select().from(schema.branches)).toEqual([
@@ -140,7 +143,13 @@ describe("fresh desktop schema", () => {
     const [rows] = await connection!.query<RowDataPacket[]>(
       "SELECT hash, created_at FROM __drizzle_migrations",
     );
-    expect(rows).toHaveLength(1);
+    const journal = JSON.parse(
+      fs.readFileSync(
+        path.join(packageRoot, "drizzle/meta/_journal.json"),
+        "utf8",
+      ),
+    );
+    expect(rows).toHaveLength(journal.entries.length);
     expect(rows[0].hash).toMatch(/^[a-f0-9]{64}$/);
   });
 

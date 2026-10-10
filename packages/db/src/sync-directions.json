@@ -1,0 +1,177 @@
+{
+  "employees": [
+    "Up"
+  ],
+  "salary_advances": [
+    "Up"
+  ],
+  "salary_adjustments": [
+    "Up"
+  ],
+  "salary_payments": [
+    "Up"
+  ],
+  "categories": [
+    "Up"
+  ],
+  "suppliers": [
+    "Up"
+  ],
+  "purchase_invoices": [
+    "Up"
+  ],
+  "supplier_payments": [
+    "Up"
+  ],
+  "items": [
+    "Up"
+  ],
+  "purchase_lines": [
+    "Up"
+  ],
+  "stock_batches": [
+    "Up"
+  ],
+  "stocktakes": [
+    "Up"
+  ],
+  "stocktake_lines": [
+    "Up"
+  ],
+  "transfer_requests": [
+    "Up"
+  ],
+  "transfer_request_lines": [
+    "Up"
+  ],
+  "transfers": [
+    "Up"
+  ],
+  "transfer_lines": [
+    "Up"
+  ],
+  "recipes": [
+    "Up"
+  ],
+  "recipe_sizes": [
+    "Up"
+  ],
+  "recipe_ingredients": [
+    "Up"
+  ],
+  "external_categories": [
+    "Up"
+  ],
+  "external_products": [
+    "Up"
+  ],
+  "external_product_sizes": [
+    "Up"
+  ],
+  "external_modifier_groups": [
+    "Up"
+  ],
+  "external_modifier_options": [
+    "Up"
+  ],
+  "external_product_ingredients": [
+    "Up"
+  ],
+  "external_size_ingredients": [
+    "Up"
+  ],
+  "external_modifier_ingredients": [
+    "Up"
+  ],
+  "external_orders_cache": [
+    "Up"
+  ],
+  "preparations": [
+    "Up"
+  ],
+  "preparation_allocations": [
+    "Up"
+  ],
+  "shifts": [
+    "Up"
+  ],
+  "shift_events": [
+    "Up"
+  ],
+  "orders": [
+    "Up"
+  ],
+  "order_lines": [
+    "Up"
+  ],
+  "order_line_modifiers": [
+    "Up"
+  ],
+  "refunds": [
+    "Up"
+  ],
+  "refund_lines": [
+    "Up"
+  ],
+  "stock_movements": [
+    "Up"
+  ],
+  "stock_deficit_allocations": [
+    "Up"
+  ],
+  "order_line_allocations": [
+    "Up"
+  ],
+  "refund_line_allocations": [
+    "Up"
+  ],
+  "waste_entries": [
+    "Up"
+  ],
+  "waste_allocations": [
+    "Up"
+  ],
+  "expense_categories": [
+    "Up"
+  ],
+  "expenses": [
+    "Up"
+  ],
+  "users": [
+    "Up (filtered)",
+    "Down"
+  ],
+  "branches": [
+    "Down"
+  ],
+  "admin_branches": [
+    "Down"
+  ],
+  "external_catalog_sync": [
+    "None"
+  ],
+  "sync_outbox": [
+    "None"
+  ],
+  "sync_state": [
+    "None"
+  ],
+  "sync_ingest_events": [
+    "None"
+  ],
+  "sync_ingest_rows": [
+    "None"
+  ],
+  "sync_ingest_pending": [
+    "None"
+  ],
+  "devices": [
+    "None"
+  ],
+  "link_codes": [
+    "None"
+  ],
+  "__drizzle_migrations": [
+    "None"
+  ]
+}

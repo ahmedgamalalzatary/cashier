@@ -18,6 +18,13 @@ import {
   requestDeviceAccounts,
   runAccountsLoop,
 } from "./accounts.js";
+import {
+  migrationCheckpoint,
+  runUploadLoop,
+  UnlinkedError,
+} from "./upload.js";
+
+import {createBackupClient} from "./backup-client.js";
 
 /** Where the desktop shell keeps the bundled MySQL tools and shared data. */
 export type DesktopTools = {
@@ -64,6 +71,8 @@ export async function startDesktopApi(
   signal: AbortSignal,
   databaseUrl: string,
   tools: DesktopTools = { mysqlBin: "", dataDir: process.cwd() },
+  /** Called once when online reports this PC is no longer linked. */
+  reportUnlinked: (reason: string) => void = reason=>console.error(reason),
 ) {
   const { environment, deviceToken, onlineApiUrl, syncEnabled, branchId } =
     loadDesktopSettings(settingsFile, databaseUrl);
@@ -73,8 +82,17 @@ export async function startDesktopApi(
   let worker = Promise.resolve();
   let shiftWorker = Promise.resolve();
   let accountsWorker = Promise.resolve();
+  let uploadWorker = Promise.resolve();
   const workerShutdown = new AbortController();
-  const stopWorker = () => workerShutdown.abort();
+  const backupShutdown = new AbortController();
+  const stopWorker = () => {workerShutdown.abort();backupShutdown.abort();};
+  let unlinkedReported=false;
+  const onUnlinked=(reason:string)=>{
+    if(unlinkedReported) return;
+    unlinkedReported=true;
+    backupShutdown.abort();
+    reportUnlinked(reason);
+  };
   signal.addEventListener("abort", stopWorker, { once: true });
   try {
     await prepareForApp(
@@ -90,17 +108,36 @@ export async function startDesktopApi(
         "Desktop database must contain only the configured BRANCH_ID",
       );
     signal.throwIfAborted();
+    // Backup to online every 15 minutes plus the admin's button (plan D10).
+    // Failures are logged and retried; they never block selling.
+    const uploadOptions = {
+      apiUrl: onlineApiUrl,
+      deviceToken,
+      appVersion: manifest.version,
+      migrationCheckpoint: await migrationCheckpoint(db),
+      signal: backupShutdown.signal,
+    };
+    const backup=createBackupClient(db,path.dirname(settingsFile),uploadOptions,onUnlinked);
+    const runUpload=()=>backup.uploadNow();
     const app = createApp(db, {
       jwtSecret: environment.JWT_SECRET,
       corsOrigins: environment.CORS_ORIGIN,
       trustProxy: false,
       branchId,
+      uploadNow: runUpload,
+      resendAll: backup.resendAll,
     });
     server = await new Promise<Server>((resolve, reject) => {
       const listener = app.listen(0, "127.0.0.1", () => resolve(listener));
       listener.once("error", reject);
     });
     shiftWorker = runAutoCloseLoop(db, workerShutdown.signal);
+    // Capture and generation requests start only after the local listener is
+    // available. Revocation stops backup work, never shift/catalog maintenance.
+    uploadWorker=runUploadLoop(runUpload,backupShutdown.signal,error=>{
+      if(error instanceof UnlinkedError){onUnlinked(error.message);return;}
+      console.error(error instanceof Error?error.message:"Backup upload failed; the data stays queued.");
+    });
     // Network availability never gates serving the local cache. A freshly
     // linked PC receives its first admin accounts as this first pull completes.
     accountsWorker = runAccountsLoop(async () => {
@@ -147,21 +184,27 @@ export async function startDesktopApi(
       close: async () => {
         if (stopped) return;
         stopped = true;
-        workerShutdown.abort();
+        stopWorker();
         signal.removeEventListener("abort", stopWorker);
         const closing = new Promise<void>((resolve) =>
           server!.close(() => resolve()),
         );
-        await Promise.all([closing, worker, shiftWorker, accountsWorker]);
+        await Promise.all([
+          closing,
+          worker,
+          shiftWorker,
+          accountsWorker,
+          uploadWorker,
+        ]);
         await closeDb(db);
       },
     };
   } catch (error) {
-    workerShutdown.abort();
+    stopWorker();
     signal.removeEventListener("abort", stopWorker);
     if (server)
       await new Promise<void>((resolve) => server!.close(() => resolve()));
-    await Promise.all([worker, shiftWorker, accountsWorker]);
+    await Promise.all([worker, shiftWorker, accountsWorker, uploadWorker]);
     await closeDb(db);
     throw error;
   }

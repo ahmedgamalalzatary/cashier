@@ -168,6 +168,13 @@ The same order applies to Phase 9's device endpoints even without a migration:
 deploy `/api/device/accounts` and the link endpoint's `expectedBranchId` check
 before distributing the desktops that depend on them.
 
+Phase 10.1 adds outbox trigger migrations. The MySQL service now enables
+`log_bin_trust_function_creators=1`, allowing the database-scoped migration
+account to create triggers with binary logging enabled. Recreate MySQL with
+the updated Compose command before running these migrations (the `up -d`
+above applies that command change while retaining the data volume). Bundled
+desktop MySQL already disables binary logging.
+
 ## Super-admin account
 
 `online-api` synchronizes the super-admin from `.env.production` on every start:

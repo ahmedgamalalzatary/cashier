@@ -14,6 +14,9 @@ const tables = [
   "link_codes",
   "sync_outbox",
   "sync_state",
+  "sync_ingest_events",
+  "sync_ingest_rows",
+  "sync_ingest_pending",
   "stocktake_lines",
   "stocktakes",
   "expenses",
@@ -67,6 +70,7 @@ let cleanupConnection: Connection;
 export async function cleanupTables() {
   const deletes = tables.map((table) => `DELETE FROM \`${table}\``).join("; ");
   await cleanupConnection.query("SET FOREIGN_KEY_CHECKS = 0");
+  await cleanupConnection.query("SET @cashier_sync_apply = 1");
   try {
     await cleanupConnection.query(deletes);
     await cleanupConnection.query("DELETE FROM branches");
@@ -75,6 +79,7 @@ export async function cleanupTables() {
       [TEST_BRANCH_ID],
     );
   } finally {
+    await cleanupConnection.query("SET @cashier_sync_apply = NULL");
     await cleanupConnection.query("SET FOREIGN_KEY_CHECKS = 1");
   }
 }

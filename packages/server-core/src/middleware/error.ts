@@ -18,9 +18,24 @@ function isMalformedJson(error: unknown) {
   );
 }
 
+function isPayloadTooLarge(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'type' in error &&
+    error.type === 'entity.too.large'
+  );
+}
+
 export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
   if (isMalformedJson(err)) {
     res.status(400).json({ error: 'بيانات JSON غير صالحة' });
+    return;
+  }
+  // An upload past the agreed ceiling is the PC's problem to fix, not a server
+  // fault: it must say so instead of returning a generic 500.
+  if (isPayloadTooLarge(err)) {
+    res.status(413).json({ error: 'حجم البيانات المرسلة أكبر من الحد المسموح' });
     return;
   }
   if (err instanceof ZodError) {
@@ -28,7 +43,7 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     return;
   }
   if (err instanceof HttpError) {
-    res.status(err.status).json({ error: err.message });
+    res.status(err.status).json({ error: err.message,...("code" in err && typeof err.code==="string"?{code:err.code}:{}) });
     return;
   }
   console.error(err);

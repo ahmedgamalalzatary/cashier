@@ -38,6 +38,14 @@ export function createApp(
       credentials: true,
     }),
   );
+  // The capture route carries whole business rows, so it gets the agreed 2 MB
+  // ceiling instead of Express's 100 KB default, which rejected normal batches
+  // and left the uploader retrying the same oversized request forever. Every
+  // other route keeps the default.
+  app.use(
+    "/api/device/ingest",
+    express.json({ limit: "2mb" }),
+  );
   app.use(express.json());
 
   app.get("/health", (_req, res) => {

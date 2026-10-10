@@ -84,6 +84,10 @@ beforeEach(async () => {
       await connection.query("SET FOREIGN_KEY_CHECKS = 0");
       for (const table of [
         "sync_outbox",
+        "sync_state",
+        "sync_ingest_events",
+        "sync_ingest_rows",
+        "sync_ingest_pending",
         "admin_branches",
         "devices",
         "users",

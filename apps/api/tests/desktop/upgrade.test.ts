@@ -367,4 +367,52 @@ describe("restoring the backup taken before a failed update", () => {
       }),
     ).rejects.toThrow(/missing or incomplete/);
   });
+
+  /** The backup progress the PC keeps beside its settings, outside the dump. */
+  const backupRecord = (directory: string) =>
+    path.join(directory, "backup-generation.json");
+  const readyRecord = {
+    deviceHash: "hash",
+    generation: 3,
+    acknowledgedSeq: 40,
+    phase: "ready",
+  };
+
+  it("marks the online backup for a fresh start before the restore replaces the data", async () => {
+    const directory = scratch();
+    const backup = path.join(directory, "pre-200-to-300.sql");
+    fs.writeFileSync(backup, dump);
+    failedUpdate(backup, directory);
+    fs.writeFileSync(backupRecord(directory), JSON.stringify(readyRecord));
+
+    await restoreDesktopBackup({
+      db: databaseAt(200),
+      databaseUrl: "mysql://cashier:secret@127.0.0.1:3307/cashier_scratch",
+      mysqlBin: unusableClient(directory),
+      dataDir: directory,
+    }).catch(() => undefined);
+
+    expect(JSON.parse(fs.readFileSync(backupRecord(directory), "utf8"))).toEqual(
+      { ...readyRecord, requiresReset: true },
+    );
+  });
+
+  it("leaves the online backup alone when the restore is refused", async () => {
+    const directory = scratch();
+    const backup = path.join(directory, "pre-200-to-300.sql");
+    fs.writeFileSync(backup, "-- MySQL dump\nINSERT INTO t VALUES (1");
+    failedUpdate(backup, directory);
+    fs.writeFileSync(backupRecord(directory), JSON.stringify(readyRecord));
+
+    await restoreDesktopBackup({
+      db: databaseAt(200),
+      databaseUrl: "mysql://cashier:secret@127.0.0.1:3307/cashier_scratch",
+      mysqlBin: unusableClient(directory),
+      dataDir: directory,
+    }).catch(() => undefined);
+
+    expect(JSON.parse(fs.readFileSync(backupRecord(directory), "utf8"))).toEqual(
+      readyRecord,
+    );
+  });
 });

@@ -7,6 +7,7 @@ export default defineConfig({
       "tests/mysql/seed-admin.test.ts",
       "tests/mysql/timezone.test.ts",
       "tests/mysql/schema.test.ts",
+      "tests/mysql/sync-triggers.test.ts",
     ],
     globalSetup: ["./tests/mysql-setup.ts"],
     fileParallelism: false,
@@ -16,6 +17,9 @@ export default defineConfig({
     // against the same local MySQL at the same time, which pushes it past the
     // 30s default and fails the run for no reason.
     hookTimeout: 120_000,
+    // The same load applies to single tests: exercising the capture triggers on
+    // every upload table takes ~2s alone but passed 5s in a full run.
+    testTimeout: 60_000,
     pool: "forks",
     poolOptions: {
       forks: { singleFork: true },

@@ -29,6 +29,7 @@ import { createStocktakesModule } from "./modules/stocktakes/stocktakes.module.j
 import { createSalariesModule } from "./modules/salaries/salaries.module.js";
 import { ShiftsRepository } from "./modules/shifts/shifts.repository.js";
 import { ShiftsService } from "./modules/shifts/shifts.service.js";
+import { createResendModule, createSyncModule } from "./modules/sync/sync.module.js";
 
 export type AppOptions = {
   jwtSecret: string;
@@ -36,11 +37,25 @@ export type AppOptions = {
   trustProxy?: boolean;
   /** Desktop pins every authenticated request to its configured branch. */
   branchId?: string;
+  /**
+   * Desktop only: the background backup uploader behind "Upload now"
+   * (plan 10.3). Without it the routes are not mounted.
+   */
+  uploadNow?: () => Promise<{ uploaded: number; pending: number }>;
+  /** Desktop only: the admin recovery tool that queues everything again. */
+  resendAll?: () => Promise<{ queued: number }>;
 };
 
 export function createApp(
   db: Db,
-  { jwtSecret, corsOrigins, trustProxy = false, branchId }: AppOptions,
+  {
+    jwtSecret,
+    corsOrigins,
+    trustProxy = false,
+    branchId,
+    uploadNow,
+    resendAll,
+  }: AppOptions,
 ) {
   const app = express();
   app.set("trust proxy", trustProxy ? 1 : false);
@@ -121,6 +136,21 @@ export function createApp(
     authenticate(db, jwtSecret),
     createTransfersModule(db, requireRole("admin")),
   );
+
+  if (uploadNow)
+    app.use(
+      "/api/sync",
+      authenticate(db, jwtSecret),
+      requireRole("admin"),
+      createSyncModule(db, uploadNow),
+    );
+  if (uploadNow && resendAll)
+    app.use(
+      "/api/sync",
+      authenticate(db, jwtSecret),
+      requireRole("admin"),
+      createResendModule(resendAll, uploadNow),
+    );
 
   app.use(errorHandler);
   return app;

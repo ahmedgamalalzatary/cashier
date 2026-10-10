@@ -18,6 +18,7 @@ services:
     command:
       - --innodb-buffer-pool-size=256M
       - --max-connections=50
+      - --log-bin-trust-function-creators=1
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:

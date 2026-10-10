@@ -10,6 +10,7 @@ import type { Db } from "@cashier/db";
 import {
   categories,
   items,
+  orderLines,
   preparationAllocations,
   preparations,
   recipeIngredients,
@@ -124,7 +125,7 @@ export class RecipesRepository {
   }
 
   lockItems(ids: string[]) {
-    const orderedIds = [...new Set(ids)].sort((a, b) => (a).localeCompare(b));
+    const orderedIds = [...new Set(ids)].sort((a, b) => a.localeCompare(b));
     return this.db
       .select({
         id: items.id,
@@ -182,7 +183,10 @@ export class RecipesRepository {
     categoryId: string;
     outputItemId: string | null;
   }) {
-    const [result] = await this.db.insert(recipes).values(branchValues(data)).$returningId();
+    const [result] = await this.db
+      .insert(recipes)
+      .values(branchValues(data))
+      .$returningId();
     return result.id;
   }
 
@@ -210,7 +214,8 @@ export class RecipesRepository {
   }) {
     const [result] = await this.db
       .insert(recipeSizes)
-      .values(branchValues(data)).$returningId();
+      .values(branchValues(data))
+      .$returningId();
     return result.id;
   }
 
@@ -229,6 +234,17 @@ export class RecipesRepository {
       .where(branchCondition(recipeSizes, eq(recipeSizes.recipeId, recipeId)));
     const sizeIds = sizes.map((size) => size.id);
     if (sizeIds.length > 0) {
+      // FK SET NULL actions do not fire MySQL triggers. Clear these explicitly
+      // inside the replacement transaction so the outbox captures the change.
+      await this.db
+        .update(orderLines)
+        .set({ recipeSizeId: null })
+        .where(
+          branchCondition(
+            orderLines,
+            inArray(orderLines.recipeSizeId, sizeIds),
+          ),
+        );
       await this.db
         .delete(recipeIngredients)
         .where(
@@ -316,14 +332,17 @@ export class RecipesRepository {
     notes: string | null;
     occurredAt: Date;
   }) {
-    const [result] = await this.db.insert(preparations).values(
-      branchValues({
-        ...data,
-        totalCost: "0.00",
-        unitCost: "0.000000",
-        outputBatchId: null,
-      }),
-    ).$returningId();
+    const [result] = await this.db
+      .insert(preparations)
+      .values(
+        branchValues({
+          ...data,
+          totalCost: "0.00",
+          unitCost: "0.000000",
+          outputBatchId: null,
+        }),
+      )
+      .$returningId();
     return result.id;
   }
 
