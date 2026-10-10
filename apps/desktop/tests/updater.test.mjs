@@ -73,7 +73,11 @@ test("a desktop-v tag builds, signs and publishes the release", () => {
 test("every workflow action is pinned to an exact commit", () => {
   const uses = [
     ...fs.readFileSync(workflowFile, "utf8").matchAll(/uses: (\S+)/g),
-  ].map((match) => match[1]);
+  ]
+    .map((match) => match[1])
+    // A workflow from this repository runs at the same commit as the release,
+    // so it has no version to pin.
+    .filter((action) => !action.startsWith("./.github/workflows/"));
   assert.ok(uses.length >= 5);
   for (const action of uses)
     assert.match(action, /^[\w.-]+\/[\w.-]+@[0-9a-f]{40}$/);

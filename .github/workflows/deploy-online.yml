@@ -62,7 +62,11 @@ jobs:
           compose build
           compose up -d
           for attempt in $(seq 1 60); do
-            state=$(docker inspect -f '{{.State.Health.Status}}' "$(compose ps -q online-web)")
+            # A stopped container is not listed; break to the diagnostics
+            # below instead of letting `docker inspect ""` end the script.
+            container=$(compose ps -q online-web)
+            [ -n "$container" ] || break
+            state=$(docker inspect -f '{{.State.Health.Status}}' "$container")
             case "$state" in
               healthy) compose ps; echo "Online is running $(git rev-parse --short HEAD)."; exit 0 ;;
               unhealthy) break ;;
