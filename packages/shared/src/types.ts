@@ -32,6 +32,16 @@ export type Branch = {
   createdAt: string;
 };
 
+/** What online knows about the PC linked to a branch (desktop versions in use). */
+export type DeviceStatus = {
+  branchId: string;
+  /** The desktop version the PC last reported; null until it first calls online. */
+  appVersion: string | null;
+  linkedAt: string;
+  lastSeenAt: string | null;
+  lastUploadAt: string | null;
+};
+
 export type Session = {
   token: string;
   user: AuthUser;

@@ -11,12 +11,14 @@ const hooks = vi.hoisted(() => ({
   user: null as AuthUser | null,
   state: [] as unknown[],
   cursor: 0,
+  effects: [] as Array<() => void>,
 }));
 const calls = vi.hoisted(() => ({
   createBranch: vi.fn(),
   updateBranch: vi.fn(),
   archiveBranch: vi.fn(),
   refresh: vi.fn(),
+  listDeviceStatus: vi.fn(),
 }));
 const scope = vi.hoisted(() => ({
   branches: [
@@ -36,6 +38,10 @@ const scope = vi.hoisted(() => ({
 // Client hooks are driven by hand here: this repo renders components without a DOM.
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
+  useCallback: (fn: unknown) => fn,
+  useEffect: (effect: () => void) => {
+    hooks.effects.push(effect);
+  },
   useState: (initial: unknown) => {
     const index = hooks.cursor++;
     if (index >= hooks.state.length) hooks.state[index] = initial;
@@ -53,6 +59,9 @@ vi.mock("../../src/components/auth/auth-provider", () => ({
 }));
 vi.mock("../../src/components/branches/branch-provider", () => ({
   useBranch: () => ({ branches: scope.branches, refresh: calls.refresh }),
+}));
+vi.mock("../../src/services/devices-service", () => ({
+  listDeviceStatus: calls.listDeviceStatus,
 }));
 vi.mock("../../src/services/branches-service", () => ({
   createBranch: calls.createBranch,
@@ -107,7 +116,9 @@ const rendered = (type: unknown) => ofType(render(), type);
 
 beforeEach(() => {
   hooks.state = [];
+  hooks.effects = [];
   hooks.user = superAdmin;
+  calls.listDeviceStatus.mockReset().mockResolvedValue([]);
   calls.createBranch.mockReset().mockResolvedValue(scope.branches[0]);
   calls.updateBranch.mockReset().mockResolvedValue(scope.branches[0]);
   calls.archiveBranch.mockReset().mockResolvedValue(scope.branches[0]);
@@ -115,6 +126,41 @@ beforeEach(() => {
 });
 
 describe("online branch management screen", () => {
+  it("shows each branch's desktop version, last contact and last backup", async () => {
+    calls.listDeviceStatus.mockResolvedValue([
+      {
+        branchId: scope.branches[0].id,
+        appVersion: "0.2.5",
+        linkedAt: "2026-10-01T10:00:00.000Z",
+        lastSeenAt: "2026-10-10T10:00:00.000Z",
+        lastUploadAt: "2026-10-10T09:30:00.000Z",
+      },
+    ]);
+    render();
+    vi.useFakeTimers();
+    for (const effect of hooks.effects) effect();
+    await vi.advanceTimersByTimeAsync(1);
+    vi.useRealTimers();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const page = render();
+    const table = ofType(page, DataTable)[0].props as {
+      rows: Branch[];
+      columns: DataColumn<Branch>[];
+    };
+    const cell = (key: string, row: Branch) =>
+      text(table.columns.find((column) => column.key === key)!.cell(row) as ReactNode);
+
+    expect(cell("version", table.rows[0])).toContain("0.2.5");
+    expect(cell("version", table.rows[1])).toContain("غير مرتبط");
+    expect(cell("lastSeen", table.rows[0])).not.toBe("");
+    expect(cell("lastUpload", table.rows[0])).not.toBe("");
+    expect(cell("lastUpload", table.rows[1])).toContain("—");
+    expect(text(page)).toContain("الإصدارات المستخدمة");
+    expect(text(page)).toContain("0.2.5");
+  });
+
   it("refuses an admin that is not the super-admin", () => {
     hooks.user = plainAdmin;
 

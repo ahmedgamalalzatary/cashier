@@ -11,6 +11,7 @@ export { createAdminsModule } from "./modules/admins/admins.module.js";
 export { createLinkCodesModule } from "./modules/link-codes/link-codes.module.js";
 export { hashCode } from "./modules/link-codes/link-codes.service.js";
 export { createDevicesModule } from "./modules/devices/devices.module.js";
+export { createDeviceStatusModule } from "./modules/devices/device-status.module.js";
 export {
   createBranchesManagementModule,
   createBranchesModule,

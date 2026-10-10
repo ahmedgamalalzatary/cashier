@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   Archive,
   ArchiveRestore,
@@ -9,7 +9,7 @@ import {
   Plus,
   RefreshCw,
 } from "lucide-react";
-import type { Branch } from "@cashier/shared";
+import type { Branch, DeviceStatus } from "@cashier/shared";
 import { useAuth } from "../components/auth/auth-provider";
 import { useBranch } from "../components/branches/branch-provider";
 import { Badge } from "../components/ui/badge";
@@ -25,6 +25,14 @@ import {
   createBranch,
   updateBranch,
 } from "../services/branches-service";
+import { listDeviceStatus } from "../services/devices-service";
+import { cairoCalendarDate, cairoClock } from "../lib/cairo-date";
+import { versionsInUse } from "../models/device-versions";
+
+const when = (value: string | null) =>
+  value
+    ? `${cairoCalendarDate(new Date(value))} ${cairoClock(new Date(value))}`
+    : "—";
 
 /**
  * Branch management for the online site (plan Phase 8.1). The super-admin owns
@@ -38,6 +46,26 @@ export function OnlineBranchesPage() {
   const [archiving, setArchiving] = useState<Branch | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Which desktop version each branch's PC runs, so old versions can be retired.
+  const [deviceStatus, setDeviceStatus] = useState<DeviceStatus[]>([]);
+  const isSuperAdmin = Boolean(user?.isSuperAdmin);
+
+  const loadDevices = useCallback(async () => {
+    try {
+      setDeviceStatus(await listDeviceStatus());
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "تعذر تحميل حالة الأجهزة",
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    // The first read runs in an event-free async task, like the backup card's.
+    const timer = setTimeout(() => void loadDevices(), 0);
+    return () => clearTimeout(timer);
+  }, [isSuperAdmin, loadDevices]);
 
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
@@ -45,6 +73,7 @@ export function OnlineBranchesPage() {
     try {
       await action();
       await refresh();
+      await loadDevices();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "تعذر حفظ الفرع");
     } finally {
@@ -83,6 +112,9 @@ export function OnlineBranchesPage() {
   if (!user?.isSuperAdmin)
     return <ErrorBanner>لا تملك صلاحية إدارة الفروع</ErrorBanner>;
 
+  const deviceOf = (branch: Branch) =>
+    deviceStatus.find((device) => device.branchId === branch.id);
+  const inUse = versionsInUse(deviceStatus);
   const columns: DataColumn<Branch>[] = [
     {
       key: "name",
@@ -103,6 +135,27 @@ export function OnlineBranchesPage() {
           {row.isActive ? "نشط" : "مؤرشف"}
         </Badge>
       ),
+    },
+    {
+      key: "version",
+      header: "إصدار البرنامج",
+      cell: (row) => {
+        const device = deviceOf(row);
+        if (!device) return <span className="text-muted">غير مرتبط</span>;
+        return device.appVersion ?? (
+          <span className="text-muted">لم يتصل بعد</span>
+        );
+      },
+    },
+    {
+      key: "lastSeen",
+      header: "آخر اتصال",
+      cell: (row) => when(deviceOf(row)?.lastSeenAt ?? null),
+    },
+    {
+      key: "lastUpload",
+      header: "آخر نسخة احتياطية",
+      cell: (row) => when(deviceOf(row)?.lastUploadAt ?? null),
     },
   ];
 
@@ -135,6 +188,17 @@ export function OnlineBranchesPage() {
         }
       />
       {error && !form && <ErrorBanner>{error}</ErrorBanner>}
+      {inUse.length > 0 && (
+        <p className="text-sm text-muted">
+          الإصدارات المستخدمة الآن:{" "}
+          {inUse
+            .map(
+              ({ version, branches: count }) =>
+                `${version ?? "لم يتصل بعد"} (${count} فرع)`,
+            )
+            .join("، ")}
+        </p>
+      )}
       <DataTable
         caption="قائمة الفروع"
         rows={branches}

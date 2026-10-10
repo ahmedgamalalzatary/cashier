@@ -677,7 +677,9 @@ repository secrets `TAURI_SIGNING_PRIVATE_KEY` (contents of the owner's `cashier
 
 **Traps**
 
-- An update that adds a migration must be deployed to the VPS **first** (D16).
+- An update that adds a migration must be deployed to the VPS **first** (D16). Online accepts
+  backups from the current and previous migration only; write additive migrations and drop columns
+  only after no PC still runs a version that sends them (`apps/desktop/README.md`).
 - A release that is a draft is invisible to `releases/latest`. Publish it.
 - Never ship a version lower than the installed one; the updater ignores it.
 
@@ -773,7 +775,10 @@ online: one transaction, @cashier_sync_apply=1, FK checks off, upsert/delete in 
   or device identity before numbers can be reused. These remain acceptance requirements for those slices.
 - Ingest is **idempotent** (same batch twice = same result) and rejects rows whose `branch_id`
   isn't the device's branch.
-- Server stores `devices.last_upload_at`; online-web shows "last backup" per branch.
+- Server stores `devices.last_upload_at`; online-web shows "last backup" per branch. **Done 2026-10-10:**
+  the super-admin's **إدارة الفروع** page shows each branch PC's desktop version, last contact and
+  last backup, plus the versions in use (`GET /api/devices`); see `apps/desktop/README.md`
+  "Database changes and older PCs" for retiring old versions.
 - Desktop UI: "Upload now" button + last success time + pending count. Failures never block selling.
 - 10.4: "resend everything" admin tool on the PC (rebuild outbox from all rows) for recovery.
   Initial backup must also enqueue rows that existed before capture triggers were installed;

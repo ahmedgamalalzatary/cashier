@@ -4,6 +4,7 @@ import type { Db } from "@cashier/db";
 import {
   authenticate,
   createAdminsModule,
+  createDeviceStatusModule,
   createLinkCodesModule,
   createAuthModule,
   createDevicesModule,
@@ -64,6 +65,11 @@ export function createApp(
     "/api/admins",
     authenticate(db, jwtSecret, onlineAccess),
     createAdminsModule(db),
+  );
+  app.use(
+    "/api/devices",
+    authenticate(db, jwtSecret, onlineAccess),
+    createDeviceStatusModule(db),
   );
   app.use(
     "/api/link-codes",

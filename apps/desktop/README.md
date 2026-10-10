@@ -170,6 +170,37 @@ through the "Update available" button.
   backed up offline. If it is lost, installed PCs can never update again; keep
   the GitHub secrets and the backup in sync.
 
+### Database changes and older PCs
+
+Shop PCs update themselves: on every open with internet, Cashier installs the
+newest published release before it starts (up to 5 seconds' check; offline it
+starts normally). While open it checks every 30 minutes and offers "Update
+available". So a PC is behind only until its next open.
+
+Online accepts a PC's backup only when the PC's database is at the server's
+current migration or **one** before it. A newer PC is refused (that is why the
+VPS is deployed first), and a PC two or more database releases behind is refused
+until it updates. A refused backup loses nothing: the changes stay queued on
+the PC and upload after it updates; selling never stops.
+
+Write database changes so older PCs keep working:
+
+- **Add, don't break.** New columns are nullable or have a default; an older PC
+  does not send them and online fills the default.
+- **Never rename or drop a column in the same release.** Online refuses rows
+  naming a column it no longer has, so an older PC would stop backing up. Add
+  the new column in one release and drop the old one in a later release, once
+  no PC runs a version that still sends it.
+- Avoid two database releases in a row before every PC has updated.
+
+**Which versions are still in use:** the online site's **إدارة الفروع** page
+(super-admin) shows, for each branch, the desktop version its PC last reported,
+its last contact and its last backup, and lists the versions in use with how
+many branches run each. A version is safe to stop supporting once no branch
+shows it. A PC that has not contacted online for days is closed or offline; it
+updates on its next open. The same data is in the online `devices` table
+(`app_version`, `last_seen_at`, `last_upload_at`) and at `GET /api/devices`.
+
 `pnpm build:desktop` still builds an unsigned local installer for testing;
 signing is switched on only by `src-tauri/tauri.release.conf.json` in the workflow.
 
