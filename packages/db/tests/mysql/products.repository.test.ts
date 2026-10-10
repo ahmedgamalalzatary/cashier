@@ -1,4 +1,5 @@
 import { it, testBranchValues } from "../support/ids.js";
+import { currentBranchId } from "../../src/branch-context.js";
 import { describe, expect } from "vitest";
 import { eq } from "drizzle-orm";
 import { categories, items } from "@cashier/db";
@@ -56,6 +57,63 @@ const catalog = (nameAr = "قهوة"): ExternalCatalog => ({
       ],
     },
   ],
+});
+
+/** Catalog changes the capture triggers queued for backup after `afterSeq`. */
+async function queuedCatalogChanges(afterSeq: number) {
+  const [rows] = await db.$client.query(
+    "SELECT table_name AS tableName, JSON_EXTRACT(row_json, '$.is_current') AS isCurrent FROM sync_outbox WHERE seq > ? AND table_name LIKE 'external\\_%' AND JSON_UNQUOTE(JSON_EXTRACT(pk, '$.branch_id')) = ? ORDER BY seq",
+    [afterSeq, currentBranchId()],
+  );
+  return rows as Array<{ tableName: string; isCurrent: number | null }>;
+}
+async function lastQueuedSeq() {
+  const [rows] = await db.$client.query(
+    "SELECT COALESCE(MAX(seq), 0) AS seq FROM sync_outbox",
+  );
+  return Number((rows as Array<{ seq: number }>)[0].seq);
+}
+
+describe("catalog refresh backup traffic", () => {
+  it("queues nothing when the upstream catalog did not change", async () => {
+    const repository = new ProductsRepository(db);
+    await repository.applyCatalog(catalog());
+    const before = await lastQueuedSeq();
+
+    await repository.applyCatalog(catalog());
+
+    expect(await queuedCatalogChanges(before)).toEqual([]);
+  });
+
+  it("queues only the row whose content changed", async () => {
+    const repository = new ProductsRepository(db);
+    await repository.applyCatalog(catalog());
+    const before = await lastQueuedSeq();
+
+    await repository.applyCatalog(catalog("قهوة محدثة"));
+
+    expect(await queuedCatalogChanges(before)).toEqual([
+      { tableName: "external_products", isCurrent: 1 },
+    ]);
+  });
+
+  it("queues one retirement for each row that left the catalog", async () => {
+    const repository = new ProductsRepository(db);
+    await repository.applyCatalog(catalog());
+    const before = await lastQueuedSeq();
+
+    await repository.applyCatalog({ ...catalog(), products: [] });
+
+    expect(
+      (await queuedCatalogChanges(before)).sort((a, b) =>
+        a.tableName.localeCompare(b.tableName),
+      ),
+    ).toEqual([
+      { tableName: "external_modifier_groups", isCurrent: 0 },
+      { tableName: "external_modifier_options", isCurrent: 0 },
+      { tableName: "external_products", isCurrent: 0 },
+    ]);
+  });
 });
 
 describe("ProductsRepository catalog reconciliation", () => {

@@ -1,6 +1,6 @@
 import { branchCondition, branchValues } from "@cashier/db";
 import type { ExternalOrderSummary } from "@cashier/shared";
-import { and, desc, like, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, inArray, like, or, sql, type SQL } from "drizzle-orm";
 import type { Db } from "@cashier/db";
 import { externalOrdersCache } from "@cashier/db";
 
@@ -32,9 +32,30 @@ export class ExternalOrdersRepository {
         itemCount: order.itemCount,
         cachedAt,
       }));
+      // Every write here is queued for the online backup, and MySQL runs the
+      // capture trigger even for a no-op duplicate update, so only orders not
+      // cached yet are written at all.
+      const cached = new Set(
+        (
+          await this.db
+            .select({ externalId: externalOrdersCache.externalId })
+            .from(externalOrdersCache)
+            .where(
+              branchCondition(
+                externalOrdersCache,
+                inArray(
+                  externalOrdersCache.externalId,
+                  rows.map((row) => row.externalId),
+                ),
+              ),
+            )
+        ).map((row) => row.externalId),
+      );
+      const unseen = rows.filter((row) => !cached.has(row.externalId));
+      if (!unseen.length) continue;
       await this.db
         .insert(externalOrdersCache)
-        .values(branchValues(rows))
+        .values(branchValues(unseen))
         .onDuplicateKeyUpdate({
           set: { externalId: sql`external_id` },
         });

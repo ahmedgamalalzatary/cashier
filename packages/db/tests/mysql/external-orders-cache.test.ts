@@ -1,4 +1,5 @@
 import { it } from "../support/ids.js";
+import { currentBranchId } from "../../src/branch-context.js";
 import { describe, expect } from "vitest";
 import request from "supertest";
 import type { ExternalOrderSummary } from "@cashier/shared";
@@ -25,6 +26,23 @@ const order = (id: number, overrides: Partial<ExternalOrderSummary> = {}) => ({
 });
 
 describe("cached external orders", () => {
+  it("queues an order for backup once, not again on every refresh", async () => {
+    const repository = new ExternalOrdersRepository(db);
+    const queued = async () => {
+      const [rows] = await db.$client.query(
+        "SELECT COUNT(*) AS n FROM sync_outbox WHERE table_name = 'external_orders_cache' AND JSON_UNQUOTE(JSON_EXTRACT(pk, '$.branch_id')) = ?",
+        [currentBranchId()],
+      );
+      return Number((rows as Array<{ n: number }>)[0].n);
+    };
+    const before = await queued();
+
+    await repository.insertUnseen([order(41), order(42)]);
+    await repository.insertUnseen([order(41), order(42), order(43)]);
+
+    expect((await queued()) - before).toBe(3);
+  });
+
   it("is append-only and serves local search, pagination, and complete totals", async () => {
     const repository = new ExternalOrdersRepository(db);
     await repository.insertUnseen([

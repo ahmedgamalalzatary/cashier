@@ -2,8 +2,11 @@ import {
   branchCondition,
   branchValues,
   branchTransaction,
+  currentBranchId,
+  quoteIdentifier,
 } from "@cashier/db";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { getTableConfig, type AnyMySqlColumn } from "drizzle-orm/mysql-core";
+import { and, asc, eq, inArray, notInArray, sql } from "drizzle-orm";
 import type { Db } from "@cashier/db";
 import {
   externalCatalogSync,
@@ -31,6 +34,76 @@ const chunks = <T>(rows: T[]) => {
   }
   return result;
 };
+
+type CatalogTable =
+  | typeof externalCategories
+  | typeof externalProducts
+  | typeof externalProductSizes
+  | typeof externalModifierGroups
+  | typeof externalModifierOptions;
+type CatalogTx = Parameters<Parameters<typeof branchTransaction>[1]>[0];
+
+/**
+ * Every write to the catalog tables is queued for the online backup, and MySQL
+ * runs the capture trigger even when an upsert leaves a row identical. New rows
+ * are inserted; existing rows are updated only where MySQL finds a value that
+ * differs, so an unchanged catalog queues nothing.
+ */
+async function writeChangedRows(
+  tx: CatalogTx,
+  table: CatalogTable,
+  rows: Array<{ externalId: number }>,
+  now: Date,
+  fields: string[],
+) {
+  if (!rows.length) return;
+  const known = new Set(
+    (
+      await tx
+        .select({ externalId: table.externalId })
+        .from(table)
+        .where(branchCondition(table))
+    ).map((row) => row.externalId),
+  );
+  const fresh = rows
+    .filter((row) => !known.has(row.externalId))
+    .map((row) => ({ ...row, syncedAt: now, isCurrent: true }));
+  for (const chunk of chunks(fresh))
+    await tx.insert(table).values(branchValues(chunk) as never);
+  const existing = rows.filter((row) => known.has(row.externalId));
+  const columns = table as unknown as Record<string, AnyMySqlColumn>;
+  const name = (field: string) => sql.raw(quoteIdentifier(columns[field].name));
+  const value = (row: Record<string, unknown>, field: string) =>
+    row[field] === null || row[field] === undefined
+      ? null
+      : columns[field].mapToDriverValue(row[field]);
+  const target = sql.raw(quoteIdentifier(getTableConfig(table).name));
+  for (const chunk of chunks(existing)) {
+    const tuples = chunk.map(
+      (row) =>
+        sql`ROW(${sql.join(
+          [
+            sql`${row.externalId}`,
+            ...fields.map(
+              (field) => sql`${value(row as Record<string, unknown>, field)}`,
+            ),
+          ],
+          sql`, `,
+        )})`,
+    );
+    await tx.execute(sql`UPDATE ${target} JOIN (VALUES ${sql.join(tuples, sql`, `)}) AS incoming (external_id, ${sql.join(fields.map(name), sql`, `)})
+      ON ${target}.external_id = incoming.external_id
+      SET ${sql.join(
+        fields.map((field) => sql`${target}.${name(field)} = incoming.${name(field)}`),
+        sql`, `,
+      )}, ${target}.synced_at = ${columns.syncedAt.mapToDriverValue(now)}, ${target}.is_current = TRUE
+      WHERE ${target}.branch_id = ${currentBranchId()}
+        AND (${target}.is_current = FALSE OR ${sql.join(
+          fields.map((field) => sql`NOT (${target}.${name(field)} <=> incoming.${name(field)})`),
+          sql` OR `,
+        )})`);
+  }
+}
 
 export class ProductsRepository implements ProductsRepositoryContract {
   constructor(
@@ -77,157 +150,123 @@ export class ProductsRepository implements ProductsRepositoryContract {
     return branchTransaction(this.db, async (tx) => {
       const now = new Date();
       // Products first: a checkout locks external_products FOR UPDATE before
-      // reading sizes, groups and options, so touching products first makes a
+      // reading sizes, groups and options, so locking products first makes a
       // concurrent refresh block there instead of changing prices mid-sale.
       await tx
-        .update(externalProducts)
-        .set({ isCurrent: false })
-        .where(branchCondition(externalProducts));
-      await tx
-        .update(externalCategories)
-        .set({ isCurrent: false })
-        .where(branchCondition(externalCategories));
-      await tx
-        .update(externalProductSizes)
-        .set({ isCurrent: false })
-        .where(branchCondition(externalProductSizes));
-      await tx
-        .update(externalModifierGroups)
-        .set({ isCurrent: false })
-        .where(branchCondition(externalModifierGroups));
-      await tx
-        .update(externalModifierOptions)
-        .set({ isCurrent: false })
-        .where(branchCondition(externalModifierOptions));
+        .select({ externalId: externalProducts.externalId })
+        .from(externalProducts)
+        .where(branchCondition(externalProducts))
+        .for("update");
+      // Every write here is queued for the online backup, so only rows that
+      // left the upstream catalog are retired; unchanged rows stay untouched.
+      const sizes = catalog.products.flatMap((product) => product.sizes);
+      const groups = catalog.products.flatMap(
+        (product) => product.modifierGroups,
+      );
+      const options = groups.flatMap((group) => group.options);
+      const retire = async (
+        table:
+          | typeof externalProducts
+          | typeof externalCategories
+          | typeof externalProductSizes
+          | typeof externalModifierGroups
+          | typeof externalModifierOptions,
+        current: Array<{ externalId: number }>,
+      ) =>
+        tx
+          .update(table)
+          .set({ isCurrent: false })
+          .where(
+            branchCondition(
+              table,
+              and(
+                eq(table.isCurrent, true),
+                current.length
+                  ? notInArray(
+                      table.externalId,
+                      current.map((row) => row.externalId),
+                    )
+                  : undefined,
+              ),
+            ),
+          );
+      await retire(externalProducts, catalog.products);
+      await retire(externalCategories, catalog.categories);
+      await retire(externalProductSizes, sizes);
+      await retire(externalModifierGroups, groups);
+      await retire(externalModifierOptions, options);
 
-      const categoryRows = catalog.categories.map((category) => ({
-        ...category,
-        syncedAt: now,
-        isCurrent: true,
-      }));
-      for (const categoryChunk of chunks(categoryRows)) {
-        await tx
-          .insert(externalCategories)
-          .values(branchValues(categoryChunk))
-          .onDuplicateKeyUpdate({
-            set: {
-              nameAr: sql`values(name_ar)`,
-              nameEn: sql`values(name_en)`,
-              descriptionAr: sql`values(description_ar)`,
-              descriptionEn: sql`values(description_en)`,
-              isActive: sql`values(is_active)`,
-              isVisible: sql`values(is_visible)`,
-              displayOrder: sql`values(display_order)`,
-              syncedAt: sql`values(synced_at)`,
-              isCurrent: true,
-            },
-          });
-      }
-      const productRows = catalog.products.map(
-        ({ sizes: _sizes, modifierGroups: _groups, ...product }) => ({
-          ...product,
-          syncedAt: now,
-          isCurrent: true,
-        }),
+      await writeChangedRows(tx, externalCategories, catalog.categories, now, [
+        "nameAr",
+        "nameEn",
+        "descriptionAr",
+        "descriptionEn",
+        "isActive",
+        "isVisible",
+        "displayOrder",
+      ]);
+      await writeChangedRows(
+        tx,
+        externalProducts,
+        catalog.products.map(
+          ({ sizes: _sizes, modifierGroups: _groups, ...product }) => product,
+        ),
+        now,
+        [
+          "externalCategoryId",
+          "nameAr",
+          "nameEn",
+          "descriptionAr",
+          "descriptionEn",
+          "imageUrl",
+          "price",
+          "discountPercentage",
+          "discountStart",
+          "discountEnd",
+          "calories",
+          "pointsReward",
+          "isAvailable",
+          "isVisible",
+        ],
       );
-      for (const productChunk of chunks(productRows)) {
-        await tx
-          .insert(externalProducts)
-          .values(branchValues(productChunk))
-          .onDuplicateKeyUpdate({
-            set: {
-              externalCategoryId: sql`values(external_category_id)`,
-              nameAr: sql`values(name_ar)`,
-              nameEn: sql`values(name_en)`,
-              descriptionAr: sql`values(description_ar)`,
-              descriptionEn: sql`values(description_en)`,
-              imageUrl: sql`values(image_url)`,
-              price: sql`values(price)`,
-              discountPercentage: sql`values(discount_percentage)`,
-              discountStart: sql`values(discount_start)`,
-              discountEnd: sql`values(discount_end)`,
-              calories: sql`values(calories)`,
-              pointsReward: sql`values(points_reward)`,
-              isAvailable: sql`values(is_available)`,
-              isVisible: sql`values(is_visible)`,
-              syncedAt: sql`values(synced_at)`,
-              isCurrent: true,
-            },
-          });
-      }
-      const sizeRows = catalog.products.flatMap((product) =>
-        product.sizes.map((size) => ({
-          ...size,
-          externalProductId: product.externalId,
-          syncedAt: now,
-          isCurrent: true,
-        })),
-      );
-      for (const sizeChunk of chunks(sizeRows)) {
-        await tx
-          .insert(externalProductSizes)
-          .values(branchValues(sizeChunk))
-          .onDuplicateKeyUpdate({
-            set: {
-              externalProductId: sql`values(external_product_id)`,
-              nameAr: sql`values(name_ar)`,
-              nameEn: sql`values(name_en)`,
-              price: sql`values(price)`,
-              isDefault: sql`values(is_default)`,
-              syncedAt: sql`values(synced_at)`,
-              isCurrent: true,
-            },
-          });
-      }
-      const groupRows = catalog.products.flatMap((product) =>
-        product.modifierGroups.map(({ options: _options, ...group }) => ({
-          ...group,
-          externalProductId: product.externalId,
-          syncedAt: now,
-          isCurrent: true,
-        })),
-      );
-      for (const groupChunk of chunks(groupRows)) {
-        await tx
-          .insert(externalModifierGroups)
-          .values(branchValues(groupChunk))
-          .onDuplicateKeyUpdate({
-            set: {
-              externalProductId: sql`values(external_product_id)`,
-              nameAr: sql`values(name_ar)`,
-              nameEn: sql`values(name_en)`,
-              isRequired: sql`values(is_required)`,
-              maxSelections: sql`values(max_selections)`,
-              syncedAt: sql`values(synced_at)`,
-              isCurrent: true,
-            },
-          });
-      }
-      const optionRows = catalog.products.flatMap((product) =>
-        product.modifierGroups.flatMap((group) =>
-          group.options.map((option) => ({
-            ...option,
-            externalModifierGroupId: group.externalId,
-            syncedAt: now,
-            isCurrent: true,
+      await writeChangedRows(
+        tx,
+        externalProductSizes,
+        catalog.products.flatMap((product) =>
+          product.sizes.map((size) => ({
+            ...size,
+            externalProductId: product.externalId,
           })),
         ),
+        now,
+        ["externalProductId", "nameAr", "nameEn", "price", "isDefault"],
       );
-      for (const optionChunk of chunks(optionRows)) {
-        await tx
-          .insert(externalModifierOptions)
-          .values(branchValues(optionChunk))
-          .onDuplicateKeyUpdate({
-            set: {
-              nameAr: sql`values(name_ar)`,
-              nameEn: sql`values(name_en)`,
-              extraPrice: sql`values(extra_price)`,
-              externalModifierGroupId: sql`values(external_modifier_group_id)`,
-              syncedAt: sql`values(synced_at)`,
-              isCurrent: true,
-            },
-          });
-      }
+      await writeChangedRows(
+        tx,
+        externalModifierGroups,
+        catalog.products.flatMap((product) =>
+          product.modifierGroups.map(({ options: _options, ...group }) => ({
+            ...group,
+            externalProductId: product.externalId,
+          })),
+        ),
+        now,
+        ["externalProductId", "nameAr", "nameEn", "isRequired", "maxSelections"],
+      );
+      await writeChangedRows(
+        tx,
+        externalModifierOptions,
+        catalog.products.flatMap((product) =>
+          product.modifierGroups.flatMap((group) =>
+            group.options.map((option) => ({
+              ...option,
+              externalModifierGroupId: group.externalId,
+            })),
+          ),
+        ),
+        now,
+        ["nameAr", "nameEn", "extraPrice", "externalModifierGroupId"],
+      );
       if (this.recordCatalogSuccess) {
         await tx
           .insert(externalCatalogSync)
