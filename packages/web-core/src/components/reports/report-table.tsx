@@ -74,7 +74,8 @@ const labelSets: Record<string, Record<string, string>> = {
   },
   expenseType: { shift: "مصروف وردية", general: "مصروف عام" },
 };
-function valueOf(
+/** The text a report cell shows; the online Excel download reuses it. */
+export function reportCellText(
   value: string | number | null,
   kind?: string,
   labelSet?: string,
@@ -121,7 +122,7 @@ export function ReportTable({ title, rows, columns, note }: ReportTableData) {
                       : ""
                   }
                 >
-                  {valueOf(row[column.key], column.kind, column.labelSet)}
+                  {reportCellText(row[column.key], column.kind, column.labelSet)}
                 </td>
               ))}
             </tr>

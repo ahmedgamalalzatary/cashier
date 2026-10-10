@@ -2,7 +2,10 @@ import { testId } from "@cashier/shared/test-support";
 import type { ReactElement, ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ReportsPage } from "../../../src/features/reports-page";
+import {
+  ReportsPage,
+  type ReportExport,
+} from "../../../src/features/reports-page";
 import { Button } from "../../../src/components/ui/button";
 import { PageHeader } from "../../../src/components/ui/page-header";
 import { Tabs } from "../../../src/components/ui/tabs";
@@ -84,9 +87,9 @@ vi.mock(
   async () => import("../../../src/models/reports-model"),
 );
 
-function render() {
+function render(props: Parameters<typeof ReportsPage>[0] = {}) {
   hooks.cursor = 0;
-  return ReportsPage();
+  return ReportsPage(props);
 }
 function nodes(node: ReactNode): ReactElement<Record<string, unknown>>[] {
   if (Array.isArray(node)) return node.flatMap(nodes);
@@ -99,6 +102,13 @@ function action(tree: ReturnType<typeof render>, print: boolean) {
   return nodes(header.props.actions as ReactNode).filter(
     (node) => node.type === Button,
   )[print ? 1 : 0];
+}
+function excelButton(tree: ReturnType<typeof render>) {
+  const header = nodes(tree).find((node) => node.type === PageHeader)!;
+  return nodes(header.props.actions as ReactNode).find(
+    (node) =>
+      node.type === Button && node.props["aria-label"] === "تنزيل Excel",
+  );
 }
 function openTab(tree: ReturnType<typeof render>, id: string) {
   const tabs = nodes(tree).find((node) => node.type === Tabs)!;
@@ -275,6 +285,46 @@ describe("report loading and printing", () => {
     openTab(render(), "suppliers");
     expect(renderToStaticMarkup(render())).toContain(
       "جميع المشتريات والمدفوعات",
+    );
+  });
+  it("offers Excel only where the site provides it, with the loaded tab's tables", async () => {
+    await loaded();
+    expect(excelButton(render())).toBeUndefined();
+    const excelDownload = vi.fn<(report: ReportExport) => Promise<void>>(
+      async () => undefined,
+    );
+    openTab(render({ excelDownload }), "stock");
+
+    const button = excelButton(render({ excelDownload }))!;
+    expect(button.props.disabled).toBe(false);
+    await (button.props.onClick as () => Promise<void>)();
+
+    const report = excelDownload.mock.calls[0][0];
+    expect(report).toMatchObject({
+      branchName: "Main Branch",
+      from: "2026-09-01",
+      to: "2026-09-10",
+      section: "المخزون والحركة",
+    });
+    expect(report.tables.map((table) => table.title)).toContain(
+      "دفتر حركة المخزون",
+    );
+    expect(report.tables.map((table) => table.title)).not.toContain(
+      "حسب اليوم",
+    );
+  });
+  it("says so when the Excel file could not be made", async () => {
+    await loaded();
+    const excelDownload = vi.fn(async () => {
+      throw new Error("boom");
+    });
+
+    await (
+      excelButton(render({ excelDownload }))!.props.onClick as () => Promise<void>
+    )();
+
+    expect(renderToStaticMarkup(render({ excelDownload }))).toContain(
+      "تعذر تنزيل ملف Excel",
     );
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { Printer, RefreshCw } from "lucide-react";
+import { FileSpreadsheet, Printer, RefreshCw } from "lucide-react";
 import { ReportTable } from "../components/reports/report-table";
 import { Button } from "../components/ui/button";
 import { PageHeader } from "../components/ui/page-header";
@@ -524,7 +524,21 @@ function tables(d: ReportsData, tab: Tab): TableData[] {
     },
   ];
 }
-export function ReportsPage() {
+/** The loaded tab, exactly as on screen, for a site that offers a download. */
+export type ReportExport = {
+  branchName: string;
+  from: string;
+  to: string;
+  section: string;
+  tables: TableData[];
+};
+
+export function ReportsPage({
+  excelDownload,
+}: {
+  /** Only the online site passes this; the desktop keeps print/PDF only. */
+  excelDownload?: (report: ReportExport) => Promise<void>;
+} = {}) {
   const today = cairoCalendarDate(),
     monthStart = `${today.slice(0, 7)}-01`;
   const { branch, error: branchError, refresh: refreshBranches } = useBranch();
@@ -534,6 +548,8 @@ export function ReportsPage() {
   const [loadedData, setData] = useState<ReportsData | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState("");
+  const [exporting, setExporting] = useState(false),
+    [exportError, setExportError] = useState("");
   const [request, setRequest] = useState({
     from: monthStart,
     to: today,
@@ -572,6 +588,7 @@ export function ReportsPage() {
   const data =
     branchId && loadedData?.range.branchId === branchId ? loadedData : null;
   const visible = useMemo(() => (data ? tables(data, tab) : []), [data, tab]);
+  const section = tabs.find(([key]) => key === tab)?.[1] ?? "";
   if (!branch)
     return (
       <div className="grid place-items-center py-16 text-center">
@@ -593,6 +610,27 @@ export function ReportsPage() {
         )}
       </div>
     );
+  // Print and Excel share one rule: only a finished report of this branch.
+  const unavailable =
+    !data || loading || Boolean(error) || data.range.branchId !== branch.id;
+  const downloadExcel = async () => {
+    if (!excelDownload || !data || unavailable) return;
+    setExporting(true);
+    setExportError("");
+    try {
+      await excelDownload({
+        branchName: branch.name,
+        from: data.range.from,
+        to: data.range.to,
+        section,
+        tables: visible,
+      });
+    } catch {
+      setExportError("تعذر تنزيل ملف Excel؛ حاول مرة أخرى.");
+    } finally {
+      setExporting(false);
+    }
+  };
   return (
     <div className="report-print-root space-y-6">
       <PageHeader
@@ -609,24 +647,24 @@ export function ReportsPage() {
             </Button>
             <Button
               onClick={() => {
-                if (
-                  data &&
-                  !loading &&
-                  !error &&
-                  data.range.branchId === branch.id
-                )
-                  window.print();
+                if (!unavailable) window.print();
               }}
-              disabled={
-                !data ||
-                loading ||
-                Boolean(error) ||
-                data.range.branchId !== branch.id
-              }
+              disabled={unavailable}
             >
               <Printer className="size-4" />
               طباعة / PDF
             </Button>
+            {excelDownload && (
+              <Button
+                variant="secondary"
+                aria-label="تنزيل Excel"
+                onClick={downloadExcel}
+                disabled={unavailable || exporting}
+              >
+                <FileSpreadsheet className="size-4" />
+                Excel
+              </Button>
+            )}
           </div>
         }
       />
@@ -677,9 +715,7 @@ export function ReportsPage() {
                 timeZone: "Africa/Cairo",
               })}
             </p>
-            <h2 className="text-xl font-bold">
-              {tabs.find(([key]) => key === tab)?.[1]}
-            </h2>
+            <h2 className="text-xl font-bold">{section}</h2>
             {(from !== data.range.from || to !== data.range.to) && (
               <p className="print-controls text-sm text-muted">
                 التواريخ المختارة لم تطبق بعد. حدّث التقرير؛ الطباعة تستخدم
@@ -721,6 +757,9 @@ export function ReportsPage() {
           </div>
         )}
         {error && <ErrorBanner>{error}</ErrorBanner>}
+        {exportError && (
+          <ErrorBanner className="print-controls">{exportError}</ErrorBanner>
+        )}
         {loading ? (
           <LoadingState label="جارِ تحميل التقرير…" />
         ) : (
