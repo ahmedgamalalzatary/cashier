@@ -30,9 +30,15 @@ jobs:
           KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
-          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # A key pasted from a Windows browser carries CRLF endings, which
+          # OpenSSH refuses to load; the key itself is unchanged by this.
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" | tr -d '\r' > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          if ! ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null; then
+            echo "::error::VPS_SSH_KEY is not a valid private key. Paste the whole key, BEGIN and END lines included (docs/docker.md, Deploy from GitHub Actions)."
+            exit 1
+          fi
 
       # Same steps as docs/docker.md "Deploy an update"; online-web turns
       # healthy only after MySQL, the migrations and online-api all succeeded.
