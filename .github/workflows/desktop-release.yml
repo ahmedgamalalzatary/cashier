@@ -1,6 +1,7 @@
 # Builds, signs and publishes the Windows installer when a desktop-vX.Y.Z tag
 # is pushed (plan 6.4). Installed PCs read latest.json from the newest release.
-# Release order for database changes: deploy the VPS first, then tag (D16).
+# Release order for database changes: the VPS first, then the desktop (D16).
+# The release runs "Deploy online" for this commit first and stops if it fails.
 name: Desktop release
 
 on:
@@ -15,7 +16,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # D16: the VPS gets this commit (and its database changes) before any shop
+  # PC can download the installer. A failed deploy stops the release.
+  deploy-online:
+    uses: ./.github/workflows/deploy-online.yml
+    secrets: inherit
+
   release:
+    needs: deploy-online
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

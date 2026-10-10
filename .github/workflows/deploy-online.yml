@@ -1,0 +1,70 @@
+# Deploys the online site to the VPS. Nothing deploys on an ordinary push:
+# - on demand: Actions > Deploy online > Run workflow, or
+#   `gh workflow run deploy-online.yml`;
+# - automatically as the first step of every desktop release, so database
+#   changes always reach the VPS before shop PCs (D16).
+# Secrets: VPS_HOST, VPS_USER, VPS_SSH_KEY (a key used only by this workflow)
+# and VPS_KNOWN_HOSTS (the server's host key line, so nothing else is trusted).
+# Setup and commands: docs/docker.md "Deploy from GitHub Actions".
+name: Deploy online
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # One deploy at a time, whether started by hand or by a release.
+    concurrency:
+      group: deploy-online
+      cancel-in-progress: false
+    steps:
+      - name: Trust only the VPS host key
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+
+      # Same steps as docs/docker.md "Deploy an update"; online-web turns
+      # healthy only after MySQL, the migrations and online-api all succeeded.
+      - name: Pull, build and restart on the VPS
+        env:
+          VPS: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$VPS" bash -s -- "$GITHUB_SHA" <<'REMOTE'
+          set -euo pipefail
+          cd /root/cashier
+          compose() { docker compose --env-file .env.production "$@"; }
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor "$1" origin/main; then
+            echo "Commit $1 is not on main; only main is deployed." >&2
+            exit 1
+          fi
+          # Moves to this commit; a VPS already past it (a newer deploy) stays.
+          git merge --ff-only "$1"
+          compose config --quiet
+          compose build
+          compose up -d
+          for attempt in $(seq 1 60); do
+            state=$(docker inspect -f '{{.State.Health.Status}}' "$(compose ps -q online-web)")
+            case "$state" in
+              healthy) compose ps; echo "Online is running $(git rev-parse --short HEAD)."; exit 0 ;;
+              unhealthy) break ;;
+            esac
+            sleep 5
+          done
+          compose ps
+          compose logs --tail 80 migrate online-api online-web
+          echo "The online site did not become healthy." >&2
+          exit 1
+          REMOTE

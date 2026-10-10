@@ -149,18 +149,28 @@ git tag desktop-v0.2.4              # must equal the new version
 git push origin desktop-v0.2.4      # push the tag by name; --follow-tags skips plain tags
 ```
 
-The tag starts `.github/workflows/desktop-release.yml` (about 10 minutes). GitHub
-builds the installer, signs it with the repository secrets `TAURI_SIGNING_PRIVATE_KEY`
-and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, and publishes `Cashier_<version>_x64-setup.exe`
-with `latest.json` as the newest release. Follow it under the repository's
-**Actions** tab. Shop PCs then update on their next open, or within 30 minutes
-through the "Update available" button.
+The tag starts `.github/workflows/desktop-release.yml`. It first deploys the
+tagged commit to the VPS (the **Deploy online** workflow, see `docs/docker.md`
+"Deploy from GitHub Actions") and stops if that fails. Then GitHub builds the
+installer (about 10 minutes), signs it with the repository secrets
+`TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, and
+publishes `Cashier_<version>_x64-setup.exe` with `latest.json` as the newest
+release. Follow it under the repository's **Actions** tab, or:
 
-- **Database changes:** if the release adds a migration, deploy the VPS first,
-  then push the tag (plan D16).
-- **Device endpoints:** deploy the online accounts endpoint before releasing the
-  Phase 9.3 desktop, even with no migration. The updated link endpoint must also
-  reach the VPS first so it enforces `expectedBranchId` before spending a code.
+```powershell
+gh run list --workflow desktop-release.yml --limit 3   # the release run and its result
+gh run watch                                           # follow it live
+gh release view desktop-vX.Y.Z                          # the published installer
+```
+
+Shop PCs then update on their next open, or within 30 minutes through the
+"Update available" button.
+
+- **Database changes and online endpoints:** the release deploys the VPS
+  before it publishes, so online always has a PC's migrations and endpoints
+  first (plan D16). The tagged commit must be on `main`.
+- **Online-only changes** (site, API, shared code) need no desktop release:
+  run **Deploy online** (`gh workflow run deploy-online.yml`).
 - **Wrong tag:** the workflow stops if the tag does not match
   `apps/desktop/package.json`; delete the tag (`git push origin :desktop-vX.Y.Z`
   and `git tag -d desktop-vX.Y.Z`), fix the version, and tag again.

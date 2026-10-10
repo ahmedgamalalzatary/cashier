@@ -163,7 +163,8 @@ sudo docker compose --env-file .env.production ps
 The MySQL volume is retained across builds and container replacements. Compose
 waits for MySQL, runs pending migrations, then starts the API and the site. A
 release that adds a migration must reach the VPS **before** it is pushed to the
-shops (deploy order is in the plan, section 5).
+shops (deploy order is in the plan, section 5); the desktop release workflow
+deploys the VPS itself first (see "Deploy from GitHub Actions").
 The same order applies to Phase 9's device endpoints even without a migration:
 deploy `/api/device/accounts` and the link endpoint's `expectedBranchId` check
 before distributing the desktops that depend on them.
@@ -174,6 +175,74 @@ account to create triggers with binary logging enabled. Recreate MySQL with
 the updated Compose command before running these migrations (the `up -d`
 above applies that command change while retaining the data volume). Bundled
 desktop MySQL already disables binary logging.
+
+## Deploy from GitHub Actions
+
+The **Deploy online** workflow (`.github/workflows/deploy-online.yml`) runs the
+steps above on the VPS over SSH, then waits until `online-web` is healthy, which
+only happens after MySQL, the migrations and `online-api` all succeeded. If the
+site does not become healthy, the run fails and prints the last log lines.
+
+An ordinary push to `main` deploys nothing. Deploys happen:
+
+- **On demand**, for changes outside the desktop app (online site, API, shared
+  code, Docker): GitHub → **Actions** → **Deploy online** (left sidebar) →
+  **Run workflow** → branch `main` → **Run workflow**. Or from a terminal:
+
+  ```powershell
+  gh workflow run deploy-online.yml
+  ```
+
+- **Automatically before every desktop release.** Pushing a `desktop-vX.Y.Z`
+  tag first deploys that commit to the VPS; the installer is built and published
+  only if the deploy succeeded, so database changes always reach the VPS before
+  the shop PCs (D16).
+
+Only commits on `main` are deployed, one deploy at a time. The VPS folder must
+stay on `main` with no local edits: the workflow fast-forwards it and stops
+instead of overwriting anything.
+
+### Everyday commands
+
+```powershell
+gh workflow run deploy-online.yml                    # deploy main to the VPS now
+gh run list --workflow deploy-online.yml --limit 5   # recent deploys and their result
+gh run watch                                         # follow a running deploy live
+gh run view --log-failed                             # why the last failed run failed
+gh run list --workflow desktop-release.yml --limit 5 # recent desktop releases
+gh release view desktop-v0.2.5                       # what a release published
+```
+
+`gh run watch` and `gh run view` ask which run when given no ID; pass one from
+`gh run list` to skip the question.
+
+### One-time setup
+
+The workflow logs in as `root` with a key used for nothing else. Run on the VPS,
+one at a time:
+
+```bash
+ssh-keygen -t ed25519 -N "" -C github-deploy -f /root/.ssh/github-deploy
+cat /root/.ssh/github-deploy.pub >> /root/.ssh/authorized_keys
+cat /root/.ssh/github-deploy        # the private key, for VPS_SSH_KEY below
+cat /etc/ssh/ssh_host_ed25519_key.pub   # the server's host key, for VPS_KNOWN_HOSTS
+```
+
+Then add four repository secrets (GitHub → **Settings** → **Secrets and
+variables** → **Actions**, or `gh secret set NAME` and paste the value):
+
+| Secret            | Value                                                                                          |
+| ----------------- | ---------------------------------------------------------------------------------------------- |
+| `VPS_HOST`        | the VPS address used with `ssh` (SSH on port 22)                                               |
+| `VPS_USER`        | `root`                                                                                         |
+| `VPS_SSH_KEY`     | the whole private key, `-----BEGIN` to `END-----` lines included                               |
+| `VPS_KNOWN_HOSTS` | `VPS_HOST`, a space, then the first two words of the host key line, e.g. `1.2.3.4 ssh-ed25519 AAAA…` |
+
+After the private key is saved as a secret, delete it from the VPS with
+`rm /root/.ssh/github-deploy` (the `.pub` line in `authorized_keys` stays).
+`git fetch` on the VPS must already work without a password prompt. To revoke
+GitHub's access, remove the `github-deploy` line from
+`/root/.ssh/authorized_keys`.
 
 ## Super-admin account
 
