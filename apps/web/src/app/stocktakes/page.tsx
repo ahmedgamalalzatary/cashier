@@ -7,7 +7,7 @@ import type {
   StocktakeSummary,
   Warehouse,
 } from "@cashier/shared";
-import { ClipboardCheck, Plus, Scale } from "lucide-react";
+import { ClipboardCheck, Plus, Printer, Scale } from "lucide-react";
 import { Button } from "@cashier/web-core/components/ui/button";
 import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
 import { Field, TextAreaField } from "@cashier/web-core/components/ui/field";
@@ -18,6 +18,8 @@ import { SelectField } from "@cashier/web-core/components/ui/select-field";
 import { SearchSelect } from "@cashier/web-core/components/ui/search-select";
 import { EmptyState, ErrorBanner } from "@cashier/web-core/components/ui/states";
 import { Table } from "@cashier/web-core/components/ui/table";
+import { PrintSlip } from "@/components/print/print-slip";
+import { StocktakeCountSlip } from "@/components/stocktakes/stocktake-count-slip";
 import {
   confirmReasonFor,
   countedLinesFromDraft,
@@ -263,7 +265,17 @@ export default function StocktakesPage() {
       </section>
 
       {active && active.status === "draft" && (
-        <Section title={`إدخال العد الفعلي — جلسة #${active.id}`}>
+        <Section
+          title={`إدخال العد الفعلي — جلسة #${active.id}`}
+          action={
+            <Button variant="secondary" onClick={() => window.print()}>
+              <Printer className="size-4" /> طباعة ورقة الجرد
+            </Button>
+          }
+        >
+          <PrintSlip>
+            <StocktakeCountSlip stocktake={active} />
+          </PrintSlip>
           <div className="space-y-4">
             <Table headers={["الصنف", "المسجل", "الفعلي", "الفرق"]}>
               {active.lines.map((line, index) => (

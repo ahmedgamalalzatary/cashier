@@ -4,10 +4,13 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { PurchaseInvoiceDetail, Supplier } from "@cashier/shared";
+import { Printer } from "lucide-react";
 import { Badge } from "@cashier/web-core/components/ui/badge";
 import { Button } from "@cashier/web-core/components/ui/button";
 import { PageHeader } from "@cashier/web-core/components/ui/page-header";
 import { PaymentModal } from "@/components/suppliers/payment-modal";
+import { PurchaseInvoiceSlip } from "@/components/purchases/purchase-invoice-slip";
+import { PrintSlip } from "@/components/print/print-slip";
 import { Stat, StatStrip } from "@cashier/web-core/components/ui/stat";
 import { Table } from "@cashier/web-core/components/ui/table";
 import { ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
@@ -90,6 +93,9 @@ function PurchaseDetailView() {
             ) : (
               <Badge tone="neutral">لم يتبقَّ رصيد للتحويل للكافيه</Badge>
             )}
+            <Button variant="secondary" onClick={() => window.print()}>
+              <Printer className="size-4" /> طباعة
+            </Button>
             <Button variant="secondary" onClick={() => void openPayment()}>
               دفعة على حساب المورد
             </Button>
@@ -103,6 +109,10 @@ function PurchaseDetailView() {
           </>
         }
       />
+
+      <PrintSlip>
+        <PurchaseInvoiceSlip invoice={invoice} />
+      </PrintSlip>
 
       {paymentError && <ErrorBanner className="mb-4">{paymentError}</ErrorBanner>}
       {paying && (

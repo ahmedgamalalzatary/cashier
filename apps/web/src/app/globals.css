@@ -502,7 +502,21 @@ summary:focus-visible,
     linear-gradient(225deg, transparent 5px, var(--surface) 0) 0 0/10px 10px;
 }
 
+/* Printed slips (components/print/print-slip.tsx) never show on screen. */
+.print-slip {
+  display: none;
+}
+
 @media print {
+  /* Only the slip takes space, so the page behind it adds no blank paper. */
+  body:has(> .print-slip) > :not(.print-slip) {
+    display: none !important;
+  }
+
+  .print-slip {
+    display: block;
+  }
+
   @page receipt {
     size: 80mm 297mm;
     margin: 0;

@@ -29,6 +29,13 @@ export function filterExternalOrders(
   });
 }
 
+/**
+ * The ordering system sends Cairo wall-clock times without an offset; reading
+ * them as UTC and formatting in UTC shows them unchanged.
+ */
+export const externalOrderDate = (value: string) =>
+  new Date(/[zZ]|[+-]\d\d:\d\d$/.test(value) ? value : `${value}Z`);
+
 const arabicNumber = new Intl.NumberFormat("ar-EG");
 
 export function externalOrdersTotals(orders: ExternalOrderSummary[]) {

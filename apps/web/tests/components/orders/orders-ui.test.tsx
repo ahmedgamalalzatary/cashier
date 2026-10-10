@@ -62,4 +62,8 @@ describe("orders UI", () => {
     expect(html).toContain("قيد التنفيذ");
     expect(html).toContain(formatMoney("95.00"));
   });
+
+  it("offers an 80mm print for each online order", () => {
+    expect(view({ orders: [order] })).toContain('aria-label="طباعة الطلب 17"');
+  });
 });

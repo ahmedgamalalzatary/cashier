@@ -1,15 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import type { ExternalOrderSummary, ExternalOrdersPage } from "@cashier/shared";
-import { Clock3, Coins, ReceiptText, Scissors, Search } from "lucide-react";
+import { Clock3, Coins, Printer, ReceiptText, Scissors, Search } from "lucide-react";
 import { Badge } from "@cashier/web-core/components/ui/badge";
 import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
+import { IconButton } from "@cashier/web-core/components/ui/icon-button";
 import { Stat, StatStrip } from "@cashier/web-core/components/ui/stat";
 import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
 import { cairoCalendarDate } from "@cashier/web-core/lib/cairo-date";
 import { formatMoney } from "@cashier/web-core/lib/format";
+import { PrintSlip } from "@/components/print/print-slip";
+import { ExternalOrderSlip } from "./external-order-slip";
 import {
+  externalOrderDate,
   externalOrderStatus,
   externalOrderTypeLabel,
   externalPaymentMethodLabel,
@@ -26,9 +31,6 @@ const timeFormat = new Intl.DateTimeFormat("ar-EG", {
   minute: "2-digit",
   timeZone: "UTC",
 });
-
-const wallClockDate = (value: string) =>
-  new Date(/[zZ]|[+-]\d\d:\d\d$/.test(value) ? value : `${value}Z`);
 
 export function ExternalOrdersPanel() {
   const [orders, setOrders] = useState<ExternalOrderSummary[]>([]);
@@ -120,6 +122,12 @@ export function ExternalOrdersPanelView({
   pagination?: ExternalOrdersPage["pagination"];
   onPageChange?: (page: number) => void;
 }) {
+  const [printing, setPrinting] = useState<ExternalOrderSummary | null>(null);
+  const print = (order: ExternalOrderSummary) => {
+    // The slip must be on the page before the print dialog reads it.
+    flushSync(() => setPrinting(order));
+    window.print();
+  };
   const summary = totals ?? {
     count: orders.length,
     sales: orders
@@ -142,7 +150,7 @@ export function ExternalOrdersPanelView({
       key: "time",
       header: "الوقت",
       cell: (row) => {
-        const createdAt = wallClockDate(row.createdAt);
+        const createdAt = externalOrderDate(row.createdAt);
         return (
           <>
             <span className="tnum block">{timeFormat.format(createdAt)}</span>
@@ -225,6 +233,9 @@ export function ExternalOrdersPanelView({
 
   return (
     <>
+      <PrintSlip>
+        {printing && <ExternalOrderSlip order={printing} />}
+      </PrintSlip>
       <StatStrip className="mb-5">
         <Stat
           icon={<ReceiptText className="size-4" />}
@@ -288,6 +299,14 @@ export function ExternalOrdersPanelView({
             rows={orders}
             rowKey={(row) => row.id}
             columns={columns}
+            actions={(row) => (
+              <IconButton
+                title={`طباعة الطلب ${row.id}`}
+                onClick={() => print(row)}
+              >
+                <Printer className="size-4" />
+              </IconButton>
+            )}
             empty={
               orders.length === 0 && !query && !day ? (
                 <EmptyState
