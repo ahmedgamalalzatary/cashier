@@ -218,31 +218,49 @@ gh release view desktop-v0.2.5                       # what a release published
 
 ### One-time setup
 
-The workflow logs in as `root` with a key used for nothing else. Run on the VPS,
-one at a time:
+The workflow logs in as `root` with a key used for nothing else. The private key
+is created on your PC and uploaded **from the file**: copying a private key out
+of a terminal into the browser corrupted it once ("error in libcrypto"). Only
+the one-line public key is ever pasted.
 
-```bash
-ssh-keygen -t ed25519 -N "" -C github-deploy -f /root/.ssh/github-deploy
-cat /root/.ssh/github-deploy.pub >> /root/.ssh/authorized_keys
-cat /root/.ssh/github-deploy        # the private key, for VPS_SSH_KEY below
-cat /etc/ssh/ssh_host_ed25519_key.pub   # the server's host key, for VPS_KNOWN_HOSTS
-```
+1. **On your PC** (Git Bash, from an empty temporary folder), one at a time:
 
-Then add four repository secrets (GitHub → **Settings** → **Secrets and
-variables** → **Actions**, or `gh secret set NAME` and paste the value):
+   ```bash
+   ssh-keygen -t ed25519 -N "" -C github-deploy -f github-deploy
+   gh secret set VPS_SSH_KEY < github-deploy   # uploads the file; never paste it
+   cat github-deploy.pub                       # one line, needed on the VPS
+   rm github-deploy github-deploy.pub          # the private key now lives only in GitHub
+   ```
 
-| Secret            | Value                                                                                          |
-| ----------------- | ---------------------------------------------------------------------------------------------- |
-| `VPS_HOST`        | the VPS address used with `ssh` (SSH on port 22)                                               |
-| `VPS_USER`        | `root`                                                                                         |
-| `VPS_SSH_KEY`     | the whole private key, `-----BEGIN` to `END-----` lines included                               |
-| `VPS_KNOWN_HOSTS` | `VPS_HOST`, a space, then the first two words of the host key line, e.g. `1.2.3.4 ssh-ed25519 AAAA…` |
+2. **On the VPS**, allow that key (paste the line `cat` printed):
 
-After the private key is saved as a secret, delete it from the VPS with
-`rm /root/.ssh/github-deploy` (the `.pub` line in `authorized_keys` stays).
-`git fetch` on the VPS must already work without a password prompt. To revoke
-GitHub's access, remove the `github-deploy` line from
-`/root/.ssh/authorized_keys`.
+   ```bash
+   echo 'ssh-ed25519 AAAA… github-deploy' >> /root/.ssh/authorized_keys
+   cat /etc/ssh/ssh_host_ed25519_key.pub   # the server's host key, for step 3
+   ```
+
+3. **On your PC**, the remaining secrets (public values; SSH on port 22):
+
+   ```bash
+   gh secret set VPS_HOST --body "187.7.16.23"
+   gh secret set VPS_USER --body "root"
+   gh secret set VPS_KNOWN_HOSTS --body "187.7.16.23 ssh-ed25519 AAAA…"
+   ```
+
+   `VPS_KNOWN_HOSTS` is `VPS_HOST`, a space, then the first two words of the
+   host key line from step 2. `ssh-keyscan -t ed25519 187.7.16.23` from the PC
+   must print the same key; if it differs, stop: that is not your server.
+
+4. Test with `gh workflow run deploy-online.yml` and `gh run watch`.
+
+`git fetch` on the VPS must already work without a password prompt. Use the
+VPS IP, not a proxied domain, for `VPS_HOST`.
+
+**Replace the key** (lost, leaked, or a failing run says `VPS_SSH_KEY is not a
+valid private key`): on the VPS remove the old line with
+`sed -i '/ github-deploy$/d' /root/.ssh/authorized_keys`, then repeat steps 1
+and 2 (the `echo` line only). **Revoke GitHub's access** with the same `sed`
+command alone.
 
 ## Super-admin account
 
