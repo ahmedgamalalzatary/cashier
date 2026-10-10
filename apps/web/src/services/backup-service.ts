@@ -1,5 +1,8 @@
 import { api } from "@cashier/web-core/lib/api";
 
+/** Fired after any successful save, so the backup card refreshes at once. */
+export { DATA_CHANGED_EVENT } from "@cashier/web-core/lib/api";
+
 export type BackupStatus = {
   lastSuccessAt: string | null;
   lastAttemptAt: string | null;

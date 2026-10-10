@@ -70,6 +70,10 @@ export type UploadBatch = {
  */
 export class GenerationChangedError extends Error {}
 
+/** Shown on the backup card when online cannot be reached or does not answer. */
+export const UNREACHABLE_MESSAGE =
+  "تعذر الاتصال بموقع كاشير. البيانات محفوظة على هذا الجهاز وسيتم رفعها تلقائيًا عند عودة الاتصال.";
+
 export async function requestDeviceJson(
   { apiUrl, deviceToken, appVersion, signal, timeoutMs = 30_000 }: UploadOptions,
   endpoint:string,
@@ -96,6 +100,11 @@ export async function requestDeviceJson(
       },
       body: compressed,
       signal: controller.signal,
+    }).catch((error: unknown) => {
+      // A shutdown stays an abort so the worker stops; anything else means the
+      // site could not be reached, which the backup card shows as is.
+      if (signal?.aborted) throw error;
+      throw new Error(UNREACHABLE_MESSAGE, { cause: error });
     });
     if (response.status === 401) throw new UnlinkedError();
     if (response.status === 409) {

@@ -106,10 +106,28 @@ describe("requesting an upload batch", () => {
     await expect(
       requestUploadBatch(options, body, {
         fetch: async () => {
-          throw new Error("ECONNREFUSED");
+          throw new TypeError("fetch failed");
         },
       }),
-    ).rejects.toThrow(/ECONNREFUSED/);
+    ).rejects.toThrow(/تعذر الاتصال بموقع كاشير/);
+  });
+
+  it("keeps a shutdown during a request distinct from an unreachable site", async () => {
+    const controller = new AbortController();
+    const pending = requestUploadBatch(
+      { ...options, signal: controller.signal },
+      body,
+      {
+        fetch: (_url, init) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () =>
+              reject(new Error("aborted")),
+            );
+            controller.abort();
+          }),
+      },
+    );
+    await expect(pending).rejects.toThrow("aborted");
   });
 
   it("gives up on a request that hangs rather than blocking the worker", async () => {
@@ -127,7 +145,7 @@ describe("requesting an upload batch", () => {
           });
         }),
     });
-    const rejection = expect(pending).rejects.toThrow("aborted");
+    const rejection = expect(pending).rejects.toThrow(/تعذر الاتصال بموقع كاشير/);
     await started;
     await vi.advanceTimersByTimeAsync(60);
     await rejection;

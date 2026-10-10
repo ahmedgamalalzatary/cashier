@@ -290,7 +290,7 @@ export function PurchaseInvoiceForm() {
                         <Trash2 className="size-4" />
                       </button>
                     </div>
-                    <div className="grid gap-3 lg:grid-cols-[minmax(12rem,1.5fr)_9rem_8rem_9rem_9rem]">
+                    <div className="grid gap-3 lg:grid-cols-[minmax(12rem,1.5fr)_repeat(4,minmax(0,1fr))]">
                       <EntityPicker
                         label="الصنف"
                         value={line.itemId}
@@ -360,7 +360,8 @@ export function PurchaseInvoiceForm() {
                         dir="ltr"
                       />
                       <Field
-                        label={`للكافيه الآن (${item?.stockUnit ?? "وحدة المخزون"})`}
+                        label="للكافيه الآن"
+                        hint={`بوحدة المخزون (${item?.stockUnit ?? "—"})`}
                         type="number"
                         min="0"
                         max={item ? amounts.stockQuantity : undefined}

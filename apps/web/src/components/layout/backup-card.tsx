@@ -5,6 +5,7 @@ import { CloudUpload, Loader2 } from "lucide-react";
 import { readSession } from "@cashier/web-core/lib/auth";
 import { cairoCalendarDate, cairoClock } from "@cashier/web-core/lib/cairo-date";
 import {
+  DATA_CHANGED_EVENT,
   readBackupStatus,
   resendEverything,
   uploadNow,
@@ -104,13 +105,19 @@ export function BackupCard(): ReactNode {
 
   useEffect(() => {
     if (!isAdmin) return;
-    // Polling keeps the pending count honest without blocking the screen; the
+    // Saves made on this screen announce themselves, so the pending count
+    // follows them at once; focus and a short poll cover background work. The
     // first read happens in an event-free async task like the update banner's.
     const timer = setTimeout(() => void refresh(), 0);
-    const poll = setInterval(() => void refresh(), 60_000);
+    const poll = setInterval(() => void refresh(), 15_000);
+    const onChange = () => void refresh();
+    window.addEventListener(DATA_CHANGED_EVENT, onChange);
+    window.addEventListener("focus", onChange);
     return () => {
       clearTimeout(timer);
       clearInterval(poll);
+      window.removeEventListener(DATA_CHANGED_EVENT, onChange);
+      window.removeEventListener("focus", onChange);
     };
   }, [isAdmin, refresh]);
 

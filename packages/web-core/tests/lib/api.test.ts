@@ -1,6 +1,6 @@
 import { testId } from "@cashier/shared/test-support";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api, buildHeaders } from "../../src/lib/api";
+import { api, buildHeaders, DATA_CHANGED_EVENT } from "../../src/lib/api";
 import { readSession, SESSION_KEY, writeSession } from "../../src/lib/auth";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -34,6 +34,43 @@ describe("buildHeaders", () => {
     );
     await expect(api("/api/auth/me")).rejects.toThrow("Branch access removed");
     expect(readSession()).toBeNull();
+  });
+  it("treats a 204 answer as success with no body", async () => {
+    vi.stubGlobal(
+      "window",
+      Object.assign(new EventTarget(), {
+        localStorage: { getItem: () => null, removeItem: () => undefined },
+      }),
+    );
+    vi.stubGlobal("fetch", async () => new Response(null, { status: 204 }));
+    await expect(
+      api<void>(`/api/employees/${testId(9)}`, { method: "DELETE" }),
+    ).resolves.toBeUndefined();
+  });
+  it("announces a successful change so status displays can refresh at once", async () => {
+    const page = Object.assign(new EventTarget(), {
+      localStorage: { getItem: () => null, removeItem: () => undefined },
+    });
+    vi.stubGlobal("window", page);
+    const announced = vi.fn();
+    page.addEventListener(DATA_CHANGED_EVENT, announced);
+    let status = 200;
+    vi.stubGlobal(
+      "fetch",
+      async () =>
+        new Response(JSON.stringify({ error: "refused" }), { status }),
+    );
+
+    await api("/api/employees");
+    expect(announced).not.toHaveBeenCalled();
+    status = 422;
+    await expect(
+      api("/api/employees", { method: "POST", body: "{}" }),
+    ).rejects.toThrow("refused");
+    expect(announced).not.toHaveBeenCalled();
+    status = 201;
+    await api("/api/employees", { method: "POST", body: "{}" });
+    expect(announced).toHaveBeenCalledOnce();
   });
   it("uses the API port supplied by the desktop runtime instead of the web deployment URL", async () => {
     vi.stubGlobal("window", {

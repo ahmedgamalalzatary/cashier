@@ -3,6 +3,9 @@ import { selectedBranchId } from "./branch-session";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
+/** Fired on `window` after any successful write, so status displays refresh at once. */
+export const DATA_CHANGED_EVENT = "cashier:data-changed";
+
 export function buildHeaders(
   input: HeadersInit | undefined,
   token?: string,
@@ -53,7 +56,8 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
       writeSession(null);
     throw new Error(body?.error ?? "حدث خطأ غير متوقع");
   }
-  const body = await res.json();
+  // 204 carries no body; reading it as JSON would fail a successful request.
+  const body = res.status === 204 ? undefined : await res.json();
   if (!globalRequest) {
     const current = readSession();
     if (
@@ -63,5 +67,8 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
       throw new Error("تم تغيير الحساب أو الفرع؛ أعد المحاولة من الفرع الحالي");
     }
   }
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (method !== "GET" && method !== "HEAD" && typeof window !== "undefined")
+    window.dispatchEvent(new Event(DATA_CHANGED_EVENT));
   return body as T;
 }
