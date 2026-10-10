@@ -11,10 +11,12 @@ import {
 } from "../modules/external/cache-refresh.module.js";
 import { runRefreshLoop } from "../modules/external/worker-loop.js";
 import { loadDesktopSettings } from "./settings.js";
+import { forgetLink } from "./link.js";
 import { prepareDesktopDatabase } from "./upgrade.js";
 import { runAutoCloseLoop } from "../modules/shifts/auto-close.js";
 import {
   applyDeviceAccounts,
+  DeviceUnlinkedError,
   requestDeviceAccounts,
   runAccountsLoop,
 } from "./accounts.js";
@@ -91,6 +93,9 @@ export async function startDesktopApi(
     if(unlinkedReported) return;
     unlinkedReported=true;
     backupShutdown.abort();
+    // Selling continues on the loaded settings; the next start links again.
+    try {forgetLink(settingsFile,deviceToken);}
+    catch {console.error("Could not clear the revoked device token from settings.env.");}
     reportUnlinked(reason);
   };
   signal.addEventListener("abort", stopWorker, { once: true });
@@ -150,7 +155,10 @@ export async function startDesktopApi(
       });
       workerShutdown.signal.throwIfAborted();
       await applyDeviceAccounts(db, branchId, snapshot);
-    }, workerShutdown.signal);
+    }, workerShutdown.signal, error => {
+      if (error instanceof DeviceUnlinkedError) onUnlinked(error.message);
+      else console.error("Accounts pull failed; cached accounts are unchanged.");
+    });
     if (syncEnabled) {
       const refresh = createCacheRefreshService(
         db,

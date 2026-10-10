@@ -66,6 +66,10 @@ describe("requesting an upload batch", () => {
         fetch: async () => new Response("", { status: 401 }),
       }),
     ).rejects.toBeInstanceOf(UnlinkedError);
+    // Shown on the upload status screen: it must say how to link again.
+    expect(new UnlinkedError().message).toContain(
+      "Close and reopen Cashier to link it again.",
+    );
   });
 
   it("refuses a batch the site considers from a newer schema", async () => {

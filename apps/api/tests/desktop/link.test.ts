@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   DEFAULT_ONLINE_API_URL,
   fileLink,
+  forgetLink,
   linkDesktop,
   onlineApiUrl,
   readSettings,
@@ -154,6 +155,33 @@ describe("saving the link", () => {
       'EXTERNAL_ORDERS_BASE_URL="https://orders.example.com"',
     );
     expect(text.match(/DESKTOP_SYNC_ENABLED=/g)).toHaveLength(1);
+  });
+});
+
+describe("forgetting a link that online revoked", () => {
+  it("removes only the device token, so the next start asks for a code for the same branch", () => {
+    const file = settingsFile(
+      `MYSQL_PASSWORD="secret"\r\nBRANCH_ID="${BRANCH.id}"\r\nDEVICE_TOKEN="${TOKEN}"\r\nDESKTOP_SYNC_ENABLED=false\r\n`,
+    );
+
+    forgetLink(file, TOKEN);
+
+    expect(readSettings(file)).toEqual({
+      MYSQL_PASSWORD: "secret",
+      BRANCH_ID: BRANCH.id,
+      DESKTOP_SYNC_ENABLED: "false",
+    });
+    expect(fs.readdirSync(path.dirname(file))).toEqual(["settings.env"]);
+  });
+
+  it("keeps a token that a newer link already saved", () => {
+    const newer = "b".repeat(43);
+    const contents = `BRANCH_ID="${BRANCH.id}"\nDEVICE_TOKEN="${newer}"\n`;
+    const file = settingsFile(contents);
+
+    forgetLink(file, TOKEN);
+
+    expect(fs.readFileSync(file, "utf8")).toBe(contents);
   });
 });
 

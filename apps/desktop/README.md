@@ -40,8 +40,13 @@ failures do not block startup or selling. Removed admins lose access on the next
 successful pull, and password changes invalidate their old sessions.
 `ADMIN_*` values are no longer required or imported on the PC; existing values
 are ignored. The online site's `.env.production` still configures the super-admin.
-An unlinked-device response stops further account pulls and is recorded in
-`backend.log`. Re-linking and the upload status screen are separate from accounts pull.
+When online answers that this PC was unlinked (another PC took its branch), from
+either the backup upload or the accounts download, Cashier stops both, records it
+in `backend.log`, and removes `DEVICE_TOKEN` from `settings.env` (keeping
+`BRANCH_ID`). Selling continues until Cashier is closed; the next start shows the
+**Link this PC** window, which accepts only a code for this PC's own branch.
+Linking it again disconnects whichever PC holds the branch now, and the new link
+uploads a fresh full backup, including sales made while unlinked.
 
 On every start the app brings the database to its own version before serving:
 a new database gets its tables; when an installed update brings database changes,

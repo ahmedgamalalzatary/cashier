@@ -115,6 +115,9 @@ describe("requesting device accounts", () => {
           Response.json({ error: options.deviceToken }, { status: 401 }),
       }),
     ).rejects.toBeInstanceOf(DeviceUnlinkedError);
+    expect(new DeviceUnlinkedError().message).toContain(
+      "Close and reopen Cashier to link it again.",
+    );
   });
 
   it("bounds a stalled request and aborts it when the desktop closes", async () => {

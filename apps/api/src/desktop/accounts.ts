@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { adminBranches, branches, users, type Db } from "@cashier/db";
 import { z } from "zod";
+import { UNLINKED_MESSAGE } from "./upload.js";
 
 const account = z.object({
   id: z.string().uuid(),
@@ -141,7 +142,7 @@ export async function applyDeviceAccounts(
 
 export class DeviceUnlinkedError extends Error {
   constructor() {
-    super("هذا الجهاز أُلغي ربطه بموقع كاشير. This PC was unlinked.");
+    super(UNLINKED_MESSAGE);
   }
 }
 

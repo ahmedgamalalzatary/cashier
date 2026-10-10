@@ -142,6 +142,26 @@ export function saveLink(
   }
 }
 
+/**
+ * Removes the device token online has revoked, keeping BRANCH_ID and every
+ * other line, so the next start shows the link screen for this same branch.
+ * A token that a newer link already saved is left alone.
+ */
+export function forgetLink(settingsFile: string, revokedToken: string) {
+  const text = fs.readFileSync(settingsFile, "utf8");
+  if (parse(text).DEVICE_TOKEN?.trim() !== revokedToken) return;
+  const kept = text
+    .split(/\r?\n/)
+    .filter((line) => line.split("=", 1)[0]?.trim() !== "DEVICE_TOKEN");
+  const temporary = `${settingsFile}.tmp`;
+  try {
+    fs.writeFileSync(temporary, kept.join("\n"));
+    fs.renameSync(temporary, settingsFile);
+  } finally {
+    fs.rmSync(temporary, { force: true });
+  }
+}
+
 /** The local branches table, as linking needs it. */
 export type LocalBranches = {
   list(): Promise<Array<{ id: string }>>;

@@ -45,9 +45,13 @@ export async function pendingCount(db: Db) {
   return Number((rows as Array<{ pending: number | string }>)[0]?.pending ?? 0);
 }
 
+/** The next start forgets the revoked token and shows the link screen. */
+export const UNLINKED_MESSAGE =
+  "هذا الجهاز أُلغي ربطه بموقع كاشير. أغلق كاشير وافتحه من جديد لربطه مرة أخرى. This PC was unlinked. Close and reopen Cashier to link it again.";
+
 export class UnlinkedError extends Error {
   constructor() {
-    super("هذا الجهاز أُلغي ربطه بموقع كاشير. This PC was unlinked.");
+    super(UNLINKED_MESSAGE);
   }
 }
 

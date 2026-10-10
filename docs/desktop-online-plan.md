@@ -746,7 +746,9 @@ Phase 10); a cashier cannot log in online; the old `api`, `web`, `cache-worker` 
   `ADMIN_*` are neither required nor seeded by the desktop; old values are ignored.
 
 **Traps:** never download password **plaintext**; the bcrypt hash is what is copied.
-Revoked device token → uploader stops and shows "This PC was unlinked".
+Revoked device token → uploader and accounts pull stop, the PC shows "This PC was unlinked.
+Close and reopen Cashier to link it again.", and `DEVICE_TOKEN` is removed from `settings.env`
+(`BRANCH_ID` kept), so the next start opens the link screen for the same branch.
 
 ### Phase 10: Upload sync
 
