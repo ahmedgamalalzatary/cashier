@@ -63,9 +63,12 @@ describe("LinkCodesService.generate", () => {
       branchId,
     });
 
-    const ttl = result.expiresAt.getTime() - before;
-    expect(ttl).toBeGreaterThan(24 * 60 * 60 * 1000 - 60_000);
-    expect(ttl).toBeLessThanOrEqual(24 * 60 * 60 * 1000);
+    const after = Date.now();
+
+    // the service reads the clock somewhere between `before` and `after`
+    const day = 24 * 60 * 60 * 1000;
+    expect(result.expiresAt.getTime()).toBeGreaterThanOrEqual(before + day);
+    expect(result.expiresAt.getTime()).toBeLessThanOrEqual(after + day);
   });
 
   it("404s for a branch that does not exist", async () => {
