@@ -1,5 +1,6 @@
 import {
   branchCondition,
+  branchTable,
   branchValues,
   branchTransaction,
 } from "@cashier/db";
@@ -169,6 +170,11 @@ export class RefundsRepository {
     return row;
   }
 
+  /**
+   * A part sold before stock existed was saved at cost 0; once stock settled
+   * it, its unit cost is the average of what settled it (an unsettled
+   * remainder still counts as 0).
+   */
   allocations(orderLineId: string) {
     return this.db
       .select({
@@ -176,7 +182,14 @@ export class RefundsRepository {
         itemId: orderLineAllocations.itemId,
         itemName: orderLineAllocations.itemName,
         quantity: orderLineAllocations.quantity,
-        unitCost: orderLineAllocations.unitCost,
+        unitCost: sql<string>`CASE
+          WHEN ${orderLineAllocations.batchId} IS NOT NULL THEN ${orderLineAllocations.unitCost}
+          ELSE CAST(ROUND(COALESCE((
+            SELECT SUM(d.quantity * d.unit_cost)
+            FROM ${branchTable("stock_deficit_allocations")} d
+            WHERE d.deficit_movement_id = ${orderLineAllocations.stockMovementId}
+          ), 0) / ${orderLineAllocations.quantity}, 6) AS DECIMAL(16,6))
+        END`,
       })
       .from(orderLineAllocations)
       .where(

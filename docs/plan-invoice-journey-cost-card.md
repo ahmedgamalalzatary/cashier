@@ -235,7 +235,9 @@ All work touches api + shared + web → run full `pnpm lint`, `pnpm typecheck`,
 
 ---
 
-## Phase 5 — Bug fixes: cost of sales made before stock arrived
+## Phase 5 — Bug fixes: cost of sales made before stock arrived — DONE
+
+Tests: `packages/db/tests/mysql/deficit-costs.test.ts` + inventory unit test.
 
 Both bugs come from "deficit" sales: the POS sells with `allowNegative: true`
 (`orders.service.ts:254`), so the missing part is recorded at cost `0`. When

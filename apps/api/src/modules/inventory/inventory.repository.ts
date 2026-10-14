@@ -4,11 +4,14 @@ import {
   branchTable,
   branchTransaction,
 } from "@cashier/db";
-import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
 import type { Db } from "@cashier/db";
 import {
   categories,
   items,
+  orderLineAllocations,
+  orderLines,
+  orders,
   stockBatches,
   stockDeficitAllocations,
   stockMovements,
@@ -69,6 +72,12 @@ export interface InventoryRepositoryPort {
     warehouse: Warehouse,
   ): Promise<OutstandingDeficitRecord[]>;
   createDeficitAllocation(data: StockDeficitAllocationWrite): Promise<void>;
+  /**
+   * Sales made before stock existed were saved at cost 0 for the missing
+   * part. Once these deficit movements are settled, recompute the cost of
+   * the order lines and orders they belong to.
+   */
+  refreshSaleCosts(deficitMovementIds: string[]): Promise<void>;
   lockAvailableBatches(
     itemId: string,
     warehouse: Warehouse,
@@ -156,6 +165,68 @@ export class InventoryRepository implements InventoryRepositoryPort {
 
   async createDeficitAllocation(data: StockDeficitAllocationWrite) {
     await this.db.insert(stockDeficitAllocations).values(branchValues(data));
+  }
+
+  async refreshSaleCosts(deficitMovementIds: string[]) {
+    const lines = await this.db
+      .selectDistinct({
+        id: orderLineAllocations.orderLineId,
+        orderId: orderLines.orderId,
+      })
+      .from(orderLineAllocations)
+      .innerJoin(
+        orderLines,
+        branchCondition(orderLines, eq(orderLines.id, orderLineAllocations.orderLineId)),
+      )
+      .where(
+        branchCondition(
+          orderLineAllocations,
+          inArray(orderLineAllocations.stockMovementId, deficitMovementIds),
+        ),
+      );
+    if (lines.length === 0) return;
+    // batch parts carry their cost; deficit parts (cost 0) add what settled them
+    await this.db
+      .update(orderLines)
+      .set({
+        totalCost: sql`(
+          SELECT CAST(ROUND(
+            COALESCE(SUM(a.quantity * a.unit_cost), 0) +
+            COALESCE((
+              SELECT SUM(d.quantity * d.unit_cost)
+              FROM ${branchTable("stock_deficit_allocations")} d
+              WHERE d.deficit_movement_id IN (
+                SELECT a2.stock_movement_id
+                FROM ${branchTable("order_line_allocations")} a2
+                WHERE a2.order_line_id = ${orderLines.id} AND a2.batch_id IS NULL
+              )
+            ), 0),
+          2) AS DECIMAL(30,2))
+          FROM ${branchTable("order_line_allocations")} a
+          WHERE a.order_line_id = ${orderLines.id}
+        )`,
+      })
+      .where(
+        branchCondition(
+          orderLines,
+          inArray(orderLines.id, lines.map((line) => line.id)),
+        ),
+      );
+    await this.db
+      .update(orders)
+      .set({
+        totalCost: sql`(
+          SELECT CAST(COALESCE(SUM(l.total_cost), 0) AS DECIMAL(30,2))
+          FROM ${branchTable("order_lines")} l
+          WHERE l.order_id = ${orders.id}
+        )`,
+      })
+      .where(
+        branchCondition(
+          orders,
+          inArray(orders.id, [...new Set(lines.map((line) => line.orderId))]),
+        ),
+      );
   }
 
   lockAvailableBatches(itemId: string, warehouse: Warehouse) {

@@ -19,6 +19,7 @@ class FakeInventoryRepository implements InventoryRepositoryPort {
     quantity: string;
     unitCost: string;
   }> = [];
+  refreshedSaleCosts: string[][] = [];
   private nextBatchId = 1;
 
   async transaction<T>(fn: (repo: InventoryRepositoryPort) => Promise<T>) {
@@ -28,12 +29,14 @@ class FakeInventoryRepository implements InventoryRepositoryPort {
     transaction.movements = structuredClone(this.movements);
     transaction.deficitAllocations = structuredClone(this.deficitAllocations);
     transaction.nextBatchId = this.nextBatchId;
+    transaction.refreshedSaleCosts = structuredClone(this.refreshedSaleCosts);
     const result = await fn(transaction);
     this.items = transaction.items;
     this.batches = transaction.batches;
     this.movements = transaction.movements;
     this.deficitAllocations = transaction.deficitAllocations;
     this.nextBatchId = transaction.nextBatchId;
+    this.refreshedSaleCosts = transaction.refreshedSaleCosts;
     return result;
   }
 
@@ -79,6 +82,10 @@ class FakeInventoryRepository implements InventoryRepositoryPort {
     unitCost: string;
   }) {
     this.deficitAllocations.push(data);
+  }
+
+  async refreshSaleCosts(deficitMovementIds: string[]) {
+    this.refreshedSaleCosts.push(deficitMovementIds);
   }
 
   async lockAvailableBatches(itemId: string, warehouse: "main" | "cafe") {
@@ -180,6 +187,20 @@ describe("FIFO inventory service", () => {
         unitCost: "8.000000",
       },
     ]);
+    // the earlier sale now knows its real cost
+    expect(repo.refreshedSaleCosts).toEqual([[testId(1)]]);
+  });
+
+  it("refreshes no sale cost when nothing was owed", async () => {
+    const repo = new FakeInventoryRepository();
+    await new InventoryService(repo).receive({
+      itemId: testId(1),
+      warehouse: "cafe",
+      quantity: 1,
+      unitCost: "8",
+      movementType: "transfer_in",
+    });
+    expect(repo.refreshedSaleCosts).toEqual([]);
   });
 
   it("preserves exact maximum costs and rejects database overflow", async () => {

@@ -165,6 +165,11 @@ export class InventoryTransaction {
       await this.repo.createDeficitAllocation(allocation);
       deficitAllocations.push(allocation);
     }
+    if (deficitAllocations.length > 0) {
+      await this.repo.refreshSaleCosts(
+        deficitAllocations.map((allocation) => allocation.deficitMovementId),
+      );
+    }
     return { batchId, deficitAllocations };
   }
 

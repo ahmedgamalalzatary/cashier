@@ -160,6 +160,7 @@ discovery do not depend on the selected header, but enforce the PC's account acc
 - Every stock inflow creates a **batch**: quantity + unit cost + date + source (purchase, transfer-in, preparation, refund return, stocktake surplus).
 - Every outflow (sale, transfer-out, waste, stocktake shortage) consumes from the **oldest batch first**; the consumed cost is recorded on the movement.
 - Transfers move quantities **with their batch costs** from main warehouse batches into cafe batches.
+- A sale made with no stock records the missing part at cost 0. When stock later arrives in that warehouse it settles the oldest open deficits first, and the settled sale's line and order cost are recomputed from the real batch costs in the same transaction (the negative-stock flag stays as history). Reports therefore see the real cost.
 - Stock value at any time = Σ(remaining batch qty × batch cost) per warehouse.
 
 ### Alerts
@@ -336,7 +337,7 @@ new schema to an old runtime during the intermediate slices.
 - Cashier selects the **original order** (by number or from recent orders) and refunds the **whole order or specific lines/quantities**, with a reason.
 - Cash is returned to the customer; the refund **reduces the current shift's expected drawer** and is attached to the current shift.
 - Stock handling per line type:
-  - **As-is items (`item` resale + `external_product` not-returnable path):** cashier chooses “return to stock” (unopened, sellable → back into cafe stock at its original cost) or “not returnable” (recorded as waste).
+  - **As-is items (`item` resale + `external_product` not-returnable path):** cashier chooses “return to stock” (unopened, sellable → back into cafe stock at its original cost; for a part sold with no stock, the average cost of the stock that settled it, or 0 while still unsettled) or “not returnable” (recorded as waste).
   - **Legacy recipe records (`recipe`):** ingredients remain consumed. New checkout rejects recipe lines; future prepared-result sales must use finished item allocations rather than restoring ingredients.
   - **External products (`external_product`):** `return_to_stock` restocks each mapped ingredient; `not_returnable` writes a waste entry linked to the refund line.
 - Refunds appear in reports (by shift, cashier, product, reason) and reduce net sales and profit.
