@@ -152,3 +152,87 @@ describe("RecipesService.prepare guards", () => {
     ).rejects.toMatchObject({ status: 400 });
   });
 });
+
+describe("RecipesService cost card costing", () => {
+  const header = {
+    id: testId(3),
+    name: "شراب سكر",
+    type: "prepared" as const,
+    categoryId: testId(2),
+    categoryName: "تحضيرات",
+    outputItemId: testId(5),
+    outputItemName: "شراب سكر",
+    outputStockUnit: "مل",
+    isActive: true,
+  };
+  const ingredient = (id: number, quantity: string) => ({
+    id: testId(100 + id),
+    itemId: testId(id),
+    itemCode: id,
+    itemName: `صنف ${id}`,
+    itemType: "raw",
+    stockUnit: "جم",
+    quantity,
+    itemIsActive: true,
+  });
+
+  function serviceWith(
+    ingredients: ReturnType<typeof ingredient>[],
+    batches: Record<string, { cafe?: Array<[string, string]>; main?: Array<[string, string]> }>,
+  ) {
+    const repository = {
+      listRecipeHeaders: vi.fn(async () => [header]),
+      findRecipeHeader: vi.fn(async () => header),
+      listSizes: vi.fn(async () => [{ outputQuantity: "10.000" }]),
+      listIngredients: vi.fn(async () => ingredients),
+      availableBatches: vi.fn(async (itemId: string, warehouse: "cafe" | "main") =>
+        (batches[itemId]?.[warehouse] ?? []).map(([remainingQuantity, unitCost], index) => ({
+          id: `${itemId}-${warehouse}-${index}`,
+          remainingQuantity,
+          unitCost,
+        })),
+      ),
+    } as unknown as RecipesRepository;
+    return new RecipesService(repository);
+  }
+
+  it("costs from cafe first, then main, and marks the source", async () => {
+    const service = serviceWith(
+      [ingredient(1, "1.000"), ingredient(2, "2.000"), ingredient(3, "1.000")],
+      {
+        [testId(1)]: { cafe: [["5.000", "2.500000"]] },
+        [testId(2)]: { cafe: [["1.000", "3.000000"]], main: [["5.000", "4.000000"]] },
+        [testId(3)]: { main: [["1.000", "1.000000"]] },
+      },
+    );
+
+    const recipe = await service.get(testId(3));
+
+    expect(recipe.ingredients.map((row) => [row.itemCode, row.costSource, row.currentCost])).toEqual([
+      [1, "cafe", "2.50"],
+      [2, "mixed", "7.00"],
+      [3, "main", "1.00"],
+    ]);
+    expect(recipe.currentCost).toBe("10.50");
+    expect(recipe.estimatedUnitCost).toBe("1.050000");
+    // preparing still needs the cafe stock
+    expect(recipe.hasSufficientStock).toBe(false);
+    expect(recipe.ingredients.map((row) => row.hasSufficientStock)).toEqual([true, false, false]);
+  });
+
+  it("shows no cost when cafe and main together are short", async () => {
+    const service = serviceWith([ingredient(1, "1.000"), ingredient(2, "3.000")], {
+      [testId(1)]: { cafe: [["1.000", "2.000000"]] },
+      [testId(2)]: { cafe: [["1.000", "1.000000"]], main: [["1.000", "1.000000"]] },
+    });
+
+    const recipe = await service.get(testId(3));
+
+    expect(recipe.ingredients.map((row) => [row.costSource, row.currentCost])).toEqual([
+      ["cafe", "2.00"],
+      [null, null],
+    ]);
+    expect(recipe.currentCost).toBeNull();
+    expect(recipe.estimatedUnitCost).toBeNull();
+  });
+});

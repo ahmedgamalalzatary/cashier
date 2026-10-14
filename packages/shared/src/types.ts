@@ -412,7 +412,11 @@ export type RecipeIngredientCost = {
   stockUnit: string;
   requiredQuantity: string;
   availableQuantity: string;
+  /** Null only when cafe and main stock together cannot cover the quantity. */
   currentCost: string | null;
+  /** Where the cost came from: cafe FIFO first, then main for any shortfall. */
+  costSource: "cafe" | "main" | "mixed" | null;
+  /** Cafe stock alone covers the quantity (preparing consumes cafe stock). */
   hasSufficientStock: boolean;
   itemIsActive: boolean;
 };

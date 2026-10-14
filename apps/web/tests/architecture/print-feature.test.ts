@@ -26,3 +26,17 @@ describe("80mm printing", () => {
     );
   });
 });
+
+describe("A4 printing", () => {
+  it("prints the recipe cost card on A4 portrait", () => {
+    const modal = read("src/components/recipes/cost-card-modal.tsx");
+    expect(modal).toContain("<PrintSlip");
+    expect(modal).toContain("a4-print-root");
+    expect(modal).toContain("window.print()");
+    expect(read("src/app/recipes/page.tsx")).toContain("<CostCardModal");
+
+    const css = read("src/app/globals.css");
+    expect(css).toMatch(/@page a4\s*\{\s*size:\s*A4 portrait/);
+    expect(css).toMatch(/\.a4-print-root\s*\{\s*page:\s*a4/);
+  });
+});

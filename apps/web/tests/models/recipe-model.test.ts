@@ -2,6 +2,7 @@ import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
 import type { Recipe } from "@cashier/shared";
 import {
+  costSourceLabel,
   emptyPreparedRecipeForm,
   recipeRequestBody,
   recipeStats,
@@ -73,6 +74,7 @@ describe("recipe model", () => {
           requiredQuantity: "1.000",
           availableQuantity: "1.000",
           currentCost: "2.00",
+          costSource: "cafe",
           hasSufficientStock: true,
           itemIsActive: true,
         },
@@ -83,5 +85,14 @@ describe("recipe model", () => {
 
     expect(ingredient.scaledQuantity).toBe(1);
     expect(ingredient.hasSufficientStock).toBe(true);
+  });
+});
+
+describe("cost card source label", () => {
+  it("names where an ingredient's cost came from", () => {
+    expect(costSourceLabel("cafe")).toBe("الكافيه");
+    expect(costSourceLabel("main")).toBe("من الرئيسي");
+    expect(costSourceLabel("mixed")).toBe("الكافيه + الرئيسي");
+    expect(costSourceLabel(null)).toBe("لا يكفي المخزون");
   });
 });

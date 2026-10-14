@@ -58,7 +58,24 @@ function costAtScaleNineToCents(value: bigint) {
   return roundDivide(value, 10_000_000n);
 }
 
-type StoredIngredient = Awaited<
+/** FIFO cost (scale 9) of up to `required` (scale 3) from the given batches. */
+function costFifo(
+  batches: Array<{ remainingQuantity: string; unitCost: string }>,
+  required: bigint,
+) {
+  let remaining = required;
+  let cost = 0n;
+  for (const batch of batches) {
+    if (remaining === 0n) break;
+    const batchQuantity = decimalToScaled(batch.remainingQuantity, 3);
+    const used = batchQuantity < remaining ? batchQuantity : remaining;
+    cost += used * decimalToScaled(batch.unitCost, 6);
+    remaining -= used;
+  }
+  return { cost, used: required - remaining, remaining };
+}
+
+type StoredIngredient =Awaited<
   ReturnType<RecipesRepository['listIngredients']>
 >[number];
 
@@ -285,56 +302,69 @@ export class RecipesService {
     };
   }
 
+  /**
+   * Costs each ingredient FIFO from cafe stock, and any cafe shortfall from
+   * main stock. Preparing still needs the whole quantity in the cafe, so
+   * `hasSufficientStock` only looks at cafe stock.
+   */
   private async costIngredients(ingredients: StoredIngredient[]) {
     let exactCost = 0n;
+    let costable = true;
     let hasSufficientStock = true;
     const decorated = [];
     for (const ingredient of ingredients) {
-      const batches = await this.repo.availableCafeBatches(ingredient.itemId);
       const required = decimalToScaled(ingredient.quantity, 3);
-      const available = batches.reduce(
+      const cafeBatches = await this.repo.availableBatches(
+        ingredient.itemId,
+        'cafe',
+      );
+      const available = cafeBatches.reduce(
         (total, batch) =>
           total + decimalToScaled(batch.remainingQuantity, 3),
         0n,
       );
-      let remaining = required;
-      let ingredientExactCost = 0n;
-      for (const batch of batches) {
-        if (remaining === 0n) break;
-        const batchQuantity = decimalToScaled(batch.remainingQuantity, 3);
-        const used = batchQuantity < remaining ? batchQuantity : remaining;
-        ingredientExactCost += used * decimalToScaled(batch.unitCost, 6);
-        remaining -= used;
-      }
-      const sufficient = remaining === 0n;
+      const cafe = costFifo(cafeBatches, required);
+      const main =
+        cafe.remaining === 0n
+          ? { cost: 0n, used: 0n, remaining: 0n }
+          : costFifo(
+              await this.repo.availableBatches(ingredient.itemId, 'main'),
+              cafe.remaining,
+            );
+      const sufficient = cafe.remaining === 0n;
       hasSufficientStock &&= sufficient;
-      const ingredientCostCents = sufficient
-        ? costAtScaleNineToCents(ingredientExactCost)
-        : null;
-      if (ingredientCostCents !== null) {
-        exactCost += ingredientExactCost;
-      }
+      const ingredientExactCost =
+        main.remaining === 0n ? cafe.cost + main.cost : null;
+      if (ingredientExactCost === null) costable = false;
+      else exactCost += ingredientExactCost;
       decorated.push({
         id: ingredient.id,
         itemId: ingredient.itemId,
+        itemCode: ingredient.itemCode,
         itemName: ingredient.itemName,
         itemType: ingredient.itemType,
         stockUnit: ingredient.stockUnit,
         requiredQuantity: ingredient.quantity,
         availableQuantity: formatScaled(available, 3),
         currentCost:
-          ingredientCostCents === null
+          ingredientExactCost === null
             ? null
-            : formatScaled(ingredientCostCents, 2),
+            : formatScaled(costAtScaleNineToCents(ingredientExactCost), 2),
+        costSource:
+          ingredientExactCost === null
+            ? null
+            : main.used === 0n
+              ? ('cafe' as const)
+              : cafe.used === 0n
+                ? ('main' as const)
+                : ('mixed' as const),
         hasSufficientStock: sufficient,
         itemIsActive: ingredient.itemIsActive,
       });
     }
     return {
-      costCents: hasSufficientStock
-        ? costAtScaleNineToCents(exactCost)
-        : null,
-      exactCost: hasSufficientStock ? exactCost : null,
+      costCents: costable ? costAtScaleNineToCents(exactCost) : null,
+      exactCost: costable ? exactCost : null,
       hasSufficientStock,
       ingredients: decorated,
     };

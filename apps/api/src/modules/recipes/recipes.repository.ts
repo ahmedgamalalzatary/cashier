@@ -298,7 +298,7 @@ export class RecipesRepository {
       .orderBy(recipeSizes.sortOrder, recipeIngredients.id);
   }
 
-  availableCafeBatches(itemId: string) {
+  availableBatches(itemId: string, warehouse: "cafe" | "main") {
     return this.db
       .select({
         id: stockBatches.id,
@@ -309,7 +309,7 @@ export class RecipesRepository {
       .where(
         branchCondition(
           stockBatches,
-          sql`${stockBatches.itemId} = ${itemId} AND ${stockBatches.warehouse} = 'cafe' AND ${stockBatches.remainingQuantity} > 0`,
+          sql`${stockBatches.itemId} = ${itemId} AND ${stockBatches.warehouse} = ${warehouse} AND ${stockBatches.remainingQuantity} > 0`,
         ),
       )
       .orderBy(stockBatches.receivedAt, stockBatches.id);

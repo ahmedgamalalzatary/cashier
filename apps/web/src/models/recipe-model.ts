@@ -124,3 +124,12 @@ export function scalePreparationIngredients(
     };
   });
 }
+
+export function costSourceLabel(
+  source: PreparedRecipe["ingredients"][number]["costSource"],
+) {
+  if (source === "cafe") return "الكافيه";
+  if (source === "main") return "من الرئيسي";
+  if (source === "mixed") return "الكافيه + الرئيسي";
+  return "لا يكفي المخزون";
+}

@@ -47,10 +47,11 @@ async function receiveCafeBatch(
   quantity: string,
   unitCost: string,
   receivedAt: Date,
+  warehouse: "cafe" | "main" = "cafe",
 ) {
   const [batch] = await db.insert(stockBatches).values(testBranchValues({
     itemId,
-    warehouse: "cafe",
+    warehouse,
     initialQuantity: quantity,
     remainingQuantity: quantity,
     unitCost,
@@ -59,7 +60,7 @@ async function receiveCafeBatch(
   })).$returningId();
   await db.insert(stockMovements).values(testBranchValues({
     itemId,
-    warehouse: "cafe",
+    warehouse,
     batchId: batch.id,
     movementType: "transfer_in",
     quantity,
@@ -243,6 +244,41 @@ describe("prepared recipes and preparations", () => {
       unitCost: "8.000000",
       sourceType: "preparation_in",
     });
+  });
+
+  it("costs a cafe shortfall from main stock for the cost card", async () => {
+    const categoryId = await createLeafCategory();
+    const milkId = await createItem(categoryId, "لبن");
+    const outputId = await createItem(categoryId, "لبن مبخر", "prepared", "لتر");
+    await receiveCafeBatch(milkId, "1.000", "10.000000", new Date("2026-07-18T00:00:00.000Z"));
+    await receiveCafeBatch(milkId, "5.000", "12.000000", new Date("2026-07-17T00:00:00.000Z"), "main");
+    const recipe = await createPreparedRecipe({
+      categoryId,
+      outputItemId: outputId,
+      ingredientItemId: milkId,
+      ingredientQuantity: 3,
+      baseYield: 2,
+    });
+
+    const detail = await request(app())
+      .get(`/api/recipes/${recipe.body.id}`)
+      .set(adminAuthorization);
+
+    expect(detail.body).toMatchObject({
+      currentCost: "34.00",
+      estimatedUnitCost: "17.000000",
+      hasSufficientStock: false,
+    });
+    expect(detail.body.ingredients).toEqual([
+      expect.objectContaining({
+        itemId: milkId,
+        itemCode: expect.any(Number),
+        costSource: "mixed",
+        currentCost: "34.00",
+        availableQuantity: "1.000",
+        hasSufficientStock: false,
+      }),
+    ]);
   });
 
   it("rolls an insufficient preparation back without stock or history changes", async () => {

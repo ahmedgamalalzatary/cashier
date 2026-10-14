@@ -6,6 +6,7 @@ import {
   Beaker,
   ChefHat,
   Eye,
+  FileText,
   Pencil,
   Power,
   PowerOff,
@@ -23,6 +24,7 @@ import type {
 } from "@cashier/shared";
 import { ExternalProductCard } from "@/components/recipes/external-product-card";
 import { CatalogSyncStatus } from "@/components/recipes/catalog-sync-status";
+import { CostCardModal } from "@/components/recipes/cost-card-modal";
 import { PrepareRecipeModal } from "@/components/recipes/prepare-recipe-modal";
 import { ProductStockSetupModal } from "@/components/recipes/product-stock-setup-modal";
 import { RecipeFormModal } from "@/components/recipes/recipe-form-modal";
@@ -67,6 +69,7 @@ export default function RecipesPage() {
   const [tab, setTab] = useState<RecipeTab>("products");
   const [form, setForm] = useState<PreparedRecipe | null | undefined>();
   const [preparing, setPreparing] = useState<PreparedRecipe | null>(null);
+  const [costCard, setCostCard] = useState<PreparedRecipe | null>(null);
   const [stockProduct, setStockProduct] = useState<ExternalProduct | null>(
     null,
   );
@@ -343,6 +346,7 @@ export default function RecipesPage() {
                   onEdit={() => setForm(recipe)}
                   onToggle={() => void toggle(recipe)}
                   onPrepare={() => setPreparing(recipe)}
+                  onCostCard={() => setCostCard(recipe)}
                 />
               ))}
             </div>
@@ -402,6 +406,9 @@ export default function RecipesPage() {
           onSaved={saved}
         />
       )}
+      {costCard && (
+        <CostCardModal recipe={costCard} onClose={() => setCostCard(null)} />
+      )}
       {preparing && (
         <PrepareRecipeModal
           recipe={preparing}
@@ -421,11 +428,13 @@ function PreparedCard({
   onEdit,
   onToggle,
   onPrepare,
+  onCostCard,
 }: {
   recipe: PreparedRecipe;
   onEdit: () => void;
   onToggle: () => void;
   onPrepare: () => void;
+  onCostCard: () => void;
 }) {
   return (
     <article
@@ -501,13 +510,22 @@ function PreparedCard({
               : formatMoney(recipe.estimatedUnitCost)}
           </span>
         </div>
-        <Button
-          className="w-full justify-center"
-          onClick={onPrepare}
-          disabled={!recipe.isActive}
-        >
-          <ChefHat className="size-4" /> تحضير دفعة
-        </Button>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Button
+            variant="secondary"
+            className="w-full justify-center"
+            onClick={onCostCard}
+          >
+            <FileText className="size-4" /> بطاقة التكلفة
+          </Button>
+          <Button
+            className="w-full justify-center"
+            onClick={onPrepare}
+            disabled={!recipe.isActive}
+          >
+            <ChefHat className="size-4" /> تحضير دفعة
+          </Button>
+        </div>
       </div>
     </article>
   );
