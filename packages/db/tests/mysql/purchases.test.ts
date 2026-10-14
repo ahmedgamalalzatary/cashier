@@ -836,3 +836,114 @@ describe("purchase invoices", () => {
     expect(await db.select().from(transfers)).toHaveLength(0);
   });
 });
+
+describe("purchase invoice journey", () => {
+  it("follows the invoice's stock to sales, refunds, waste and what is left", async () => {
+    const cashier = await loginAs(app(), "cashier");
+    await request(app()).post("/api/shifts/open").set(cashier).send({ openingFloat: 100 });
+    const [supplier] = await db.insert(suppliers).values(testBranchValues({ name: "مورد المياه" })).$returningId();
+    const [category] = await db.insert(categories).values(testBranchValues({ name: "مياه" })).$returningId();
+    const [item] = await db.insert(items).values(testBranchValues({
+      code: nextTestItemCode(),
+      name: "مياه",
+      categoryId: category.id,
+      type: "resale",
+      stockUnit: "قطعة",
+      sellingPrice: "10.00",
+    })).$returningId();
+    const sell = (quantity: number, discount: { type: "fixed"; value: number } | null) =>
+      request(app())
+        .post("/api/orders")
+        .set(cashier)
+        .send({
+          clientRequestId: crypto.randomUUID(),
+          lines: [{ type: "item", itemId: item.id, quantity }],
+          discount,
+          cashReceived: 100,
+        });
+
+    // sold before any stock existed; this invoice's cafe transfer settles it
+    expect((await sell(1, null)).status).toBe(201);
+    const invoice = await request(app())
+      .post("/api/purchases")
+      .set(authorization)
+      .send({
+        clientRequestId: crypto.randomUUID(),
+        supplierId: supplier.id,
+        invoiceNumber: "J-1",
+        purchasedAt: "2026-07-20",
+        paidAmount: 0,
+        notes: null,
+        lines: [{ itemId: item.id, quantity: 10, unitMode: "stock", unitPrice: 4, toCafeQuantity: 6 }],
+      });
+    expect(invoice.status).toBe(201);
+    // 3 × 10 with 5 off → 25 paid
+    const order = await sell(3, { type: "fixed", value: 5 });
+    expect(order.status).toBe(201);
+    const refund = await request(app())
+      .post("/api/refunds")
+      .set(cashier)
+      .send({
+        clientRequestId: crypto.randomUUID(),
+        orderId: order.body.id,
+        reason: "طلب العميل",
+        lines: [{ orderLineId: order.body.lines[0].id, quantity: 1, stockAction: "return_to_stock" }],
+      });
+    expect(refund.status).toBe(201);
+    const waste = await request(app())
+      .post("/api/waste")
+      .set(cashier)
+      .send({
+        clientRequestId: crypto.randomUUID(),
+        warehouse: "cafe",
+        target: { type: "item", itemId: item.id },
+        quantity: 1,
+        reason: "damaged",
+      });
+    expect(waste.status).toBe(201);
+
+    const journey = await request(app())
+      .get(`/api/purchases/${invoice.body.id}/journey`)
+      .set(authorization);
+
+    expect(journey.status).toBe(200);
+    // 40 bought = 12 sold + 4 wasted + 16 main + 8 cafe
+    expect(journey.body.totals).toEqual({
+      boughtCost: "40.00",
+      soldCost: "12.00",
+      salesAmount: "35.00",
+      refundedAmount: "8.33",
+      profit: "14.67",
+      wastedCost: "4.00",
+      shortageCost: "0.00",
+      mainStockCost: "16.00",
+      cafeStockCost: "8.00",
+      preparedStockCost: "0.00",
+    });
+    expect(journey.body.lines).toEqual([
+      expect.objectContaining({
+        itemId: item.id,
+        itemName: "مياه",
+        stockUnit: "قطعة",
+        boughtQuantity: "10.000",
+        soldQuantity: "3.000",
+        wastedQuantity: "1.000",
+        mainStockQuantity: "4.000",
+        cafeStockQuantity: "2.000",
+        unmatchedSaleQuantity: "0.000",
+      }),
+    ]);
+    expect(journey.body.products).toEqual([
+      expect.objectContaining({ productName: "مياه", quantity: "3.000", salesAmount: "35.00" }),
+    ]);
+
+    const cashierView = await request(app())
+      .get(`/api/purchases/${invoice.body.id}/journey`)
+      .set(cashier);
+    expect(cashierView.status).toBe(403);
+    const missing = await request(app())
+      .get(`/api/purchases/${testId(999)}/journey`)
+      .set(authorization);
+    expect(missing.status).toBe(404);
+  });
+});

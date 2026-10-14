@@ -6,6 +6,7 @@ import { errorHandler, HttpError } from "@cashier/server-core";
 import type { PurchasesController } from "../../src/modules/purchases/purchases.controller.js";
 import { PurchasesController as RealPurchasesController } from "../../src/modules/purchases/purchases.controller.js";
 import type { PurchasesService } from "../../src/modules/purchases/purchases.service.js";
+import type { InvoiceJourneyService } from "../../src/modules/purchases/invoice-journey.service.js";
 import { purchasesRouter } from "../../src/modules/purchases/purchases.router.js";
 
 function appWithStubs(controller: PurchasesController) {
@@ -35,13 +36,15 @@ describe("purchase routes", () => {
       list: vi.fn((_req, res) => res.json([])),
       get: vi.fn((_req, res) => res.json({ id: testId(1) })),
       create: vi.fn((_req, res) => res.status(201).json({ id: testId(44) })),
+      journey: vi.fn((_req, res) => res.json({ invoiceId: testId(1) })),
     } as unknown as PurchasesController;
     const app = appWithStubs(controller);
 
-    const [list, detail, created] = await Promise.all([
+    const [list, detail, created, journey] = await Promise.all([
       request(app).get("/"),
       request(app).get("/00000000-0000-7000-8000-00000000002c"),
       request(app).post("/").send(validBody),
+      request(app).get("/00000000-0000-7000-8000-00000000002c/journey"),
     ]);
 
     expect(list.status).toBe(200);
@@ -50,8 +53,12 @@ describe("purchase routes", () => {
     expect(controller.list).toHaveBeenCalledTimes(1);
     expect(controller.get).toHaveBeenCalledTimes(1);
     expect(controller.create).toHaveBeenCalledTimes(1);
+    expect(journey.status).toBe(200);
+    expect(controller.journey).toHaveBeenCalledTimes(1);
   });
 });
+
+const noJourney = {} as InvoiceJourneyService;
 
 describe("purchase controller wiring", () => {
   it("returns 201 with the parsed input and actor id", async () => {
@@ -60,7 +67,7 @@ describe("purchase controller wiring", () => {
     } as unknown as PurchasesService;
 
     const response = await request(
-      appWithStubs(new RealPurchasesController(service)),
+      appWithStubs(new RealPurchasesController(service, noJourney)),
     )
       .post("/")
       .send(validBody);
@@ -83,7 +90,7 @@ describe("purchase controller wiring", () => {
         .fn()
         .mockRejectedValue(new HttpError(404, "فاتورة الشراء غير موجودة")),
     } as unknown as PurchasesService;
-    const app = appWithStubs(new RealPurchasesController(service));
+    const app = appWithStubs(new RealPurchasesController(service, noJourney));
 
     const duplicate = await request(app)
       .post("/")
@@ -103,5 +110,25 @@ describe("purchase controller wiring", () => {
     const missing = await request(app).get("/00000000-0000-7000-8000-0000000003e7");
     expect(missing.status).toBe(404);
     expect(missing.body).toEqual({ error: "فاتورة الشراء غير موجودة" });
+  });
+
+  it("returns an invoice journey and 404s a missing invoice", async () => {
+    const journey = {
+      get: vi
+        .fn()
+        .mockResolvedValueOnce({ invoiceId: testId(44) })
+        .mockRejectedValueOnce(new HttpError(404, "فاتورة الشراء غير موجودة")),
+    } as unknown as InvoiceJourneyService;
+    const app = appWithStubs(
+      new RealPurchasesController({} as PurchasesService, journey),
+    );
+
+    const found = await request(app).get(`/${testId(44)}/journey`);
+    expect(found.status).toBe(200);
+    expect(found.body).toEqual({ invoiceId: testId(44) });
+    expect(journey.get).toHaveBeenCalledWith(testId(44));
+
+    expect((await request(app).get(`/${testId(45)}/journey`)).status).toBe(404);
+    expect((await request(app).get("/abc/journey")).status).toBe(400);
   });
 });

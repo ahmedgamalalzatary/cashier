@@ -122,7 +122,12 @@ labelled them with it but the API dropped it).
 
 ---
 
-## Phase 2 — Invoice journey: API
+## Phase 2 — Invoice journey: API — DONE
+
+Built as `invoice-journey.ts` (pure exact-fraction walker),
+`invoice-journey.repository.ts`, `invoice-journey.service.ts`;
+route `GET /api/purchases/:id/journey`. Refunds reverse a sale
+proportionally (refunded qty / allocation qty).
 
 ### 2.1 Repository (read-only queries)
 - `apps/api/src/modules/purchases/purchases.repository.ts` (or a new

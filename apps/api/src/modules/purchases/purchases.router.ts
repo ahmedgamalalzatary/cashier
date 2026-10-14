@@ -6,5 +6,6 @@ export function purchasesRouter(controller: PurchasesController) {
   router.get('/', controller.list);
   router.post('/', controller.create);
   router.get('/:id', controller.get);
+  router.get('/:id/journey', controller.journey);
   return router;
 }
