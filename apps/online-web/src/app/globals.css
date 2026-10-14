@@ -527,6 +527,11 @@ summary:focus-visible,
     margin: 10mm;
   }
 
+  @page a4 {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
   body {
     background: #fff !important;
   }
@@ -566,6 +571,18 @@ summary:focus-visible,
 
   .report-print-root,
   .report-print-root * {
+    visibility: visible !important;
+  }
+
+  .a4-print-root {
+    page: a4;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+  }
+
+  .a4-print-root,
+  .a4-print-root * {
     visibility: visible !important;
   }
 

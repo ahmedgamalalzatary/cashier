@@ -209,7 +209,11 @@ proportionally (refunded qty / allocation qty).
 
 ---
 
-## Phase 4 — Final green (run last, after Phase 5)
+## Phase 4 — Final green (run last, after Phase 5) — DONE
+
+Full lint, typecheck, test (sequential, `--concurrency=1`) and build green.
+Found: the online site keeps an identical copy of the stylesheet
+(`apps/online-web/src/app/globals.css`); synced the A4 print rule into it.
 
 All work touches api + shared + web → run full `pnpm lint`, `pnpm typecheck`,
 `pnpm test`, `pnpm build` sequentially.
