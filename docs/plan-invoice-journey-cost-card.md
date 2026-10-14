@@ -189,7 +189,7 @@ proportionally (refunded qty / allocation qty).
 
 ---
 
-## Phase 3 — Invoice journey: Web
+## Phase 3 — Invoice journey: Web — DONE
 
 - `apps/web/src/services/purchases-service.ts` → `getPurchaseJourney(id)`.
 - New page `apps/web/src/app/purchases/journey/page.tsx` (`?id=`, same

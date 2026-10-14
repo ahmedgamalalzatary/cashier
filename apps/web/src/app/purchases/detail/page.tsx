@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { PurchaseInvoiceDetail, Supplier } from "@cashier/shared";
-import { Printer } from "lucide-react";
+import { Printer, Route } from "lucide-react";
 import { Badge } from "@cashier/web-core/components/ui/badge";
 import { Button } from "@cashier/web-core/components/ui/button";
 import { PageHeader } from "@cashier/web-core/components/ui/page-header";
@@ -93,6 +93,12 @@ function PurchaseDetailView() {
             ) : (
               <Badge tone="neutral">لم يتبقَّ رصيد للتحويل للكافيه</Badge>
             )}
+            <Link
+              href={`/purchases/journey?id=${invoice.id}`}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-surface px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-primary/40 hover:bg-paper"
+            >
+              <Route className="size-4" /> رحلة الفاتورة
+            </Link>
             <Button variant="secondary" onClick={() => window.print()}>
               <Printer className="size-4" /> طباعة
             </Button>

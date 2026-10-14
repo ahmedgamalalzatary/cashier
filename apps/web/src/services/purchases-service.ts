@@ -1,5 +1,6 @@
 import type {
   PurchaseInvoiceDetail,
+  PurchaseInvoiceJourney,
   PurchaseInvoiceSummary,
   PurchaseUnitMode,
 } from "@cashier/shared";
@@ -27,6 +28,10 @@ export function listPurchases() {
 
 export function getPurchase(id: string) {
   return api<PurchaseInvoiceDetail>(`/api/purchases/${id}`);
+}
+
+export function getPurchaseJourney(id: string) {
+  return api<PurchaseInvoiceJourney>(`/api/purchases/${id}/journey`);
 }
 
 export function createPurchase(body: PurchaseCreateBody) {
