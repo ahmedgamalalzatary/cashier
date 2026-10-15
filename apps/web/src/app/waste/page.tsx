@@ -81,7 +81,7 @@ export default function WastePage() {
       key: "cost",
       header: "تكلفة FIFO",
       numeric: true,
-      cell: (entry) => formatMoney(entry.totalCost),
+      cell: (entry) => formatMoney(entry.totalCost ?? "0.00"),
     },
     { key: "by", header: "المسجل", cell: (entry) => entry.recordedByName },
     {
@@ -157,7 +157,7 @@ export default function WastePage() {
             <div>
               <dt className="text-xs text-muted">تكلفة FIFO</dt>
               <dd className="tnum font-bold">
-                {formatMoney(detail.totalCost)}
+                {formatMoney(detail.totalCost ?? "0.00")}
               </dd>
             </div>
             <div>
@@ -186,7 +186,7 @@ export default function WastePage() {
                   <b className="tnum">{allocation.quantity}</b>
                 </span>
                 <span className="tnum text-muted">
-                  {formatMoney(allocation.unitCost)}
+                  {formatMoney(allocation.unitCost ?? "0.00")}
                 </span>
               </div>
             ))}

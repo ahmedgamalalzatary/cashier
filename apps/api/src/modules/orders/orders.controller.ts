@@ -3,6 +3,7 @@ import { idParam } from "@cashier/server-core";
 import type { OrdersService } from "./orders.service.js";
 import type { ExternalOrdersRepository } from "./external-orders.repository.js";
 import { orderInput } from "./orders.schemas.js";
+import { withoutCostFieldsFor } from "../../lib/strip-costs.js";
 
 export class OrdersController {
   constructor(
@@ -11,7 +12,9 @@ export class OrdersController {
   ) {}
 
   list = async (_req: Request, res: Response) => {
-    res.json(await this.service.list());
+    res.json(
+      withoutCostFieldsFor(_req.user?.role, await this.service.list()),
+    );
   };
 
   externalList = async (req: Request, res: Response) => {
@@ -32,7 +35,12 @@ export class OrdersController {
   };
 
   get = async (req: Request, res: Response) => {
-    res.json(await this.service.get(idParam.parse(req.params.id)));
+    res.json(
+      withoutCostFieldsFor(
+        req.user?.role,
+        await this.service.get(idParam.parse(req.params.id)),
+      ),
+    );
   };
 
   create = async (req: Request, res: Response) => {
@@ -40,6 +48,6 @@ export class OrdersController {
       orderInput.parse(req.body),
       req.user!,
     );
-    res.status(201).json(order);
+    res.status(201).json(withoutCostFieldsFor(req.user?.role, order));
   };
 }

@@ -53,10 +53,14 @@ export function splitOrderNumber(orderNumber: string) {
 }
 
 /** Cost and profit of a single order, for admin eyes only. */
-export function orderMargin(order: Pick<OrderSummary, "total" | "totalCost">) {
+export function orderMargin(
+  order: Pick<OrderSummary, "total"> & { totalCost?: string },
+) {
+  // admins always receive the cost; the default only satisfies the type
+  const cost = order.totalCost ?? "0.00";
   return {
-    cost: formatMoney(order.totalCost),
-    profit: formatMoney(sumDecimalValues([order.total, `-${order.totalCost}`])),
+    cost: formatMoney(cost),
+    profit: formatMoney(sumDecimalValues([order.total, `-${cost}`])),
   };
 }
 

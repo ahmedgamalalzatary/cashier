@@ -252,7 +252,7 @@ function OrderDetailView() {
               </td>
               {isAdmin && (
                 <td className="tnum px-4 py-3 text-muted">
-                  {formatMoney(line.totalCost)}
+                  {formatMoney(line.totalCost ?? "0.00")}
                 </td>
               )}
             </tr>
@@ -310,7 +310,7 @@ function OrderDetailView() {
                       {quantity(allocation.quantity)}
                     </td>
                     <td className="tnum px-4 py-3 text-muted">
-                      {formatMoney(allocation.unitCost)}
+                      {formatMoney(allocation.unitCost ?? "0.00")}
                     </td>
                     <td className="tnum px-4 py-3">
                       {formatMoney(allocation.lineCost)}

@@ -671,7 +671,8 @@ export type OrderSummary = {
   total: string;
   cashReceived: string;
   changeAmount: string;
-  totalCost: string;
+  /** Admin eyes only (§2): the response omits it for a cashier. */
+  totalCost?: string;
   isNegativeStock: boolean;
   /** True when an admin completed the sale without an open shift. */
   isAdminSale: boolean;
@@ -689,7 +690,7 @@ export type OrderLineAllocation = {
   batchId: string | null;
   stockMovementId: string;
   quantity: string;
-  unitCost: string;
+  unitCost?: string;
   lineCost: string;
 };
 
@@ -706,7 +707,8 @@ export type OrderLine = {
   quantity: string;
   unitPrice: string;
   lineSubtotal: string;
-  totalCost: string;
+  /** Admin eyes only (§2): the response omits it for a cashier. */
+  totalCost?: string;
   hasStockDeficit: boolean;
   /** Of this line's sold quantity, what refunds brought back. */
   refundedQuantity: string;
@@ -787,7 +789,8 @@ export type RefundSummary = {
   cashierName: string;
   reason: string;
   amount: string;
-  totalCostReturned: string;
+  /** Admin eyes only (§2): the response omits it for a cashier. */
+  totalCostReturned?: string;
   /** True when an admin issued the refund without an open shift. */
   isAdminRefund: boolean;
   createdAt: string;
@@ -805,7 +808,8 @@ export type RefundLine = {
   grossAmount: string;
   refundAmount: string;
   stockAction: RefundStockAction | null;
-  returnedCost: string;
+  /** Admin eyes only (§2): the response omits it for a cashier. */
+  returnedCost?: string;
 };
 
 export type RefundDetail = RefundSummary & {
@@ -825,7 +829,8 @@ export type WasteSummary = {
   quantity: string;
   reason: WasteReason;
   note: string | null;
-  totalCost: string;
+  /** Admin eyes only (§2): the response omits it for a cashier. */
+  totalCost?: string;
   recordedBy: string;
   recordedByName: string;
   occurredAt: string;
@@ -837,7 +842,8 @@ export type WasteAllocation = {
   itemName: string;
   batchId: string | null;
   quantity: string;
-  unitCost: string;
+  /** Admin eyes only (§2): the response omits it for a cashier. */
+  unitCost?: string;
 };
 
 export type WasteDetail = WasteSummary & {

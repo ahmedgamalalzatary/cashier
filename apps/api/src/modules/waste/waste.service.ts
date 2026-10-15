@@ -1,6 +1,7 @@
 import type { AuthUser } from "@cashier/shared";
 import { requestFingerprint as hashRequest } from "../../lib/request-fingerprint.js";
 import { transactionWithDeadlockRetry } from "../../lib/deadlock-retry.js";
+import { withoutCostFieldsFor } from "../../lib/strip-costs.js";
 import { HttpError } from "@cashier/server-core";
 import type { WasteInput } from "./waste.schemas.js";
 import type { WasteRepository } from "./waste.repository.js";
@@ -254,7 +255,10 @@ export class WasteService {
   }
 
   list(actor: AuthUser) {
-    return this.repo.list(actor.role === "cashier" ? "cafe" : undefined);
+    const rows = this.repo.list(actor.role === "cashier" ? "cafe" : undefined);
+    return actor.role === "cashier"
+      ? rows.then((entries) => withoutCostFieldsFor(actor.role, entries) as typeof entries)
+      : rows;
   }
 
   async get(id: string, actor?: AuthUser) {
@@ -262,6 +266,9 @@ export class WasteService {
     if (!entry) throw new HttpError(404, "سجل الهالك غير موجود");
     if (actor?.role === "cashier" && entry.warehouse !== "cafe")
       throw new HttpError(403, "لا تملك صلاحية عرض هالك المخزن الرئيسي");
-    return { ...entry, allocations: await this.repo.allocations(id) };
+    const wide = { ...entry, allocations: await this.repo.allocations(id) };
+    return actor?.role === "cashier"
+      ? (withoutCostFieldsFor(actor.role, wide) as typeof wide)
+      : wide;
   }
 }
