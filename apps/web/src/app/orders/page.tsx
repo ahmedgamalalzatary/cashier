@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import Link from "next/link";
-import type { OrderSummary } from "@cashier/shared";
+import type { OrderDetail, OrderSummary } from "@cashier/shared";
 import {
   Coins,
   ReceiptText,
@@ -13,6 +14,8 @@ import {
 import { useAuth } from "@cashier/web-core/components/auth/auth-provider";
 import { ExternalOrdersPanel } from "@/components/orders/external-orders-panel";
 import { OrderPrintButton } from "@/components/orders/order-print-button";
+import { PrintSlip } from "@/components/print/print-slip";
+import { OrderReceipt } from "@/components/pos/order-receipt";
 import { Badge } from "@cashier/web-core/components/ui/badge";
 import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
 import { PageHeader } from "@cashier/web-core/components/ui/page-header";
@@ -50,6 +53,16 @@ export default function OrdersPage() {
   const [day, setDay] = useState("");
   const [error, setError] = useState("");
   const [printError, setPrintError] = useState("");
+  const [printing, setPrinting] = useState<OrderDetail | null>(null);
+
+  // The list owns a single receipt so a second print cannot leave the first
+  // slip behind; the dialog reads it, then this clears.
+  const printNow = (order: OrderDetail) => {
+    // The slip must be on the page before the print dialog reads it.
+    flushSync(() => setPrinting(order));
+    window.print();
+    setPrinting(null);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -242,6 +255,12 @@ export default function OrdersPage() {
             <ErrorBanner className="mb-4">{printError}</ErrorBanner>
           )}
 
+          {printing && (
+            <PrintSlip>
+              <OrderReceipt order={printing} />
+            </PrintSlip>
+          )}
+
           <div className="toolbar mb-4">
             <label className="relative min-w-[14rem] flex-1">
               <Search className="pointer-events-none absolute inset-y-0 start-3 my-auto size-4 text-muted" />
@@ -297,6 +316,7 @@ export default function OrdersPage() {
                   orderId={row.id}
                   orderNumber={row.orderNumber}
                   onFail={setPrintError}
+                  onOrder={printNow}
                 />
               )}
               empty={

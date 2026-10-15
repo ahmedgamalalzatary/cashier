@@ -1,17 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Ban, KeyRound, Lock, Pencil, Plus, Power, UserMinus } from "lucide-react";
 import type { Employee } from "@cashier/shared";
 import { CashierAccessModal } from "@/components/employees/cashier-access-modal";
 import { CashierPasswordModal } from "@/components/employees/cashier-password-modal";
 import { EmployeeModal } from "@/components/employees/employee-modal";
+import SalariesTab from "@/components/salaries/salaries-tab";
 import { Badge } from "@cashier/web-core/components/ui/badge";
 import { Button } from "@cashier/web-core/components/ui/button";
 import { ConfirmDialog } from "@cashier/web-core/components/ui/confirm-dialog";
 import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
 import { IconButton } from "@cashier/web-core/components/ui/icon-button";
 import { PageHeader } from "@cashier/web-core/components/ui/page-header";
+import { TabPanel, Tabs } from "@cashier/web-core/components/ui/tabs";
 import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
 import { formatMoney } from "@cashier/web-core/lib/format";
 import {
@@ -23,7 +26,24 @@ import {
 
 type ConfirmAction = { kind: "deactivate" | "revoke"; employee: Employee };
 
+type EmployeesTab = "employees" | "salaries";
+
 export default function EmployeesPage() {
+  return (
+    <Suspense fallback={<LoadingState label="جارِ التحميل…" />}>
+      <EmployeesPageView />
+    </Suspense>
+  );
+}
+
+function EmployeesPageView() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const tab = useSearchParams().get("tab") === "salaries"
+    ? "salaries"
+    : ("employees" as EmployeesTab);
+  const setTab = (next: EmployeesTab) =>
+    router.replace(next === "salaries" ? `${pathname}?tab=salaries` : pathname);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -137,8 +157,21 @@ export default function EmployeesPage() {
 
   return (
     <div>
-      <PageHeader
-        title="الموظفون"
+      <Tabs
+        idPrefix="team"
+        items={[
+          { id: "employees", label: "الموظفين" },
+          { id: "salaries", label: "المرتبات" },
+        ]}
+        active={tab}
+        onChange={setTab}
+        ariaLabel="الموظفون والمرتبات"
+        className="mb-5"
+      />
+      <TabPanel idPrefix="team" active={tab}>
+        <section hidden={tab !== "employees"}>
+          <PageHeader
+            title="الموظفون"
         description="سجلات الموظفين مستقلة عن الدخول للنظام. يمكن منح الموظف صلاحية كاشير واحدة، وتُحسب ساعات عمل الكاشير من ووردياته."
         actions={
           <Button onClick={() => setEditing(null)}>
@@ -282,6 +315,12 @@ export default function EmployeesPage() {
           setConfirmingError("");
         }}
       />
+        </section>
+
+        <section hidden={tab !== "salaries"}>
+          <SalariesTab active={tab === "salaries"} />
+        </section>
+      </TabPanel>
     </div>
   );
 }

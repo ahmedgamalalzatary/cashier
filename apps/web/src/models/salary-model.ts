@@ -1,6 +1,35 @@
 import type { SalaryMonthEmployee } from "@cashier/shared";
 import { formatMoney } from "@cashier/web-core/lib/format";
 
+/** Of the selected month's net: what the employee has already received. */
+export function salaryPaidSoFar(row: SalaryMonthEmployee): string {
+  if (row.payment) return formatMoney(row.payment.netPay);
+  return formatMoney(row.advances);
+}
+
+/** What is still due this month; null when the month was already paid. */
+export function salaryRemaining(
+  row: Pick<SalaryMonthEmployee, "payment" | "netPay">,
+): string | null {
+  if (row.payment) return null;
+  return row.netPay;
+}
+
+/**
+ * The المتبقي column: paid only with an actual payment, the amount when the
+ * month is payable, and the blocking reason (or a dash) otherwise.
+ */
+export function salaryRemainingCell(
+  row: Pick<
+    SalaryMonthEmployee,
+    "payment" | "netPay" | "blockedReason" | "blockedMessage"
+  >,
+): { kind: "paid" } | { kind: "amount"; value: string } | { kind: "blocked"; label: string | null } {
+  if (row.payment) return { kind: "paid" };
+  if (row.netPay !== null) return { kind: "amount", value: row.netPay };
+  return { kind: "blocked", label: salaryBlockedLabel(row) };
+}
+
 /**
  * The month sheet used to print "يلزم راتب شهري" for every blocked row, so an
  * admin whose month was already locked by a later payment went looking for a

@@ -2,11 +2,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Banknote, Plus } from "lucide-react";
 import type { SalaryMonth } from "@cashier/shared";
+import { DATA_CHANGED_EVENT } from "@/services/backup-service";
 import { Button } from "@cashier/web-core/components/ui/button";
 import { ConfirmDialog } from "@cashier/web-core/components/ui/confirm-dialog";
 import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
 import { PageHeader } from "@cashier/web-core/components/ui/page-header";
-import { Section } from "@cashier/web-core/components/ui/section";
+import { Modal } from "@cashier/web-core/components/ui/modal";
 import { SelectField } from "@cashier/web-core/components/ui/select-field";
 import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
 import { Table } from "@cashier/web-core/components/ui/table";
@@ -15,6 +16,8 @@ import { formatMoney } from "@cashier/web-core/lib/format";
 import {
   payConfirmationText,
   salaryBlockedLabel,
+  salaryPaidSoFar,
+  salaryRemainingCell,
 } from "@/models/salary-model";
 import {
   createSalaryAdjustment,
@@ -26,7 +29,12 @@ import {
 type Row = NonNullable<SalaryMonth["employees"]>[number];
 
 const initialMonth = cairoCalendarDate().slice(0, 7);
-export default function SalariesPage() {
+export default function SalariesTab({
+  active = false,
+}: {
+  /** True while the tab is the one on screen, so switching to it refreshes. */
+  active?: boolean;
+}) {
   const [month, setMonth] = useState(initialMonth),
     [data, setData] = useState<SalaryMonth | null>(null);
   const [employeeId, setEmployeeId] = useState(""),
@@ -39,6 +47,12 @@ export default function SalariesPage() {
     [error, setError] = useState("");
   const [paying, setPaying] = useState<Row | null>(null);
   const [payingError, setPayingError] = useState("");
+  const [logging, setLogging] = useState(false);
+  const [formError, setFormError] = useState("");
+  const clearForm = () => {
+    setLogging(false);
+    setFormError("");
+  };
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -54,9 +68,20 @@ export default function SalariesPage() {
     const id = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(id);
   }, [load]);
+  useEffect(() => {
+    if (!active) return;
+    const id = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(id);
+  }, [active, load]);
+  useEffect(() => {
+    // employee and salary writes anywhere (POS included) refresh the sheet
+    const onChange = () => void load();
+    window.addEventListener(DATA_CHANGED_EVENT, onChange);
+    return () => window.removeEventListener(DATA_CHANGED_EVENT, onChange);
+  }, [load]);
   async function addEntry() {
     setSaving(true);
-    setError("");
+    setFormError("");
     try {
       const body = {
         employeeId: employeeId,
@@ -68,9 +93,10 @@ export default function SalariesPage() {
       else await createSalaryAdjustment({ ...body, type: kind });
       setAmount("");
       setNote("");
+      setLogging(false);
       await load();
     } catch (cause) {
-      setError((cause as Error).message);
+      setFormError((cause as Error).message);
     } finally {
       setSaving(false);
     }
@@ -130,6 +156,36 @@ export default function SalariesPage() {
       cell: (e) => formatMoney(e.advances),
     },
     {
+      key: "paidSoFar",
+      header: "صُرف حتى الآن",
+      numeric: true,
+      cell: (e) => salaryPaidSoFar(e),
+    },
+    {
+      key: "remaining",
+      header: "المتبقي",
+      numeric: true,
+      cell: (e) => {
+        const remaining = salaryRemainingCell(e);
+        switch (remaining.kind) {
+          case "paid":
+            return <span className="text-success">تم الصرف</span>;
+          case "blocked":
+            return remaining.label ? (
+              <span className="text-muted">{remaining.label}</span>
+            ) : (
+              "—"
+            );
+          default:
+            return (
+              <span className="font-bold">
+                {formatMoney(remaining.value)}
+              </span>
+            );
+        }
+      },
+    },
+    {
       key: "net",
       header: "الصافي",
       numeric: true,
@@ -163,25 +219,34 @@ export default function SalariesPage() {
       <PageHeader
         title="المرتبات والسلف"
         actions={
-          <label className="flex items-center gap-2 text-sm">
-            شهر الاستحقاق
-            <input
-              aria-label="شهر الاستحقاق"
-              type="month"
-              value={month}
-              onChange={(e) => {
-                setMonth(e.target.value);
-                setEntryDate(`${e.target.value}-01`);
-              }}
-              className="input w-auto"
-            />
-          </label>
+          <>
+            <label className="flex items-center gap-2 text-sm">
+              شهر الاستحقاق
+              <input
+                aria-label="شهر الاستحقاق"
+                type="month"
+                value={month}
+                onChange={(e) => {
+                  setMonth(e.target.value);
+                  setEntryDate(`${e.target.value}-01`);
+                }}
+                className="input w-auto"
+              />
+            </label>
+            <Button onClick={() => setLogging(true)}>
+              <Plus className="size-4" />
+              صرف جزء من الراتب
+            </Button>
+          </>
         }
       />
-      {error && <ErrorBanner>{error}</ErrorBanner>}
-
-      <Section title="تسجيل سلفة أو تسوية">
-        <div className="grid gap-4 md:grid-cols-5">
+      {logging && (
+        <Modal
+          title="صرف جزء من الراتب"
+          open
+          onClose={() => clearForm()}
+        >
+          <div className="grid gap-4 md:grid-cols-2">
           <SelectField
             label="الموظف"
             value={employeeId}
@@ -226,7 +291,7 @@ export default function SalariesPage() {
               className="input"
             />
           </label>
-          <label className="block space-y-1.5">
+          <label className="block space-y-1.5 md:col-span-2">
             <span className="text-sm font-medium">ملاحظات</span>
             <input
               aria-label="ملاحظات"
@@ -238,6 +303,7 @@ export default function SalariesPage() {
             />
           </label>
         </div>
+        {formError && <ErrorBanner className="mt-4">{formError}</ErrorBanner>}
         <Button
           className="mt-4"
           onClick={addEntry}
@@ -246,7 +312,9 @@ export default function SalariesPage() {
           <Plus className="size-4" />
           تسجيل
         </Button>
-      </Section>
+        </Modal>
+      )}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
 
       <section className="space-y-3">
         <h2 className="font-bold">كشف رواتب الشهر</h2>

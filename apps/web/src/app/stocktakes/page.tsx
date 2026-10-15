@@ -11,6 +11,7 @@ import { ClipboardCheck, Plus, Printer, Scale } from "lucide-react";
 import { Button } from "@cashier/web-core/components/ui/button";
 import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
 import { Field, TextAreaField } from "@cashier/web-core/components/ui/field";
+import { Modal } from "@cashier/web-core/components/ui/modal";
 import { PageHeader } from "@cashier/web-core/components/ui/page-header";
 import { Section } from "@cashier/web-core/components/ui/section";
 import { Badge } from "@cashier/web-core/components/ui/badge";
@@ -52,6 +53,10 @@ export default function StocktakesPage() {
     [manualNote, setManualNote] = useState("");
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const [showStart, setShowStart] = useState(false),
+    [showAdjust, setShowAdjust] = useState(false);
+  const [startFormError, setStartFormError] = useState(""),
+    [adjustFormError, setAdjustFormError] = useState("");
   const load = async (selected: Warehouse = warehouse) => {
     const [documents, categoryRows, stockRows] = await Promise.all([
       listStocktakes(),
@@ -82,27 +87,41 @@ export default function StocktakesPage() {
       cancelled = true;
     };
   }, []);
-  const run = async (work: () => Promise<void>) => {
+  const run = async (
+    work: () => Promise<void>,
+    onFail?: (message: string) => void,
+  ) => {
     setBusy(true);
     setError("");
     try {
       await work();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "تعذر حفظ الجرد");
+      const message = e instanceof Error ? e.message : "تعذر حفظ الجرد";
+      if (onFail) onFail(message);
+      else setError(message);
     } finally {
       setBusy(false);
     }
   };
+  const withFormError = (
+    onFail: (message: string) => void,
+    work: () => Promise<void>,
+  ) => {
+    onFail("");
+    return run(work, onFail);
+  };
   const start = () =>
-    run(async () =>
+    withFormError(setStartFormError, async () => {
       setActive(
         await startStocktake({
           warehouse,
           categoryId: categoryId ? categoryId : null,
           note: note.trim() || null,
         }),
-      ),
-    );
+      );
+      /* close start */
+      setShowStart(false);
+    });
   const saveCounts = () =>
     run(async () => {
       if (!active) return;
@@ -124,7 +143,7 @@ export default function StocktakesPage() {
       await load();
     });
   const manual = () =>
-    run(async () => {
+    withFormError(setAdjustFormError, async () => {
       if (!manualItem || manualCount === "" || !manualNote.trim())
         throw new Error("أكمل بيانات التسوية وسببها");
       await createManualAdjustment({
@@ -136,6 +155,8 @@ export default function StocktakesPage() {
       setManualItem("");
       setManualCount("");
       setManualNote("");
+      /* close adjust */
+      setShowAdjust(false);
       await load();
     });
 
@@ -183,11 +204,28 @@ export default function StocktakesPage() {
       <PageHeader
         title="الجرد والتسويات المخزنية"
         description="جلسات جرد كاملة أو تسوية صنف واحد، مع سجل ثابت لكل مستند."
+        actions={
+          <>
+            <Button onClick={() => setShowStart(true)}>
+              <ClipboardCheck className="size-4" />
+              جرد جديد
+            </Button>
+            <Button variant="secondary" onClick={() => setShowAdjust(true)}>
+              <Scale className="size-4" />
+              تسوية صنف
+            </Button>
+          </>
+        }
       />
-      {error && <ErrorBanner>{error}</ErrorBanner>}
-
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Section title="جلسة جرد جديدة" icon={<ClipboardCheck className="size-5" />}>
+      {showStart && (
+        <Modal
+          title="جلسة جرد جديدة"
+          open
+          onClose={() => {
+            setShowStart(false);
+            setStartFormError("");
+          }}
+        >
           <div className="space-y-4">
             <SelectField
               label="المخزن"
@@ -227,11 +265,40 @@ export default function StocktakesPage() {
               <Plus className="size-4" />
               بدء الجرد
             </Button>
+            {startFormError && (
+              <ErrorBanner>{startFormError}</ErrorBanner>
+            )}
           </div>
-        </Section>
+        </Modal>
+      )}
 
-        <Section title="تسوية صنف واحد" icon={<Scale className="size-5" />}>
+      {showAdjust && (
+        <Modal
+          title="تسوية صنف واحد"
+          open
+          onClose={() => {
+            setShowAdjust(false);
+            setAdjustFormError("");
+          }}
+        >
           <div className="space-y-4">
+            <SelectField
+              label="المخزن"
+              value={warehouse}
+              onChange={(e) => {
+                const selected = e.target.value as Warehouse;
+                setWarehouse(selected);
+                (selected === "main"
+                  ? getMainWarehouseStock()
+                  : getCafeWarehouseStock()
+                )
+                  .then(setStock)
+                  .catch((caught: Error) => setError(caught.message));
+              }}
+            >
+              <option value="main">المخزن الرئيسي</option>
+              <option value="cafe">مخزن الكافيه</option>
+            </SelectField>
             <SearchSelect
               label="الصنف"
               value={manualItem}
@@ -257,12 +324,16 @@ export default function StocktakesPage() {
               value={manualNote}
               onChange={(e) => setManualNote(e.target.value)}
             />
+            {adjustFormError && (
+              <ErrorBanner>{adjustFormError}</ErrorBanner>
+            )}
             <Button onClick={manual} disabled={busy}>
               حفظ التسوية
             </Button>
           </div>
-        </Section>
-      </section>
+        </Modal>
+      )}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
 
       {active && active.status === "draft" && (
         <Section

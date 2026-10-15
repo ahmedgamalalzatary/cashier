@@ -1,10 +1,18 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
+/**
+ * True inside the Tauri desktop shell; false in an ordinary browser, which
+ * decides whether desktop-only UI (updates, the backup bar) exists at all.
+ */
+export function inDesktop() {
+  return (
+    typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+  );
+}
+
 // The desktop shell looks for newer releases while Cashier is open (plan 6.3).
 // In an ordinary browser every function here does nothing.
-const inDesktop = () =>
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 /** A newer version the shell already found, if any. */
 export async function pendingUpdate(): Promise<string | null> {

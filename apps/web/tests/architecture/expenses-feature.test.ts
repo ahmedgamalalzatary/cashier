@@ -36,4 +36,12 @@ describe("expenses feature", () => {
       /onSaved=\{[\s\S]*?load\(\)\.catch\([\s\S]*?تم تسجيل المصروف، لكن تعذر تحديث البيانات/,
     );
   });
+
+  it("opens the entry form in a modal from the header, not inline", () => {
+    const page = read("app/expenses/page.tsx");
+    expect(page).toContain("تسجيل مصروف");
+    expect(page).toContain("<Modal");
+    expect(page).toContain("<ExpenseEntryForm");
+    expect(page).not.toContain("تسجيل مصروف عام");
+  });
 });

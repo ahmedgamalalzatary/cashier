@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { describe, expect, it, vi } from "vitest";
 import { OrderPrintButton } from "../../../src/components/orders/order-print-button";
 import { getOrder } from "../../../src/services/orders-service";
 import type { OrderDetail } from "@cashier/shared";
@@ -32,21 +32,6 @@ vi.mock("@/services/orders-service", () => ({ getOrder: vi.fn() }));
 const order = {
   id: "o1",
   orderNumber: "55",
-  cashierId: "c1",
-  cashierName: "كاشير",
-  shiftId: null,
-  subtotal: "0",
-  discountType: null,
-  discountValue: null,
-  discountAmount: "0.00",
-  total: "0.00",
-  cashReceived: "0.00",
-  changeAmount: "0.00",
-  totalCost: "0.00",
-  isNegativeStock: false,
-  isAdminSale: false,
-  createdAt: "2026-10-15T14:00:00",
-  lines: [],
 } as unknown as OrderDetail;
 
 function propsOf(node: unknown): Record<string, unknown> {
@@ -64,74 +49,94 @@ function elements(node: ReactNode): ReactElement[] {
   return [element, ...walk.flatMap((value) => elements(value as ReactNode))];
 }
 
-function render(orderState: unknown, loading: unknown) {
-  hooks.cursor = 0;
-  hooks.effects = [];
-  hooks.state = [orderState, loading];
-  return renderToStaticMarkup(
-    <OrderPrintButton orderId="o1" orderNumber="55" onFail={vi.fn()} />,
-  );
-}
+const page = readFileSync(
+  new URL("../../../src/app/orders/page.tsx", import.meta.url),
+  "utf8",
+);
 
 describe("printing a receipt from an order row", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.stubGlobal("window", { print: vi.fn() });
-  });
-  afterEach(() => vi.unstubAllGlobals());
-
   it("carries a per-row print icon", () => {
-    expect(render(null, false)).toContain('aria-label="طباعة الطلب 55"');
-  });
-
-  it("does not disable the icon while the page is idle", () => {
-    expect(render(null, false)).not.toContain("disabled=");
-  });
-
-  it("loads the order detail and starts printing", async () => {
     hooks.cursor = 0;
-    hooks.state = [null, false];
+    hooks.state = [false, null];
+    const markup = renderToStaticMarkup(
+      <OrderPrintButton
+        orderId="o1"
+        orderNumber="55"
+        onFail={vi.fn()}
+        onOrder={vi.fn()}
+      />,
+    );
+    expect(markup).toContain('aria-label="طباعة الطلب 55"');
+  });
+
+  it("renders no receipt itself; the list owns the single active one", () => {
+    hooks.cursor = 0;
+    hooks.state = [false, { id: "o1" }];
+    const markup = renderToStaticMarkup(
+      <OrderPrintButton
+        orderId="o1"
+        orderNumber="55"
+        onFail={vi.fn()}
+        onOrder={vi.fn()}
+      />,
+    );
+    expect(markup).not.toContain("PrintSlip");
+    expect(
+      elements(
+        OrderPrintButton({
+          orderId: "o1",
+          orderNumber: "55",
+          onFail: vi.fn(),
+          onOrder: vi.fn(),
+        }),
+      ).some((el) => typeof el.type === "function" && el.type.name === "PrintSlip"),
+    ).toBe(false);
+  });
+
+  it("hands the loaded order to the list for printing", async () => {
+    hooks.cursor = 0;
+    hooks.state = [false, null];
     vi.mocked(getOrder).mockResolvedValue(order);
+    const onOrder = vi.fn();
     const button = OrderPrintButton({
       orderId: "o1",
       orderNumber: "55",
       onFail: vi.fn(),
+      onOrder,
     });
-    const icon = elements(button).find(
-      (el) => "onClick" in propsOf(el),
-    )!;
+    const icon = elements(button).find((el) => "onClick" in propsOf(el))!;
     (propsOf(icon).onClick as () => void)();
     expect(getOrder).toHaveBeenCalledExactlyOnceWith("o1");
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
-    // the order was committed before the dialog opened, then printing ran
-    expect(window.print).toHaveBeenCalledOnce();
-    expect(hooks.state[1]).toBe(false);
-    expect(hooks.state[0]).toEqual(order);
-  });
-
-  it("cannot start twice while the order is loading", () => {
-    const markup = render(null, true);
-    expect(markup).toContain("disabled=");
+    expect(onOrder).toHaveBeenCalledExactlyOnceWith(order);
   });
 
   it("reports a load failure to the page banner", async () => {
     hooks.cursor = 0;
-    hooks.state = [null, false];
+    hooks.state = [false, null];
     vi.mocked(getOrder).mockRejectedValue(new Error("تعذر تحميل الطلب"));
     const onFail = vi.fn();
     const button = OrderPrintButton({
       orderId: "o1",
       orderNumber: "55",
       onFail,
+      onOrder: vi.fn(),
     });
-    const icon = elements(button).find(
-      (el) => "onClick" in propsOf(el),
-    )!;
+    const icon = elements(button).find((el) => "onClick" in propsOf(el))!;
     (propsOf(icon).onClick as () => void)();
     await new Promise((resolve) => setTimeout(resolve));
     expect(onFail).toHaveBeenLastCalledWith("تعذر تحميل الطلب");
-    expect(hooks.state[1]).toBe(false);
+  });
+
+  it("keeps one active receipt for the whole list and clears it after printing", () => {
+    // one printing state at page level, not inside each row's button
+    expect(page).toContain("const [printing, setPrinting]");
+    expect(page).toContain("<OrderPrintButton");
+    expect(page.match(/<PrintSlip>/g)?.length ?? 0).toBe(1);
+    expect(page).toContain("setPrinting(null)");
   });
 });
+
+import { renderToStaticMarkup } from "react-dom/server";

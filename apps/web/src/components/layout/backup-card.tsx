@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { CloudUpload, Loader2 } from "lucide-react";
 import { readSession } from "@cashier/web-core/lib/auth";
+import { inDesktop } from "@/lib/desktop-update";
 import { cairoCalendarDate, cairoClock } from "@cashier/web-core/lib/cairo-date";
 import {
   DATA_CHANGED_EVENT,
@@ -94,10 +95,13 @@ export function BackupCard(): ReactNode {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // The sync service only exists in the desktop runtime, so a plain browser
+  // shows nothing here and never starts polling (also silences its 404s).
   const isAdmin = readSession()?.user.role === "admin";
+  const visible = isAdmin && inDesktop();
 
   const refresh = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!visible) return;
     try {
       setStatus(await readBackupStatus());
       setError(null);
@@ -106,10 +110,10 @@ export function BackupCard(): ReactNode {
         cause instanceof Error ? cause.message : "تعذر قراءة حالة الرفع",
       );
     }
-  }, [isAdmin]);
+  }, [visible]);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!visible) return;
     // Saves made on this screen announce themselves, so the pending count
     // follows them at once; focus and a short poll cover background work. The
     // first read happens in an event-free async task like the update banner's.
@@ -124,9 +128,9 @@ export function BackupCard(): ReactNode {
       window.removeEventListener(DATA_CHANGED_EVENT, onChange);
       window.removeEventListener("focus", onChange);
     };
-  }, [isAdmin, refresh]);
+  }, [visible, refresh]);
 
-  if (!isAdmin) return null;
+  if (!visible) return null;
   if(!status) return error ? (
     <div className="mb-4 rounded-lg border border-line bg-surface p-4 text-sm">
       <p role="alert" className="text-danger">{error}</p>

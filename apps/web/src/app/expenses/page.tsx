@@ -7,6 +7,7 @@ import { useAuth } from "@cashier/web-core/components/auth/auth-provider";
 import { ExpenseEntryForm } from "@/components/expenses/expense-entry-form";
 import { Button } from "@cashier/web-core/components/ui/button";
 import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
+import { Modal } from "@cashier/web-core/components/ui/modal";
 import { PageHeader } from "@cashier/web-core/components/ui/page-header";
 import { Section } from "@cashier/web-core/components/ui/section";
 import { EmptyState, ErrorBanner } from "@cashier/web-core/components/ui/states";
@@ -24,6 +25,7 @@ export default function ExpensesPage() {
   const [entries, setEntries] = useState<ExpenseSummary[]>([]);
   const [newCategory, setNewCategory] = useState("");
   const [error, setError] = useState("");
+  const [logging, setLogging] = useState(false);
 
   async function load() {
     const [nextCategories, nextEntries] = await Promise.all([
@@ -99,24 +101,32 @@ export default function ExpensesPage() {
             ? "تسجيل المصروفات العامة وتصنيفاتها."
             : "تسجيل المصروفات المدفوعة من درج الوردية."
         }
-      />
-      {error && <ErrorBanner>{error}</ErrorBanner>}
-
-      <Section
-        title={
-          user?.role === "admin" ? "تسجيل مصروف عام" : "مصروف من درج الوردية"
+        actions={
+          <Button onClick={() => setLogging(true)}>
+            <Receipt className="size-4" />
+            تسجيل مصروف
+          </Button>
         }
-      >
-        <ExpenseEntryForm
-          categories={categories}
-          onSaved={() => {
-            setError("");
-            void load().catch(() =>
-              setError("تم تسجيل المصروف، لكن تعذر تحديث البيانات"),
-            );
-          }}
-        />
-      </Section>
+      />
+      {logging && (
+        <Modal
+          title="تسجيل مصروف"
+          open
+          onClose={() => setLogging(false)}
+        >
+          <ExpenseEntryForm
+            categories={categories}
+            onSaved={() => {
+              setLogging(false);
+              setError("");
+              void load().catch(() =>
+                setError("تم تسجيل المصروف، لكن تعذر تحديث البيانات"),
+              );
+            }}
+          />
+        </Modal>
+      )}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
 
       {user?.role === "admin" && (
         <Section title="تصنيفات المصروفات" bodyClassName="p-0">

@@ -5,6 +5,9 @@ import { formatMoney } from "@cashier/web-core/lib/format";
 import {
   payConfirmationText,
   salaryBlockedLabel,
+  salaryPaidSoFar,
+  salaryRemaining,
+  salaryRemainingCell,
 } from "../../src/models/salary-model";
 
 const row = (
@@ -95,5 +98,81 @@ describe("pay confirmation", () => {
     expect(confirmation(12)).toContain("12 شهراً سابقاً غير مدفوع");
     expect(confirmation(11)).toContain("11 شهراً سابقاً غير مدفوع");
     expect(confirmation(10)).toContain("10 أشهر سابقة غير مدفوعة");
+  });
+});
+
+describe("advance figures", () => {
+  it("shows how much was paid so far and what remains of an unpaid month", () => {
+    const example = row({ advances: "2000.00", netPay: "3000.00" });
+    expect(salaryPaidSoFar(example)).toBe(formatMoney("2000.00"));
+    expect(salaryRemaining(example)).toBe("3000.00");
+  });
+
+  it("shows the payment itself for a paid month, not a remaining figure", () => {
+    const paid = row({
+      advances: "500.00",
+      netPay: "4500.00",
+      payment: {
+        id: "p1",
+        employeeId: row().employeeId,
+        employeeName: "أحمد",
+        periodMonth: "2026-09-01",
+        basePay: "5000.00",
+        bonuses: "0.00",
+        deductions: "0.00",
+        advances: "500.00",
+        netPay: "4500.00",
+        paidByName: "مدير",
+        paidAt: "2026-10-01T00:00:00",
+      },
+    });
+    expect(salaryPaidSoFar(paid)).toBe(formatMoney("4500.00"));
+    expect(salaryRemaining(paid)).toBeNull();
+  });
+});
+
+describe("remaining column", () => {
+  it("says paid only for a real payment", () => {
+    const paidRow = row({
+      netPay: "4500.00",
+      payment: {
+        id: "p1",
+        employeeId: row().employeeId,
+        employeeName: "أحمد",
+        periodMonth: "2026-09-01",
+        basePay: "5000.00",
+        bonuses: "0.00",
+        deductions: "0.00",
+        advances: "500.00",
+        netPay: "4500.00",
+        paidByName: "مدير",
+        paidAt: "2026-10-01T00:00:00",
+      },
+    });
+    expect(salaryRemainingCell(paidRow)).toEqual({ kind: "paid" });
+  });
+
+  it("shows the amount for a payable month", () => {
+    expect(salaryRemainingCell(row({ netPay: "3000.00" }))).toEqual({
+      kind: "amount",
+      value: "3000.00",
+    });
+  });
+
+  it("shows the blocking reason instead of treating it as paid", () => {
+    const blockedRow = row({
+      basePay: null,
+      netPay: null,
+      blockedReason: "no_salary",
+    });
+    expect(salaryRemainingCell(blockedRow)).toEqual({
+      kind: "blocked",
+      label: "حدد الراتب الشهري",
+    });
+    expect(
+      salaryRemainingCell(
+        row({ basePay: null, netPay: null, blockedReason: null }),
+      ),
+    ).toEqual({ kind: "blocked", label: null });
   });
 });

@@ -14,7 +14,7 @@ afterEach(()=>{vi.clearAllTimers();vi.useRealTimers();vi.unstubAllGlobals();hook
 it("refreshes the waiting count as soon as something changes, on focus, and every 15 seconds",async()=>{
   vi.useFakeTimers();
   const page=new EventTarget();
-  vi.stubGlobal("window",page);
+  vi.stubGlobal("window",Object.assign(page,{__TAURI_INTERNALS__:{}}) as unknown as Window & typeof globalThis);
   BackupCard();
   const cleanup=hooks.effects[0]();
   await vi.advanceTimersByTimeAsync(1);

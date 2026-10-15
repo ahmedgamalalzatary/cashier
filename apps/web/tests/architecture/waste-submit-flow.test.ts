@@ -16,6 +16,13 @@ describe("waste submission flow", () => {
     expect(page).toContain("formatMoney(allocation.unitCost)");
   });
 
+  it("opens the entry form in a modal from the header, not inline", () => {
+    expect(page).toContain("تسجيل هالك");
+    expect(page).toContain("<Modal");
+    expect(page).toContain("<WasteEntryForm");
+    expect(page).not.toContain('title="تسجيل هالك جديد"');
+  });
+
   it("reuses a draft-scoped request id across retries", () => {
     expect(form).toContain(
       "const [clientRequestId, setClientRequestId] = useState(() =>",

@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import type { WasteDetail, WasteSummary } from "@cashier/shared";
 import { Trash2 } from "lucide-react";
 import { WasteEntryForm, wasteReasonLabels } from "@/components/waste/waste-entry-form";
+import { Button } from "@cashier/web-core/components/ui/button";
 import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
 import { Modal } from "@cashier/web-core/components/ui/modal";
 import { PageHeader } from "@cashier/web-core/components/ui/page-header";
-import { Section } from "@cashier/web-core/components/ui/section";
 import { EmptyState, ErrorBanner } from "@cashier/web-core/components/ui/states";
 import { formatMoney } from "@cashier/web-core/lib/format";
 import { getWaste, listWaste } from "@/services/waste-service";
@@ -18,6 +18,7 @@ export default function WastePage() {
   const [entries, setEntries] = useState<WasteSummary[]>([]);
   const [detail, setDetail] = useState<WasteDetail | null>(null);
   const [error, setError] = useState("");
+  const [logging, setLogging] = useState(false);
 
   async function load() {
     setEntries(await listWaste());
@@ -99,19 +100,31 @@ export default function WastePage() {
       <PageHeader
         title="الهالك"
         description="تسجيل التالف والمنتهي والمسكوب، وتكلفته FIFO من المخزون."
+        actions={
+          <Button onClick={() => setLogging(true)}>
+            <Trash2 className="size-4" />
+            تسجيل هالك
+          </Button>
+        }
       />
+      {logging && (
+        <Modal
+          title="تسجيل هالك"
+          open
+          onClose={() => setLogging(false)}
+        >
+          <WasteEntryForm
+            onSaved={(entry) => {
+              setLogging(false);
+              setDetail(entry);
+              void load().catch(() =>
+                setError("تم تسجيل الهالك، لكن تعذر تحديث البيانات"),
+              );
+            }}
+          />
+        </Modal>
+      )}
       {error && <ErrorBanner>{error}</ErrorBanner>}
-
-      <Section title="تسجيل هالك جديد">
-        <WasteEntryForm
-          onSaved={(entry) => {
-            setDetail(entry);
-            void load().catch(() =>
-              setError("تم تسجيل الهالك، لكن تعذر تحديث البيانات"),
-            );
-          }}
-        />
-      </Section>
 
       <section className="space-y-3">
         <h2 className="font-bold">سجل الهالك</h2>

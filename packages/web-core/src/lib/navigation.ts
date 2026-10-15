@@ -32,7 +32,6 @@ export const NAV_GROUPS = [
     items: [
       { href: "/shifts", label: "الورديات", adminOnly: true },
       { href: "/employees", label: "الموظفين", adminOnly: true },
-      { href: "/salaries", label: "المرتبات", adminOnly: true },
       { href: "/reports", label: "التقارير", adminOnly: true },
       { href: "/users", label: "مستخدمو النظام", adminOnly: true },
       { href: "/branches", label: "الفروع", adminOnly: true },

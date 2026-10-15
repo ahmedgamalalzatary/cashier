@@ -12,7 +12,10 @@ import {BackupCard} from "../../../src/components/layout/backup-card";
 afterEach(()=>{vi.clearAllTimers();vi.useRealTimers();vi.unstubAllGlobals();hooks.state=[];hooks.cursor=0;hooks.effects=[];});
 it("shows a first-load failure with a retry control",async()=>{
   vi.useFakeTimers();
-  vi.stubGlobal("window",new EventTarget());
+  vi.stubGlobal(
+    "window",
+    Object.assign(new EventTarget(), { __TAURI_INTERNALS__: {} }) as unknown as Window & typeof globalThis,
+  );
   BackupCard();
   const cleanup=hooks.effects[0]();
   await vi.advanceTimersByTimeAsync(1);

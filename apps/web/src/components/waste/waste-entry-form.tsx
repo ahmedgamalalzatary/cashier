@@ -33,14 +33,22 @@ export const wasteReasonLabels: Record<WasteReason, string> = {
  */
 export function WasteEntryForm({
   onSaved,
+  presetWarehouse,
+  allowedTargetKeys,
 }: {
   onSaved: (entry: WasteDetail) => void;
+  /** Locks the warehouse select to one warehouse (an order refunds only the cafe). */
+  presetWarehouse?: "main" | "cafe";
+  /** Limits the target list to these keys, e.g. only an order's products. */
+  allowedTargetKeys?: string[];
 }) {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" && !presetWarehouse;
   const [catalog, setCatalog] = useState<WasteCatalog | null>(null);
   const [targetKey, setTargetKey] = useState("");
-  const [warehouse, setWarehouse] = useState<"main" | "cafe">("cafe");
+  const [warehouse, setWarehouse] = useState<"main" | "cafe">(
+    presetWarehouse ?? "cafe",
+  );
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState<WasteReason>("damaged");
   const [note, setNote] = useState("");
@@ -81,9 +89,12 @@ export function WasteEntryForm({
               value: `product:${product.externalProductId}:${product.externalSizeId ?? 0}`,
               label: `${product.productName}${product.sizeName ? ` — ${product.sizeName}` : ""}`,
             })),
-          ]
+          ].filter(
+            (target) =>
+              !allowedTargetKeys || allowedTargetKeys.includes(target.value),
+          )
         : [],
-    [catalog],
+    [catalog, allowedTargetKeys],
   );
 
   async function submit() {
