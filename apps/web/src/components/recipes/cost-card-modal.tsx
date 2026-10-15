@@ -3,6 +3,7 @@
 import { Printer } from "lucide-react";
 import type { PreparedRecipe } from "@cashier/shared";
 import { costSourceLabel } from "@/models/recipe-model";
+import { CostCardDocument } from "@/components/recipes/cost-card-document";
 import { PrintSlip } from "@/components/print/print-slip";
 import { Badge } from "@cashier/web-core/components/ui/badge";
 import { Button } from "@cashier/web-core/components/ui/button";
@@ -33,18 +34,7 @@ export function CostCardModal({
         </div>
       </div>
       <PrintSlip>
-        <article
-          className="a4-print-root bg-white p-2 text-ink"
-          aria-label={`بطاقة تكلفة ${recipe.name}`}
-        >
-          <header className="mb-4 border-b border-ink/30 pb-3">
-            <p className="text-xl font-bold">بطاقة التكلفة — {recipe.name}</p>
-            <p className="mt-1 text-xs">
-              {new Date().toLocaleString("ar-EG")}
-            </p>
-          </header>
-          <CostCard recipe={recipe} />
-        </article>
+        <CostCardDocument recipe={recipe} />
       </PrintSlip>
     </Modal>
   );

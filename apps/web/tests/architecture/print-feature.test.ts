@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 const read = (relative: string) =>
   fs.readFileSync(path.resolve(process.cwd(), relative), "utf8");
 
-describe("80mm printing", () => {
+describe("print wiring", () => {
   it.each([
     ["src/app/suppliers/statement/page.tsx", "SupplierStatementSlip"],
     ["src/app/purchases/detail/page.tsx", "PurchaseInvoiceSlip"],
@@ -41,10 +41,25 @@ describe("80mm printing", () => {
 });
 
 describe("A4 printing", () => {
+  it("shares one A4 layout for every filed document", () => {
+    const layout = read("src/components/print/a4-document.tsx");
+    expect(layout).toContain("a4-print-root");
+    expect(layout).toContain("الكافيه");
+  });
+
+  it.each([
+    ["src/components/purchases/purchase-invoice-slip.tsx", "A4Document"],
+    ["src/components/suppliers/supplier-statement-slip.tsx", "A4Document"],
+    ["src/components/stocktakes/stocktake-count-slip.tsx", "A4Document"],
+    ["src/components/recipes/cost-card-document.tsx", "A4Document"],
+  ])("%s prints through the shared A4 layout", (relative, marker) => {
+    expect(read(relative)).toContain(marker);
+  });
+
   it("prints the recipe cost card on A4 portrait", () => {
     const modal = read("src/components/recipes/cost-card-modal.tsx");
     expect(modal).toContain("<PrintSlip");
-    expect(modal).toContain("a4-print-root");
+    expect(modal).toContain("CostCardDocument");
     expect(modal).toContain("window.print()");
     expect(read("src/app/recipes/page.tsx")).toContain("<CostCardModal");
 

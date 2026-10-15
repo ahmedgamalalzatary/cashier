@@ -89,11 +89,3 @@ export function SlipTotals({
   );
 }
 
-export function SlipNote({ label, text }: { label: string; text: string }) {
-  return (
-    <p className="mt-4 border-t border-dotted border-ink/30 pt-3 text-xs">
-      <span className="text-muted">{label}: </span>
-      {text}
-    </p>
-  );
-}
