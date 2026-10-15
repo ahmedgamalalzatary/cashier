@@ -35,6 +35,16 @@ describe("stocktakes page structure", () => {
     expect(adjust).toContain(".then(setStock)");
   });
 
+  it("reports stock-load failures inside the modal, not behind it", () => {
+    const startModal = page.match(/showStart && \([\s\S]*?<\/Modal>/)?.[0] ?? "";
+    const adjustModal = page.match(/showAdjust && \([\s\S]*?<\/Modal>/)?.[0] ?? "";
+    expect(startModal).toContain("setStartFormError(caught.message)");
+    expect(adjustModal).toContain("setAdjustFormError(caught.message)");
+    // the page-level banner is reserved for page-load failures
+    expect(startModal).not.toContain("setError(caught.message)");
+    expect(adjustModal).not.toContain("setError(caught.message)");
+  });
+
   it("reports rejected submissions inside each modal", () => {
     const startModal = page.match(/showStart && \([\s\S]*?<\/Modal>/)?.[0] ?? "";
     const adjustModal = page.match(/showAdjust && \([\s\S]*?<\/Modal>/)?.[0] ?? "";

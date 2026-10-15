@@ -58,6 +58,7 @@ export default function OrdersPage() {
   // The list owns a single receipt so a second print cannot leave the first
   // slip behind; the dialog reads it, then this clears.
   const printNow = (order: OrderDetail) => {
+    setPrintError("");
     // The slip must be on the page before the print dialog reads it.
     flushSync(() => setPrinting(order));
     window.print();

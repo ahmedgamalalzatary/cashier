@@ -238,7 +238,7 @@ export default function StocktakesPage() {
                   : getCafeWarehouseStock()
                 )
                   .then(setStock)
-                  .catch((caught: Error) => setError(caught.message));
+                  .catch((caught: Error) => setStartFormError(caught.message));
               }}
             >
               <option value="main">المخزن الرئيسي</option>
@@ -293,7 +293,7 @@ export default function StocktakesPage() {
                   : getCafeWarehouseStock()
                 )
                   .then(setStock)
-                  .catch((caught: Error) => setError(caught.message));
+                  .catch((caught: Error) => setAdjustFormError(caught.message));
               }}
             >
               <option value="main">المخزن الرئيسي</option>

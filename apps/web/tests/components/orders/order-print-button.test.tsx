@@ -137,6 +137,13 @@ describe("printing a receipt from an order row", () => {
     expect(page.match(/<PrintSlip>/g)?.length ?? 0).toBe(1);
     expect(page).toContain("setPrinting(null)");
   });
+
+  it("forgets the print banner once a later print reaches the dialog", () => {
+    const printNow = page.match(
+      /const printNow = \(order: OrderDetail\) => \{[\s\S]*?\};/,
+    )?.[0];
+    expect(printNow).toContain('setPrintError("")');
+  });
 });
 
 import { renderToStaticMarkup } from "react-dom/server";
