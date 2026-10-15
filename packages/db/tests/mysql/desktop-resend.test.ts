@@ -11,35 +11,23 @@ import {
   syncState,
   uuidv7,
   closeDb,
-  createDb,
   type Db,
 } from "@cashier/db";
-import { migrate } from "drizzle-orm/mysql2/migrator";
-import mysql from "mysql2/promise";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { requeueEverything } from "../../../../apps/api/src/desktop/resend.js";
 import { createBackupClient } from "../../../../apps/api/src/desktop/backup-client.js";
 import { pendingCount } from "../../../../apps/api/src/desktop/upload.js";
-import { loadTestEnvironment, migrationsFolder } from "../support/test-env.js";
+import { openScratchDatabase } from "../support/scratch-database.js";
 
-const name = `cashier_resend_${process.pid}_${Date.now()}_test`;
 const branch = uuidv7();
 let db: Db;
-let owner: mysql.Connection;
 
 beforeAll(async () => {
-  owner = await mysql.createConnection(loadTestEnvironment());
-  await owner.query("CREATE DATABASE ?? CHARACTER SET utf8mb4", [name]);
-  db = createDb(loadTestEnvironment({ databaseName: name }));
-  await migrate(db, { migrationsFolder });
+  ({ db } = await openScratchDatabase("cashier_scratch_a_test"));
   await db.insert(branches).values({ id: branch, name: "Shop" });
-}, 90_000);
-
-afterAll(async () => {
-  await closeDb(db);
-  await owner.query("DROP DATABASE IF EXISTS ??", [name]);
-  await owner.end();
 });
+
+afterAll(() => closeDb(db));
 
 beforeEach(async () => {
   // The apply flag covers only the connection that set it.

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { build } from "esbuild";
+import { copyIfChanged, syncDirectory, writeIfChanged } from "./files.mjs";
 import { collectDependencyLicenses } from "./licenses.mjs";
 import { MYSQL_PIN, prepareMysql } from "./mysql.mjs";
 
@@ -30,7 +31,7 @@ const binary = path.join(
   binaryDirectory,
   `cashier-node-${target}${process.platform === "win32" ? ".exe" : ""}`,
 );
-fs.copyFileSync(process.execPath, binary);
+copyIfChanged(process.execPath, binary);
 const licenseFile = path.join(runtime, "node-LICENSE.txt");
 const existingManifest = path.join(runtime, "manifest.json");
 const sameNode =
@@ -46,11 +47,12 @@ if (!sameNode || !fs.existsSync(licenseFile)) {
     throw new Error(
       "Cannot download the bundled Node license; retry runtime preparation when online.",
     );
-  fs.writeFileSync(licenseFile, await response.text());
+  writeIfChanged(licenseFile, await response.text());
 }
 const bundled = await build({
   absWorkingDir: root,
   metafile: true,
+  write: false,
   entryPoints: [path.join(root, "apps/api/src/desktop/main.ts")],
   outfile: path.join(runtime, "api.mjs"),
   bundle: true,
@@ -63,20 +65,19 @@ const bundled = await build({
   },
   logLevel: "warning",
 });
+for (const output of bundled.outputFiles)
+  writeIfChanged(output.path, output.contents);
 const packages = collectDependencyLicenses(
   root,
   Object.keys(bundled.metafile.inputs),
 );
-fs.writeFileSync(
+writeIfChanged(
   path.join(runtime, "dependency-LICENSES.txt"),
   [...packages].map(([name, text]) => `--- ${name} ---\n${text}`).join("\n\n"),
 );
 // The app applies these itself on start (plan 5.3).
 const migrations = path.join(runtime, "migrations");
-fs.rmSync(migrations, { recursive: true, force: true });
-fs.cpSync(path.join(root, "packages/db/drizzle"), migrations, {
-  recursive: true,
-});
+syncDirectory(path.join(root, "packages/db/drizzle"), migrations);
 const journal = JSON.parse(
   fs.readFileSync(
     path.join(root, "packages/db/drizzle/meta/_journal.json"),
@@ -86,7 +87,7 @@ const journal = JSON.parse(
 const version = JSON.parse(
   fs.readFileSync(path.join(desktop, "package.json"), "utf8"),
 ).version;
-fs.writeFileSync(
+writeIfChanged(
   path.join(runtime, "manifest.json"),
   JSON.stringify(
     {
@@ -100,7 +101,7 @@ fs.writeFileSync(
     2,
   ) + "\n",
 );
-fs.copyFileSync(
+copyIfChanged(
   path.join(desktop, "settings.example.env"),
   path.join(runtime, "settings.example.env"),
 );

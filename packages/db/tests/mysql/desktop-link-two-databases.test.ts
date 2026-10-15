@@ -4,12 +4,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { eq } from "drizzle-orm";
-import mysql from "mysql2/promise";
-import { migrate } from "drizzle-orm/mysql2/migrator";
 import { afterAll, afterEach, beforeAll, describe, expect } from "vitest";
 import { branches, devices, linkCodes } from "@cashier/db";
-import { closeDb, createDb, type Db } from "../../src/client.js";
-import { loadTestEnvironment } from "../support/test-env.js";
+import { closeDb, type Db } from "../../src/client.js";
+import {
+  emptyScratchDatabase,
+  openScratchDatabase,
+} from "../support/scratch-database.js";
 import { db } from "../support/api-setup.js";
 import { it } from "../support/ids.js";
 import { createApp } from "../../../../apps/online-api/src/app.js";
@@ -39,7 +40,8 @@ let server: ReturnType<typeof onlineApp.listen>;
 let apiUrl: string;
 let siteUrl: string;
 let directories: string[];
-const cleanups: Array<() => Promise<void> | void> = [];
+// The PC's own database: a shared scratch database, emptied after every test.
+let local: Db;
 
 beforeAll(async () => {
   server = onlineApp.listen(0);
@@ -48,14 +50,16 @@ beforeAll(async () => {
   siteUrl = `http://127.0.0.1:${port}`;
   apiUrl = `${siteUrl}/api`;
   directories = [];
+  ({ db: local } = await openScratchDatabase("cashier_scratch_a_test"));
 });
 
 afterAll(async () => {
   await new Promise((resolve) => server.close(resolve));
+  await closeDb(local);
 });
 
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+  await emptyScratchDatabase("cashier_scratch_a_test");
   for (const directory of directories.splice(0)) {
     if (!directory.startsWith(path.join(os.tmpdir(), "cashier-link-e2e-")))
       throw new Error("Unexpected test directory");
@@ -66,24 +70,8 @@ afterEach(async () => {
 const sha256 = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 
-/** A real second database, with the real schema, dropped after the test. */
-async function pcDatabase() {
-  const name = `cashier_link_pc_${process.pid}_${cleanups.length}_test`;
-  const owner = await mysql.createConnection(loadTestEnvironment());
-  await owner.query("DROP DATABASE IF EXISTS ??", [name]);
-  await owner.query("CREATE DATABASE ?? CHARACTER SET utf8mb4", [name]);
-  const url = loadTestEnvironment({ databaseName: name });
-  const local = createDb(url);
-  await migrate(local, {
-    migrationsFolder: path.resolve(import.meta.dirname, "../../drizzle"),
-  });
-  cleanups.push(async () => {
-    await closeDb(local);
-    await owner.query("DROP DATABASE ??", [name]);
-    await owner.end();
-  });
-  return local;
-}
+/** A real second database, with the real schema, empty at the test's start. */
+const pcDatabase = async () => local;
 
 function settingsFile() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "cashier-link-e2e-"));

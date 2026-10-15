@@ -1,10 +1,9 @@
 import { randomUUID } from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
 import { is } from "drizzle-orm";
 import { getTableConfig, MySqlTable } from "drizzle-orm/mysql-core";
 import * as schema from "../../src/schema.js";
 import { generateSyncTriggers } from "../../scripts/generate-sync-triggers.js";
+import syncDirections from "../../src/sync-directions.json" with { type: "json" };
 import mysql, { type Connection, type RowDataPacket } from "mysql2/promise";
 import { migrate } from "drizzle-orm/mysql2/migrator";
 import { afterAll, beforeAll, beforeEach, expect, it } from "vitest";
@@ -176,27 +175,14 @@ it("rolls back the outbox together with business data", async () => {
   );
   expect(data).toEqual([]);
 });
-const plan = fs.readFileSync(
-  path.resolve(import.meta.dirname, "../../../../docs/desktop-online-plan.md"),
-  "utf8",
-);
-const directionRows = plan
-  .slice(plan.indexOf("### 7.1"), plan.indexOf("### 7.2"))
-  .split("\n");
-const upNames = directionRows
-  .filter((line) => /^\| Up\s*\|/.test(line))
-  .flatMap((line) =>
-    [...line.matchAll(/`([a-z_]+)`/g)].map((match) => match[1]),
-  );
+const upNames = Object.entries(syncDirections)
+  .filter(([, directions]) => directions.includes("Up"))
+  .map(([name]) => name);
 const tables = Object.values(schema)
   .filter((table) => is(table, MySqlTable))
   .map(getTableConfig);
 it("installs exactly three capture triggers for every upload table and none for other directions", async () => {
-  const classified = directionRows
-    .filter((line) => /^\| (Up|Down|None)/.test(line))
-    .flatMap((line) =>
-      [...line.matchAll(/`([a-z_]+)`/g)].map((match) => match[1]),
-    );
+  const classified = Object.keys(syncDirections);
   expect(
     tables
       .map((table) => table.name)
@@ -350,12 +336,7 @@ it("keeps apply suppression connection-local", async () => {
   }
 });
 it("removes old capture triggers when a table stops uploading", async () => {
-  const changed = plan
-    .replace("`employees`, ", "")
-    .replace(
-      "`external_catalog_sync` (local worker bookkeeping)",
-      "`employees`, `external_catalog_sync` (local worker bookkeeping)",
-    );
+  const changed = { ...syncDirections, employees: ["None"] };
   const apply = async (sql: string) => {
     for (const statement of sql.split("--> statement-breakpoint"))
       if (statement.trim()) await connection.query(statement);
@@ -365,6 +346,6 @@ it("removes old capture triggers when a table stops uploading", async () => {
     await insertEmployee();
     expect(await rows()).toEqual([]);
   } finally {
-    await apply(generateSyncTriggers(plan));
+    await apply(generateSyncTriggers());
   }
 });

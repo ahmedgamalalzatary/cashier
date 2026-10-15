@@ -8,31 +8,30 @@ import {
   type AnyMySqlColumn,
 } from "drizzle-orm/mysql-core";
 import * as schema from "../src/schema.js";
+import syncDirections from "../src/sync-directions.json" with { type: "json" };
 
-export function readSyncDirections(plan: string) {
-  const section = plan.slice(plan.indexOf("### 7.1"), plan.indexOf("### 7.2"));
+/** Which way each table syncs; `src/sync-directions.json` is the contract. */
+export type SyncDirections = Record<string, string[]>;
+
+const knownDirections = ["Up", "Up (filtered)", "Down", "None"];
+
+function readSyncDirections(contract: SyncDirections) {
   const directions = new Map<string, Set<string>>();
-  for (const line of section.split("\n")) {
-    const direction = /^\| (Up \(filtered\)|Up|Down|None)\s*\|/.exec(line)?.[1];
-    if (!direction) continue;
-    if (
-      direction === "Up (filtered)" &&
-      !line.includes("`role = 'cashier'` only")
-    )
-      throw new Error("Unsupported upload filter in the direction contract");
-    for (const match of line.matchAll(/`([a-z_]+)`/g)) {
-      const assigned = directions.get(match[1]) ?? new Set<string>();
-      if (assigned.has(direction))
-        throw new Error(`Duplicate sync direction: ${match[1]}`);
-      assigned.add(direction);
-      directions.set(match[1], assigned);
-    }
+  for (const [name, assigned] of Object.entries(contract)) {
+    for (const direction of assigned)
+      if (!knownDirections.includes(direction))
+        throw new Error(`Unknown sync direction for ${name}: ${direction}`);
+    if (new Set(assigned).size !== assigned.length)
+      throw new Error(`Duplicate sync direction: ${name}`);
+    directions.set(name, new Set(assigned));
   }
   return directions;
 }
 
-export function generateSyncTriggers(plan: string): string {
-  const directions=readSyncDirections(plan);
+export function generateSyncTriggers(
+  contract: SyncDirections = syncDirections,
+): string {
+  const directions = readSyncDirections(contract);
   const tables = Object.values(schema)
     .filter((table) => is(table, MySqlTable))
     .map(getTableConfig);
@@ -123,8 +122,8 @@ export function generateSyncTriggers(plan: string): string {
   return statements.join("\n--> statement-breakpoint\n") + "\n";
 }
 
-export function writeTriggerMigration(directory: string, plan: string) {
-  const generated = generateSyncTriggers(plan);
+export function writeTriggerMigration(directory: string) {
+  const generated = generateSyncTriggers();
   const journalPath = path.join(directory, "meta/_journal.json");
   const journal = JSON.parse(fs.readFileSync(journalPath, "utf8")) as {
     entries: Array<{ tag: string }>;
@@ -173,16 +172,8 @@ if (
   const directory = path.resolve(
     process.argv.find((arg) => arg.startsWith("--out="))?.slice(6) ?? "drizzle",
   );
-  const planPath = path.resolve(
-    process.argv.find((arg) => arg.startsWith("--plan="))?.slice(7) ??
-      "../../docs/desktop-online-plan.md",
-  );
-  const plan=fs.readFileSync(planPath,"utf8");
   console.log(
-    writeTriggerMigration(directory, plan) ??
+    writeTriggerMigration(directory) ??
       "Sync triggers are current; no migration written.",
   );
-  const file=path.resolve(import.meta.dirname,"../src/sync-directions.json");
-  const data=JSON.stringify(Object.fromEntries([...readSyncDirections(plan)].map(([name,directions])=>[name,[...directions]])),null,2)+"\n";
-  if(!fs.existsSync(file)||fs.readFileSync(file,"utf8")!==data) fs.writeFileSync(file,data);
 }

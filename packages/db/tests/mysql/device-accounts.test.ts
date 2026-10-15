@@ -1,10 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import mysql from "mysql2/promise";
 import bcrypt from "bcryptjs";
 import request from "supertest";
-import { migrate } from "drizzle-orm/mysql2/migrator";
 import { eq } from "drizzle-orm";
 import {
   afterAll,
@@ -23,10 +21,9 @@ import {
   users,
   uuidv7,
   closeDb,
-  createDb,
   type Db,
 } from "@cashier/db";
-import { loadTestEnvironment, migrationsFolder } from "../support/test-env.js";
+import { openScratchDatabase } from "../support/scratch-database.js";
 import { createApp as onlineApp } from "../../../../apps/online-api/src/app.js";
 import { createApp as localApp } from "../../../../apps/api/src/app.js";
 import { hashDeviceToken } from "../../../../packages/server-core/src/modules/devices/device-link.service.js";
@@ -44,37 +41,18 @@ const passwordHash = bcrypt.hashSync("secret123", 4);
 let online: Db;
 let local: Db;
 let localUrl: string;
-const owned: Array<{ db: Db; name: string; owner: mysql.Connection }> = [];
 const directories: string[] = [];
 
 beforeAll(async () => {
-  for (const side of ["online", "local"]) {
-    const name = `cashier_accounts_${side}_${process.pid}_${Date.now()}_test`;
-    const owner = await mysql.createConnection(loadTestEnvironment());
-    try {
-      await owner.query("CREATE DATABASE ?? CHARACTER SET utf8mb4", [name]);
-    } catch (error) {
-      await owner.end();
-      throw error;
-    }
-    const url = loadTestEnvironment({ databaseName: name });
-    const db = createDb(url);
-    owned.push({ db, name, owner });
-    await migrate(db, { migrationsFolder });
-    if (side === "online") online = db;
-    else {
-      local = db;
-      localUrl = url;
-    }
-  }
-}, 90_000);
+  ({ db: online } = await openScratchDatabase("cashier_scratch_a_test"));
+  ({ db: local, url: localUrl } = await openScratchDatabase(
+    "cashier_scratch_b_test",
+  ));
+});
 
 afterAll(async () => {
-  for (const { db, name, owner } of owned.reverse()) {
-    await closeDb(db);
-    await owner.query("DROP DATABASE ??", [name]);
-    await owner.end();
-  }
+  await closeDb(online);
+  await closeDb(local);
 });
 
 beforeEach(async () => {
