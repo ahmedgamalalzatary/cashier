@@ -21,8 +21,16 @@ export type JourneyBatch = {
 };
 
 export type JourneyOutflows = {
-  transfers: Array<{ sourceBatchId: string; cafeBatchId: string; quantity: string }>;
-  preparations: Array<{ sourceBatchId: string; preparationId: string; quantity: string }>;
+  transfers: Array<{
+    sourceBatchId: string | null;
+    cafeBatchId: string;
+    quantity: string;
+  }>;
+  preparations: Array<{
+    sourceBatchId: string | null;
+    preparationId: string;
+    quantity: string;
+  }>;
   /** Includes sales made before stock arrived and later settled by the batch. */
   sales: Array<{ batchId: string; allocationId: string; quantity: string }>;
   /** Includes stocktake shortages made before stock arrived and later settled. */

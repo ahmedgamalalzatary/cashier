@@ -129,7 +129,6 @@ export function TransferReviewModal({
                       type="number"
                       min="0.001"
                       step="0.001"
-                      max={Math.max(0, Number(stock?.quantity ?? 0))}
                       value={quantities[line.itemId] ?? ""}
                       onChange={(event) =>
                         setQuantities((current) => ({
@@ -141,12 +140,21 @@ export function TransferReviewModal({
                     />
                   )}
                   {isAdmin && request.status === "pending" && (
-                    <p className="mt-2 text-xs text-muted">
-                      المتاح في الرئيسي: {Number(stock?.quantity ?? 0).toLocaleString("ar-EG", {
-                        maximumFractionDigits: 3,
-                      })}{" "}
-                      {line.stockUnit}
-                    </p>
+                    <>
+                      <p className="mt-2 text-xs text-muted">
+                        المتاح في الرئيسي: {Number(stock?.quantity ?? 0).toLocaleString("ar-EG", {
+                          maximumFractionDigits: 3,
+                        })}{" "}
+                        {line.stockUnit}
+                      </p>
+                      {Number(quantities[line.itemId] ?? 0) >
+                        Number(stock?.quantity ?? 0) && (
+                        <p className="mt-1 text-xs text-danger">
+                          الكمية أكبر من المتاح؛ سيصبح رصيد الرئيسي سالباً بعد
+                          الاعتماد.
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               );

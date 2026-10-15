@@ -1,9 +1,9 @@
-import { HttpError } from "@cashier/server-core";
 import type { InventoryTransaction } from "../inventory/inventory.service.js";
 import type { TransfersRepository } from "./transfers.repository.js";
 
 // Moves stock main → cafe FIFO inside the caller's transaction, carrying each
-// main batch's cost into a matching cafe batch.
+// main batch's cost into a matching cafe batch. When main stock is short the
+// remainder is taken below zero and costed at the item's last known cost.
 export async function moveStockToCafe(
   repo: TransfersRepository,
   inventory: InventoryTransaction,
@@ -19,6 +19,9 @@ export async function moveStockToCafe(
   const transferId = await repo.createTransfer(header);
   const occurredAt = new Date();
   const orderedLines = [...lines].sort((a, b) => (a.itemId).localeCompare(b.itemId));
+  const lastCosts = await inventory.lastKnownUnitCosts(
+    [...new Set(orderedLines.map((line) => line.itemId))],
+  );
   for (const line of orderedLines) {
     const consumed = await inventory.consume({
       itemId: line.itemId,
@@ -28,11 +31,10 @@ export async function moveStockToCafe(
       referenceType: "transfer",
       referenceId: transferId,
       occurredAt,
+      allowNegative: true,
+      shortfallUnitCost: lastCosts.get(line.itemId) ?? "0.000000",
     });
     for (const allocation of consumed.allocations) {
-      if (allocation.batchId === null) {
-        throw new HttpError(409, "الرصيد المتاح لا يكفي");
-      }
       const received = await inventory.receive({
         itemId: line.itemId,
         warehouse: "cafe",

@@ -1,5 +1,34 @@
-import type { Item, PurchaseUnitMode } from "@cashier/shared";
+import type {
+  Item,
+  PurchaseInvoiceStatus,
+  PurchaseUnitMode,
+} from "@cashier/shared";
 import type { PurchaseCreateBody } from "@/services/purchases-service";
+
+/** The invoice badge follows what remains after allocation, per spec §5. */
+export function purchaseStatusLabel(status: PurchaseInvoiceStatus): string {
+  switch (status) {
+    case "paid":
+      return "مدفوعة";
+    case "partial":
+      return "جزئية";
+    default:
+      return "آجلة";
+  }
+}
+
+export function purchaseStatusTone(
+  status: PurchaseInvoiceStatus,
+): "success" | "neutral" | "danger" {
+  switch (status) {
+    case "paid":
+      return "success";
+    case "partial":
+      return "neutral";
+    default:
+      return "danger";
+  }
+}
 
 export type PurchaseLineForm = {
   key: number;

@@ -2,6 +2,10 @@ import { requestFingerprint as hashRequest } from '../../lib/request-fingerprint
 import { transactionWithDeadlockRetry } from '../../lib/deadlock-retry.js';
 import { HttpError } from '@cashier/server-core';
 import { moveStockToCafe } from '../transfers/move-stock.js';
+import {
+  allocateSupplierPayments,
+  type InvoiceAllocation,
+} from './payment-allocation.js';
 import type { PurchasesRepository } from './purchases.repository.js';
 import type { PurchaseInput } from './purchases.schemas.js';
 
@@ -232,15 +236,34 @@ export class PurchasesService {
   }
 
   async list() {
-    const [invoices, withStock] = await Promise.all([
+    const [invoices, withStock, openingBalances, payments] = await Promise.all([
       this.repo.list(),
       this.repo.listInvoicesWithStock(),
+      this.repo.listSupplierOpeningBalances(),
+      this.repo.listStandalonePayments(),
     ]);
     const stock = new Set(
       withStock.filter((row) => row.hasStock).map((row) => row.invoiceId),
     );
+    const openingBySupplier = new Map(
+      openingBalances.map((row) => [row.supplierId, row.openingBalance]),
+    );
+    const paymentsBySupplier = groupBy(payments, (row) => row.supplierId);
+    const invoicesBySupplier = groupBy(invoices, (row) => row.supplierId);
+    const allocations = new Map<string, InvoiceAllocation>();
+    for (const [supplierId, supplierInvoices] of invoicesBySupplier) {
+      const { byInvoice } = allocateSupplierPayments({
+        openingBalance: openingBySupplier.get(supplierId) ?? '0.00',
+        invoices: supplierInvoices,
+        payments: paymentsBySupplier.get(supplierId) ?? [],
+      });
+      for (const [invoiceId, values] of byInvoice) {
+        allocations.set(invoiceId, values);
+      }
+    }
     return invoices.map((invoice) => ({
       ...invoice,
+      ...allocations.get(invoice.id)!,
       hasStockToTransfer: stock.has(invoice.id),
     }));
   }
@@ -248,10 +271,35 @@ export class PurchasesService {
   async get(id: string) {
     const invoice = await this.repo.findById(id);
     if (!invoice) throw new HttpError(404, 'فاتورة الشراء غير موجودة');
+    const [lines, transfers, supplierInvoices, openingBalance, payments] =
+      await Promise.all([
+        this.repo.listLines(id),
+        this.repo.listLinkedTransfers(id),
+        this.repo.listSupplierInvoices(invoice.supplierId),
+        this.repo.listSupplierOpeningBalance(invoice.supplierId),
+        this.repo.listStandalonePayments(invoice.supplierId),
+      ]);
+    const { byInvoice, balance } = allocateSupplierPayments({
+      openingBalance: openingBalance ?? '0.00',
+      invoices: supplierInvoices,
+      payments,
+    });
     return {
       ...invoice,
-      lines: await this.repo.listLines(id),
-      transfers: await this.repo.listLinkedTransfers(id),
+      ...byInvoice.get(id)!,
+      supplierBalance: balance,
+      lines,
+      transfers,
     };
   }
+}
+
+function groupBy<T, K>(rows: T[], key: (row: T) => K) {
+  const groups = new Map<K, T[]>();
+  for (const row of rows) {
+    const group = groups.get(key(row));
+    if (group) group.push(row);
+    else groups.set(key(row), [row]);
+  }
+  return groups;
 }

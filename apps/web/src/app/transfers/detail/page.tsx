@@ -54,6 +54,13 @@ function TransferDetailView() {
         }
       />
 
+      {transfer.isNegativeStock && (
+        <ErrorBanner className="mb-4">
+          رصيد سالب: تم تحويل كمية أكبر من المتاح في المخزن الرئيسي، وسُجِّلت
+          الزيادة بتكلفة آخر دفعة معروفة.
+        </ErrorBanner>
+      )}
+
       <StatStrip className="mb-5">
         <Stat
           label="المصدر"
@@ -96,7 +103,9 @@ function TransferDetailView() {
             <td className="tnum px-4 py-3 font-medium">
               {formatMoney(line.lineCost)}
             </td>
-            <td className="tnum px-4 py-3 text-muted">#{line.sourceBatchId}</td>
+            <td className="tnum px-4 py-3 text-muted">
+              {line.sourceBatchId ? `#${line.sourceBatchId}` : "—"}
+            </td>
             <td className="tnum px-4 py-3 text-muted">#{line.cafeBatchId}</td>
           </tr>
         ))}

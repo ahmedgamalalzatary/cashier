@@ -206,14 +206,22 @@ export class TransfersService {
     }
   }
 
-  listTransfers() {
-    return this.repo.listTransfers();
+  async listTransfers() {
+    const rows = await this.repo.listTransfers();
+    return rows.map((row) => ({
+      ...row,
+      isNegativeStock: Boolean(row.isNegativeStock),
+    }));
   }
 
   async getTransfer(id: string) {
     const row = await this.repo.findTransferById(id);
     if (!row) throw new HttpError(404, "التحويل غير موجود");
-    return { ...row, lines: await this.repo.listTransferLines(id) };
+    return {
+      ...row,
+      isNegativeStock: Boolean(row.isNegativeStock),
+      lines: await this.repo.listTransferLines(id),
+    };
   }
 
   private async validateItems(

@@ -23,7 +23,7 @@ export type InvoiceTransferRow = {
   remainingQuantity: number;
   availableQuantity: number;
   quantity: string;
-  /** the invoice bought more than is left in the main warehouse */
+  /** the requested quantity is more than the main warehouse holds */
   clamped: boolean;
   /** the item was deactivated after this invoice; the API would reject it */
   inactive: boolean;
@@ -60,12 +60,13 @@ export function invoiceTransferRows(
       ? 0
       : Math.max(0, roundQuantity(Number(stock?.quantity ?? 0)));
     // the invoice only still owes what it bought minus what already left for
-    // the cafe, and never more than the main warehouse can supply
+    // the cafe; going below the main warehouse balance is allowed now, so the
+    // available quantity only warns instead of capping the line
     const owedQuantity = Math.max(
       0,
       roundQuantity(invoiceQuantity - transferredQuantity),
     );
-    const quantity = Math.min(owedQuantity, availableQuantity);
+    const quantity = inactive ? 0 : owedQuantity;
     merged.set(line.itemId, {
       itemId: line.itemId,
       code: line.itemCode,
@@ -76,7 +77,7 @@ export function invoiceTransferRows(
       remainingQuantity: owedQuantity,
       availableQuantity,
       quantity: String(quantity),
-      clamped: quantity < owedQuantity,
+      clamped: !inactive && owedQuantity > availableQuantity,
       inactive,
       selected: quantity > 0,
     });

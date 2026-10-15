@@ -11,6 +11,7 @@ import { PageHeader } from "@cashier/web-core/components/ui/page-header";
 import { PaymentModal } from "@/components/suppliers/payment-modal";
 import { PurchaseInvoiceSlip } from "@/components/purchases/purchase-invoice-slip";
 import { PrintSlip } from "@/components/print/print-slip";
+import { purchaseStatusLabel, purchaseStatusTone } from "@/models/purchase-model";
 import { Stat, StatStrip } from "@cashier/web-core/components/ui/stat";
 import { Table } from "@cashier/web-core/components/ui/table";
 import { ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
@@ -67,8 +68,7 @@ function PurchaseDetailView() {
     }
   }
 
-  const due = Number(invoice.dueAmount);
-  const paid = Number(invoice.paidAmount);
+  const supplierHasBalance = Number(invoice.supplierBalance) > 0;
   // every line already fully sent to the cafe: the button would only ever
   // offer quantities the API rejects
   const canTransferToCafe = invoice.lines.some(
@@ -102,15 +102,13 @@ function PurchaseDetailView() {
             <Button variant="secondary" onClick={() => window.print()}>
               <Printer className="size-4" /> طباعة
             </Button>
-            <Button variant="secondary" onClick={() => void openPayment()}>
-              دفعة على حساب المورد
-            </Button>
-            <Badge tone={due === 0 ? "success" : paid > 0 ? "neutral" : "danger"}>
-              {due === 0
-                ? "مدفوعة بالكامل عند الشراء"
-                : paid > 0
-                  ? "دفعة جزئية عند الشراء"
-                  : "آجلة بالكامل عند الشراء"}
+            {supplierHasBalance && (
+              <Button variant="secondary" onClick={() => void openPayment()}>
+                دفعة على حساب المورد
+              </Button>
+            )}
+            <Badge tone={purchaseStatusTone(invoice.status)}>
+              {purchaseStatusLabel(invoice.status)}
             </Badge>
           </>
         }
@@ -247,10 +245,16 @@ function PurchaseDetailView() {
               {formatMoney(invoice.paidAmount)}
             </dd>
           </div>
+          <div className="flex justify-between">
+            <dt className="text-sidebar-ink">مغطى بدفعات لاحقة</dt>
+            <dd className="tnum text-success">
+              {formatMoney(invoice.coveredAmount)}
+            </dd>
+          </div>
           <div className="flex justify-between border-t border-white/10 pt-3 text-base">
-            <dt className="font-medium">الآجل عند التسجيل</dt>
+            <dt className="font-medium">المتبقي</dt>
             <dd className="tnum font-bold text-accent">
-              {formatMoney(invoice.dueAmount)}
+              {formatMoney(invoice.remainingAmount)}
             </dd>
           </div>
         </dl>

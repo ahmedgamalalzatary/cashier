@@ -1,0 +1,2 @@
+ALTER TABLE `preparation_allocations` MODIFY COLUMN `source_batch_id` char(36) CHARACTER SET ascii COLLATE ascii_bin;--> statement-breakpoint
+ALTER TABLE `transfer_lines` MODIFY COLUMN `source_batch_id` char(36) CHARACTER SET ascii COLLATE ascii_bin;

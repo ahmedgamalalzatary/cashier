@@ -12,6 +12,7 @@ const baseTransfer = {
   approvedByName: "منى",
   notes: "نقل صباحي",
   totalCost: "120.00",
+  isNegativeStock: false,
   createdAt: "2026-10-01T08:00:00.000Z",
   lines: [
     {
@@ -68,5 +69,19 @@ describe("transfer document (A4)", () => {
     printable(html);
     expect(html).toContain(`طلب تحويل #${testId(9)}`);
     expect(html).not.toContain("تحويل مباشر");
+  });
+
+  it("flags a transfer that took main stock below zero", () => {
+    const transfer = {
+      ...baseTransfer,
+      requestId: null,
+      isNegativeStock: true,
+      lines: [{ ...baseTransfer.lines[0], sourceBatchId: null }],
+    } satisfies TransferDetail;
+
+    const html = renderToStaticMarkup(<TransferDocument transfer={transfer} />);
+
+    printable(html);
+    expect(html).toContain("رصيد سالب");
   });
 });

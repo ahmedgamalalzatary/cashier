@@ -291,6 +291,8 @@ export type StocktakeDetail = Omit<StocktakeSummary, "lineCount"> & {
 
 export type PurchaseUnitMode = "stock" | "purchase";
 
+export type PurchaseInvoiceStatus = "paid" | "partial" | "credit";
+
 export type PurchaseInvoiceSummary = {
   id: string;
   supplierId: string;
@@ -301,6 +303,11 @@ export type PurchaseInvoiceSummary = {
   totalAmount: string;
   paidAmount: string;
   dueAmount: string;
+  /** Of this invoice's total, covered by payments recorded after purchase. */
+  coveredAmount: string;
+  /** What is still owed on this invoice; the badge follows it. */
+  remainingAmount: string;
+  status: PurchaseInvoiceStatus;
   createdBy: string;
   createdByName: string;
   /** A line of this invoice still owes stock to the cafe (can open a transfer). */
@@ -334,6 +341,8 @@ export type PurchaseInvoiceTransferLink = {
 };
 
 export type PurchaseInvoiceDetail = PurchaseInvoiceSummary & {
+  /** The supplier's live balance; the payment action shows only while it is > 0. */
+  supplierBalance: string;
   lines: PurchaseInvoiceLine[];
   transfers: PurchaseInvoiceTransferLink[];
 };
@@ -440,6 +449,8 @@ export type TransferSummary = {
   approvedByName: string;
   notes: string | null;
   totalCost: string;
+  /** True when the transfer took main stock below zero. */
+  isNegativeStock: boolean;
   /** ISO timestamp. */
   createdAt: string;
 };
@@ -453,7 +464,8 @@ export type TransferLine = {
   quantity: string;
   unitCost: string;
   lineCost: string;
-  sourceBatchId: string;
+  /** Null when the line's shortfall took main stock below zero. */
+  sourceBatchId: string | null;
   cafeBatchId: string;
 };
 
@@ -521,6 +533,8 @@ export type PreparationSummary = {
   notes: string | null;
   occurredAt: string;
   createdAt: string;
+  /** True when an ingredient was taken below zero by this preparation. */
+  isNegativeStock: boolean;
 };
 
 export type PreparationAllocation = {
@@ -532,7 +546,8 @@ export type PreparationAllocation = {
   quantity: string;
   unitCost: string;
   lineCost: string;
-  sourceBatchId: string;
+  /** Null when the allocation's shortfall took cafe stock below zero. */
+  sourceBatchId: string | null;
 };
 
 export type PreparationDetail = PreparationSummary & {

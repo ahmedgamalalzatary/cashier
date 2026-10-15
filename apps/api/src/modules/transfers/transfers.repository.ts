@@ -253,7 +253,7 @@ export class TransfersRepository {
     itemId: string;
     quantity: string;
     unitCost: string;
-    sourceBatchId: string;
+    sourceBatchId: string | null;
     cafeBatchId: string;
   }) {
     await this.db.insert(transferLines).values(branchValues(data));
@@ -284,6 +284,10 @@ export class TransfersRepository {
       FROM ${branchTable("transfer_lines")} tl
       WHERE tl.transfer_id = ${transfers.id}
     ), 0) AS DECIMAL(30,2))`;
+    const isNegativeStock = sql<boolean>`EXISTS(
+      SELECT 1 FROM ${branchTable("transfer_lines")} tl
+      WHERE tl.transfer_id = ${transfers.id} AND tl.source_batch_id IS NULL
+    )`;
     return this.db
       .select({
         id: transfers.id,
@@ -294,6 +298,7 @@ export class TransfersRepository {
         approvedByName: transferApprover.name,
         notes: transfers.notes,
         totalCost,
+        isNegativeStock,
         createdAt: transfers.createdAt,
       })
       .from(transfers)
@@ -312,6 +317,10 @@ export class TransfersRepository {
       FROM ${branchTable("transfer_lines")} tl
       WHERE tl.transfer_id = ${transfers.id}
     ), 0) AS DECIMAL(30,2))`;
+    const isNegativeStock = sql<boolean>`EXISTS(
+      SELECT 1 FROM ${branchTable("transfer_lines")} tl
+      WHERE tl.transfer_id = ${transfers.id} AND tl.source_batch_id IS NULL
+    )`;
     const [row] = await this.db
       .select({
         id: transfers.id,
@@ -322,6 +331,7 @@ export class TransfersRepository {
         approvedByName: transferApprover.name,
         notes: transfers.notes,
         totalCost,
+        isNegativeStock,
         createdAt: transfers.createdAt,
       })
       .from(transfers)

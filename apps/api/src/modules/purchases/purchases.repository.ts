@@ -4,7 +4,7 @@ import {
   branchTransaction,
   currentBranchId,
 } from "@cashier/db";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db } from "@cashier/db";
 import {
   items,
@@ -175,6 +175,77 @@ export class PurchasesRepository {
       .innerJoin(users, eq(purchaseInvoices.createdBy, users.id))
       .where(branchCondition(purchaseInvoices))
       .orderBy(desc(purchaseInvoices.purchasedAt), desc(purchaseInvoices.id));
+  }
+
+  /** Every supplier's opening balance, for allocing payments across the list. */
+  listSupplierOpeningBalances() {
+    return this.db
+      .select({
+        supplierId: suppliers.id,
+        openingBalance: suppliers.openingBalance,
+      })
+      .from(suppliers)
+      .where(branchCondition(suppliers));
+  }
+
+  async listSupplierOpeningBalance(supplierId: string) {
+    const [row] = await this.db
+      .select({ openingBalance: suppliers.openingBalance })
+      .from(suppliers)
+      .where(branchCondition(suppliers, eq(suppliers.id, supplierId)));
+    return row?.openingBalance;
+  }
+
+  /** Payments not tied to an invoice: the ones later allocation applies. */
+  listStandalonePayments(supplierId?: string) {
+    return this.db
+      .select({
+        supplierId: supplierPayments.supplierId,
+        id: supplierPayments.id,
+        paidAt: supplierPayments.paidAt,
+        createdAt: supplierPayments.createdAt,
+        amount: supplierPayments.amount,
+      })
+      .from(supplierPayments)
+      .where(
+        branchCondition(
+          supplierPayments,
+          and(
+            isNull(supplierPayments.purchaseInvoiceId),
+            supplierId ? eq(supplierPayments.supplierId, supplierId) : undefined,
+          ),
+        ),
+      )
+      .orderBy(
+        supplierPayments.paidAt,
+        supplierPayments.createdAt,
+        supplierPayments.id,
+      );
+  }
+
+  /** A supplier's invoices, oldest-first, for the allocation. */
+  listSupplierInvoices(supplierId: string) {
+    return this.db
+      .select({
+        id: purchaseInvoices.id,
+        supplierId: purchaseInvoices.supplierId,
+        purchasedAt: purchaseInvoices.purchasedAt,
+        createdAt: purchaseInvoices.createdAt,
+        totalAmount: purchaseInvoices.totalAmount,
+        paidAmount: purchaseInvoices.paidAmount,
+      })
+      .from(purchaseInvoices)
+      .where(
+        branchCondition(
+          purchaseInvoices,
+          eq(purchaseInvoices.supplierId, supplierId),
+        ),
+      )
+      .orderBy(
+        purchaseInvoices.purchasedAt,
+        purchaseInvoices.createdAt,
+        purchaseInvoices.id,
+      );
   }
 
   /**

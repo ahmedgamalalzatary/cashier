@@ -105,6 +105,18 @@ class FakeInventoryRepository implements InventoryRepositoryPort {
   async listStock() {
     return [];
   }
+
+  async lastKnownUnitCosts(itemIds: string[]) {
+    const result = new Map<string, string>();
+    const ordered = [...this.batches].sort(
+      (a, b) => b.receivedAt.getTime() - a.receivedAt.getTime(),
+    );
+    for (const itemId of itemIds) {
+      const batch = ordered.find((candidate) => candidate.itemId === itemId);
+      result.set(itemId, batch ? batch.unitCost : "0.000000");
+    }
+    return result;
+  }
 }
 
 describe("FIFO inventory service", () => {
@@ -369,6 +381,75 @@ describe("FIFO inventory service", () => {
           unitCost: "0.000000",
         },
       ],
+    });
+  });
+
+  it("costs an allowed shortfall at the given unit cost", async () => {
+    const repo = new FakeInventoryRepository();
+    repo.batches = [
+      {
+        id: testId(1),
+        itemId: testId(1),
+        warehouse: "main",
+        initialQuantity: "1.000",
+        remainingQuantity: "1.000",
+        unitCost: "8.000000",
+        receivedAt: new Date("2026-07-01T00:00:00Z"),
+        sourceType: "purchase",
+        sourceId: testId(1),
+      },
+    ];
+    const service = new InventoryService(repo);
+
+    const result = await service.consume({
+      itemId: testId(1),
+      warehouse: "main",
+      quantity: 3,
+      movementType: "transfer_out",
+      allowNegative: true,
+      shortfallUnitCost: "7.5",
+    });
+
+    expect(repo.movements[1]).toMatchObject({
+      batchId: null,
+      quantity: "-2.000",
+      unitCost: "7.500000",
+    });
+    expect(result.allocations).toEqual([
+      {
+        batchId: testId(1),
+        movementId: testId(1),
+        quantity: "1.000",
+        unitCost: "8.000000",
+      },
+      {
+        batchId: null,
+        movementId: testId(2),
+        quantity: "2.000",
+        unitCost: "7.500000",
+      },
+    ]);
+  });
+
+  it("still costs a sale shortfall at zero when no cost is given", async () => {
+    const repo = new FakeInventoryRepository();
+    const service = new InventoryService(repo);
+
+    const result = await service.consume({
+      itemId: testId(1),
+      warehouse: "cafe",
+      quantity: 2,
+      movementType: "sale",
+      allowNegative: true,
+    });
+
+    expect(repo.movements[0]).toMatchObject({
+      batchId: null,
+      unitCost: "0.000000",
+    });
+    expect(result.allocations[0]).toMatchObject({
+      batchId: null,
+      unitCost: "0.000000",
     });
   });
 

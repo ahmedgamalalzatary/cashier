@@ -217,6 +217,16 @@ export default function RecipesPage() {
     },
     { key: "by", header: "نفذها", cell: (row) => row.preparedByName },
     {
+      key: "flag",
+      header: "الحالة",
+      cell: (row) =>
+        row.isNegativeStock ? (
+          <Badge tone="danger">رصيد سالب</Badge>
+        ) : (
+          <Badge tone="success">مكتمل</Badge>
+        ),
+    },
+    {
       key: "at",
       header: "الوقت",
       cell: (row) => (

@@ -4,7 +4,7 @@ import {
   branchTable,
   branchTransaction,
 } from "@cashier/db";
-import { and, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
 import type { Db } from "@cashier/db";
 import {
   categories,
@@ -83,6 +83,12 @@ export interface InventoryRepositoryPort {
     warehouse: Warehouse,
   ): Promise<StockBatchRecord[]>;
   updateBatchRemaining(id: string, remainingQuantity: string): Promise<void>;
+  /**
+   * Newest batch unit cost seen for each item in any warehouse. Used to cost
+   * the part of a transfer/preparation that takes stock below zero. Items
+   * never received map to "0.000000".
+   */
+  lastKnownUnitCosts(itemIds: string[]): Promise<Map<string, string>>;
   listStock(warehouse: Warehouse): Promise<InventoryStockRecord[]>;
 }
 
@@ -262,6 +268,23 @@ export class InventoryRepository implements InventoryRepositoryPort {
       .update(stockBatches)
       .set({ remainingQuantity })
       .where(branchCondition(stockBatches, eq(stockBatches.id, id)));
+  }
+
+  async lastKnownUnitCosts(itemIds: string[]) {
+    const result = new Map<string, string>();
+    if (itemIds.length === 0) return result;
+    const rows = await this.db
+      .select({
+        itemId: stockBatches.itemId,
+        unitCost: stockBatches.unitCost,
+      })
+      .from(stockBatches)
+      .where(branchCondition(stockBatches, inArray(stockBatches.itemId, itemIds)))
+      .orderBy(desc(stockBatches.receivedAt), desc(stockBatches.id));
+    for (const row of rows) {
+      if (!result.has(row.itemId)) result.set(row.itemId, row.unitCost);
+    }
+    return result;
   }
 
   listStock(warehouse: Warehouse) {

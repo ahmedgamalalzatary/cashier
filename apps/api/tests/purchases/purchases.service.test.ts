@@ -117,13 +117,24 @@ describe("PurchasesService list stock flag", () => {
   it("marks an invoice transferable when a line still owes the cafe stock", async () => {
     const invoiceIds = [testId(1), testId(2), testId(3)];
     const repo = {
-      list: vi.fn().mockResolvedValue(invoiceIds.map((id) => ({ id }))),
+      list: vi.fn().mockResolvedValue(
+        invoiceIds.map((id) => ({
+          id,
+          supplierId: testId(1),
+          purchasedAt: "2026-07-01",
+          createdAt: "2026-07-01T08:00:00.000Z",
+          totalAmount: "10.00",
+          paidAmount: "0.00",
+        })),
+      ),
       listInvoicesWithStock: vi
         .fn()
         .mockResolvedValue([
           { invoiceId: testId(1), hasStock: true },
           { invoiceId: testId(3), hasStock: true },
         ]),
+      listSupplierOpeningBalances: vi.fn().mockResolvedValue([]),
+      listStandalonePayments: vi.fn().mockResolvedValue([]),
     } as unknown as PurchasesRepository;
     const rows = await new PurchasesService(repo).list();
     expect(

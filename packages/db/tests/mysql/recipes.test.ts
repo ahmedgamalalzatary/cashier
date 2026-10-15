@@ -246,6 +246,65 @@ describe("prepared recipes and preparations", () => {
     });
   });
 
+  it("prepares with a missing ingredient, costing the shortfall at the last known cost", async () => {
+    const categoryId = await createLeafCategory();
+    const sugarId = await createItem(categoryId, "سكر");
+    const syrupId = await createItem(categoryId, "شربات", "prepared", "لتر");
+    // only the main warehouse holds the sugar; the cafe has none to consume
+    await receiveCafeBatch(
+      sugarId,
+      "3.000",
+      "12.000000",
+      new Date("2026-07-18T00:00:00.000Z"),
+      "main",
+    );
+    const recipe = await createPreparedRecipe({
+      categoryId,
+      outputItemId: syrupId,
+      ingredientItemId: sugarId,
+      ingredientQuantity: 1,
+      baseYield: 2,
+    });
+    expect(recipe.status).toBe(201);
+
+    const prepared = await request(app())
+      .post(`/api/recipes/${recipe.body.id}/prepare`)
+      .set(adminAuthorization)
+      .send({ quantity: 5, notes: null });
+    expect(prepared.status).toBe(201);
+
+    const detail = await request(app())
+      .get(`/api/recipes/preparations/${prepared.body.preparationId}`)
+      .set(adminAuthorization);
+    expect(detail.body).toMatchObject({
+      producedQuantity: "5.000",
+      totalCost: "30.00",
+      unitCost: "6.000000",
+      isNegativeStock: true,
+    });
+    expect(detail.body.allocations).toEqual([
+      expect.objectContaining({
+        quantity: "2.500",
+        unitCost: "12.000000",
+        sourceBatchId: null,
+      }),
+    ]);
+    const [outputBatch] = await db
+      .select()
+      .from(stockBatches)
+      .where(
+        and(
+          eq(stockBatches.itemId, syrupId),
+          eq(stockBatches.warehouse, "cafe"),
+        ),
+      );
+    expect(outputBatch).toMatchObject({
+      initialQuantity: "5.000",
+      unitCost: "6.000000",
+      sourceType: "preparation_in",
+    });
+  });
+
   it("costs a cafe shortfall from main stock for the cost card", async () => {
     const categoryId = await createLeafCategory();
     const milkId = await createItem(categoryId, "لبن");
@@ -281,7 +340,7 @@ describe("prepared recipes and preparations", () => {
     ]);
   });
 
-  it("rolls an insufficient preparation back without stock or history changes", async () => {
+  it("prepares below the cafe balance, costing the shortfall at the last known cost", async () => {
     const categoryId = await createLeafCategory();
     const ingredientId = await createItem(categoryId, "فانيليا");
     const outputId = await createItem(categoryId, "صوص", "prepared", "لتر");
@@ -303,16 +362,33 @@ describe("prepared recipes and preparations", () => {
       .post(`/api/recipes/${recipe.body.id}/prepare`)
       .set(adminAuthorization)
       .send({ quantity: 1 });
-    expect(prepared.status).toBe(409);
+    expect(prepared.status).toBe(201);
     const [inputBatch] = await db
       .select()
       .from(stockBatches)
       .where(eq(stockBatches.id, inputBatchId));
-    expect(inputBatch.remainingQuantity).toBe("1.000");
-    const history = await request(app())
-      .get("/api/recipes/preparations")
+    expect(inputBatch.remainingQuantity).toBe("0.000");
+    const detail = await request(app())
+      .get(`/api/recipes/preparations/${prepared.body.preparationId}`)
       .set(adminAuthorization);
-    expect(history.body).toEqual([]);
+    expect(detail.body).toMatchObject({
+      producedQuantity: "1.000",
+      totalCost: "30.00",
+      unitCost: "30.000000",
+      isNegativeStock: true,
+    });
+    expect(detail.body.allocations).toEqual([
+      expect.objectContaining({
+        quantity: "1.000",
+        unitCost: "15.000000",
+        sourceBatchId: inputBatchId,
+      }),
+      expect.objectContaining({
+        quantity: "1.000",
+        unitCost: "15.000000",
+        sourceBatchId: null,
+      }),
+    ]);
   });
 
   it("rejects direct and indirect prepared-item recipe cycles", async () => {
@@ -351,7 +427,7 @@ describe("prepared recipes and preparations", () => {
     ).toBe(409);
   });
 
-  it("serializes competing preparation runs so cafe stock is consumed once", async () => {
+  it("runs competing preparations serially, letting the second take cafe stock negative", async () => {
     const categoryId = await createLeafCategory();
     const ingredientId = await createItem(categoryId, "مركز");
     const outputId = await createItem(categoryId, "خلطة", "prepared");
@@ -379,6 +455,14 @@ describe("prepared recipes and preparations", () => {
         .set(adminAuthorization)
         .send({ quantity: 1 }),
     ]);
-    expect(results.map((result) => result.status).sort()).toEqual([201, 409]);
+    expect(results.map((result) => result.status)).toEqual([201, 201]);
+    const cafeStock = await request(app())
+      .get("/api/inventory/cafe/stock")
+      .set(adminAuthorization);
+    expect(
+      cafeStock.body.find(
+        (row: { itemId: string }) => row.itemId === ingredientId,
+      ),
+    ).toMatchObject({ quantity: "-1.000" });
   });
 });

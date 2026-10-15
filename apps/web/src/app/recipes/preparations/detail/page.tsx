@@ -58,7 +58,13 @@ function PreparationDetailView() {
       <PageHeader
         back={{ href: "/recipes", label: "العودة للوصفات" }}
         title={`عملية التحضير #${preparation.id}`}
-        actions={<Badge tone="success">وثيقة ثابتة</Badge>}
+        actions={
+          preparation.isNegativeStock ? (
+            <Badge tone="danger">رصيد سالب</Badge>
+          ) : (
+            <Badge tone="success">وثيقة ثابتة</Badge>
+          )
+        }
       />
 
       <StatStrip className="mb-5" tone="dark">
@@ -138,7 +144,7 @@ function PreparationDetailView() {
               {formatMoney(allocation.lineCost)}
             </td>
             <td className="tnum px-4 py-3 text-muted">
-              #{allocation.sourceBatchId}
+              {allocation.sourceBatchId ? `#${allocation.sourceBatchId}` : "—"}
             </td>
           </tr>
         ))}

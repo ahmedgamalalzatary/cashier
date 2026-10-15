@@ -799,9 +799,9 @@ export const transferLines = mysqlTable(
       .references(() => items.id),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
     unitCost: decimal("unit_cost", { precision: 16, scale: 6 }).notNull(),
-    sourceBatchId: uuidColumn("source_batch_id")
-      .notNull()
-      .references(() => stockBatches.id),
+    sourceBatchId: uuidColumn("source_batch_id").references(
+      () => stockBatches.id,
+    ),
     cafeBatchId: uuidColumn("cafe_batch_id")
       .notNull()
       .references(() => stockBatches.id),
@@ -1332,9 +1332,9 @@ export const preparationAllocations = mysqlTable(
     }).notNull(),
     quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull(),
     unitCost: decimal("unit_cost", { precision: 16, scale: 6 }).notNull(),
-    sourceBatchId: uuidColumn("source_batch_id")
-      .notNull()
-      .references(() => stockBatches.id),
+    sourceBatchId: uuidColumn("source_batch_id").references(
+      () => stockBatches.id,
+    ),
   },
   (table) => [
     uniqueIndex("preparation_allocations_branch_id_uidx").on(

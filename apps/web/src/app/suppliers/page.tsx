@@ -200,9 +200,14 @@ export default function SuppliersPage() {
               >
                 <FileText className="size-4" />
               </Link>
-              <IconBtn title="تسجيل دفعة" onClick={() => setPayingSupplier(s)}>
-                <HandCoins className="size-4" />
-              </IconBtn>
+              {Number(s.balance) > 0 && (
+                <IconBtn
+                  title="تسجيل دفعة"
+                  onClick={() => setPayingSupplier(s)}
+                >
+                  <HandCoins className="size-4" />
+                </IconBtn>
+              )}
               <IconBtn
                 title="تعديل"
                 onClick={() => {

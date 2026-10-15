@@ -100,7 +100,7 @@ describe("transfer model", () => {
     });
   });
 
-  it("clamps a line to the stock left in the main warehouse and flags it", () => {
+  it("warns when the line exceeds the main warehouse balance", () => {
     const [row] = invoiceTransferRows(
       [invoiceLine({ itemId: testId(3), stockQuantity: "8.000" })],
       [stockRow(testId(3), "2.500")],
@@ -109,13 +109,13 @@ describe("transfer model", () => {
     expect(row).toMatchObject({
       invoiceQuantity: 8,
       availableQuantity: 2.5,
-      quantity: "2.5",
+      quantity: "8",
       clamped: true,
       selected: true,
     });
   });
 
-  it("leaves items with no remaining stock unselected", () => {
+  it("selects an item even when the main warehouse is empty", () => {
     const [row] = invoiceTransferRows(
       [invoiceLine({ itemId: testId(3), stockQuantity: "8.000" })],
       [stockRow(testId(3), "0.000")],
@@ -123,19 +123,24 @@ describe("transfer model", () => {
 
     expect(row).toMatchObject({
       availableQuantity: 0,
-      quantity: "0",
+      quantity: "8",
       clamped: true,
-      selected: false,
+      selected: true,
     });
   });
 
-  it("treats an item missing from main stock as unavailable", () => {
+  it("warns when an item is missing from main stock", () => {
     const [row] = invoiceTransferRows(
       [invoiceLine({ itemId: testId(9), stockQuantity: "4.000" })],
       [],
     );
 
-    expect(row).toMatchObject({ availableQuantity: 0, selected: false });
+    expect(row).toMatchObject({
+      availableQuantity: 0,
+      quantity: "4",
+      clamped: true,
+      selected: true,
+    });
   });
 
   it("refuses a deactivated item the manual picker could not offer", () => {
@@ -190,7 +195,7 @@ describe("transfer model", () => {
     });
   });
 
-  it("caps the invoice remainder at the main stock and flags it", () => {
+  it("flags when the invoice remainder exceeds the main stock", () => {
     const [row] = invoiceTransferRows(
       [
         invoiceLine({
@@ -204,7 +209,7 @@ describe("transfer model", () => {
 
     expect(row).toMatchObject({
       transferredQuantity: 18,
-      quantity: "1.5",
+      quantity: "2",
       availableQuantity: 1.5,
       clamped: true,
     });

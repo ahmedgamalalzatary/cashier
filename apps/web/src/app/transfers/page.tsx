@@ -223,6 +223,16 @@ function TransfersView() {
       cell: (transfer) => formatMoney(transfer.totalCost),
     },
     {
+      key: "flag",
+      header: "الحالة",
+      cell: (transfer) =>
+        transfer.isNegativeStock ? (
+          <Badge tone="danger">رصيد سالب</Badge>
+        ) : (
+          <Badge tone="success">مكتمل</Badge>
+        ),
+    },
+    {
       key: "at",
       header: "الوقت",
       cell: (transfer) => (

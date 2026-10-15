@@ -5,6 +5,8 @@ import {
   newPurchaseLine,
   purchaseLineAmounts,
   purchaseRequestBody,
+  purchaseStatusLabel,
+  purchaseStatusTone,
   purchaseTotal,
 } from "../../src/models/purchase-model";
 
@@ -120,5 +122,19 @@ describe("purchase form model", () => {
         { itemId: testId(5), quantity: 1, unitMode: "stock", unitPrice: 50 },
       ],
     });
+  });
+});
+
+describe("purchase invoice allocation status", () => {
+  it("labels the three statuses", () => {
+    expect(purchaseStatusLabel("paid")).toBe("مدفوعة");
+    expect(purchaseStatusLabel("partial")).toBe("جزئية");
+    expect(purchaseStatusLabel("credit")).toBe("آجلة");
+  });
+
+  it("maps each status to a badge tone", () => {
+    expect(purchaseStatusTone("paid")).toBe("success");
+    expect(purchaseStatusTone("partial")).toBe("neutral");
+    expect(purchaseStatusTone("credit")).toBe("danger");
   });
 });

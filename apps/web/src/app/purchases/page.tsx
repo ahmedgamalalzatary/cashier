@@ -12,6 +12,7 @@ import { Stat, StatStrip } from "@cashier/web-core/components/ui/stat";
 import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
 import { formatMoney, sumDecimalValues } from "@cashier/web-core/lib/format";
 import { TransferFormModal } from "@/components/transfers/transfer-form-modal";
+import { purchaseStatusLabel, purchaseStatusTone } from "@/models/purchase-model";
 import {
   getCafeWarehouseStock,
   getMainWarehouseStock,
@@ -54,7 +55,7 @@ export default function PurchasesPage() {
     () => ({
       total: sumDecimalValues(invoices.map((row) => row.totalAmount)),
       paid: sumDecimalValues(invoices.map((row) => row.paidAmount)),
-      due: sumDecimalValues(invoices.map((row) => row.dueAmount)),
+      remaining: sumDecimalValues(invoices.map((row) => row.remainingAmount)),
     }),
     [invoices],
   );
@@ -89,34 +90,38 @@ export default function PurchasesPage() {
     },
     {
       key: "paidAmount",
-      header: "المدفوع",
+      header: "المدفوع عند الشراء",
       numeric: true,
       cell: (invoice) => (
         <span className="text-success">{formatMoney(invoice.paidAmount)}</span>
       ),
     },
     {
-      key: "dueAmount",
-      header: "الآجل عند التسجيل",
+      key: "coveredAmount",
+      header: "مغطى بدفعات لاحقة",
+      numeric: true,
+      cell: (invoice) => formatMoney(invoice.coveredAmount),
+    },
+    {
+      key: "remainingAmount",
+      header: "المتبقي",
       numeric: true,
       cell: (invoice) => (
-        <span className={Number(invoice.dueAmount) > 0 ? "text-danger" : undefined}>
-          {formatMoney(invoice.dueAmount)}
+        <span
+          className={Number(invoice.remainingAmount) > 0 ? "text-danger" : undefined}
+        >
+          {formatMoney(invoice.remainingAmount)}
         </span>
       ),
     },
     {
       key: "status",
       header: "سداد الفاتورة",
-      cell: (invoice) => {
-        const due = Number(invoice.dueAmount);
-        const paid = Number(invoice.paidAmount);
-        return (
-          <Badge tone={due === 0 ? "success" : paid > 0 ? "neutral" : "danger"}>
-            {due === 0 ? "مدفوع" : paid > 0 ? "جزئي" : "آجل"}
-          </Badge>
-        );
-      },
+      cell: (invoice) => (
+        <Badge tone={purchaseStatusTone(invoice.status)}>
+          {purchaseStatusLabel(invoice.status)}
+        </Badge>
+      ),
     },
   ];
 
@@ -142,9 +147,9 @@ export default function PurchasesPage() {
           <Stat label="إجمالي المشتريات" value={formatMoney(totals.total)} />
           <Stat label="إجمالي المدفوع" value={formatMoney(totals.paid)} />
           <Stat
-            label="الآجل عند التسجيل"
-            value={formatMoney(totals.due)}
-            tone={Number(totals.due) > 0 ? "danger" : "default"}
+            label="المتبقي"
+            value={formatMoney(totals.remaining)}
+            tone={Number(totals.remaining) > 0 ? "danger" : "default"}
           />
         </StatStrip>
       )}

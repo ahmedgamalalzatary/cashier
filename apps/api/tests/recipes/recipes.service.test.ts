@@ -60,16 +60,18 @@ function txForPrepare(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function serviceForPrepare(tx: Record<string, unknown>) {
+function serviceForPrepare(
+  tx: Record<string, unknown>,
+  inventory: Record<string, unknown> = {},
+) {
   const repository = {
     transaction: vi.fn(async (callback) =>
-      callback(
-        tx,
-        {
-          consume: vi.fn(async () => ({ allocations: [] })),
-          receive: vi.fn(async () => ({ batchId: testId(9) })),
-        },
-      ),
+      callback(tx, {
+        lastKnownUnitCosts: vi.fn(async () => new Map()),
+        consume: vi.fn(async () => ({ allocations: [] })),
+        receive: vi.fn(async () => ({ batchId: testId(9) })),
+        ...inventory,
+      }),
     ),
   } as unknown as RecipesRepository;
   return new RecipesService(repository);
@@ -150,6 +152,84 @@ describe("RecipesService.prepare guards", () => {
     await expect(
       service.prepare(testId(3), { quantity: 0.001, notes: null }, testId(9)),
     ).rejects.toMatchObject({ status: 400 });
+  });
+});
+
+describe("RecipesService.prepare negative stock", () => {
+  it("takes an ingredient below zero and records an uncosted-source allocation", async () => {
+    const tx = txForPrepare();
+    const createPreparationAllocation = tx.createPreparationAllocation;
+    const consume = vi.fn(async () => ({
+      quantity: "1.000",
+      totalCost: "0.000000",
+      allocations: [
+        {
+          batchId: null,
+          movementId: testId(21),
+          quantity: "1.000",
+          unitCost: "0.000000",
+        },
+      ],
+    }));
+    const inventory = {
+      lastKnownUnitCosts: vi.fn(async () => new Map()),
+      consume,
+    };
+
+    const id = await serviceForPrepare(
+      tx,
+      inventory,
+    ).prepare(testId(3), { quantity: 2, notes: null }, testId(9));
+
+    expect(id).toBe(testId(77));
+    expect(consume).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: testId(1),
+        warehouse: "cafe",
+        allowNegative: true,
+        shortfallUnitCost: "0.000000",
+      }),
+    );
+    expect(createPreparationAllocation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        preparationId: testId(77),
+        ingredientItemId: testId(1),
+        quantity: "1.000",
+        unitCost: "0.000000",
+        sourceBatchId: null,
+      }),
+    );
+  });
+
+  it("costs a never-received ingredient's shortfall at zero and still completes", async () => {
+    const tx = txForPrepare();
+    const consume = vi.fn(async () => ({
+      quantity: "2.000",
+      totalCost: "0.000000",
+      allocations: [
+        {
+          batchId: null,
+          movementId: testId(21),
+          quantity: "2.000",
+          unitCost: "0.000000",
+        },
+      ],
+    }));
+    const inventory = {
+      lastKnownUnitCosts: vi.fn(async () => new Map()),
+      consume,
+    };
+
+    await serviceForPrepare(tx, inventory).prepare(
+      testId(3),
+      { quantity: 20, notes: null },
+      testId(9),
+    );
+
+    expect(tx.completePreparation).toHaveBeenCalledWith(
+      testId(77),
+      expect.objectContaining({ totalCost: "0.00", unitCost: "0.000000" }),
+    );
   });
 });
 

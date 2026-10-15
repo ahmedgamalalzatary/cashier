@@ -33,6 +33,9 @@ export function TransferDocument({ transfer }: { transfer: TransferDetail }) {
           </span>,
         ],
         ["ملاحظات", transfer.notes],
+        ...(transfer.isNegativeStock
+          ? [["تنبيه", "رصيد سالب: كمية أكبر من المتاح في المخزن الرئيسي"] as [string, string]]
+          : []),
       ]}
       signatures={["المُسلِّم", "المُستلِم"]}
     >

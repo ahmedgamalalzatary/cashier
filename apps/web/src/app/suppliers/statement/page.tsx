@@ -75,9 +75,11 @@ function SupplierStatementView() {
             <Button variant="secondary" onClick={() => window.print()}>
               <Printer className="size-4" /> طباعة
             </Button>
-            <Button variant="secondary" onClick={() => setPaying(true)}>
-              تسجيل دفعة
-            </Button>
+            {Number(supplier.balance) > 0 && (
+              <Button variant="secondary" onClick={() => setPaying(true)}>
+                تسجيل دفعة
+              </Button>
+            )}
             <Link
               href={`/purchases/new?supplier=${supplier.id}`}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-strong"

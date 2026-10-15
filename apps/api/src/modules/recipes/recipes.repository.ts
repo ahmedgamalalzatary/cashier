@@ -362,12 +362,16 @@ export class RecipesRepository {
     ingredientItemName: string;
     quantity: string;
     unitCost: string;
-    sourceBatchId: string;
+    sourceBatchId: string | null;
   }) {
     await this.db.insert(preparationAllocations).values(branchValues(data));
   }
 
   listPreparations() {
+    const isNegativeStock = sql<boolean>`EXISTS(
+      SELECT 1 FROM ${branchTable("preparation_allocations")} pa
+      WHERE pa.preparation_id = ${preparations.id} AND pa.source_batch_id IS NULL
+    )`;
     return this.db
       .select({
         id: preparations.id,
@@ -385,6 +389,7 @@ export class RecipesRepository {
         notes: preparations.notes,
         occurredAt: preparations.occurredAt,
         createdAt: preparations.createdAt,
+        isNegativeStock,
       })
       .from(preparations)
       .innerJoin(preparer, eq(preparations.preparedBy, preparer.id))
@@ -400,6 +405,10 @@ export class RecipesRepository {
   }
 
   async findPreparation(id: string) {
+    const isNegativeStock = sql<boolean>`EXISTS(
+      SELECT 1 FROM ${branchTable("preparation_allocations")} pa
+      WHERE pa.preparation_id = ${preparations.id} AND pa.source_batch_id IS NULL
+    )`;
     const [row] = await this.db
       .select({
         id: preparations.id,
@@ -417,6 +426,7 @@ export class RecipesRepository {
         notes: preparations.notes,
         occurredAt: preparations.occurredAt,
         createdAt: preparations.createdAt,
+        isNegativeStock,
       })
       .from(preparations)
       .innerJoin(preparer, eq(preparations.preparedBy, preparer.id))

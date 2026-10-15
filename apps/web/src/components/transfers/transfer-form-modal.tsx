@@ -313,7 +313,7 @@ export function TransferFormModal({
                     <div
                       key={row.itemId}
 className={`rounded-xl border border-line p-3 ${
-                        row.availableQuantity === 0 || row.remainingQuantity === 0
+                        row.inactive || row.remainingQuantity === 0
                           ? "opacity-60"
                           : ""
                       }`}
@@ -323,7 +323,7 @@ className={`rounded-xl border border-line p-3 ${
                           type="checkbox"
                           className="mt-1 size-4 accent-primary"
                           checked={row.selected}
-                          disabled={row.availableQuantity === 0 || row.remainingQuantity === 0}
+                          disabled={row.inactive || row.remainingQuantity === 0}
                           aria-label={`تحويل ${row.name}`}
                           onChange={(event) =>
                             updateInvoiceRow(row.itemId, {
@@ -363,9 +363,7 @@ className={`rounded-xl border border-line p-3 ${
                             <p className="mt-1 text-xs text-danger">
                               {row.inactive
                                 ? "الصنف موقوف ولا يمكن تحويله."
-                                : row.availableQuantity === 0
-                                  ? "لم يتبقَ رصيد من هذا الصنف في المخزن الرئيسي."
-                                  : "الكمية المتبقية من الفاتورة لم تعد متاحة بالكامل، وتم تخفيضها للمتاح."}
+                                : "الكمية أكبر من المتاح في المخزن الرئيسي؛ سيصبح رصيده سالباً بعد التحويل."}
                             </p>
                           )}
                         </div>
@@ -373,7 +371,7 @@ className={`rounded-xl border border-line p-3 ${
                           type="number"
                           min="0.001"
                           step="0.001"
-                          max={Math.min(row.remainingQuantity, row.availableQuantity)}
+                          max={row.remainingQuantity}
                           dir="ltr"
                           aria-label={`كمية ${row.name}`}
                           disabled={!row.selected}
@@ -456,11 +454,6 @@ className={`rounded-xl border border-line p-3 ${
                         type="number"
                         min="0.001"
                         step="0.001"
-                        max={
-                          mode === "direct" && stock
-                            ? Math.max(0, Number(stock.quantity))
-                            : undefined
-                        }
                         value={line.quantity}
                         onChange={(event) =>
                           updateLine(line.key, { quantity: event.target.value })
@@ -471,10 +464,19 @@ className={`rounded-xl border border-line p-3 ${
                     </div>
                     {mode === "direct" ? (
                       item && (
-                        <p className="mt-2 text-xs text-muted">
-                          المتاح في الرئيسي: {quantity(stock?.quantity)}{" "}
-                          {item.stockUnit}
-                        </p>
+                        <>
+                          <p className="mt-2 text-xs text-muted">
+                            المتاح في الرئيسي: {quantity(stock?.quantity)}{" "}
+                            {item.stockUnit}
+                          </p>
+                          {Number(line.quantity) >
+                            Number(stock?.quantity ?? 0) && (
+                            <p className="mt-1 text-xs text-danger">
+                              الكمية أكبر من المتاح؛ سيصبح رصيد الرئيسي سالباً
+                              بعد التحويل.
+                            </p>
+                          )}
+                        </>
                       )
                     ) : (
                       item && (

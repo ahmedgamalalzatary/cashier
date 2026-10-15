@@ -23,6 +23,8 @@ export type ReceiveStockInput = MovementContext & {
 
 export type ConsumeStockInput = MovementContext & {
   allowNegative?: boolean;
+  /** Cost used for the part taken below zero; defaults to zero (sales). */
+  shortfallUnitCost?: string;
 };
 
 export type FifoAllocation = {
@@ -103,6 +105,10 @@ export class InventoryTransaction {
     const item = await this.repo.findItemForUpdate(itemId);
     if (!item) throw new HttpError(404, "الصنف غير موجود");
     if (!item.isActive) throw new HttpError(409, "الصنف موقوف");
+  }
+
+  lastKnownUnitCosts(itemIds: string[]) {
+    return this.repo.lastKnownUnitCosts(itemIds);
   }
 
   async receive(input: ReceiveStockInput) {
@@ -225,13 +231,16 @@ export class InventoryTransaction {
     }
     if (remaining > 0n) {
       const shortfall = formatScaled(remaining, 3);
+      const shortfallUnitCost = normalizeUnitCost(
+        input.shortfallUnitCost ?? "0.000000",
+      );
       const movementId = await this.repo.createMovement({
         itemId: input.itemId,
         warehouse: input.warehouse,
         batchId: null,
         movementType: input.movementType,
         quantity: formatScaled(-remaining, 3),
-        unitCost: "0.000000",
+        unitCost: shortfallUnitCost,
         referenceType: input.referenceType ?? null,
         referenceId: input.referenceId ?? null,
         notes: input.notes ?? null,
@@ -241,8 +250,10 @@ export class InventoryTransaction {
         batchId: null,
         movementId,
         quantity: shortfall,
-        unitCost: "0.000000",
+        unitCost: shortfallUnitCost,
       });
+      totalCostAtScaleNine +=
+        remaining * decimalToScaled(shortfallUnitCost, 6);
     }
 
     return {

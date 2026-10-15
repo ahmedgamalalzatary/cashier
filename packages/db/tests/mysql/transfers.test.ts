@@ -1,13 +1,14 @@
 import { beforeEach, it, testBranchValues } from "../support/ids.js";
 import { describe, expect } from "vitest";
 import request from "supertest";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { createApp } from "../../../../apps/api/src/app.js";
 import {
   categories,
   items,
   stockBatches,
   stockMovements,
+  suppliers,
   transferRequests,
 } from "@cashier/db";
 import { appOptions, db, nextTestItemCode } from "../support/api-setup.js";
@@ -88,6 +89,29 @@ async function createRequest(
       notes: "احتياج الوردية",
       lines: [{ itemId, quantity }],
     });
+}
+
+/** Buys `quantity` of an item at `unitPrice` straight into the main warehouse. */
+async function buyIntomain(itemId: string, quantity: number, unitPrice: number) {
+  const [supplier] = await db
+    .insert(suppliers)
+    .values(testBranchValues({ name: "مورد" }))
+    .$returningId();
+  const response = await request(app())
+    .post("/api/purchases")
+    .set(adminAuthorization)
+    .send({
+      clientRequestId: crypto.randomUUID(),
+      supplierId: supplier.id,
+      invoiceNumber: null,
+      purchasedAt: "2026-07-21",
+      paidAmount: 0,
+      notes: null,
+      lines: [
+        { itemId, quantity, unitMode: "stock", unitPrice, toCafeQuantity: 0 },
+      ],
+    });
+  expect(response.status).toBe(201);
 }
 
 describe("cafe transfer requests and transfers", () => {
@@ -269,7 +293,7 @@ describe("cafe transfer requests and transfers", () => {
     });
   });
 
-  it("rejects insufficient approvals atomically and leaves the request pending", async () => {
+  it("approves above the balance, taking main below zero at the last known cost", async () => {
     const itemId = await createItem();
     const batchId = await receiveMainBatch(
       itemId,
@@ -284,24 +308,98 @@ describe("cafe transfer requests and transfers", () => {
       .set(adminAuthorization)
       .send({ lines: [{ itemId, quantity: 3 }] });
 
-    expect(approved.status).toBe(409);
-    const detail = await request(app())
-      .get(`/api/transfers/requests/${created.body.id}`)
-      .set(cashierAuthorization);
-    expect(detail.body.status).toBe("pending");
-    expect(
-      await request(app()).get("/api/transfers").set(cashierAuthorization),
-    ).toMatchObject({ status: 200, body: [] });
+    expect(approved.status).toBe(201);
     const [batch] = await db
       .select()
       .from(stockBatches)
       .where(eq(stockBatches.id, batchId));
-    expect(batch.remainingQuantity).toBe("2.000");
-    const cafeMovements = await db
+    expect(batch.remainingQuantity).toBe("0.000");
+    const cafeBatches = await db
+      .select()
+      .from(stockBatches)
+      .where(
+        and(
+          eq(stockBatches.itemId, itemId),
+          eq(stockBatches.warehouse, "cafe"),
+        ),
+      )
+      .orderBy(stockBatches.id);
+    expect(cafeBatches).toEqual([
+      expect.objectContaining({
+        initialQuantity: "2.000",
+        unitCost: "10.000000",
+        sourceType: "transfer_in",
+      }),
+      expect.objectContaining({
+        initialQuantity: "1.000",
+        unitCost: "10.000000",
+        sourceType: "transfer_in",
+      }),
+    ]);
+    // the part with no main batch is recorded as a negative main movement
+    const [mainDeficit] = await db
       .select()
       .from(stockMovements)
-      .where(eq(stockMovements.warehouse, "cafe"));
-    expect(cafeMovements).toHaveLength(0);
+      .where(
+        and(
+          eq(stockMovements.itemId, itemId),
+          eq(stockMovements.warehouse, "main"),
+          isNull(stockMovements.batchId),
+        ),
+      );
+    expect(mainDeficit).toMatchObject({ quantity: "-1.000", batchId: null });
+
+    const detail = await request(app())
+      .get(`/api/transfers/${approved.body.transferId}`)
+      .set(cashierAuthorization);
+    expect(detail.body).toMatchObject({
+      isNegativeStock: true,
+      totalCost: "30.00",
+    });
+    expect(detail.body.lines).toEqual([
+      expect.objectContaining({
+        quantity: "2.000",
+        unitCost: "10.000000",
+        sourceBatchId: batchId,
+      }),
+      expect.objectContaining({
+        quantity: "1.000",
+        unitCost: "10.000000",
+        sourceBatchId: null,
+      }),
+    ]);
+  });
+
+  it("settles the main shortage on the next purchase without touching the transfer cost", async () => {
+    const itemId = await createItem();
+    await receiveMainBatch(
+      itemId,
+      "2.000",
+      "10.000000",
+      new Date("2026-07-19T00:00:00.000Z"),
+    );
+    const created = await createRequest(cashierAuthorization, itemId, 3);
+    const approved = await request(app())
+      .post(`/api/transfers/requests/${created.body.id}/approve`)
+      .set(adminAuthorization)
+      .send({ lines: [{ itemId, quantity: 3 }] });
+    expect(approved.status).toBe(201);
+
+    await buyIntomain(itemId, 1, 25);
+
+    const mainStock = await request(app())
+      .get("/api/inventory/main/stock")
+      .set(adminAuthorization);
+    expect(mainStock.body[0]).toMatchObject({ itemId, quantity: "0.000" });
+
+    const detail = await request(app())
+      .get(`/api/transfers/${approved.body.transferId}`)
+      .set(cashierAuthorization);
+    expect(detail.body.totalCost).toBe("30.00");
+    expect(detail.body.lines[1]).toMatchObject({
+      quantity: "1.000",
+      unitCost: "10.000000",
+    });
   });
 
   it("rejects approval when it omits an originally requested item", async () => {

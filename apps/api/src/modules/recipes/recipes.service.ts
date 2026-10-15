@@ -215,6 +215,9 @@ export class RecipesService {
       });
 
       let exactTotalCost = 0n;
+      const lastCosts = await inventory.lastKnownUnitCosts(
+        scaledIngredients.map((ingredient) => ingredient.itemId),
+      );
       for (const ingredient of scaledIngredients) {
         const consumed = await inventory.consume({
           itemId: ingredient.itemId,
@@ -224,11 +227,10 @@ export class RecipesService {
           referenceType: 'preparation',
           referenceId: preparationId,
           occurredAt,
+          allowNegative: true,
+          shortfallUnitCost: lastCosts.get(ingredient.itemId) ?? '0.000000',
         });
         for (const allocation of consumed.allocations) {
-          if (allocation.batchId === null) {
-            throw new HttpError(409, 'الرصيد المتاح لا يكفي');
-          }
           const allocationCost = allocationCostAtScaleNine(allocation);
           exactTotalCost += allocationCost;
           await repo.createPreparationAllocation({
@@ -263,8 +265,12 @@ export class RecipesService {
     });
   }
 
-  listPreparations() {
-    return this.repo.listPreparations();
+  async listPreparations() {
+    const rows = await this.repo.listPreparations();
+    return rows.map((row) => ({
+      ...row,
+      isNegativeStock: Boolean(row.isNegativeStock),
+    }));
   }
 
   async getPreparation(id: string) {
@@ -272,6 +278,7 @@ export class RecipesService {
     if (!row) throw new HttpError(404, 'عملية التحضير غير موجودة');
     return {
       ...row,
+      isNegativeStock: Boolean(row.isNegativeStock),
       allocations: await this.repo.listPreparationAllocations(id),
     };
   }
