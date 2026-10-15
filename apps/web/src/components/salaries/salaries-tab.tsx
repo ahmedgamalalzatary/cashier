@@ -1,11 +1,13 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Banknote, Plus } from "lucide-react";
-import type { SalaryMonth } from "@cashier/shared";
+import { flushSync } from "react-dom";
+import { Banknote, Plus, Printer } from "lucide-react";
+import type { SalaryMonth, SalaryPayment } from "@cashier/shared";
 import { DATA_CHANGED_EVENT } from "@/services/backup-service";
 import { Button } from "@cashier/web-core/components/ui/button";
 import { ConfirmDialog } from "@cashier/web-core/components/ui/confirm-dialog";
 import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
+import { IconButton } from "@cashier/web-core/components/ui/icon-button";
 import { PageHeader } from "@cashier/web-core/components/ui/page-header";
 import { Modal } from "@cashier/web-core/components/ui/modal";
 import { SelectField } from "@cashier/web-core/components/ui/select-field";
@@ -13,6 +15,8 @@ import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/compone
 import { Table } from "@cashier/web-core/components/ui/table";
 import { cairoCalendarDate } from "@cashier/web-core/lib/cairo-date";
 import { formatMoney } from "@cashier/web-core/lib/format";
+import { PrintSlip } from "@/components/print/print-slip";
+import { SalaryPayslip } from "@/components/salaries/salary-payslip";
 import {
   payConfirmationText,
   salaryBlockedLabel,
@@ -47,6 +51,7 @@ export default function SalariesTab({
     [error, setError] = useState("");
   const [paying, setPaying] = useState<Row | null>(null);
   const [payingError, setPayingError] = useState("");
+  const [printing, setPrinting] = useState<SalaryPayment | null>(null);
   const [logging, setLogging] = useState(false);
   const [formError, setFormError] = useState("");
   const clearForm = () => {
@@ -114,6 +119,13 @@ export default function SalariesTab({
     } finally {
       setSaving(false);
     }
+  }
+
+  function printPayslip(payment: SalaryPayment) {
+    // The slip must be on the page before the print dialog reads it.
+    flushSync(() => setPrinting(payment));
+    window.print();
+    setPrinting(null);
   }
 
   const columns: DataColumn<Row>[] = [
@@ -200,7 +212,15 @@ export default function SalariesTab({
       header: "الحالة",
       cell: (e) =>
         e.payment ? (
-          <span className="text-success">تم الصرف</span>
+          <span className="inline-flex items-center gap-2">
+            <span className="text-success">تم الصرف</span>
+            <IconButton
+              title={`طباعة قسيمة ${e.employeeName}`}
+              onClick={() => printPayslip(e.payment!)}
+            >
+              <Printer className="size-4" />
+            </IconButton>
+          </span>
         ) : (
           <Button
             size="sm"
@@ -397,6 +417,12 @@ export default function SalariesTab({
           setPayingError("");
         }}
       />
+
+      {printing && (
+        <PrintSlip>
+          <SalaryPayslip payment={printing} />
+        </PrintSlip>
+      )}
     </div>
   );
 }

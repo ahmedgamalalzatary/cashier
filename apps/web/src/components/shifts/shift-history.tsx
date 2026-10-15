@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
+import { Printer } from "lucide-react";
 import type { Shift, ShiftEventAction } from "@cashier/shared";
 import { Button } from "@cashier/web-core/components/ui/button";
+import { IconButton } from "@cashier/web-core/components/ui/icon-button";
 import { Table } from "@cashier/web-core/components/ui/table";
 import { Badge } from "@cashier/web-core/components/ui/badge";
 import { formatMoney } from "@cashier/web-core/lib/format";
+import { PrintSlip } from "@/components/print/print-slip";
+import { ShiftCloseReport } from "./shift-close-report";
 import { listShifts } from "../../services/shifts-service";
 import { workedLabel } from "../../models/home-model";
 
@@ -35,6 +40,7 @@ export function ShiftHistory({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retryVersion, setRetryVersion] = useState(0);
+  const [printing, setPrinting] = useState<Shift | null>(null);
   useEffect(() => {
     let cancelled = false;
     listShifts({ limit: PAGE_SIZE, offset })
@@ -63,6 +69,13 @@ export function ShiftHistory({
     setRows([]);
     setError("");
     setOffset(nextOffset);
+  }
+
+  function printNow(shift: Shift) {
+    // The slip must be on the page before the print dialog reads it.
+    flushSync(() => setPrinting(shift));
+    window.print();
+    setPrinting(null);
   }
 
   return (
@@ -195,7 +208,17 @@ export function ShiftHistory({
                         ))}
                       </ol>
                     </details>
-                    {renderActions?.(shift)}
+                    <div className="mt-2 flex gap-1">
+                      {shift.status === "closed" && (
+                        <IconButton
+                          title={`طباعة تقرير الوردية #${shift.id}`}
+                          onClick={() => printNow(shift)}
+                        >
+                          <Printer className="size-4" />
+                        </IconButton>
+                      )}
+                      {renderActions?.(shift)}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -222,6 +245,11 @@ export function ShiftHistory({
           التالي
         </Button>
       </div>
+      {printing && (
+        <PrintSlip>
+          <ShiftCloseReport shift={printing} />
+        </PrintSlip>
+      )}
     </section>
   );
 }

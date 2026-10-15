@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { Printer } from "lucide-react";
 import type { Shift } from "@cashier/shared";
 import { shiftAutoCloseWarning } from "@cashier/shared";
 import { Button } from "@cashier/web-core/components/ui/button";
 import { Modal } from "@cashier/web-core/components/ui/modal";
 import { ShiftActionModal } from "./shift-action-modal";
+import { ShiftCloseReport } from "./shift-close-report";
 import { ShiftHistory } from "./shift-history";
 import { closeShift, openShift } from "../../services/shifts-service";
 
@@ -21,6 +23,7 @@ export function CashierShiftControls({
   const [action, setAction] = useState<
     { mode: "open" } | { mode: "close"; shift: Shift } | null
   >(null);
+  const [closed, setClosed] = useState<Shift | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const autoCloseWarning = shiftAutoCloseWarning(current);
 
@@ -58,8 +61,12 @@ export function CashierShiftControls({
               const opened = await openShift(values.openingFloat!);
               onChanged(opened);
             } else {
-              await closeShift(action.shift.id, values.actualCash!);
+              const report = await closeShift(
+                action.shift.id,
+                values.actualCash!,
+              );
               onChanged(null);
+              setClosed(report);
             }
             setAction(null);
           }}
@@ -73,6 +80,22 @@ export function CashierShiftControls({
           onClose={() => setHistoryOpen(false)}
         >
           <ShiftHistory />
+        </Modal>
+      )}
+      {closed && (
+        <Modal
+          open
+          title="تم إغلاق الوردية"
+          onClose={() => setClosed(null)}
+          panelClassName="pos-receipt-dialog"
+        >
+          <ShiftCloseReport shift={closed} />
+          <Button
+            className="mt-4 w-full justify-center"
+            onClick={() => window.print()}
+          >
+            <Printer className="size-4" /> طباعة تقرير الوردية
+          </Button>
         </Modal>
       )}
       </div>

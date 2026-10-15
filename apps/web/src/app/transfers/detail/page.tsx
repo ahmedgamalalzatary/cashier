@@ -2,12 +2,16 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { Printer } from "lucide-react";
 import type { TransferDetail } from "@cashier/shared";
 import { PageHeader } from "@cashier/web-core/components/ui/page-header";
+import { Button } from "@cashier/web-core/components/ui/button";
 import { Stat, StatStrip } from "@cashier/web-core/components/ui/stat";
 import { Table } from "@cashier/web-core/components/ui/table";
 import { ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
 import { formatMoney, itemLabel } from "@cashier/web-core/lib/format";
+import { PrintSlip } from "@/components/print/print-slip";
+import { TransferDocument } from "@/components/transfers/transfer-document";
 import { getTransfer } from "@/services/transfers-service";
 
 export default function TransferDetailPage() {
@@ -43,6 +47,11 @@ function TransferDetailView() {
       <PageHeader
         back={{ href: "/transfers", label: "رجوع إلى التحويلات" }}
         title={`تحويل مخزني #${transfer.id}`}
+        actions={
+          <Button variant="secondary" onClick={() => window.print()}>
+            <Printer className="size-4" /> طباعة المستند
+          </Button>
+        }
       />
 
       <StatStrip className="mb-5">
@@ -107,6 +116,10 @@ function TransferDetailView() {
           </p>
         </div>
       </div>
+
+      <PrintSlip>
+        <TransferDocument transfer={transfer} />
+      </PrintSlip>
     </div>
   );
 }

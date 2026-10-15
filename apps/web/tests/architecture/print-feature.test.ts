@@ -10,6 +10,8 @@ describe("print wiring", () => {
     ["src/app/suppliers/statement/page.tsx", "SupplierStatementSlip"],
     ["src/app/purchases/detail/page.tsx", "PurchaseInvoiceSlip"],
     ["src/app/stocktakes/page.tsx", "StocktakeCountSlip"],
+    ["src/app/transfers/detail/page.tsx", "TransferDocument"],
+    ["src/components/salaries/salaries-tab.tsx", "SalaryPayslip"],
     ["src/components/orders/external-orders-panel.tsx", "ExternalOrderSlip"],
   ])("%s prints its own slip", (relative, slip) => {
     const source = read(relative);
@@ -51,6 +53,8 @@ describe("A4 printing", () => {
     ["src/components/purchases/purchase-invoice-slip.tsx", "A4Document"],
     ["src/components/suppliers/supplier-statement-slip.tsx", "A4Document"],
     ["src/components/stocktakes/stocktake-count-slip.tsx", "A4Document"],
+    ["src/components/transfers/transfer-document.tsx", "A4Document"],
+    ["src/components/salaries/salary-payslip.tsx", "A4Document"],
     ["src/components/recipes/cost-card-document.tsx", "A4Document"],
   ])("%s prints through the shared A4 layout", (relative, marker) => {
     expect(read(relative)).toContain(marker);

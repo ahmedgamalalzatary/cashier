@@ -17,3 +17,27 @@ describe("shifts feature boundaries", () => {
     expect(page).toContain("activeShift.totals.wasteEntries");
   });
 });
+
+describe("shift close report", () => {
+  const read = (relative: string) =>
+    fs.readFileSync(path.resolve(process.cwd(), relative), "utf8");
+
+  it("prints from the cashier close flow after closing", () => {
+    const controls = read("src/components/shifts/cashier-shift-controls.tsx");
+    expect(controls).toContain("ShiftCloseReport");
+    expect(controls).toContain("window.print()");
+  });
+
+  it("prints per shift from the shift history", () => {
+    const history = read("src/components/shifts/shift-history.tsx");
+    expect(history).toContain("<ShiftCloseReport");
+    expect(history).toContain("<PrintSlip");
+    expect(history).toContain("window.print()");
+  });
+
+  it("prints the report on the 80mm receipt page", () => {
+    expect(read("src/components/shifts/shift-close-report.tsx")).toContain(
+      "Slip",
+    );
+  });
+});
