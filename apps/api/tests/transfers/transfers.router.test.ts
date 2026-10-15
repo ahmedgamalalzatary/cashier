@@ -144,6 +144,55 @@ describe("transfer controller wiring", () => {
     expect(direct.body).toEqual({ transferId: testId(33) });
   });
 
+  it("strips transfer costs for cashiers and keeps them for admins", async () => {
+    const service = {
+      listTransfers: vi.fn(async () => [{ id: testId(1), totalCost: "30.00" }]),
+      getTransfer: vi.fn(async () => ({
+        id: testId(1),
+        totalCost: "30.00",
+        lines: [
+          {
+            id: testId(2),
+            quantity: "2.000",
+            unitCost: "10.000000",
+            lineCost: "20.00",
+          },
+        ],
+      })),
+    } as unknown as TransfersService;
+
+    const cashierList = await request(appWithService(service)).get("/");
+    expect(cashierList.body).toEqual([{ id: testId(1) }]);
+
+    const cashierDetail = await request(appWithService(service)).get(
+      "/00000000-0000-7000-8000-000000000001",
+    );
+    expect(cashierDetail.body).toEqual({
+      id: testId(1),
+      lines: [{ id: testId(2), quantity: "2.000" }],
+    });
+
+    const adminApp = appWithStubs(new RealTransfersController(service), adminUser);
+    const adminList = await request(adminApp).get("/");
+    expect(adminList.body).toEqual([{ id: testId(1), totalCost: "30.00" }]);
+
+    const adminDetail = await request(adminApp).get(
+      "/00000000-0000-7000-8000-000000000001",
+    );
+    expect(adminDetail.body).toEqual({
+      id: testId(1),
+      totalCost: "30.00",
+      lines: [
+        {
+          id: testId(2),
+          quantity: "2.000",
+          unitCost: "10.000000",
+          lineCost: "20.00",
+        },
+      ],
+    });
+  });
+
   it("maps duplicate lines to 400 and unknown ids to 404", async () => {
     const service = {
       createRequest: vi.fn(async () => testId(11)),

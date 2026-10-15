@@ -1,4 +1,5 @@
 import type { PurchaseInvoiceDetail } from "@cashier/shared";
+import { cairoCalendarLabel } from "@cashier/web-core/lib/cairo-date";
 import { formatMoney, itemLabel } from "@cashier/web-core/lib/format";
 import { A4Document } from "@/components/print/a4-document";
 import { slipQuantity } from "@/components/print/print-slip";
@@ -21,7 +22,7 @@ export function PurchaseInvoiceSlip({
           </b>,
         ],
         ["المورد", invoice.supplierName],
-        ["تاريخ الشراء", <span key="date" className="tnum">{invoice.purchasedAt}</span>],
+        ["تاريخ الشراء", <span key="date" className="tnum">{cairoCalendarLabel(invoice.purchasedAt)}</span>],
         ["سجلها", invoice.createdByName],
       ]}
       totals={[

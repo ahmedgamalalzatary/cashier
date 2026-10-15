@@ -333,12 +333,21 @@ export class TransfersRepository {
         totalCost,
         isNegativeStock,
         createdAt: transfers.createdAt,
+        requestCreatedAt: transferRequests.createdAt,
+        requestReviewedAt: transferRequests.reviewedAt,
       })
       .from(transfers)
       .innerJoin(transferCreator, eq(transfers.createdBy, transferCreator.id))
       .innerJoin(
         transferApprover,
         eq(transfers.approvedBy, transferApprover.id),
+      )
+      .leftJoin(
+        transferRequests,
+        branchCondition(
+          transferRequests,
+          eq(transfers.requestId, transferRequests.id),
+        ),
       )
       .where(branchCondition(transfers, eq(transfers.id, id)));
     return row;

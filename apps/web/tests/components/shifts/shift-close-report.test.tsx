@@ -1,6 +1,6 @@
 import { testId } from "@cashier/shared/test-support";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Shift } from "@cashier/shared";
 import { formatMoney } from "@cashier/web-core/lib/format";
 import { ShiftCloseReport } from "../../../src/components/shifts/shift-close-report";
@@ -67,5 +67,42 @@ describe("shift close report (80mm)", () => {
     // Counted cash and over/short are never assumed for an auto-close.
     expect(html.match(/لم يُعدّ/g)).toHaveLength(2);
     expect(html).not.toContain(formatMoney("1500.00"));
+  });
+
+  it("prints Cairo times whatever timezone the computer uses", async () => {
+    const original = process.env.TZ;
+    process.env.TZ = "America/New_York";
+    vi.resetModules();
+    try {
+      const { ShiftCloseReport: Report } = await import(
+        "../../../src/components/shifts/shift-close-report"
+      );
+      const shift = {
+        ...baseShift,
+        openedAt: "2026-07-01T22:30:00Z",
+        actualCash: "0.00",
+        expectedCash: "0.00",
+        overShort: "0.00",
+      } satisfies Shift;
+
+      const html = renderToStaticMarkup(<Report shift={shift} />);
+      const stamp = new Date("2026-07-01T22:30:00Z");
+      const cairo = new Intl.DateTimeFormat("ar-EG", {
+        timeZone: "Africa/Cairo",
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(stamp);
+      const newYork = new Intl.DateTimeFormat("ar-EG", {
+        timeZone: "America/New_York",
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(stamp);
+
+      // near midnight the Cairo day is already the 2nd of July
+      expect(html).toContain(cairo);
+      expect(html).not.toContain(newYork);
+    } finally {
+      process.env.TZ = original;
+    }
   });
 });

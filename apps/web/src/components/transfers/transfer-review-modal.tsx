@@ -16,6 +16,12 @@ import {
   rejectTransferRequest,
 } from "@/services/transfers-service";
 
+const cairoDateTime = new Intl.DateTimeFormat("ar-EG", {
+  timeZone: "Africa/Cairo",
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
 export function TransferReviewModal({
   requestId,
   isAdmin,
@@ -103,7 +109,7 @@ export function TransferReviewModal({
             <div>
               <p className="font-medium">{request.requestedByName}</p>
               <p className="text-xs text-muted">
-                {new Date(request.createdAt).toLocaleString("ar-EG")}
+                {cairoDateTime.format(new Date(request.createdAt))}
               </p>
             </div>
             <StatusBadge status={request.status} />

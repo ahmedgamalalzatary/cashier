@@ -8,7 +8,7 @@ import type {
   Supplier,
   SupplierStatementMovement,
 } from "@cashier/shared";
-import { cairoCalendarDate } from "@cashier/web-core/lib/cairo-date";
+import { cairoCalendarDate, cairoCalendarLabel } from "@cashier/web-core/lib/cairo-date";
 import { formatMoney } from "@cashier/web-core/lib/format";
 import { A4Document } from "../../../src/components/print/a4-document";
 import { PurchaseInvoiceSlip } from "../../../src/components/purchases/purchase-invoice-slip";
@@ -33,7 +33,8 @@ describe("shared A4 document layout", () => {
     printable(html);
     expect(html).toContain("الكافيه");
     expect(html).toContain("فاتورة شراء");
-    expect(html).toContain(cairoCalendarDate());
+    expect(html).toContain(cairoCalendarLabel());
+    expect(html).not.toContain(cairoCalendarDate());
   });
 
   it("shows facts, totals and signature lines when given", () => {
@@ -111,6 +112,9 @@ describe("A4 print documents", () => {
     expect(html).toContain(formatMoney("200.00"));
     expect(html).toContain(formatMoney("150.00"));
     expect(html).toContain("تسليم صباحي");
+    // the purchase date prints in Arabic, not raw ISO
+    expect(html).toContain(cairoCalendarLabel("2026-10-01"));
+    expect(html).not.toContain("2026-10-01");
   });
 
   it("prints a supplier statement as an A4 page with its balances and movements", () => {
@@ -160,7 +164,9 @@ describe("A4 print documents", () => {
     expect(html).toContain("01111111111");
     expect(html).toContain("فاتورة شراء INV-7");
     expect(html).toContain("دفعة نقدية");
-    expect(html).toContain("2026-10-02");
+    // both movement dates print in Arabic, not raw ISO
+    expect(html).toContain(cairoCalendarLabel("2026-10-02"));
+    expect(html).not.toContain("2026-10-02");
     expect(html).toContain(formatMoney("350.00"));
     expect(html).toContain("الرصيد المستحق");
   });

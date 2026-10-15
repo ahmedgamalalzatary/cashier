@@ -11,13 +11,35 @@ describe("print wiring", () => {
     ["src/app/purchases/detail/page.tsx", "PurchaseInvoiceSlip"],
     ["src/app/stocktakes/page.tsx", "StocktakeCountSlip"],
     ["src/app/transfers/detail/page.tsx", "TransferDocument"],
-    ["src/components/salaries/salaries-tab.tsx", "SalaryPayslip"],
-    ["src/components/orders/external-orders-panel.tsx", "ExternalOrderSlip"],
   ])("%s prints its own slip", (relative, slip) => {
     const source = read(relative);
     expect(source).toContain(slip);
     expect(source).toContain("<PrintSlip");
     expect(source).toContain("window.print()");
+  });
+
+  it.each([
+    ["src/components/salaries/salaries-tab.tsx", "SalaryPayslip"],
+    ["src/components/orders/external-orders-panel.tsx", "ExternalOrderSlip"],
+    ["src/components/shifts/shift-history.tsx", "ShiftCloseReport"],
+    ["src/app/orders/page.tsx", "OrderReceipt"],
+  ])(
+    "%s prints its own slip through the shared print lifecycle",
+    (relative, slip) => {
+      const source = read(relative);
+      expect(source).toContain(slip);
+      expect(source).toContain("<PrintSlip");
+      expect(source).toContain("usePrintSlip");
+    },
+  );
+
+  it("keeps the printed slip mounted until the print lifecycle ends", () => {
+    // A slip is removed on `afterprint`, never the moment window.print()
+    // returns: a browser may still be reading the DOM while the dialog shows.
+    const hook = read("src/components/print/use-print-slip.ts");
+    expect(hook).toContain('addEventListener("afterprint"');
+    expect(hook).toContain("window.print()");
+    expect(hook).not.toMatch(/window\.print\(\);\s*setPrinting\(null\)/);
   });
 
   it("prints only the slip, so the hidden page does not feed blank paper", () => {

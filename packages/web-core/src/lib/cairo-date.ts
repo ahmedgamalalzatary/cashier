@@ -40,3 +40,23 @@ export function cairoDayLabel(date = new Date()) {
     month: "long",
   }).format(date);
 }
+
+const cairoDayMonthYear = new Intl.DateTimeFormat("ar-EG", {
+  timeZone: "Africa/Cairo",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+
+/**
+ * Arabic calendar day for display, e.g. ١٥ أكتوبر ٢٠٢٦. A "YYYY-MM-DD" value is
+ * a calendar date with no timezone, so it is anchored at noon UTC: that keeps
+ * it on the same Cairo day instead of sliding to the day before.
+ */
+export function cairoCalendarLabel(value: Date | string = new Date()) {
+  return cairoDayMonthYear.format(
+    typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T12:00:00Z`)
+      : new Date(value),
+  );
+}

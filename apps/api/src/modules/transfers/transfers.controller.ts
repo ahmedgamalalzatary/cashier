@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { idParam } from "@cashier/server-core";
+import { withoutCostFieldsFor } from "../../lib/strip-costs.js";
 import type { TransfersService } from "./transfers.service.js";
 import {
   transferApprovalInput,
@@ -46,12 +47,19 @@ export class TransfersController {
     res.json({ ok: true });
   };
 
-  listTransfers = async (_req: Request, res: Response) => {
-    res.json(await this.service.listTransfers());
+  listTransfers = async (req: Request, res: Response) => {
+    res.json(
+      withoutCostFieldsFor(req.user?.role, await this.service.listTransfers()),
+    );
   };
 
   getTransfer = async (req: Request, res: Response) => {
-    res.json(await this.service.getTransfer(idParam.parse(req.params.id)));
+    res.json(
+      withoutCostFieldsFor(
+        req.user?.role,
+        await this.service.getTransfer(idParam.parse(req.params.id)),
+      ),
+    );
   };
 
   createDirect = async (req: Request, res: Response) => {

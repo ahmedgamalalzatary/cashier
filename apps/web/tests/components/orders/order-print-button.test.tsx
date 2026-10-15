@@ -132,10 +132,11 @@ describe("printing a receipt from an order row", () => {
 
   it("keeps one active receipt for the whole list and clears it after printing", () => {
     // one printing state at page level, not inside each row's button
-    expect(page).toContain("const [printing, setPrinting]");
+    expect(page).toContain("usePrintSlip<OrderDetail>()");
     expect(page).toContain("<OrderPrintButton");
     expect(page.match(/<PrintSlip>/g)?.length ?? 0).toBe(1);
-    expect(page).toContain("setPrinting(null)");
+    // the shared hook clears on afterprint, never right after window.print()
+    expect(page).not.toContain("setPrinting(null)");
   });
 
   it("forgets the print banner once a later print reaches the dialog", () => {

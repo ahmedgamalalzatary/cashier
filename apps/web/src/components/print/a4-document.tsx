@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode } from "react";
-import { cairoCalendarDate } from "@cashier/web-core/lib/cairo-date";
+import { cairoCalendarLabel } from "@cashier/web-core/lib/cairo-date";
 
 export type A4Fact = [label: string, value: ReactNode];
 
@@ -32,7 +32,7 @@ export function A4Document({
       <header className="mb-4 border-b-2 border-ink/40 pb-3 text-center">
         <p className="text-2xl font-bold">الكافيه</p>
         <p className="mt-1 text-sm font-medium">{title}</p>
-        <p className="tnum mt-1 text-xs text-muted">{cairoCalendarDate()}</p>
+        <p className="tnum mt-1 text-xs text-muted">{cairoCalendarLabel()}</p>
       </header>
       {facts && <A4Facts facts={facts} />}
       {children}

@@ -32,7 +32,7 @@ describe("shift close report", () => {
     const history = read("src/components/shifts/shift-history.tsx");
     expect(history).toContain("<ShiftCloseReport");
     expect(history).toContain("<PrintSlip");
-    expect(history).toContain("window.print()");
+    expect(history).toContain("usePrintSlip");
   });
 
   it("prints the report on the 80mm receipt page", () => {

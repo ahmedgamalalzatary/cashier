@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { flushSync } from "react-dom";
 import type { ExternalOrderSummary, ExternalOrdersPage } from "@cashier/shared";
 import { Clock3, Coins, Printer, ReceiptText, Scissors, Search } from "lucide-react";
 import { Badge } from "@cashier/web-core/components/ui/badge";
@@ -12,6 +11,7 @@ import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/compone
 import { cairoCalendarDate } from "@cashier/web-core/lib/cairo-date";
 import { formatMoney } from "@cashier/web-core/lib/format";
 import { PrintSlip } from "@/components/print/print-slip";
+import { usePrintSlip } from "@/components/print/use-print-slip";
 import { ExternalOrderSlip } from "./external-order-slip";
 import {
   externalOrderDate,
@@ -122,12 +122,7 @@ export function ExternalOrdersPanelView({
   pagination?: ExternalOrdersPage["pagination"];
   onPageChange?: (page: number) => void;
 }) {
-  const [printing, setPrinting] = useState<ExternalOrderSummary | null>(null);
-  const print = (order: ExternalOrderSummary) => {
-    // The slip must be on the page before the print dialog reads it.
-    flushSync(() => setPrinting(order));
-    window.print();
-  };
+  const { printing, print } = usePrintSlip<ExternalOrderSummary>();
   const summary = totals ?? {
     count: orders.length,
     sales: orders

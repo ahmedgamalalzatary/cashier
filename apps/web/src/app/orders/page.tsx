@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { flushSync } from "react-dom";
 import Link from "next/link";
 import type { OrderDetail, OrderSummary } from "@cashier/shared";
 import {
@@ -19,6 +18,7 @@ import { OrderPrintButton } from "@/components/orders/order-print-button";
 import { OrderWasteModal } from "@/components/orders/order-waste-modal";
 import { RefundOrderModal } from "@/components/refunds/refund-order-modal";
 import { PrintSlip } from "@/components/print/print-slip";
+import { usePrintSlip } from "@/components/print/use-print-slip";
 import { OrderReceipt } from "@/components/pos/order-receipt";
 import { IconButton } from "@cashier/web-core/components/ui/icon-button";
 import { Badge } from "@cashier/web-core/components/ui/badge";
@@ -58,18 +58,15 @@ export default function OrdersPage() {
   const [day, setDay] = useState("");
   const [error, setError] = useState("");
   const [printError, setPrintError] = useState("");
-  const [printing, setPrinting] = useState<OrderDetail | null>(null);
+  const { printing, print } = usePrintSlip<OrderDetail>();
   const [refundingId, setRefundingId] = useState<string | null>(null);
   const [wastingOrder, setWastingOrder] = useState<OrderSummary | null>(null);
 
   // The list owns a single receipt so a second print cannot leave the first
-  // slip behind; the dialog reads it, then this clears.
+  // slip behind; the dialog reads it, then this clears on afterprint.
   const printNow = (order: OrderDetail) => {
     setPrintError("");
-    // The slip must be on the page before the print dialog reads it.
-    flushSync(() => setPrinting(order));
-    window.print();
-    setPrinting(null);
+    print(order);
   };
 
   const load = () =>

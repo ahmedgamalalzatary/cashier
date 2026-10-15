@@ -448,7 +448,8 @@ export type TransferSummary = {
   approvedBy: string;
   approvedByName: string;
   notes: string | null;
-  totalCost: string;
+  /** Admin eyes only (§2): the response omits it for a cashier. */
+  totalCost?: string;
   /** True when the transfer took main stock below zero. */
   isNegativeStock: boolean;
   /** ISO timestamp. */
@@ -462,14 +463,20 @@ export type TransferLine = {
   itemName: string;
   stockUnit: string;
   quantity: string;
-  unitCost: string;
-  lineCost: string;
+  /** Admin eyes only (§2): the response omits it for a cashier. */
+  unitCost?: string;
+  /** Admin eyes only (§2): the response omits it for a cashier. */
+  lineCost?: string;
   /** Null when the line's shortfall took main stock below zero. */
   sourceBatchId: string | null;
   cafeBatchId: string;
 };
 
 export type TransferDetail = TransferSummary & {
+  /** When the linked request was submitted; null for a direct transfer. */
+  requestCreatedAt: string | null;
+  /** When the linked request was approved; null for a direct transfer. */
+  requestReviewedAt: string | null;
   lines: TransferLine[];
 };
 

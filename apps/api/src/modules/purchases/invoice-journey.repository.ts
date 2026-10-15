@@ -100,7 +100,8 @@ export class InvoiceJourneyRepository implements JourneySource {
   }
 
   async outflows(ids: string[]): Promise<JourneyOutflows> {
-    const [transfers, used, sold, lost, settled] = await Promise.all([
+    const [transferRows, preparationRows, sold, lost, settled] =
+      await Promise.all([
       this.db
         .select({
           sourceBatchId: transferLines.sourceBatchId,
@@ -147,13 +148,18 @@ export class InvoiceJourneyRepository implements JourneySource {
             ),
           ),
         ),
-      // sales/shortages made before stock arrived, settled later by these batches
+      // Sales, shortages, transfers and preparations made before stock arrived,
+      // settled later by these batches. A settled deficit is followed into the
+      // batch the missing stock should have landed in: the cafe batch a transfer
+      // created, or the output batch a preparation produced.
       this.db
         .select({
           batchId: stockDeficitAllocations.batchId,
           quantity: stockDeficitAllocations.quantity,
           movementType: stockMovements.movementType,
           allocationId: orderLineAllocations.id,
+          cafeBatchId: transferLines.cafeBatchId,
+          preparationId: preparationAllocations.preparationId,
         })
         .from(stockDeficitAllocations)
         .innerJoin(
@@ -170,6 +176,33 @@ export class InvoiceJourneyRepository implements JourneySource {
             eq(orderLineAllocations.stockMovementId, stockMovements.id),
           ),
         )
+        .leftJoin(
+          transferLines,
+          branchCondition(
+            transferLines,
+            and(
+              eq(transferLines.transferId, stockMovements.referenceId),
+              isNull(transferLines.sourceBatchId),
+              eq(transferLines.itemId, stockMovements.itemId),
+              eq(transferLines.quantity, sql`-${stockMovements.quantity}`),
+            ),
+          ),
+        )
+        .leftJoin(
+          preparationAllocations,
+          branchCondition(
+            preparationAllocations,
+            and(
+              eq(preparationAllocations.preparationId, stockMovements.referenceId),
+              isNull(preparationAllocations.sourceBatchId),
+              eq(
+                preparationAllocations.ingredientItemId,
+                stockMovements.itemId,
+              ),
+              eq(preparationAllocations.quantity, sql`-${stockMovements.quantity}`),
+            ),
+          ),
+        )
         .where(
           branchCondition(
             stockDeficitAllocations,
@@ -178,6 +211,18 @@ export class InvoiceJourneyRepository implements JourneySource {
         ),
     ]);
 
+    const transfers: JourneyOutflows["transfers"] = transferRows.map((row) => ({
+      sourceBatchId: row.sourceBatchId,
+      cafeBatchId: row.cafeBatchId,
+      quantity: row.quantity,
+    }));
+    const preparations: JourneyOutflows["preparations"] = preparationRows.map(
+      (row) => ({
+        sourceBatchId: row.sourceBatchId,
+        preparationId: row.preparationId,
+        quantity: row.quantity,
+      }),
+    );
     const sales: JourneyOutflows["sales"] = sold.map((row) => ({
       batchId: row.batchId!,
       allocationId: row.allocationId,
@@ -193,24 +238,27 @@ export class InvoiceJourneyRepository implements JourneySource {
         sales.push({ batchId: row.batchId, allocationId: row.allocationId, quantity: row.quantity });
       } else if (row.movementType === "stocktake_shortage") {
         losses.push({ batchId: row.batchId, kind: "shortage", quantity: row.quantity });
+      } else if (row.movementType === "transfer_out" && row.cafeBatchId) {
+        // The incoming stock replaced a transfer that had taken main below
+        // zero; follow it into the cafe batch that transfer had already filled.
+        transfers.push({
+          sourceBatchId: row.batchId,
+          cafeBatchId: row.cafeBatchId,
+          quantity: row.quantity,
+        });
+      } else if (row.movementType === "preparation_out" && row.preparationId) {
+        // Same idea for an ingredient a preparation used before it arrived:
+        // follow it into the preparation's output batch.
+        preparations.push({
+          sourceBatchId: row.batchId,
+          preparationId: row.preparationId,
+          quantity: row.quantity,
+        });
       } else {
         throw new Error(`unexpected settled stock deficit: ${row.movementType}`);
       }
     }
-    return {
-      transfers: transfers.map((row) => ({
-        sourceBatchId: row.sourceBatchId,
-        cafeBatchId: row.cafeBatchId,
-        quantity: row.quantity,
-      })),
-      preparations: used.map((row) => ({
-        sourceBatchId: row.sourceBatchId,
-        preparationId: row.preparationId,
-        quantity: row.quantity,
-      })),
-      sales,
-      losses,
-    };
+    return { transfers, preparations, sales, losses };
   }
 
   async preparations(ids: string[]): Promise<JourneyPreparation[]> {

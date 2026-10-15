@@ -344,7 +344,22 @@ export async function traceInvoice(roots: JourneyBatch[], source: JourneySource)
     );
 
     for (const transfer of flows.transfers) {
-      children.push({ ...packet, batchId: transfer.cafeBatchId });
+      // A transfer fills its cafe batch with exactly `quantity` units, so that
+      // fraction of the packet rides along. It is the whole packet for a normal
+      // transfer, but only the settled share when this batch settled a transfer
+      // shortage that the cafe had already been given.
+      const cafeBatch = batches.get(transfer.cafeBatchId);
+      if (!cafeBatch) throw new Error(`stock batch ${transfer.cafeBatchId} not found`);
+      const portion = Fraction.decimal(transfer.quantity).div(
+        Fraction.decimal(cafeBatch.initialQuantity),
+      );
+      children.push({
+        batchId: transfer.cafeBatchId,
+        itemId: packet.itemId,
+        quantity: packet.quantity.mul(portion),
+        cost: packet.cost.mul(portion),
+        share: packet.share.mul(portion),
+      });
     }
 
     for (const used of flows.preparations) {
@@ -381,7 +396,18 @@ export async function traceInvoice(roots: JourneyBatch[], source: JourneySource)
       const allocation = sales.get(sale.allocationId);
       if (!allocation) throw new Error(`sale allocation ${sale.allocationId} not found`);
       const sold = amount(sale.quantity);
-      const revenue = saleShare(allocation, sold.cost, sold.units.mul(packet.share));
+      // The invoice's part of the line's price is its share of the line's
+      // *recorded* cost, so both sides of the ratio use the same basis: the
+      // batch's own cost (the estimate a settled shortage kept), never the
+      // later receipt's actual cost.
+      const recordedCost = sold.units
+        .mul(Fraction.decimal(batch.unitCost))
+        .mul(packet.share);
+      const revenue = saleShare(
+        allocation,
+        recordedCost,
+        sold.units.mul(packet.share),
+      );
       const product = productFor(packet, batch, allocation);
       addTo(line.sold, sold.quantity, sold.cost);
       addTo(product.sold, sold.quantity, sold.cost);
@@ -471,8 +497,9 @@ export async function traceInvoice(roots: JourneyBatch[], source: JourneySource)
 }
 
 /**
- * The invoice's part of a sale line's price: its cost share of the line's
- * known cost, or its quantity share when the line has no cost at all.
+ * The invoice's part of a sale line's price: its share of the line's *recorded*
+ * cost (the batch's own cost, so an estimate a settled shortage kept stays on
+ * the same basis), or its quantity share when the line has no cost at all.
  */
 function saleShare(
   allocation: JourneySaleAllocation,

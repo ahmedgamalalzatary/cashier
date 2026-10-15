@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { TransferDetail } from "@cashier/shared";
 import { itemLabel } from "@cashier/web-core/lib/format";
 import { A4Document } from "@/components/print/a4-document";
@@ -26,6 +27,26 @@ export function TransferDocument({ transfer }: { transfer: TransferDetail }) {
         ],
         ["صاحب الطلب", transfer.createdByName],
         ["اعتمد التحويل", transfer.approvedByName],
+        ...(transfer.requestCreatedAt
+          ? ([
+              [
+                "وقت الطلب",
+                <span key="requested" className="tnum">
+                  {cairoDateTime.format(new Date(transfer.requestCreatedAt))}
+                </span>,
+              ],
+            ] as [string, ReactNode][])
+          : []),
+        ...(transfer.requestReviewedAt
+          ? ([
+              [
+                "وقت الاعتماد",
+                <span key="reviewed" className="tnum">
+                  {cairoDateTime.format(new Date(transfer.requestReviewedAt))}
+                </span>,
+              ],
+            ] as [string, ReactNode][])
+          : []),
         [
           "وقت التنفيذ",
           <span key="time" className="tnum">

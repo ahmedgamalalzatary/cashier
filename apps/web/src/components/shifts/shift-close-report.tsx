@@ -3,6 +3,7 @@ import { formatMoney } from "@cashier/web-core/lib/format";
 import { Slip, SlipFacts, SlipTotals } from "@/components/print/print-slip";
 
 const dateTime = new Intl.DateTimeFormat("ar-EG", {
+  timeZone: "Africa/Cairo",
   dateStyle: "medium",
   timeStyle: "short",
 });

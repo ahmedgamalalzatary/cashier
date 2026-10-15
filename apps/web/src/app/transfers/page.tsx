@@ -19,7 +19,7 @@ import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data
 import { PageHeader } from "@cashier/web-core/components/ui/page-header";
 import { TabPanel, Tabs } from "@cashier/web-core/components/ui/tabs";
 import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
-import { formatMoney } from "@cashier/web-core/lib/format";
+import { formatOptionalMoney } from "@cashier/web-core/lib/format";
 import {
   getCafeWarehouseStock,
   getMainWarehouseStock,
@@ -216,12 +216,17 @@ function TransfersView() {
       header: "اعتمده",
       cell: (transfer) => transfer.approvedByName,
     },
-    {
-      key: "cost",
-      header: "التكلفة",
-      numeric: true,
-      cell: (transfer) => formatMoney(transfer.totalCost),
-    },
+    ...(isAdmin
+      ? [
+          {
+            key: "cost",
+            header: "التكلفة",
+            numeric: true,
+            cell: (transfer: TransferSummary) =>
+              formatOptionalMoney(transfer.totalCost),
+          },
+        ]
+      : []),
     {
       key: "flag",
       header: "الحالة",

@@ -1,4 +1,5 @@
 import type { Supplier, SupplierStatementMovement } from "@cashier/shared";
+import { cairoCalendarLabel } from "@cashier/web-core/lib/cairo-date";
 import { formatMoney } from "@cashier/web-core/lib/format";
 import { A4Document } from "@/components/print/a4-document";
 
@@ -49,7 +50,7 @@ export function SupplierStatementSlip({
               <td className="py-2 pe-2">
                 <span className="font-medium">{movement.description}</span>
                 <span className="tnum block text-xs text-muted">
-                  {movement.date}
+                  {cairoCalendarLabel(movement.date)}
                 </span>
               </td>
               <td className="tnum py-2 text-center">

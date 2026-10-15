@@ -258,7 +258,7 @@ describe("cafe transfer requests and transfers", () => {
 
     const detail = await request(app())
       .get(`/api/transfers/${approved.body.transferId}`)
-      .set(cashierAuthorization);
+      .set(adminAuthorization);
     expect(detail.status).toBe(200);
     expect(detail.body).toMatchObject({
       requestId: created.body.id,
@@ -266,6 +266,9 @@ describe("cafe transfer requests and transfers", () => {
       approvedByName: "مدير",
       totalCost: "60.00",
     });
+    // the original request and its approval carry their own times
+    expect(detail.body.requestCreatedAt).not.toBeNull();
+    expect(detail.body.requestReviewedAt).not.toBeNull();
     expect(detail.body.lines).toEqual([
       expect.objectContaining({
         itemId,
@@ -285,7 +288,7 @@ describe("cafe transfer requests and transfers", () => {
 
     const cafeStock = await request(app())
       .get("/api/inventory/cafe/stock")
-      .set(cashierAuthorization);
+      .set(adminAuthorization);
     expect(cafeStock.body[0]).toMatchObject({
       itemId,
       quantity: "4.000",
@@ -351,7 +354,7 @@ describe("cafe transfer requests and transfers", () => {
 
     const detail = await request(app())
       .get(`/api/transfers/${approved.body.transferId}`)
-      .set(cashierAuthorization);
+      .set(adminAuthorization);
     expect(detail.body).toMatchObject({
       isNegativeStock: true,
       totalCost: "30.00",
@@ -368,6 +371,21 @@ describe("cafe transfer requests and transfers", () => {
         sourceBatchId: null,
       }),
     ]);
+
+    // a cashier may read the transfer but must never receive its costs
+    const cashierDetail = await request(app())
+      .get(`/api/transfers/${approved.body.transferId}`)
+      .set(cashierAuthorization);
+    expect(cashierDetail.status).toBe(200);
+    expect(cashierDetail.body).not.toHaveProperty("totalCost");
+    expect(cashierDetail.body.lines[0]).not.toHaveProperty("unitCost");
+    expect(cashierDetail.body.lines[0]).not.toHaveProperty("lineCost");
+
+    const cashierList = await request(app())
+      .get("/api/transfers")
+      .set(cashierAuthorization);
+    expect(cashierList.status).toBe(200);
+    expect(cashierList.body[0]).not.toHaveProperty("totalCost");
   });
 
   it("settles the main shortage on the next purchase without touching the transfer cost", async () => {
@@ -394,7 +412,7 @@ describe("cafe transfer requests and transfers", () => {
 
     const detail = await request(app())
       .get(`/api/transfers/${approved.body.transferId}`)
-      .set(cashierAuthorization);
+      .set(adminAuthorization);
     expect(detail.body.totalCost).toBe("30.00");
     expect(detail.body.lines[1]).toMatchObject({
       quantity: "1.000",
@@ -528,6 +546,9 @@ describe("cafe transfer requests and transfers", () => {
       approvedByName: "مدير",
       notes: "تحويل مباشر",
     });
+    // a direct transfer has no request, so it has no request times
+    expect(detail.body.requestCreatedAt).toBeNull();
+    expect(detail.body.requestReviewedAt).toBeNull();
   });
 
   it("reports large transfer costs without overflowing list calculations", async () => {

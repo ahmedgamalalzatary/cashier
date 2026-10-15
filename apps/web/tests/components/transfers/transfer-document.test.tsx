@@ -14,6 +14,8 @@ const baseTransfer = {
   totalCost: "120.00",
   isNegativeStock: false,
   createdAt: "2026-10-01T08:00:00.000Z",
+  requestCreatedAt: null,
+  requestReviewedAt: null,
   lines: [
     {
       id: testId(4),
@@ -62,6 +64,8 @@ describe("transfer document (A4)", () => {
     const transfer = {
       ...baseTransfer,
       requestId: testId(9),
+      requestCreatedAt: "2026-09-30T06:00:00.000Z",
+      requestReviewedAt: "2026-10-01T07:00:00.000Z",
     } satisfies TransferDetail;
 
     const html = renderToStaticMarkup(<TransferDocument transfer={transfer} />);
@@ -69,6 +73,23 @@ describe("transfer document (A4)", () => {
     printable(html);
     expect(html).toContain(`طلب تحويل #${testId(9)}`);
     expect(html).not.toContain("تحويل مباشر");
+    // the original request and its approval are times of their own
+    expect(html).toContain("وقت الطلب");
+    expect(html).toContain("وقت الاعتماد");
+  });
+
+  it("prints only the execution time for a direct transfer", () => {
+    const transfer = {
+      ...baseTransfer,
+      requestId: null,
+    } satisfies TransferDetail;
+
+    const html = renderToStaticMarkup(<TransferDocument transfer={transfer} />);
+
+    printable(html);
+    expect(html).toContain("وقت التنفيذ");
+    expect(html).not.toContain("وقت الطلب");
+    expect(html).not.toContain("وقت الاعتماد");
   });
 
   it("flags a transfer that took main stock below zero", () => {

@@ -1,6 +1,5 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { flushSync } from "react-dom";
 import { Banknote, Plus, Printer } from "lucide-react";
 import type { SalaryMonth, SalaryPayment } from "@cashier/shared";
 import { DATA_CHANGED_EVENT } from "@/services/backup-service";
@@ -16,6 +15,7 @@ import { Table } from "@cashier/web-core/components/ui/table";
 import { cairoCalendarDate } from "@cashier/web-core/lib/cairo-date";
 import { formatMoney } from "@cashier/web-core/lib/format";
 import { PrintSlip } from "@/components/print/print-slip";
+import { usePrintSlip } from "@/components/print/use-print-slip";
 import { SalaryPayslip } from "@/components/salaries/salary-payslip";
 import {
   payConfirmationText,
@@ -51,7 +51,7 @@ export default function SalariesTab({
     [error, setError] = useState("");
   const [paying, setPaying] = useState<Row | null>(null);
   const [payingError, setPayingError] = useState("");
-  const [printing, setPrinting] = useState<SalaryPayment | null>(null);
+  const { printing, print: printPayslip } = usePrintSlip<SalaryPayment>();
   const [logging, setLogging] = useState(false);
   const [formError, setFormError] = useState("");
   const clearForm = () => {
@@ -119,13 +119,6 @@ export default function SalariesTab({
     } finally {
       setSaving(false);
     }
-  }
-
-  function printPayslip(payment: SalaryPayment) {
-    // The slip must be on the page before the print dialog reads it.
-    flushSync(() => setPrinting(payment));
-    window.print();
-    setPrinting(null);
   }
 
   const columns: DataColumn<Row>[] = [
