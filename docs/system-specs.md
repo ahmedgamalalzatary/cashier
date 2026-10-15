@@ -1,6 +1,6 @@
 # Cashier + Warehouse System — Specification
 
-**Date:** 2026-07-19 (amended 2026-09-19 — internal POS sales restored; 2026-09-27 — independent branch workspaces; 2026-10-06 — branch, shift, and report details merged in from their separate docs)
+**Date:** 2026-07-19 (amended 2026-09-19 — internal POS sales restored; 2026-09-27 — independent branch workspaces; 2026-10-06 — branch, shift, and report details merged in from their separate docs; 2026-10-15 — beta feedback decisions: negative transfers/preparations, supplier payment allocation, online order stock deduction, prints, reports redesign, UI conventions)
 **Status:** Approved by owner
 **Scope:** Multiple independent branches — each has one main warehouse + one cafe (sub-warehouse)
 
@@ -28,6 +28,27 @@ A cloud-hosted web application combining a cafe POS (cashier) with warehouse/inv
 - **Backend:** Express.js REST API (TypeScript), JWT-based auth with role checks on every endpoint.
 - **Database:** MySQL (InnoDB, utf8mb4) accessed via Drizzle ORM (drizzle-kit migrations). All money stored as `DECIMAL`, all quantities as `DECIMAL` (fractional units supported).
 - **Printing:** 80mm thermal receipts rendered as an Arabic print view; browser print to the printer attached to the cashier PC. Auto-print after each sale.
+- **Paper size rule** (owner decision 2026-10-15): slips handed to a customer or kept at the drawer print on **80mm**. Documents with tables, signatures or filed records print on **A4**. All A4 documents share one layout (shop name, title, facts, table, totals, signature lines).
+
+  | Print                                                                                     | Size         |
+  | ----------------------------------------------------------------------------------------- | ------------ |
+  | Sale receipt (POS, order page, orders list row)                                           | 80mm         |
+  | Online order slip                                                                         | 80mm         |
+  | Shift close report (float, sales, refunds, shift expenses, expected, counted, over/short) | 80mm         |
+  | Purchase invoice                                                                          | A4           |
+  | Supplier statement                                                                        | A4           |
+  | Stocktake count sheet (with an empty "counted" column)                                    | A4           |
+  | Transfer document (items, quantities, units, requester, approver, signatures)             | A4           |
+  | Salary payslip (base, bonuses, deductions, advances, net)                                 | A4           |
+  | Recipe cost card                                                                          | A4 portrait  |
+  | Reports                                                                                   | A4 landscape |
+
+### UI conventions (owner decision 2026-10-15)
+
+- **Entry forms open in a modal** from a button in the page header, and the list stays visible behind it. This applies to waste, expenses, stocktakes (**جرد جديد** and **تسوية صنف**), salary advances/adjustments, transfers, suppliers and employees. Exceptions: a new purchase invoice has its own page (`/purchases/new`); the online link-codes page keeps its inline form because creating a code is its only purpose; expense categories stay an inline admin list.
+- The mobile menu button sits on the side the drawer opens from (the right, in RTL).
+- Employees and salaries are **one page** (**الموظفين**, tabs **الموظفين | المرتبات**). There is no separate salaries page or sidebar entry.
+- **Backup bar** (admin, desktop): shows the last successful upload _and_ the last automatic check (`lastAttemptAt`), so it visibly moves every 15 minutes even when nothing new was sent.
 - **PDF export:** browser Print / Save as PDF with Arabic report labels for every report (owner-confirmed 2026-09-27).
 
 ### Roles & permissions
@@ -42,6 +63,7 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 - Revoking or deactivating the linked user blocks login without deleting or deactivating the employee record.
 - Cashier actions are stored against the authenticated user and are reportable through the linked employee, including shifts, orders, discounts, refunds, shift expenses, waste entries, and transfer requests where applicable.
 - There is no employee PIN or standalone attendance clock. Only cashiers have worked-time tracking, derived from their shift open and close times.
+- **Costs are admin-only data** (owner decision 2026-10-15): the server never sends cost, profit or FIFO allocation costs to a cashier account (orders, refunds, waste, cafe stock). Hiding them on screen is not enough.
 
 #### Admin accounts (super-admin)
 
@@ -58,7 +80,7 @@ Only admins and cashiers can sign in. An employee record is a staff/HR record an
 - A cashier account belongs to exactly one branch through its employee record. Moving a person to another branch requires a new employee/account record; past records remain in the original branch.
 - Admin identities are global and may act within any selected workspace. Application requests carry `X-Branch-Id`; the server validates the selection against the current account. Cashiers default to their assigned branch and cannot override it.
 - Archive preserves history, blocks cashier login and operational writes, and skips worker refreshes. Admin can read archived records and restore the branch. A branch with an open shift, or the last active branch, cannot be archived.
-- Background catalog/order caching runs separately in each active branch with independent refresh state and leases. Online order stock deduction is a separate pending feature.
+- Background catalog/order caching runs separately in each active branch with independent refresh state and leases. Online orders take stock only in the one branch chosen to fulfill them (§7, Online orders).
 - **Using branches:** open **الفروع** (admin) to add, rename, archive, or restore. Select **الفرع الحالي** in the header (or **فتح الفرع** in the list); the workspace opens on Home and forms/carts/page state reset on a switch. To staff a branch, create the employee inside that workspace and grant cashier access; the account inherits the employee's branch.
 - New workspaces copy only cached catalog data. Ingredient mappings, modifier stock effects, stock, staff, and transactions are not copied; each branch configures its catalog stock setup independently.
 - Internal IDs stay globally unique; local item codes, request keys, and external catalog/order IDs may repeat across branches. Composite foreign keys protect owned-record references. The browser remembers the selected branch per account, but authorization always reads the account's real assignment, and responses that arrive after a branch/account switch are discarded.
@@ -161,6 +183,7 @@ discovery do not depend on the selected header, but enforce the PC's account acc
 - Every outflow (sale, transfer-out, waste, stocktake shortage) consumes from the **oldest batch first**; the consumed cost is recorded on the movement.
 - Transfers move quantities **with their batch costs** from main warehouse batches into cafe batches.
 - A sale made with no stock records the missing part at cost 0. When stock later arrives in that warehouse it settles the oldest open deficits first, and the settled sale's line and order cost are recomputed from the real batch costs in the same transaction (the negative-stock flag stays as history). Reports therefore see the real cost.
+- **Negative stock** (owner decision 2026-10-15): sales, transfers (approved requests and direct) and recipe preparations may take a warehouse below zero. For transfers and preparations, the missing part is costed at the item's **last known unit cost** (its newest batch in any warehouse; 0 if it was never received), and the cafe batch or prepared output carries that estimate. Arriving stock settles the shortage quantity, but the estimated cost is **not** recomputed afterwards (accepted trade-off). Such documents carry the negative-stock flag like sales. Waste still refuses a shortage, and a stocktake cannot produce negative stock because a count is always ≥ 0.
 - Stock value at any time = Σ(remaining batch qty × batch cost) per warehouse.
 
 ### Alerts
@@ -196,7 +219,10 @@ discovery do not depend on the selected header, but enforce the PC's account acc
   - Profit = sales − refunds − cost of what stays sold. Bought cost always equals sold + wasted + shortage + still in stock (to rounding).
 - **Payment on invoice:** paid in full, partial, or fully on credit (آجل). Unpaid remainder increases the supplier's balance.
 - Confirmed purchase invoices are immutable so their FIFO batches and supplier accounting cannot drift; corrections use explicit stock/accounting adjustments rather than editing history.
-- **Supplier payments:** recorded any time against the supplier balance (amount, date, note); shown in the statement. A payment does not change any invoice's paid amount, which stays what was paid at purchase.
+- **Supplier payments:** recorded any time against the supplier balance (amount, date, note); shown in the statement.
+- **Payment allocation, oldest first** (owner decision 2026-10-15): payments are applied automatically, in date order, to the supplier's opening balance first and then to the oldest unpaid invoice. Each invoice shows _paid at purchase_, _covered by later payments_ and _remaining_, and its status (مدفوعة / جزئية / آجلة) follows what remains. Allocation is computed from the payments, not stored, so an invoice's recorded paid-at-purchase amount never changes. The payment button shows only while the supplier still has a balance.
+  Example: invoices of 700 · 600 · 400 · 300 and a payment of 1,000 → the first is مدفوعة, the second جزئية with 300 left, the last two آجلة.
+- **Transfer from the purchases list** (owner decision 2026-10-15): each invoice row offers a transfer-to-cafe action (the direct-transfer modal linked to that invoice). It is hidden when nothing is left to transfer.
 - **No purchase returns** — damaged/rejected goods are recorded as waste (§11).
 
 ---
@@ -208,7 +234,7 @@ discovery do not depend on the selected header, but enforce the PC's account acc
   1. Cashier creates a **transfer request**: items + quantities + note.
   2. Admin reviews, may edit each requested quantity (without adding or dropping item lines), then **approves** → stock moves main → cafe immediately; or **rejects** with a reason.
 - Cashiers and admins working in the same branch see that branch's cafe request queue. Other branches have separate queues. Request lines preserve the originally requested quantities; approved quantities are stored on the resulting transfer.
-- Approval is atomic. If any approved quantity is unavailable in the main warehouse, no stock moves, the API returns a conflict, and the request remains pending for adjustment and retry.
+- Approval is atomic: all lines move or none do. A quantity above the main-warehouse balance is allowed and takes main below zero (owner decision 2026-10-15; see §4, Negative stock).
 - Admin can also create a **direct transfer** (no request) in one step. A direct transfer may optionally name the purchase invoice it moves stock for (§5); request-approved transfers are never invoice-linked.
 - Reviewed requests and completed transfers are immutable audit records. Every transfer document lists items, quantities, source and cafe batch IDs, carried FIFO costs, requester, approver, and timestamps.
 
@@ -222,11 +248,28 @@ discovery do not depend on the selected header, but enforce the PC's account acc
   1. `external_product` — flat external catalog item (existing flow). Price from catalog (minus catalog discount) + modifier extras. Deducts mapped ingredients (`external_*_ingredients`) from **cafe stock** (FIFO).
   2. `item` — local as-is **resale item** (`items.type='resale'`, `items.sellingPrice`). The server reads its stored price and deducts the item itself (FIFO) from **cafe stock**, with no recipe required. Each imported menu flavor/size can be a separate local item.
 - `recipe` lines are legacy records; new checkout does not accept them. The owner-confirmed prepared-result model consumes a prepared output stock item at sale, not recipe ingredients. Local prepared pricing/sales and explicit imported recipe/output links remain unimplemented.
+- Local resale items are sold as themselves × quantity: they have **no add-ons and no sizes**. Add-ons and sizes exist only for external catalog products.
 - Sales are allowed even if computed stock would go negative (the shop can't stop selling because of a data entry gap); negative stock is flagged on the dashboard for correction.
 - **Payments:** cash only. Received amount + change recorded.
 - **Discounts:** percentage or fixed amount per order; cashier applies freely; every discount is stored with order, cashier, and shift, and is visible in reports.
 - **Receipt:** 80mm Arabic thermal receipt — shop name, date/time, order number, cashier, lines (product/size/qty/price), discount, total, received, change. Auto-print, with a reprint option.
 - Every order records: cashier, shift, timestamp, lines with unit price and FIFO cost at sale time (for profit reports).
+
+### Orders page (owner decision 2026-10-15)
+
+- **Cashier orders:** each row prints the 80mm receipt and offers **مرتجع** (hidden once the order is fully refunded) and **هالك**. The order page offers the same actions to admins and cashiers.
+- **Refund status is visible:** a row shows **مرتجع جزئي** or **مرتجع بالكامل**. The order page shows the returned quantity per line (e.g. `1 من 3`), the refunded amount, and links to each refund.
+- **Waste from an order** opens the waste modal limited to the cafe and that order's products. It does not change the sale. A refund marked "not returnable" is already recorded as waste, so the same item must not be wasted again.
+- **Online orders list:** the customer cell shows the name only (search by phone still works); each row prints the 80mm slip.
+
+### Online orders (owner decision 2026-10-15)
+
+- One online ordering account serves every branch, and online orders carry no branch. The super-admin picks **one branch that fulfills online orders** on the online site. Each PC learns whether it is that branch from its regular accounts pull. Only that branch's PC takes online orders from stock; the others only display them.
+- An order takes stock **as soon as it arrives** on that PC, as a sale with source **online**, recorded **once per online order number** (unique). Retries, restarts and repeated fetches therefore never deduct twice. A later **cancellation** fully reverses it once (stock back to its batches).
+- Only orders arriving after the branch is switched on are deducted. Earlier orders are never deducted backwards, and changing the fulfilling branch affects new orders only. An offline PC deducts when it fetches the orders after reconnecting.
+- Online sales never enter a cashier's shift or expected cash. They get cost, profit, refunds and waste like any sale, and reports show them as a separate **أونلاين** channel.
+- **Add-on matching:** the ordering system sends each add-on's names, quantity and price, but not its option ID. The ID is resolved from the cached catalog by searching only the ordered product's modifier options and matching both the Arabic and English names (price breaks a tie). The ordering system reads the option's current name for every order, and the cache refreshes to that name, so renames stay matched. Zero or several matches are never guessed: the product and size ingredients are still deducted, the add-on is skipped, and the order is flagged **يحتاج مراجعة**. If the ordering system later sends the option ID, it is used directly.
+- A product or size without an ingredient setup deducts nothing and is flagged for setup.
 
 ---
 
@@ -299,6 +342,7 @@ new schema to an old runtime during the intermediate slices.
 
 - **Monthly salary:** one amount per employee; empty means the salary was never set and the employee is not payable.
 - **Advances (سلف):** recorded any time; cash out immediately (appears in cash-flow); accumulates against the employee until payday.
+- **Partial salary = advance** (owner decision 2026-10-15): paying part of a month's salary early is recorded as an advance, labelled **صرف جزء من الراتب** on screen. The salaries tab shows _paid so far_ and _remaining_ per employee for the month. Example: salary 5,000, 2,000 taken → payday net 3,000. A month keeps exactly one salary payment: once it is paid nothing more can be added to it, and advances above a month's net block that month instead of carrying over.
 - **Bonuses / deductions:** dated entries with amounts and notes.
 - **Payday screen:** for a chosen period per employee —
   `net = monthly salary + bonuses − deductions − advances` → confirm to record the salary payment, showing the net amount in the confirmation. Full salary history retained. Payday is one calendar month at a time. A month on or before the latest paid month cannot be paid; the payday screen shows those months as not payable. Net pay is computed in integer cents so two-decimal amounts do not drift.
@@ -315,7 +359,7 @@ new schema to an old runtime during the intermediate slices.
 - **Cost card:** each prepared recipe has a cost card (Recipes page → **بطاقة التكلفة**) listing every ingredient with its quantity, current cost and cost source, plus the recipe's total cost and unit cost. Ingredients are costed FIFO from cafe stock; any cafe shortfall is costed FIFO from main stock and marked as such. Cost shows "—" only when cafe and main stock together cannot cover an ingredient. The "enough stock to prepare" warning still uses cafe stock only. The card prints on A4 portrait. Menu products, add-ons and resale items have no cost card.
 - Recipes are created and edited by Admin only; changes affect future preparations only (past preparations and orders keep their historical cost).
 - A prepared recipe declares a base yield. Any requested preparation quantity scales every ingredient proportionally to that yield, rounded to the stock ledger's three-decimal quantity precision.
-- Preparation never permits negative ingredient stock. The recipe, all cafe FIFO deductions, allocation snapshots, and the costed prepared-item output batch commit atomically; insufficient stock returns a conflict and changes nothing.
+- Preparation may take ingredient stock below zero (owner decision 2026-10-15). The missing part is costed at the item's last known unit cost (§4, Negative stock). The recipe, all cafe FIFO deductions, allocation snapshots, and the costed prepared-item output batch commit atomically.
 - Every preparation is immutable and retains recipe/output names, the administrator, time, notes, source FIFO batches, exact carried costs, and the resulting cafe batch. Recipe edits affect only later preparations.
 - An active recipe protects its category, ingredient items, and prepared output item from incompatible deactivation or stock-unit/type changes. Prepared-recipe dependency cycles are rejected.
 
@@ -374,12 +418,20 @@ new schema to an old runtime during the intermediate slices.
 
 The Reports page is admin-only and reads the selected branch. Supplier reports complement the full statements on the Suppliers page.
 
+#### Reports page design (owner decision 2026-10-15)
+
+- **Date bar:** presets (اليوم، أمس، هذا الأسبوع، هذا الشهر، الشهر الماضي، مخصص). The report reloads automatically when the range changes, and dates show in Arabic.
+- **Overview tab (default):** KPI cards compared with the previous period of equal length: net sales, orders, average order, gross profit and margin %, expenses, waste, salaries paid, and **net profit** = gross profit − expenses − waste cost − salaries and advances paid in the period. It also shows sales by day and by hour (peak hours) charts, the top 5 products by sales and by profit, and alerts (low/negative stock, over/short shifts).
+- **Tabs:** نظرة عامة · المبيعات · المخزون · المصروفات والأرباح · الموظفون والورديات · الموردون. Waste and refunds sit under sales/stock; transfers and preparations sit under stock.
+- **Every table** has search, sorting by any column, filters where meaningful (warehouse, category, cashier, type, status), a totals row, readable document references that link to the document (never raw UUIDs), and an empty state. Raw ledgers collapse into an expandable details section under their summary.
+- Work time shows in hours, and products and categories show margin %. Charts are inline SVG and print. Print (A4 landscape) and the online Excel download output what is filtered on screen. Desktop and online share the page.
+
 #### Dates and amounts
 
 - `from` and `to` are inclusive Cairo calendar dates. Timestamp queries use `[first instant of from, first instant of the day after to)`, including days where daylight saving skips midnight.
 - Timestamps are stored and sent as UTC and displayed in Cairo time. Expense, purchase/payment, and salary advance/adjustment dates stay calendar dates; no time is invented. The database pool uses UTC so the host timezone cannot shift report boundaries.
 - All sections read one read-only REPEATABLE READ transaction, so concurrent writes cannot make sections describe different states.
-- The response `range` carries `from`, `to`, `branchId`, and `generatedAt`. Editing the date controls does not relabel loaded figures; refresh clears the old report, and a pending or failed refresh cannot be printed. Late responses, including ones from a previous branch, are ignored.
+- The response `range` carries `from`, `to`, `branchId`, and `generatedAt`. Changing the range reloads the report; the old figures are cleared, and a pending or failed load cannot be printed. Late responses, including ones from a previous branch, are ignored.
 - Stock quantities/value/alerts and supplier balances are **current snapshots** at generation, not historical closing balances. Transfer-request status and stocktakes show their current state but are selected by creation date.
 - **Gross profit** = `sales − refunds − sales cost + returned cost`. Expenses, salaries, and waste are not deducted. Discounts are already inside the stored sale total and are not subtracted again.
 - Sales by shift counts only orders/refunds timestamped inside the period, including shifts opened earlier or reopened. Lifetime shift totals and the latest cash reconciliation appear separately.
@@ -396,7 +448,7 @@ Select a report group, load its dates, then choose **طباعة / PDF** and use 
 
 #### Pending
 
-Online revenue counted once for completed orders, per-branch online stock costs, and transaction edit/delete history depend on the unfinished online-order and correction features. Cached online summaries are not counted as POS revenue or cash flow.
+Transaction edit/delete history depends on the unfinished correction feature. Online orders count as revenue only once they are recorded as online sales in the fulfilling branch (§7, Online orders); cached summaries alone are never counted as revenue or cash flow.
 
 ---
 
@@ -407,7 +459,7 @@ Online revenue counted once for completed orders, per-branch online stock costs,
 `suppliers` · `purchase_invoices` + `purchase_lines` · `supplier_payments`
 `transfer_requests` + `transfers` (+ optional branch-scoped `purchase_invoice_id`) + `transfer_lines`
 `recipes` (product/sub-recipe) + `recipe_sizes` + `recipe_ingredients` · `preparations` (batch runs)
-`shifts` + `shift_events` · `orders` + `order_lines` (price + FIFO cost snapshot) · `refunds` + `refund_lines`
+`shifts` + `shift_events` · `orders` + `order_lines` (price + FIFO cost snapshot; planned 2026-10-15: order source `pos`/`online` and a unique online order number) · `refunds` + `refund_lines`
 `waste_entries` · `expenses` + `expense_categories` · `stocktakes` + `stocktake_lines`
 
 All stock changes go through `stock_movements` + `stock_batches` so every quantity and cost is traceable to a document.
@@ -446,4 +498,4 @@ Desktop/online Phase 4 schema rules:
 - Expiry-date tracking; purchase returns to suppliers.
 - Customer accounts/loyalty; kitchen display screens.
 - English interface; currencies other than EGP.
-- Excel export (PDF only).
+- Excel export on the desktop (print/PDF only there). The online site's Excel download of reports is intentional (owner decision 2026-10-15).

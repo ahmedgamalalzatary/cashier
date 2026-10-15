@@ -41,6 +41,11 @@ export function BackupCardView({
             : "لم يتم رفع نسخة احتياطية بعد"}
         </p>
         <p className="text-muted">
+          {status.lastAttemptAt
+            ? `آخر فحص تلقائي ${cairoCalendarDate(new Date(status.lastAttemptAt))} ${cairoClock(new Date(status.lastAttemptAt))}`
+            : "آخر فحص تلقائي لم يُسجَّل بعد"}
+        </p>
+        <p className="text-muted">
           {status.pending > 0
             ? `${status.pending} تغيير بانتظار الرفع`
             : "لا توجد تغييرات بانتظار الرفع"}

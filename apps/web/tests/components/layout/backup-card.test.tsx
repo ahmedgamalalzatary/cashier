@@ -102,6 +102,31 @@ describe("backup card", () => {
     expect(text(card)).toContain("تعذر الاتصال بالموقع");
     expect(button(card)!.props.disabled).toBe(false);
   });
+
+  it("shows the last automatic check time in addition to the last upload", () => {
+    const card = BackupCardView({
+      status: {
+        ...status,
+        lastAttemptAt: "2026-10-09T11:30:00.000Z",
+        lastSuccessAt: "2026-10-09T10:00:00.000Z",
+      },
+      uploading: false,
+      onUploadNow: vi.fn(),
+    });
+
+    expect(text(card)).toContain("تم آخر رفع");
+    expect(text(card)).toContain("آخر فحص تلقائي");
+  });
+
+  it("handles a missing last automatic check without crashing", () => {
+    const card = BackupCardView({
+      status: { ...status, lastAttemptAt: null },
+      uploading: false,
+      onUploadNow: vi.fn(),
+    });
+
+    expect(text(card)).toContain("آخر فحص تلقائي");
+  });
 });
 
 describe("resend everything control", () => {

@@ -25,6 +25,19 @@ describe("80mm printing", () => {
       "body:has(> .print-slip) > :not(.print-slip)",
     );
   });
+
+  it("gives each cashier order row its own receipt print", () => {
+    const page = read("src/app/orders/page.tsx");
+    expect(page).toContain("<OrderPrintButton");
+  });
+
+  it("prints the order page receipt through the slip, not a hidden div", () => {
+    const page = read("src/app/orders/detail/page.tsx");
+    expect(page).toContain("<PrintSlip");
+    expect(page).toContain("window.print()");
+    expect(page).toContain("<OrderReceipt");
+    expect(page).not.toContain("hidden print:block");
+  });
 });
 
 describe("A4 printing", () => {

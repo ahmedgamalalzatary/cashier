@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@cashier/web-core/components/auth/auth-provider";
 import { ExternalOrdersPanel } from "@/components/orders/external-orders-panel";
+import { OrderPrintButton } from "@/components/orders/order-print-button";
 import { Badge } from "@cashier/web-core/components/ui/badge";
 import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
 import { PageHeader } from "@cashier/web-core/components/ui/page-header";
@@ -48,6 +49,7 @@ export default function OrdersPage() {
   const [cashierId, setCashierId] = useState("");
   const [day, setDay] = useState("");
   const [error, setError] = useState("");
+  const [printError, setPrintError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -236,6 +238,9 @@ export default function OrdersPage() {
           </StatStrip>
 
           {error && <ErrorBanner className="mb-4">{error}</ErrorBanner>}
+          {printError && (
+            <ErrorBanner className="mb-4">{printError}</ErrorBanner>
+          )}
 
           <div className="toolbar mb-4">
             <label className="relative min-w-[14rem] flex-1">
@@ -287,6 +292,13 @@ export default function OrdersPage() {
               rows={visibleRows}
               rowKey={(row) => row.id}
               columns={columns}
+              actions={(row) => (
+                <OrderPrintButton
+                  orderId={row.id}
+                  orderNumber={row.orderNumber}
+                  onFail={setPrintError}
+                />
+              )}
               empty={
                 orders.length === 0 ? (
                   <EmptyState

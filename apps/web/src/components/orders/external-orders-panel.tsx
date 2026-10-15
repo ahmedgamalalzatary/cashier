@@ -164,16 +164,7 @@ export function ExternalOrdersPanelView({
     {
       key: "customer",
       header: "العميل",
-      cell: (row) => (
-        <>
-          <span className="block font-medium">{row.customerName}</span>
-          {row.customerPhone && (
-            <span className="tnum block text-xs text-muted" dir="ltr">
-              {row.customerPhone}
-            </span>
-          )}
-        </>
-      ),
+      cell: (row) => <span className="font-medium">{row.customerName}</span>,
     },
     {
       key: "type",

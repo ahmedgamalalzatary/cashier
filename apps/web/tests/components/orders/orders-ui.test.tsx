@@ -58,9 +58,13 @@ describe("orders UI", () => {
   it("renders successful online order rows", () => {
     const html = view({ orders: [order] });
     expect(html).toContain("عميل تجريبي");
-    expect(html).toContain("01000000000");
     expect(html).toContain("قيد التنفيذ");
     expect(html).toContain(formatMoney("95.00"));
+  });
+
+  it("shows the customer name only, without the phone, in the customers column", () => {
+    const html = view({ orders: [order] });
+    expect(html).not.toContain("01000000000");
   });
 
   it("offers an 80mm print for each online order", () => {

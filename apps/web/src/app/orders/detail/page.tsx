@@ -15,6 +15,7 @@ import {
 import { useAuth } from "@cashier/web-core/components/auth/auth-provider";
 import { OrderReceipt } from "@/components/pos/order-receipt";
 import { RefundOrderModal } from "@/components/refunds/refund-order-modal";
+import { PrintSlip } from "@/components/print/print-slip";
 import { Badge } from "@cashier/web-core/components/ui/badge";
 import { Button } from "@cashier/web-core/components/ui/button";
 import { PageHeader } from "@cashier/web-core/components/ui/page-header";
@@ -81,12 +82,10 @@ function OrderDetailView() {
             <span className="rounded-lg border border-line bg-surface px-2.5 py-1 text-sm font-bold tnum">
               {order.orderNumber}
             </span>
-            {!isAdmin && (
-              <Button variant="secondary" onClick={() => setRefunding(true)}>
-                <RotateCcw className="size-4" />
-                مرتجع
-              </Button>
-            )}
+            <Button variant="secondary" onClick={() => setRefunding(true)}>
+              <RotateCcw className="size-4" />
+              مرتجع
+            </Button>
             <Button onClick={() => window.print()}>
               <Printer className="size-4" />
               طباعة الإيصال
@@ -259,11 +258,11 @@ function OrderDetailView() {
         </>
       )}
 
-      {/* the receipt itself is the print artifact; on screen the tables above
-          say the same thing with room to read */}
-      <div className="hidden print:block">
+      {/* the receipt itself is the print artifact; PrintSlip hides the page
+          behind it from the printer so it cannot feed blank paper */}
+      <PrintSlip>
         <OrderReceipt order={order} />
-      </div>
+      </PrintSlip>
     </div>
   );
 }

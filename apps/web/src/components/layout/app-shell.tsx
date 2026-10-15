@@ -9,6 +9,37 @@ import { UpdateBanner } from "./update-banner";
 import { BackupCard } from "./backup-card";
 import { WorkspaceBar } from "@cashier/web-core/components/branches/workspace-bar";
 
+/**
+ * The mobile header. The button renders first so, in RTL flow with
+ * `justify-between`, it hugs the right edge — the side the drawer enters from.
+ */
+export function AppShellHeaderView({
+  navOpen,
+  onOpen,
+}: {
+  navOpen: boolean;
+  onOpen: () => void;
+}) {
+  return (
+    <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-surface px-4 py-3 lg:hidden">
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label="فتح القائمة"
+        aria-expanded={navOpen}
+        aria-controls="app-nav"
+        className="-ms-2 rounded-lg p-2 text-muted hover:bg-line/50 hover:text-ink"
+      >
+        <Menu className="size-5" />
+      </button>
+      <span className="flex items-center gap-2 text-primary">
+        <Coffee className="size-5" />
+        <span className="font-bold text-ink">الكافيه</span>
+      </span>
+    </header>
+  );
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = normalizePath(usePathname());
   const [navOpen, setNavOpen] = useState(false);
@@ -36,22 +67,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen lg:flex">
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-surface px-4 py-3 lg:hidden">
-        <span className="flex items-center gap-2 text-primary">
-          <Coffee className="size-5" />
-          <span className="font-bold text-ink">الكافيه</span>
-        </span>
-        <button
-          type="button"
-          onClick={() => setNavOpen(true)}
-          aria-label="فتح القائمة"
-          aria-expanded={navOpen}
-          aria-controls="app-nav"
-          className="-me-2 rounded-lg p-2 text-muted hover:bg-line/50 hover:text-ink"
-        >
-          <Menu className="size-5" />
-        </button>
-      </header>
+      <AppShellHeaderView
+        navOpen={navOpen}
+        onOpen={() => setNavOpen(true)}
+      />
       <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
       <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
         <div className="mx-auto w-full max-w-[96rem]">
