@@ -20,9 +20,12 @@ import { loginAs } from "../support/api-helpers.js";
 
 const app = createApp(db, appOptions);
 let cashier: { readonly Authorization: string };
+// cost figures are admin-only (spec §2), so cost checks re-read as admin
+let admin: { readonly Authorization: string; readonly "X-Branch-Id": string };
 
 beforeEach(async () => {
   cashier = await loginAs(app, "cashier");
+  admin = await loginAs(app, "admin");
   await request(app)
     .post("/api/shifts/open")
     .set(cashier)
@@ -152,7 +155,6 @@ describe("local resale POS", () => {
       subtotal: "70.00",
       total: "65.00",
       changeAmount: "35.00",
-      totalCost: "8.00",
       isNegativeStock: false,
       lines: [
         {
@@ -162,19 +164,26 @@ describe("local resale POS", () => {
           productName: "تركي سنجل",
           unitPrice: "35.00",
           quantity: "2.000",
-          totalCost: "8.00",
           modifiers: [],
         },
       ],
     });
     expect(
       response.body.lines[0].allocations.map(
-        (row: { quantity: string; unitCost: string }) => [
-          row.quantity,
-          row.unitCost,
-        ],
+        (row: { quantity: string; unitCost?: string }) => [row.quantity, row.unitCost],
       ),
     ).toEqual([
+      ["1.000", undefined],
+      ["1.000", undefined],
+    ]);
+    // costs stay behind the cashier cut; admins read them on the order
+    const asAdmin = await request(app)
+      .get(`/api/orders/${response.body.id}`)
+      .set(admin);
+    expect(asAdmin.body.totalCost).toBe("8.00");
+    expect(asAdmin.body.lines[0].allocations.map(
+      (row: { quantity: string; unitCost: string }) => [row.quantity, row.unitCost],
+    )).toEqual([
       ["1.000", "3.000000"],
       ["1.000", "5.000000"],
     ]);
@@ -229,8 +238,12 @@ describe("local resale POS", () => {
       .expect(201);
     expect(refund.body).toMatchObject({
       amount: "32.50",
-      totalCostReturned: "3.00",
     });
+    // costs stay behind the cashier cut; admins read them on the refund
+    const refundAsAdmin = await request(app)
+      .get(`/api/refunds/${refund.body.id}`)
+      .set(admin);
+    expect(refundAsAdmin.body.totalCostReturned).toBe("3.00");
     const returns = await db
       .select()
       .from(stockMovements)
@@ -306,7 +319,6 @@ describe("local resale POS", () => {
     expect(response.body).toMatchObject({
       subtotal: "55.00",
       total: "50.00",
-      totalCost: "8.00",
       lines: [
         {
           type: "item",
@@ -322,6 +334,11 @@ describe("local resale POS", () => {
         },
       ],
     });
+    // the combined FIFO cost is admin eyes only
+    const asAdmin = await request(app)
+      .get(`/api/orders/${response.body.id}`)
+      .set(admin);
+    expect(asAdmin.body.totalCost).toBe("8.00");
   });
 
   it("flags a cafe deficit while leaving main stock untouched", async () => {

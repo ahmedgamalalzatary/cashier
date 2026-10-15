@@ -23,9 +23,12 @@ import { createUser, loginAs } from "../support/api-helpers.js";
 
 const app = () => createApp(db, appOptions);
 let authorization: { readonly Authorization: string };
+// cost figures are admin-only (spec §2), so cost checks re-read as admin
+let adminAuthorization: { readonly Authorization: string; readonly "X-Branch-Id": string };
 
 beforeEach(async () => {
   authorization = await loginAs(app(), "cashier");
+  adminAuthorization = await loginAs(app(), "admin");
   await request(app())
     .post("/api/shifts/open")
     .set(authorization)
@@ -234,17 +237,21 @@ describe("refunds", () => {
     expect(response.body).toMatchObject({
       orderId: fixture.orderId,
       amount: "9.00",
-      totalCostReturned: "3.00",
       lines: [
         {
           orderLineId: fixture.lineId,
           quantity: "1.000",
           refundAmount: "9.00",
           stockAction: "return_to_stock",
-          returnedCost: "3.00",
         },
       ],
     });
+    // costs stay behind the cashier cut, admins still see them
+    const asAdmin = await request(app())
+      .get(`/api/refunds/${response.body.id}`)
+      .set(adminAuthorization);
+    expect(asAdmin.body.totalCostReturned).toBe("3.00");
+    expect(asAdmin.body.lines[0].returnedCost).toBe("3.00");
     const shift = (
       await request(app()).get("/api/shifts/current").set(authorization)
     ).body;
@@ -285,17 +292,20 @@ describe("refunds", () => {
     expect(response.body).toMatchObject({
       orderId: fixture.orderId,
       amount: "0.00",
-      totalCostReturned: "3.00",
       lines: [
         {
           orderLineId: fixture.lineId,
           quantity: "1.000",
           refundAmount: "0.00",
           stockAction: "return_to_stock",
-          returnedCost: "3.00",
         },
       ],
     });
+    const asAdmin = await request(app())
+      .get(`/api/refunds/${response.body.id}`)
+      .set(adminAuthorization);
+    expect(asAdmin.body.totalCostReturned).toBe("3.00");
+    expect(asAdmin.body.lines[0].returnedCost).toBe("3.00");
     // the goods actually came back, as a refund return and not as waste
     const returns = await db
       .select()
@@ -530,7 +540,6 @@ describe("refunds", () => {
 
   it("lets an admin refund without a shift and keeps it out of the cashier drawer", async () => {
     const fixture = await soldResaleOrder();
-    const adminAuthorization = await loginAs(app(), "admin");
 
     const response = await request(app())
       .post("/api/refunds")

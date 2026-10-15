@@ -1,5 +1,6 @@
 import { it, testBranchValues } from "../support/ids.js";
-import { currentBranchId } from "../../src/branch-context.js";
+import { currentBranchId } from "@cashier/db";
+
 import { describe, expect } from "vitest";
 import { eq } from "drizzle-orm";
 import { categories, items } from "@cashier/db";

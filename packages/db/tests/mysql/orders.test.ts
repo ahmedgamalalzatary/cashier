@@ -200,7 +200,6 @@ describe("external-product POS orders", () => {
     expect(response.body).toMatchObject({
       subtotal: "260.00",
       total: "260.00",
-      totalCost: "0.80",
       isAdminSale: false,
       shiftId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
       lines: [
@@ -266,12 +265,16 @@ describe("external-product POS orders", () => {
     expect(response.body.isNegativeStock).toBe(true);
     expect(response.body.lines[0]).toMatchObject({
       hasStockDeficit: true,
-      totalCost: "0.10",
     });
     expect(response.body.lines[0].allocations).toEqual([
       expect.objectContaining({ quantity: "0.010", batchId: fixture.batchId }),
       expect.objectContaining({ quantity: "0.070", batchId: null }),
     ]);
+    // the deficit is priced at the last known cost, admin eyes only
+    const asAdmin = await request(app())
+      .get(`/api/orders/${response.body.id}`)
+      .set(adminAuthorization);
+    expect(asAdmin.body.lines[0].totalCost).toBe("0.10");
   });
 
   it("replays the same client request without consuming stock twice", async () => {
@@ -361,12 +364,16 @@ describe("external-product POS orders", () => {
     });
     expect(deficit[0]!.body.lines[0]).toMatchObject({
       hasStockDeficit: true,
-      totalCost: "0.20",
       allocations: [
         { batchId: fixture.batchId, quantity: "0.020" },
         { batchId: null, quantity: "0.060" },
       ],
     });
+    // the deficit cost is visible to admins only
+    const deficitAsAdmin = await request(app())
+      .get(`/api/orders/${deficit[0]!.body.id}`)
+      .set(adminAuthorization);
+    expect(deficitAsAdmin.body.lines[0].totalCost).toBe("0.20");
 
     const [batch] = await db
       .select({ remainingQuantity: stockBatches.remainingQuantity })

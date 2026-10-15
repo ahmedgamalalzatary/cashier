@@ -1,5 +1,5 @@
 import { it } from "../support/ids.js";
-import { currentBranchId } from "../../src/branch-context.js";
+import { currentBranchId } from "@cashier/db";
 import { describe, expect } from "vitest";
 import request from "supertest";
 import type { ExternalOrderSummary } from "@cashier/shared";
