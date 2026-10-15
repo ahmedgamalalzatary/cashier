@@ -231,8 +231,18 @@ export class PurchasesService {
     }
   }
 
-  list() {
-    return this.repo.list();
+  async list() {
+    const [invoices, withStock] = await Promise.all([
+      this.repo.list(),
+      this.repo.listInvoicesWithStock(),
+    ]);
+    const stock = new Set(
+      withStock.filter((row) => row.hasStock).map((row) => row.invoiceId),
+    );
+    return invoices.map((invoice) => ({
+      ...invoice,
+      hasStockToTransfer: stock.has(invoice.id),
+    }));
   }
 
   async get(id: string) {

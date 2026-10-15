@@ -113,6 +113,25 @@ describe("PurchasesService stock receive order", () => {
   });
 });
 
+describe("PurchasesService list stock flag", () => {
+  it("marks an invoice transferable when a line still owes the cafe stock", async () => {
+    const invoiceIds = [testId(1), testId(2), testId(3)];
+    const repo = {
+      list: vi.fn().mockResolvedValue(invoiceIds.map((id) => ({ id }))),
+      listInvoicesWithStock: vi
+        .fn()
+        .mockResolvedValue([
+          { invoiceId: testId(1), hasStock: true },
+          { invoiceId: testId(3), hasStock: true },
+        ]),
+    } as unknown as PurchasesRepository;
+    const rows = await new PurchasesService(repo).list();
+    expect(
+      rows.map((row: { hasStockToTransfer: boolean }) => row.hasStockToTransfer),
+    ).toEqual([true, false, true]);
+  });
+});
+
 const stockItem = (overrides: Record<string, unknown> = {}) => ({
   id: testId(5),
   type: "raw",

@@ -303,6 +303,8 @@ export type PurchaseInvoiceSummary = {
   dueAmount: string;
   createdBy: string;
   createdByName: string;
+  /** A line of this invoice still owes stock to the cafe (can open a transfer). */
+  hasStockToTransfer: boolean;
   /** ISO timestamp — Date on the server, serialized to string over JSON */
   createdAt: string;
 };

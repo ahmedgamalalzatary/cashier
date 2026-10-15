@@ -85,6 +85,7 @@ describe("80mm print slips", () => {
       dueAmount: "150.00",
       createdBy: testId(5),
       createdByName: "أحمد",
+      hasStockToTransfer: false,
       createdAt: "2026-10-01T08:00:00.000Z",
       transfers: [],
       lines: [

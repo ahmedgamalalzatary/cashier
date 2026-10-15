@@ -1,5 +1,5 @@
 import { beforeEach as originalBeforeEach, it as originalIt } from "vitest";
-import { currentBranchId, withBranch } from "../../src/branch-context.js";
+import { currentBranchId, withBranch } from "@cashier/db";
 import { TEST_BRANCH_ID } from "@cashier/shared/test-support";
 
 export { testId, TEST_BRANCH_ID } from "@cashier/shared/test-support";

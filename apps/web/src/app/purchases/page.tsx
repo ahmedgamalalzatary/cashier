@@ -2,30 +2,52 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Eye, Plus, ShoppingCart } from "lucide-react";
-import type { PurchaseInvoiceSummary } from "@cashier/shared";
+import { ArrowLeftRight, Eye, Plus, ShoppingCart } from "lucide-react";
+import type { InventoryStockRow, PurchaseInvoiceSummary } from "@cashier/shared";
 import { Badge } from "@cashier/web-core/components/ui/badge";
 import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
+import { IconButton } from "@cashier/web-core/components/ui/icon-button";
 import { PageHeader } from "@cashier/web-core/components/ui/page-header";
 import { Stat, StatStrip } from "@cashier/web-core/components/ui/stat";
 import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
 import { formatMoney, sumDecimalValues } from "@cashier/web-core/lib/format";
+import { TransferFormModal } from "@/components/transfers/transfer-form-modal";
+import {
+  getCafeWarehouseStock,
+  getMainWarehouseStock,
+} from "@/services/inventory-service";
 import { listPurchases } from "@/services/purchases-service";
 
 export default function PurchasesPage() {
   const [invoices, setInvoices] = useState<PurchaseInvoiceSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [stock, setStock] = useState<InventoryStockRow[]>([]);
+  const [mainStock, setMainStock] = useState<InventoryStockRow[]>([]);
+  const [transferringId, setTransferringId] = useState<string | null>(null);
+
+  const load = async () => {
+    try {
+      setInvoices(await listPurchases());
+      setError("");
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "تعذر تحميل فواتير الشراء",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    listPurchases()
-      .then(setInvoices)
-      .catch((caught) =>
-        setError(
-          caught instanceof Error ? caught.message : "تعذر تحميل فواتير الشراء",
-        ),
-      )
-      .finally(() => setLoading(false));
+    void (async () => {
+      // the transfer modal needs both warehouses beside the capped invoice lines
+      await Promise.all([
+        load(),
+        getCafeWarehouseStock().then(setStock).catch(() => undefined),
+        getMainWarehouseStock().then(setMainStock).catch(() => undefined),
+      ]);
+    })();
   }, []);
 
   const totals = useMemo(
@@ -151,15 +173,39 @@ export default function PurchasesPage() {
             />
           }
           actions={(invoice) => (
-            <Link
-              href={`/purchases/detail?id=${invoice.id}`}
-              aria-label={`عرض فاتورة ${invoice.invoiceNumber || invoice.id}`}
-              title="عرض الفاتورة"
-              className="inline-flex rounded-lg p-2 text-muted transition-colors hover:bg-line/50 hover:text-ink"
-            >
-              <Eye className="size-4" />
-            </Link>
+            <span className="flex items-center gap-1">
+              <Link
+                href={`/purchases/detail?id=${invoice.id}`}
+                aria-label={`عرض فاتورة ${invoice.invoiceNumber || invoice.id}`}
+                title="عرض الفاتورة"
+                className="inline-flex rounded-lg p-2 text-muted transition-colors hover:bg-line/50 hover:text-ink"
+              >
+                <Eye className="size-4" />
+              </Link>
+              {invoice.hasStockToTransfer && (
+                <IconButton
+                  title={`تحويل رصيد فاتورة ${invoice.invoiceNumber || invoice.id} إلى الكافيه`}
+                  onClick={() => setTransferringId(invoice.id)}
+                >
+                  <ArrowLeftRight className="size-4" />
+                </IconButton>
+              )}
+            </span>
           )}
+        />
+      )}
+
+      {transferringId && (
+        <TransferFormModal
+          mode="direct"
+          items={stock}
+          mainStock={mainStock}
+          initialInvoiceId={transferringId}
+          onClose={() => setTransferringId(null)}
+          onSaved={() => {
+            setTransferringId(null);
+            void load();
+          }}
         />
       )}
     </div>

@@ -2,6 +2,7 @@ import {
   branchCondition,
   branchValues,
   branchTransaction,
+  currentBranchId,
 } from "@cashier/db";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "@cashier/db";
@@ -174,6 +175,32 @@ export class PurchasesRepository {
       .innerJoin(users, eq(purchaseInvoices.createdBy, users.id))
       .where(branchCondition(purchaseInvoices))
       .orderBy(desc(purchaseInvoices.purchasedAt), desc(purchaseInvoices.id));
+  }
+
+  /**
+   * Invoice ids that still owe the cafe stock: some line holds more than the
+   * cafe has already received from that invoice (the same rule the invoice
+   * detail page applies).
+   */
+  listInvoicesWithStock() {
+    // written raw because a correlated subquery needs fully qualified columns
+    return this.db
+      .select({
+        invoiceId: purchaseLines.invoiceId,
+        hasStock: sql<boolean>`MAX(
+          CAST(purchase_lines.stock_quantity AS DECIMAL(14,3)) - COALESCE((
+            SELECT SUM(CAST(transfer_lines.quantity AS DECIMAL(14,3)))
+            FROM transfers
+            JOIN transfer_lines ON transfer_lines.transfer_id = transfers.id
+            WHERE transfers.purchase_invoice_id = purchase_lines.invoice_id
+              AND transfer_lines.item_id = purchase_lines.item_id
+              AND transfers.branch_id = ${currentBranchId()}
+          ), 0)
+        ) > 0`,
+      })
+      .from(purchaseLines)
+      .where(branchCondition(purchaseLines))
+      .groupBy(purchaseLines.invoiceId);
   }
 
   async findById(id: string) {
