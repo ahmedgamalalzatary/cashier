@@ -1,5 +1,5 @@
 // Shared types and utilities used by both apps/web and apps/api
-export * from './types.js';
-export * from './shift.js';
-export * from './external-discount.js';
-export * from './password.js';
+export * from "#types";
+export * from "#shift";
+export * from "#external-discount";
+export * from "#password";

@@ -1,4 +1,4 @@
-import { MAX_SHIFT_HOURS, SHIFT_WARNING_MINUTES } from "./types.js";
+import { MAX_SHIFT_HOURS, SHIFT_WARNING_MINUTES } from "#types";
 
 export type ShiftAutoCloseWarning = {
   /** Minutes left before the system closes the shift; 0 once it is overdue. */
