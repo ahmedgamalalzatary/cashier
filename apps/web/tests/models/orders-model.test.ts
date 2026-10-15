@@ -26,6 +26,8 @@ function order(overrides: Partial<OrderSummary> & Pick<OrderSummary, "id">) {
     totalCost: "40.00",
     isNegativeStock: false,
     isAdminSale: false,
+    refundedAmount: "0.00",
+    refundStatus: "none",
     // 10:00 Cairo on 2026-08-02
     createdAt: "2026-08-02T07:00:00.000Z",
     ...overrides,

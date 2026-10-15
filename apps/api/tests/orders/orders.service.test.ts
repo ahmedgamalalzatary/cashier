@@ -118,6 +118,8 @@ describe("OrdersService idempotency fingerprint", () => {
       listLines: vi.fn().mockResolvedValue([]),
       listAllocations: vi.fn().mockResolvedValue([]),
       listModifiers: vi.fn().mockResolvedValue([]),
+      listRefundFigures: vi.fn().mockResolvedValue([]),
+      listOrderRefunds: vi.fn().mockResolvedValue([]),
     } as unknown as OrdersRepository;
     const service = new OrdersService(repo);
     const clientRequestId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -190,6 +192,8 @@ describe("OrdersService idempotency fingerprint", () => {
       listLines: vi.fn().mockResolvedValue([]),
       listAllocations: vi.fn().mockResolvedValue([]),
       listModifiers: vi.fn().mockResolvedValue([]),
+      listRefundFigures: vi.fn().mockResolvedValue([]),
+      listOrderRefunds: vi.fn().mockResolvedValue([]),
     } as unknown as OrdersRepository;
     const service = new OrdersService(repo);
     const clientRequestId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -249,6 +253,8 @@ function repoForCreate(tx: Record<string, unknown>) {
     listLines: vi.fn(async () => []),
     listAllocations: vi.fn(async () => []),
     listModifiers: vi.fn(async () => []),
+    listRefundFigures: vi.fn(async () => []),
+    listOrderRefunds: vi.fn(async () => []),
     consume,
   } as unknown as OrdersRepository;
 }
@@ -473,14 +479,21 @@ describe("OrdersService admin sales", () => {
 });
 
 describe("OrdersService lookups", () => {
-  it("404s a missing order and delegates the list", async () => {
+  it("404s a missing order and lists refund-free orders first", async () => {
     const repo = {
       findOrder: vi.fn(async () => undefined),
       listRecent: vi.fn(async () => [{ id: testId(1) }]),
+      listRefundFigures: vi.fn(async () => []),
     } as unknown as OrdersRepository;
     const service = new OrdersService(repo);
 
     await expect(service.get(testId(999))).rejects.toMatchObject({ status: 404 });
-    await expect(service.list()).resolves.toEqual([{ id: testId(1) }]);
+    await expect(service.list()).resolves.toEqual([
+      {
+        id: testId(1),
+        refundedAmount: "0.00",
+        refundStatus: "none",
+      },
+    ]);
   });
 });

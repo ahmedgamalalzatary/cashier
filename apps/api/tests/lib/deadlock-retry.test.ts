@@ -132,6 +132,8 @@ describe("orders.create retries after a deadlock", () => {
       listLines: vi.fn().mockResolvedValue([]),
       listAllocations: vi.fn().mockResolvedValue([]),
       listModifiers: vi.fn().mockResolvedValue([]),
+      listRefundFigures: vi.fn().mockResolvedValue([]),
+      listOrderRefunds: vi.fn().mockResolvedValue([]),
     } as unknown as OrdersRepository & { transaction: ReturnType<typeof vi.fn> };
 
     const replay = await new OrdersService(repo).create(

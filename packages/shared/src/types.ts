@@ -656,6 +656,8 @@ export type ProductStockSetupBody = {
 
 export type OrderDiscountType = "percent" | "fixed";
 
+export type RefundStatus = "none" | "partial" | "full";
+
 export type OrderSummary = {
   id: string;
   orderNumber: string;
@@ -673,6 +675,9 @@ export type OrderSummary = {
   isNegativeStock: boolean;
   /** True when an admin completed the sale without an open shift. */
   isAdminSale: boolean;
+  /** Cash that came back through refunds of this order. */
+  refundedAmount: string;
+  refundStatus: RefundStatus;
   createdAt: string;
 };
 
@@ -703,6 +708,8 @@ export type OrderLine = {
   lineSubtotal: string;
   totalCost: string;
   hasStockDeficit: boolean;
+  /** Of this line's sold quantity, what refunds brought back. */
+  refundedQuantity: string;
   modifiers: Array<{
     id: string;
     externalModifierGroupId: number;
@@ -715,8 +722,16 @@ export type OrderLine = {
   allocations: OrderLineAllocation[];
 };
 
+/** One refund document linked to an order, as the order page lists it. */
+export type OrderRefundLink = {
+  id: string;
+  amount: string;
+  createdAt: string;
+};
+
 export type OrderDetail = OrderSummary & {
   lines: OrderLine[];
+  refunds: OrderRefundLink[];
 };
 
 export type ExternalOrderStatus =

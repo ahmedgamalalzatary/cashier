@@ -200,6 +200,18 @@ export default function OrdersPage() {
           <Badge tone="success">مكتمل</Badge>
         ),
     },
+    {
+      key: "refund",
+      header: "المرتجع",
+      cell: (row) =>
+        row.refundStatus === "full" ? (
+          <Badge tone="danger">مرتجع بالكامل</Badge>
+        ) : row.refundStatus === "partial" ? (
+          <Badge tone="neutral">مرتجع جزئي</Badge>
+        ) : (
+          <span className="text-muted">—</span>
+        ),
+    },
   ];
 
   return (

@@ -21,7 +21,10 @@ const order: OrderDetail = {
   totalCost: "20.00",
   isNegativeStock: false,
   isAdminSale: false,
+  refundedAmount: "0.00",
+  refundStatus: "none",
   createdAt: "2026-07-20T10:00:00.000Z",
+  refunds: [],
   lines: [
     {
       id: testId(3),
@@ -38,6 +41,7 @@ const order: OrderDetail = {
       lineSubtotal: "80.00",
       totalCost: "20.00",
       hasStockDeficit: false,
+      refundedQuantity: "0.000",
       modifiers: [
         {
           id: testId(1),
@@ -66,6 +70,7 @@ const order: OrderDetail = {
       lineSubtotal: "25.00",
       totalCost: "12.00",
       hasStockDeficit: false,
+      refundedQuantity: "0.000",
       modifiers: [],
       allocations: [],
     },

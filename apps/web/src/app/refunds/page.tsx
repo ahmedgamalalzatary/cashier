@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type {
   OrderSummary,
   RefundDetail,
@@ -11,7 +12,7 @@ import { PageHeader } from "@cashier/web-core/components/ui/page-header";
 import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
 import { Modal } from "@cashier/web-core/components/ui/modal";
 import { Section } from "@cashier/web-core/components/ui/section";
-import { EmptyState, ErrorBanner } from "@cashier/web-core/components/ui/states";
+import { EmptyState, ErrorBanner, LoadingState } from "@cashier/web-core/components/ui/states";
 import { OrderPicker } from "@/components/refunds/order-picker";
 import { RefundOrderModal } from "@/components/refunds/refund-order-modal";
 import { formatMoney } from "@cashier/web-core/lib/format";
@@ -19,6 +20,15 @@ import { listOrders } from "@/services/orders-service";
 import { getRefund, listRefunds } from "@/services/refunds-service";
 
 export default function RefundsPage() {
+  return (
+    <Suspense fallback={<LoadingState label="جارِ تحميل المرتجعات…" />}>
+      <RefundsView />
+    </Suspense>
+  );
+}
+
+function RefundsView() {
+  const requestedRefund = useSearchParams().get("refund");
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [refunds, setRefunds] = useState<RefundSummary[]>([]);
   const [refundingOrderId, setRefundingOrderId] = useState<string | null>(null);
@@ -40,12 +50,23 @@ export default function RefundsPage() {
     Promise.resolve()
       .then(() => load(() => cancelled))
       .catch((cause: Error) => {
-        if (!cancelled) setError(cause.message);
+        if (cancelled) return;
+        setError(cause.message);
       });
+    // a direct link to one refund (order page) opens its detail
+    if (requestedRefund) {
+      getRefund(requestedRefund)
+        .then((refund) => {
+          if (!cancelled) setDetail(refund);
+        })
+        .catch((cause: Error) => {
+          if (!cancelled) setError(cause.message);
+        });
+    }
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [requestedRefund]);
 
   const refundColumns: DataColumn<RefundSummary>[] = [
     {

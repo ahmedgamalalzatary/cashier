@@ -2,6 +2,7 @@ import {
   branchCondition,
   branchValues,
   branchTransaction,
+  currentBranchId,
 } from "@cashier/db";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "@cashier/db";
@@ -18,6 +19,8 @@ import {
   orderLineModifiers,
   orderLines,
   orders,
+  refundLines,
+  refunds,
   stockBatches,
   stockMovements,
   shifts,
@@ -448,5 +451,48 @@ export class OrdersRepository {
         ),
       )
       .orderBy(asc(orderLineModifiers.id));
+  }
+
+  /**
+   * Per sold line of these orders: what was sold and what its refunds brought
+   * back (quantity and cash). Rows exist even without refunds, so callers can
+   * tell "nothing refunded" apart from a missing lookup.
+   */
+  listRefundFigures(orderIds: string[]) {
+    if (orderIds.length === 0) return Promise.resolve([]);
+    return this.db
+      .select({
+        orderId: orderLines.orderId,
+        orderLineId: orderLines.id,
+        soldQuantity: orderLines.quantity,
+        refundedQuantity: sql<string>`CAST(COALESCE(SUM(${refundLines.quantity}), 0) AS DECIMAL(14,3))`,
+        refundedAmount: sql<string>`CAST(COALESCE(SUM(${refundLines.refundAmount}), 0) AS DECIMAL(12,2))`,
+      })
+      .from(orderLines)
+      .leftJoin(
+        refundLines,
+        and(
+          eq(refundLines.orderLineId, orderLines.id),
+          eq(refundLines.branchId, currentBranchId()),
+        ),
+      )
+      .where(
+        branchCondition(orderLines, inArray(orderLines.orderId, orderIds)),
+      )
+      .groupBy(orderLines.orderId, orderLines.id)
+      .orderBy(asc(orderLines.id));
+  }
+
+  /** Refund documents of one order, newest first (the order page links them). */
+  listOrderRefunds(orderId: string) {
+    return this.db
+      .select({
+        id: refunds.id,
+        amount: refunds.amount,
+        createdAt: refunds.createdAt,
+      })
+      .from(refunds)
+      .where(branchCondition(refunds, eq(refunds.orderId, orderId)))
+      .orderBy(desc(refunds.id));
   }
 }

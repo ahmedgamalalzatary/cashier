@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { OrderDetail } from "@cashier/shared";
 import {
@@ -189,6 +190,7 @@ function OrderDetailView() {
           headers={[
             "الصنف",
             "الكمية",
+            "المرتجع",
             "سعر الوحدة",
             "الإجمالي",
             ...(isAdmin ? ["التكلفة"] : []),
@@ -208,6 +210,16 @@ function OrderDetailView() {
                 ))}
               </td>
               <td className="tnum px-4 py-3">{quantity(line.quantity)}</td>
+              <td className="tnum px-4 py-3">
+                {Number(line.refundedQuantity) > 0 ? (
+                  <span>
+                    {quantity(line.refundedQuantity)} من{" "}
+                    {quantity(line.quantity)}
+                  </span>
+                ) : (
+                  <span className="text-muted">—</span>
+                )}
+              </td>
               <td className="tnum px-4 py-3 text-muted">
                 {formatMoney(line.unitPrice)}
               </td>
@@ -223,6 +235,39 @@ function OrderDetailView() {
           ))}
         </Table>
       </div>
+
+      {order.refunds.length > 0 && (
+        <div className="mb-6 rounded-xl border border-line p-4">
+          <p className="text-sm font-medium">
+            مرتجعات هذا الطلب
+            {Number(order.refundedAmount) > 0 && (
+              <span className="tnum text-muted">
+                {" "}
+                — <b className="tnum text-danger">
+                  {formatMoney(order.refundedAmount)}
+                </b>{" "}
+                مستردة
+              </span>
+            )}
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {order.refunds.map((refund) => (
+              <li key={refund.id} className="text-sm">
+                <Link
+                  href={`/refunds?refund=${refund.id}`}
+                  className="font-medium text-primary underline"
+                >
+                  مرتجع {dateTime.format(new Date(refund.createdAt))}
+                </Link>
+                <span className="tnum text-muted">
+                  {" "}
+                  — {formatMoney(refund.amount)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {isAdmin && (
         <>

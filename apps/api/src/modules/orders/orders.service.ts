@@ -4,9 +4,45 @@ import { requestFingerprint as hashRequest } from "../../lib/request-fingerprint
 import { transactionWithDeadlockRetry } from "../../lib/deadlock-retry.js";
 import { HttpError } from "@cashier/server-core";
 import type { FifoAllocation } from "../inventory/inventory.service.js";
+import type { RefundStatus } from "@cashier/shared";
 import { calculateExternalOrderLine } from "./external-order-line.js";
 import type { OrdersRepository } from "./orders.repository.js";
 import type { OrderInput, OrderLineInput } from "./orders.schemas.js";
+
+type RefundFigure = {
+  soldQuantity: string;
+  refundedQuantity: string;
+  refundedAmount: string;
+};
+
+const QUANTITY_EPSILON_MILLI = 1n; // a rounding hair in the third decimal
+
+const stringToMilli = (value: string) => stringToScaled(value, 3);
+
+const sumAmounts = (figures: RefundFigure[]) =>
+  figures.reduce(
+    (total, figure) =>
+      (Number(total) + Number(figure.refundedAmount)).toFixed(2),
+    "0.00",
+  );
+
+/** none / partial / full, from what each sold line got back. */
+export function refundStatusFor(
+  figures: Array<RefundFigure>,
+): RefundStatus {
+  let refundedSomewhere = false;
+  let everythingBack = true;
+  for (const figure of figures) {
+    const sold = stringToMilli(figure.soldQuantity);
+    if (sold === 0n) continue;
+    const refunded = stringToMilli(figure.refundedQuantity);
+    if (refunded > 0n) refundedSomewhere = true;
+    if (sold - refunded > QUANTITY_EPSILON_MILLI) everythingBack = false;
+  }
+  if (everythingBack && refundedSomewhere) return "full";
+  if (refundedSomewhere) return "partial";
+  return "none";
+}
 
 const formatScaled = (value: bigint, scale: number) => {
   const negative = value < 0n;
@@ -325,22 +361,48 @@ export class OrdersService {
     });
   }
 
-  list() {
-    return this.repo.listRecent();
+  async list() {
+    const rows = await this.repo.listRecent();
+    const figures = await this.repo.listRefundFigures(
+      rows.map((row) => row.id),
+    );
+    const byOrder = new Map<string, RefundFigure[]>();
+    for (const figure of figures) {
+      const group = byOrder.get(figure.orderId) ?? [];
+      group.push(figure);
+      byOrder.set(figure.orderId, group);
+    }
+    return rows.map((row) => {
+      const figuresOfOrder = byOrder.get(row.id) ?? [];
+      return {
+        ...row,
+        refundedAmount: sumAmounts(figuresOfOrder),
+        refundStatus: refundStatusFor(figuresOfOrder),
+      };
+    });
   }
 
   async get(id: string) {
     const order = await this.repo.findOrder(id);
     if (!order) throw new HttpError(404, "الطلب غير موجود");
     const lines = await this.repo.listLines(id);
-    const [allocations, modifiers] = await Promise.all([
+    const [allocations, modifiers, figures, refunds] = await Promise.all([
       this.repo.listAllocations(lines.map((line) => line.id)),
       this.repo.listModifiers(lines.map((line) => line.id)),
+      this.repo.listRefundFigures([id]),
+      this.repo.listOrderRefunds(id),
     ]);
+    const soldBack = new Map(
+      figures.map((figure) => [figure.orderLineId, figure.refundedQuantity]),
+    );
     return {
       ...order,
+      refundedAmount: sumAmounts(figures),
+      refundStatus: refundStatusFor(figures),
+      refunds,
       lines: lines.map((line) => ({
         ...line,
+        refundedQuantity: soldBack.get(line.id) ?? "0.000",
         allocations: allocations
           .filter((allocation) => allocation.orderLineId === line.id)
           .map(({ orderLineId: _orderLineId, ...allocation }) => allocation),

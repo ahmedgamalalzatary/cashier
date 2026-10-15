@@ -84,6 +84,8 @@ const makeService = (productRow: ReturnType<typeof product>) => {
     listLines: vi.fn().mockResolvedValue([]),
     listAllocations: vi.fn().mockResolvedValue([]),
     listModifiers: vi.fn().mockResolvedValue([]),
+    listRefundFigures: vi.fn().mockResolvedValue([]),
+    listOrderRefunds: vi.fn().mockResolvedValue([]),
   } as unknown as OrdersRepository;
   return { service: new OrdersService(repo), tx };
 };

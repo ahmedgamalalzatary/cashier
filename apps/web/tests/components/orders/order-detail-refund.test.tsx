@@ -51,7 +51,10 @@ const order = {
   totalCost: "60.00",
   isNegativeStock: false,
   isAdminSale: false,
+  refundedAmount: "0.00",
+  refundStatus: "none",
   createdAt: "2026-10-15T14:00:00",
+  refunds: [],
   lines: [
     {
       id: "l1",
@@ -68,6 +71,7 @@ const order = {
       lineSubtotal: "100.00",
       totalCost: "60.00",
       hasStockDeficit: false,
+      refundedQuantity: "0.000",
       modifiers: [],
       allocations: [],
     },
