@@ -1,201 +1,26 @@
-import { beforeEach, it, testBranchValues } from "../support/ids.js";
+import { beforeEach, it } from "../support/ids.js";
 import { describe, expect } from "vitest";
 import request from "supertest";
 import { and, eq, isNull } from "drizzle-orm";
-import { createApp } from "../../../../apps/api/src/app.js";
+import { stockBatches, stockMovements } from "@cashier/db";
+import { db } from "../support/api-setup.js";
 import {
-  categories,
-  items,
-  stockBatches,
-  stockMovements,
-  suppliers,
-  transferRequests,
-} from "@cashier/db";
-import { appOptions, db, nextTestItemCode } from "../support/api-setup.js";
-import { createUser, loginAs } from "../support/api-helpers.js";
+  app,
+  buyIntomain,
+  createItem,
+  createRequest,
+  receiveMainBatch,
+  setupCafeSession,
+} from "../support/transfers-fixtures.js";
 
-const app = () => createApp(db, appOptions);
 let adminAuthorization: { readonly Authorization: string };
 let cashierAuthorization: { readonly Authorization: string };
-let openedShiftId: string;
 
 beforeEach(async () => {
-  adminAuthorization = await loginAs(app(), "admin");
-  cashierAuthorization = await loginAs(app(), "cashier");
-  const opened = await request(app())
-    .post("/api/shifts/open")
-    .set(cashierAuthorization)
-    .send({ openingFloat: 0 });
-  openedShiftId = opened.body.id;
+  ({ adminAuthorization, cashierAuthorization } = await setupCafeSession());
 });
 
-async function loginSecondCashier() {
-  const credentials = await createUser("cashier", "cashier-two");
-  const response = await request(app())
-    .post("/api/auth/login")
-    .send(credentials);
-  return { Authorization: `Bearer ${response.body.token}` } as const;
-}
-
-async function createItem(name = "بن") {
-  const [category] = await db.insert(categories).values(testBranchValues({ name: "خامات" })).$returningId();
-  const [item] = await db.insert(items).values(testBranchValues({
-    code: nextTestItemCode(),
-    name,
-    categoryId: category.id,
-    type: "raw",
-    stockUnit: "كجم",
-  })).$returningId();
-  return item.id;
-}
-
-async function receiveMainBatch(
-  itemId: string,
-  quantity: string,
-  unitCost: string,
-  receivedAt: Date,
-) {
-  const [batch] = await db.insert(stockBatches).values(testBranchValues({
-    itemId,
-    warehouse: "main",
-    initialQuantity: quantity,
-    remainingQuantity: quantity,
-    unitCost,
-    receivedAt,
-    sourceType: "purchase",
-  })).$returningId();
-  await db.insert(stockMovements).values(testBranchValues({
-    itemId,
-    warehouse: "main",
-    batchId: batch.id,
-    movementType: "purchase",
-    quantity,
-    unitCost,
-    occurredAt: receivedAt,
-  }));
-  return batch.id;
-}
-
-async function createRequest(
-  authorization: { readonly Authorization: string },
-  itemId: string,
-  quantity = 1,
-) {
-  return request(app())
-    .post("/api/transfers/requests")
-    .set(authorization)
-    .send({
-      clientRequestId: crypto.randomUUID(),
-      notes: "احتياج الوردية",
-      lines: [{ itemId, quantity }],
-    });
-}
-
-/** Buys `quantity` of an item at `unitPrice` straight into the main warehouse. */
-async function buyIntomain(itemId: string, quantity: number, unitPrice: number) {
-  const [supplier] = await db
-    .insert(suppliers)
-    .values(testBranchValues({ name: "مورد" }))
-    .$returningId();
-  const response = await request(app())
-    .post("/api/purchases")
-    .set(adminAuthorization)
-    .send({
-      clientRequestId: crypto.randomUUID(),
-      supplierId: supplier.id,
-      invoiceNumber: null,
-      purchasedAt: "2026-07-21",
-      paidAmount: 0,
-      notes: null,
-      lines: [
-        { itemId, quantity, unitMode: "stock", unitPrice, toCafeQuantity: 0 },
-      ],
-    });
-  expect(response.status).toBe(201);
-}
-
-describe("cafe transfer requests and transfers", () => {
-  it("lets cashiers create requests and lets every cashier see them", async () => {
-    const itemId = await createItem();
-    const created = await createRequest(cashierAuthorization, itemId, 3.5);
-    expect(created.status).toBe(201);
-
-    const secondCashierAuthorization = await loginSecondCashier();
-    const list = await request(app())
-      .get("/api/transfers/requests")
-      .set(secondCashierAuthorization);
-
-    expect(list.status).toBe(200);
-    expect(list.body).toEqual([
-      expect.objectContaining({
-        id: created.body.id,
-        status: "pending",
-        requestedByName: "كاشير",
-        notes: "احتياج الوردية",
-        lineCount: 1,
-      }),
-    ]);
-
-    const detail = await request(app())
-      .get(`/api/transfers/requests/${created.body.id}`)
-      .set(secondCashierAuthorization);
-    expect(detail.status).toBe(200);
-    expect(detail.body.shiftId).toBe(openedShiftId);
-    expect(detail.body.lines).toEqual([
-      expect.objectContaining({ itemId, itemName: "بن", quantity: "3.500" }),
-    ]);
-    const shift = await request(app())
-      .get("/api/shifts/current")
-      .set(cashierAuthorization);
-    expect(shift.body.totals.transferRequests).toBe(1);
-  });
-
-  it("requires the cashier open shift and links the request to it", async () => {
-    const itemId = await createItem();
-    await request(app())
-      .post(`/api/shifts/${openedShiftId}/close`)
-      .set(cashierAuthorization)
-      .send({ actualCash: 0 });
-
-    const response = await createRequest(cashierAuthorization, itemId);
-
-    expect(response.status).toBe(409);
-    expect(await db.select().from(transferRequests)).toEqual([]);
-  });
-
-  it("allows an admin request without pretending it belongs to a shift", async () => {
-    const itemId = await createItem();
-
-    const created = await createRequest(adminAuthorization, itemId);
-    const detail = await request(app())
-      .get(`/api/transfers/requests/${created.body.id}`)
-      .set(adminAuthorization);
-
-    expect(created.status).toBe(201);
-    expect(detail.body.shiftId).toBeNull();
-  });
-
-  it("serializes a cashier request with a concurrent shift close", async () => {
-    const itemId = await createItem();
-
-    const [created, closed] = await Promise.all([
-      createRequest(cashierAuthorization, itemId),
-      request(app())
-        .post(`/api/shifts/${openedShiftId}/close`)
-        .set(cashierAuthorization)
-        .send({ actualCash: 0 }),
-    ]);
-
-    expect(closed.status).toBe(200);
-    expect([201, 409]).toContain(created.status);
-    if (created.status === 201) {
-      const detail = await request(app())
-        .get(`/api/transfers/requests/${created.body.id}`)
-        .set(cashierAuthorization);
-      expect(detail.body.shiftId).toBe(openedShiftId);
-    }
-  });
-
+describe("cafe transfer costing and direct transfers", () => {
   it("approves edited quantities and preserves every main FIFO batch cost in cafe stock", async () => {
     const itemId = await createItem();
     const firstBatchId = await receiveMainBatch(
@@ -218,7 +43,11 @@ describe("cafe transfer requests and transfers", () => {
       .send({ lines: [{ itemId, quantity: 4 }] });
 
     expect(approved.status).toBe(201);
-    expect(approved.body.transferId).toEqual(expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));
+    expect(approved.body.transferId).toEqual(
+      expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      ),
+    );
 
     const [firstMainBatch] = await db
       .select()
@@ -403,7 +232,7 @@ describe("cafe transfer requests and transfers", () => {
       .send({ lines: [{ itemId, quantity: 3 }] });
     expect(approved.status).toBe(201);
 
-    await buyIntomain(itemId, 1, 25);
+    await buyIntomain(adminAuthorization, itemId, 1, 25);
 
     const mainStock = await request(app())
       .get("/api/inventory/main/stock")
@@ -418,6 +247,36 @@ describe("cafe transfer requests and transfers", () => {
       quantity: "1.000",
       unitCost: "10.000000",
     });
+  });
+
+  it("serializes simultaneous approvals so exactly one transfer commits", async () => {
+    const itemId = await createItem();
+    await receiveMainBatch(
+      itemId,
+      "2.000",
+      "10.000000",
+      new Date("2026-07-19T00:00:00.000Z"),
+    );
+    const created = await createRequest(cashierAuthorization, itemId, 1);
+    const approve = () =>
+      request(app())
+        .post(`/api/transfers/requests/${created.body.id}/approve`)
+        .set(adminAuthorization)
+        .send({ lines: [{ itemId, quantity: 1 }] });
+
+    const responses = await Promise.all([approve(), approve()]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      201, 409,
+    ]);
+    const transfers = await request(app())
+      .get("/api/transfers")
+      .set(cashierAuthorization);
+    expect(transfers.body).toHaveLength(1);
+    const cafeStock = await request(app())
+      .get("/api/inventory/cafe/stock")
+      .set(cashierAuthorization);
+    expect(cafeStock.body[0].quantity).toBe("1.000");
   });
 
   it("rejects approval when it omits an originally requested item", async () => {
@@ -451,68 +310,6 @@ describe("cafe transfer requests and transfers", () => {
       .get(`/api/transfers/requests/${created.body.id}`)
       .set(cashierAuthorization);
     expect(detail.body.status).toBe("pending");
-  });
-
-  it("serializes simultaneous approvals so exactly one transfer commits", async () => {
-    const itemId = await createItem();
-    await receiveMainBatch(
-      itemId,
-      "2.000",
-      "10.000000",
-      new Date("2026-07-19T00:00:00.000Z"),
-    );
-    const created = await createRequest(cashierAuthorization, itemId, 1);
-    const approve = () =>
-      request(app())
-        .post(`/api/transfers/requests/${created.body.id}/approve`)
-        .set(adminAuthorization)
-        .send({ lines: [{ itemId, quantity: 1 }] });
-
-    const responses = await Promise.all([approve(), approve()]);
-
-    expect(responses.map((response) => response.status).sort()).toEqual([
-      201, 409,
-    ]);
-    const transfers = await request(app())
-      .get("/api/transfers")
-      .set(cashierAuthorization);
-    expect(transfers.body).toHaveLength(1);
-    const cafeStock = await request(app())
-      .get("/api/inventory/cafe/stock")
-      .set(cashierAuthorization);
-    expect(cafeStock.body[0].quantity).toBe("1.000");
-  });
-
-  it("allows only admins to reject pending requests and records the reason", async () => {
-    const itemId = await createItem();
-    const created = await createRequest(cashierAuthorization, itemId, 1);
-
-    const forbidden = await request(app())
-      .post(`/api/transfers/requests/${created.body.id}/reject`)
-      .set(cashierAuthorization)
-      .send({ reason: "الرصيد غير مطلوب" });
-    expect(forbidden.status).toBe(403);
-
-    const rejected = await request(app())
-      .post(`/api/transfers/requests/${created.body.id}/reject`)
-      .set(adminAuthorization)
-      .send({ reason: "الرصيد غير مطلوب" });
-    expect(rejected.status).toBe(200);
-
-    const detail = await request(app())
-      .get(`/api/transfers/requests/${created.body.id}`)
-      .set(cashierAuthorization);
-    expect(detail.body).toMatchObject({
-      status: "rejected",
-      rejectionReason: "الرصيد غير مطلوب",
-      reviewedByName: "مدير",
-    });
-
-    const approveRejected = await request(app())
-      .post(`/api/transfers/requests/${created.body.id}/approve`)
-      .set(adminAuthorization)
-      .send({ lines: [{ itemId, quantity: 1 }] });
-    expect(approveRejected.status).toBe(409);
   });
 
   it("allows admins to create direct transfers but rejects cashier access", async () => {
@@ -601,37 +398,5 @@ describe("cafe transfer requests and transfers", () => {
       detail.body.lines.map((line: { lineCost: string }) => line.lineCost),
     ).toEqual(["0.01", "0.01"]);
     expect(detail.body.totalCost).toBe("0.02");
-  });
-
-  it("replays the same clientRequestId without duplicating the request, and 409s on a changed payload", async () => {
-    const itemId = await createItem();
-    const body = {
-      clientRequestId: crypto.randomUUID(),
-      notes: "احتياج الوردية",
-      lines: [{ itemId, quantity: 2 }],
-    };
-
-    const first = await request(app())
-      .post("/api/transfers/requests")
-      .set(cashierAuthorization)
-      .send(body);
-    expect(first.status).toBe(201);
-
-    // a retry with the same key returns the original request, not a duplicate
-    const replay = await request(app())
-      .post("/api/transfers/requests")
-      .set(cashierAuthorization)
-      .send(body);
-    expect(replay.status).toBe(201);
-    expect(replay.body.id).toBe(first.body.id);
-    expect(await db.select().from(transferRequests)).toHaveLength(1);
-
-    // the same key with a different payload is a conflict, not a new request
-    const changed = await request(app())
-      .post("/api/transfers/requests")
-      .set(cashierAuthorization)
-      .send({ ...body, notes: "ملاحظة مختلفة" });
-    expect(changed.status).toBe(409);
-    expect(await db.select().from(transferRequests)).toHaveLength(1);
   });
 });

@@ -179,7 +179,7 @@ Small API changes plus UI. Run the full suite at the end of this phase.
   direct mode, `purchaseInvoiceId`) on the purchases page itself. The list refreshes after
   saving. The icon is hidden when every line of the invoice is already fully in the café.
 - **Changes:** add `hasStockToTransfer: boolean` to `PurchaseInvoiceSummary`
-  (`packages/shared/src/types.ts:294`), computed in the purchases list query with the same rule as
+  (`packages/shared/src/types/purchases.ts`), computed in the purchases list query with the same rule as
   `purchases/detail/page.tsx:74-77` (some line has `stockQuantity − transferredToCafeQuantity > 0`).
 - **Done when:** the icon hides after a full transfer, and the server caps still apply
   (spec §5, invoice ⇄ café link).
@@ -237,16 +237,16 @@ with `.receipt-print-root`. A4 uses `@page a4` / `.a4-print-root` (`app/globals.
 
 **Audit (now → goal):**
 
-| Print button                                                    | Prints               | Now          | Goal                    |
-| --------------------------------------------------------------- | -------------------- | ------------ | ----------------------- |
-| POS (`pos/page.tsx:228`, `:781`)                                | sale receipt         | 80mm         | 80mm ✔ (keep)           |
-| Order page / orders row                                         | sale receipt         | 80mm         | 80mm ✔ (fixed in 1.5)   |
-| Online order row (`external-orders-panel.tsx:302`)              | order slip           | 80mm         | 80mm ✔ (keep)           |
-| Purchase invoice (`purchases/detail/page.tsx:102`)              | invoice + item table | 80mm         | **A4** (4.1)            |
-| Supplier statement (`suppliers/statement/page.tsx:75`)          | statement table      | 80mm         | **A4** (4.1)            |
-| Stocktake (`stocktakes/page.tsx:271`)                           | count sheet          | 80mm         | **A4** (4.1)            |
-| Recipe cost card (`components/recipes/cost-card-modal.tsx:30`)  | cost table           | A4           | A4 ✔ (adopt 4.1 layout) |
-| Reports (`packages/web-core/src/features/reports-page.tsx:650`) | report               | A4 landscape | A4 landscape (phase 6)  |
+| Print button                                                   | Prints               | Now          | Goal                    |
+| -------------------------------------------------------------- | -------------------- | ------------ | ----------------------- |
+| POS (`pos/page.tsx`)                                           | sale receipt         | 80mm         | 80mm ✔ (keep)           |
+| Order page / orders row                                        | sale receipt         | 80mm         | 80mm ✔ (fixed in 1.5)   |
+| Online order row (`external-orders-panel.tsx:302`)             | order slip           | 80mm         | 80mm ✔ (keep)           |
+| Purchase invoice (`purchases/detail/page.tsx:102`)             | invoice + item table | 80mm         | **A4** (4.1)            |
+| Supplier statement (`suppliers/statement/page.tsx:75`)         | statement table      | 80mm         | **A4** (4.1)            |
+| Stocktake (`stocktakes/page.tsx:271`)                          | count sheet          | 80mm         | **A4** (4.1)            |
+| Recipe cost card (`components/recipes/cost-card-modal.tsx:30`) | cost table           | A4           | A4 ✔ (adopt 4.1 layout) |
+| Reports (`packages/web-core/src/features/reports-page.tsx`)    | report               | A4 landscape | A4 landscape (phase 6)  |
 
 ### 4.1 Shared A4 document layout; three prints move to A4
 
@@ -338,7 +338,8 @@ end.
 
 ## Phase 6 — Reports redesign
 
-`packages/web-core/src/features/reports-page.tsx` (shared by desktop and online),
+`packages/web-core/src/features/reports-page.tsx` (shared by desktop and online; its per-tab table
+builders live in `packages/web-core/src/features/reports/tables/*`),
 `packages/web-core/src/components/reports/report-table.tsx`, `packages/web-core/src/models/reports-model.ts`,
 and `packages/server-core/src/modules/reports/*`. Spec §14 "Reports page design" holds the target.
 Run the full suite at the end, including `@cashier/online-web` and `@cashier/online-api`.
@@ -350,7 +351,7 @@ in minutes. There's no margin %.
 ### 6.1 Fix the two confirmed bugs
 
 - **Now:** every ID column shows **"ليس رقمًا"**, because UUIDs are formatted with `kind: "number"`
-  (`reports-page.tsx`: `shiftId`, `id`, `referenceId`, `transferId`, `requestId`, `invoiceId`,
+  (`features/reports/tables/*`: `shiftId`, `id`, `referenceId`, `transferId`, `requestId`, `invoiceId`,
   `preparationId`, `purchaseInvoiceId`). Verified on live data. "By day" hides `returnedCost`, so a
   row doesn't add up (597 − 37.32 − 403 ≠ 168.68).
 - **Goal:** ID columns show a readable reference (the document number where one exists, e.g. the

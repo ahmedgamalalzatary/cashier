@@ -2,221 +2,37 @@ import { beforeEach, it, testBranchValues } from "../support/ids.js";
 import { describe, expect } from "vitest";
 import request from "supertest";
 import { eq } from "drizzle-orm";
-import { createApp } from "../../../../apps/api/src/app.js";
 import {
-  categories,
-  externalCategories,
-  externalProducts,
-  items,
   orderLineAllocations,
   orderLines,
   orders,
   refundLineAllocations,
   refunds,
-  stockBatches,
   stockMovements,
-  users,
   wasteEntries,
 } from "@cashier/db";
-import { appOptions, db, nextTestItemCode } from "../support/api-setup.js";
-import { createUser, loginAs } from "../support/api-helpers.js";
+import { db } from "../support/api-setup.js";
+import { createUser } from "../support/api-helpers.js";
+import {
+  app,
+  setupRefundSession,
+  soldResaleOrder,
+} from "../support/refunds-fixtures.js";
 
-const app = () => createApp(db, appOptions);
 let authorization: { readonly Authorization: string };
 // cost figures are admin-only (spec §2), so cost checks re-read as admin
-let adminAuthorization: { readonly Authorization: string; readonly "X-Branch-Id": string };
+let adminAuthorization: {
+  readonly Authorization: string;
+  readonly "X-Branch-Id": string;
+};
 
 beforeEach(async () => {
-  authorization = await loginAs(app(), "cashier");
-  adminAuthorization = await loginAs(app(), "admin");
-  await request(app())
-    .post("/api/shifts/open")
-    .set(authorization)
-    .send({ openingFloat: 100 });
+  ({ authorization, adminAuthorization } = await setupRefundSession());
 });
-
-async function soldResaleOrder() {
-  const [cashier] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.username, "cashier"));
-  const [category] = await db.insert(categories).values(testBranchValues({ name: "مياه" })).$returningId();
-  const [item] = await db.insert(items).values(testBranchValues({
-    code: nextTestItemCode(),
-    name: "مياه",
-    categoryId: category.id,
-    type: "resale",
-    stockUnit: "قطعة",
-    sellingPrice: "10.00",
-  })).$returningId();
-  const shift = (
-    await request(app()).get("/api/shifts/current").set(authorization)
-  ).body;
-  const [order] = await db.insert(orders).values(testBranchValues({
-    orderNumber: `TEST-${Date.now()}`,
-    clientRequestId: crypto.randomUUID(),
-    requestFingerprint: "a".repeat(64),
-    cashierId: cashier.id,
-    shiftId: shift.id,
-    subtotal: "20.00",
-    discountType: "fixed",
-    discountValue: "2.00",
-    discountAmount: "2.00",
-    total: "18.00",
-    cashReceived: "20.00",
-    changeAmount: "2.00",
-    totalCost: "6.00",
-  })).$returningId();
-  const [line] = await db.insert(orderLines).values(testBranchValues({
-    orderId: order.id,
-    type: "item",
-    itemId: item.id,
-    productName: "مياه",
-    quantity: "2.000",
-    unitPrice: "10.00",
-    lineSubtotal: "20.00",
-    totalCost: "6.00",
-  })).$returningId();
-  const [sourceBatch] = await db.insert(stockBatches).values(testBranchValues({
-    itemId: item.id,
-    warehouse: "cafe",
-    initialQuantity: "10.000",
-    remainingQuantity: "8.000",
-    unitCost: "3.000000",
-    receivedAt: new Date(),
-    sourceType: "transfer_in",
-  })).$returningId();
-  const [saleMovement] = await db.insert(stockMovements).values(testBranchValues({
-    itemId: item.id,
-    warehouse: "cafe",
-    batchId: sourceBatch.id,
-    movementType: "sale",
-    quantity: "-2.000",
-    unitCost: "3.000000",
-    referenceType: "order",
-    referenceId: order.id,
-    occurredAt: new Date(),
-  })).$returningId();
-  await db.insert(orderLineAllocations).values(testBranchValues({
-    orderLineId: line.id,
-    itemId: item.id,
-    itemName: "مياه",
-    batchId: sourceBatch.id,
-    stockMovementId: saleMovement.id,
-    quantity: "2.000",
-    unitCost: "3.000000",
-  }));
-  return { orderId: order.id, lineId: line.id };
-}
-
-async function soldExternalOrder() {
-  const [cashier] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.username, "cashier"));
-  await db
-    .insert(externalCategories)
-    .values(testBranchValues({
-      externalId: 9001,
-      nameAr: "مشروبات",
-      nameEn: "Drinks",
-      isActive: true,
-      isVisible: true,
-      displayOrder: 0,
-      syncedAt: new Date(),
-    }))
-    .onDuplicateKeyUpdate({ set: { nameAr: "مشروبات" } });
-  await db
-    .insert(externalProducts)
-    .values(testBranchValues({
-      externalId: 9101,
-      externalCategoryId: 9001,
-      nameAr: "لاتيه",
-      nameEn: "Latte",
-      price: "20.00",
-      calories: 0,
-      pointsReward: 0,
-      isAvailable: true,
-      isVisible: true,
-      syncedAt: new Date(),
-    }))
-    .onDuplicateKeyUpdate({ set: { nameAr: "لاتيه" } });
-  const [ingredientCategory] = await db
-    .insert(categories)
-    .values(testBranchValues({ name: "خامات" })).$returningId();
-  const [ingredient] = await db.insert(items).values(testBranchValues({
-    code: nextTestItemCode(),
-    name: "حليب",
-    categoryId: ingredientCategory.id,
-    type: "raw",
-    stockUnit: "لتر",
-  })).$returningId();
-  const shift = (
-    await request(app()).get("/api/shifts/current").set(authorization)
-  ).body;
-  const [order] = await db.insert(orders).values(testBranchValues({
-    orderNumber: `TEST-${Date.now()}`,
-    clientRequestId: crypto.randomUUID(),
-    requestFingerprint: "b".repeat(64),
-    cashierId: cashier.id,
-    shiftId: shift.id,
-    subtotal: "20.00",
-    discountAmount: "0.00",
-    total: "20.00",
-    cashReceived: "20.00",
-    changeAmount: "0.00",
-    totalCost: "1.00",
-  })).$returningId();
-  const [line] = await db.insert(orderLines).values(testBranchValues({
-    orderId: order.id,
-    type: "external_product",
-    externalProductId: 9101,
-    productName: "لاتيه",
-    quantity: "1.000",
-    unitPrice: "20.00",
-    lineSubtotal: "20.00",
-    totalCost: "1.00",
-  })).$returningId();
-  const [sourceBatch] = await db.insert(stockBatches).values(testBranchValues({
-    itemId: ingredient.id,
-    warehouse: "cafe",
-    initialQuantity: "5.000",
-    remainingQuantity: "4.900",
-    unitCost: "10.000000",
-    receivedAt: new Date(),
-    sourceType: "transfer_in",
-  })).$returningId();
-  const [saleMovement] = await db.insert(stockMovements).values(testBranchValues({
-    itemId: ingredient.id,
-    warehouse: "cafe",
-    batchId: sourceBatch.id,
-    movementType: "sale",
-    quantity: "-0.100",
-    unitCost: "10.000000",
-    referenceType: "order",
-    referenceId: order.id,
-    occurredAt: new Date(),
-  })).$returningId();
-  await db.insert(orderLineAllocations).values(testBranchValues({
-    orderLineId: line.id,
-    itemId: ingredient.id,
-    itemName: "حليب",
-    batchId: sourceBatch.id,
-    stockMovementId: saleMovement.id,
-    quantity: "0.100",
-    unitCost: "10.000000",
-  }));
-  return {
-    orderId: order.id,
-    lineId: line.id,
-    ingredientId: ingredient.id,
-    batchId: sourceBatch.id,
-  };
-}
 
 describe("refunds", () => {
   it("partially refunds the discounted cash amount and restores resale stock at original cost", async () => {
-    const fixture = await soldResaleOrder();
+    const fixture = await soldResaleOrder(authorization);
     const response = await request(app())
       .post("/api/refunds")
       .set(authorization)
@@ -265,11 +81,17 @@ describe("refunds", () => {
   });
 
   it("restocks a fully discounted sale with a zero-cash refund", async () => {
-    const fixture = await soldResaleOrder();
+    const fixture = await soldResaleOrder(authorization);
     // 100% discount: the customer paid nothing, so the cash refund is zero
     await db
       .update(orders)
-      .set({ subtotal: "20.00", discountAmount: "20.00", total: "0.00", cashReceived: "0.00", changeAmount: "0.00" })
+      .set({
+        subtotal: "20.00",
+        discountAmount: "20.00",
+        total: "0.00",
+        cashReceived: "0.00",
+        changeAmount: "0.00",
+      })
       .where(eq(orders.id, fixture.orderId));
 
     const response = await request(app())
@@ -323,7 +145,7 @@ describe("refunds", () => {
   });
 
   it("rejects cumulative quantities above the sold amount", async () => {
-    const fixture = await soldResaleOrder();
+    const fixture = await soldResaleOrder(authorization);
     const body = {
       clientRequestId: crypto.randomUUID(),
       orderId: fixture.orderId,
@@ -348,7 +170,7 @@ describe("refunds", () => {
   });
 
   it("replays a concurrent double-submit of the same clientRequestId as one refund", async () => {
-    const fixture = await soldResaleOrder();
+    const fixture = await soldResaleOrder(authorization);
     const body = {
       clientRequestId: crypto.randomUUID(),
       orderId: fixture.orderId,
@@ -387,7 +209,7 @@ describe("refunds", () => {
   });
 
   it("rejects a concurrent refund of the same remaining unit from a different request", async () => {
-    const fixture = await soldResaleOrder();
+    const fixture = await soldResaleOrder(authorization);
     await db
       .update(orderLines)
       .set({ quantity: "1.000", lineSubtotal: "10.00" })
@@ -438,7 +260,7 @@ describe("refunds", () => {
   });
 
   it("never over-refunds discounted thirds and replays the same client request", async () => {
-    const fixture = await soldResaleOrder();
+    const fixture = await soldResaleOrder(authorization);
     await db
       .update(orders)
       .set({ subtotal: "1.00", discountAmount: "0.00", total: "1.00" })
@@ -509,98 +331,8 @@ describe("refunds", () => {
     expect(amounts.reduce((sum, amount) => sum + amount, 0)).toBe(1);
   });
 
-  it("rejects refund creation without an open shift", async () => {
-    const fixture = await soldResaleOrder();
-    const current = (
-      await request(app()).get("/api/shifts/current").set(authorization)
-    ).body;
-    await request(app())
-      .post(`/api/shifts/${current.id}/close`)
-      .set(authorization)
-      .send({ actualCash: 100 });
-
-    const response = await request(app())
-      .post("/api/refunds")
-      .set(authorization)
-      .send({
-        clientRequestId: crypto.randomUUID(),
-        orderId: fixture.orderId,
-        reason: "طلب العميل",
-        lines: [
-          {
-            orderLineId: fixture.lineId,
-            quantity: 1,
-            stockAction: "return_to_stock",
-          },
-        ],
-      });
-
-    expect(response.status).toBe(409);
-  });
-
-  it("lets an admin refund without a shift and keeps it out of the cashier drawer", async () => {
-    const fixture = await soldResaleOrder();
-
-    const response = await request(app())
-      .post("/api/refunds")
-      .set(adminAuthorization)
-      .send({
-        clientRequestId: crypto.randomUUID(),
-        orderId: fixture.orderId,
-        reason: "طلب العميل",
-        lines: [
-          {
-            orderLineId: fixture.lineId,
-            quantity: 1,
-            stockAction: "return_to_stock",
-          },
-        ],
-      });
-
-    expect(response.status).toBe(201);
-    expect(response.body).toMatchObject({
-      shiftId: null,
-      isAdminRefund: true,
-      cashierName: "مدير",
-      amount: "9.00",
-    });
-    const shift = (
-      await request(app()).get("/api/shifts/current").set(authorization)
-    ).body;
-    expect(shift.totals.refunds).toBe("0.00");
-  });
-
-  it("still requires an open shift from a cashier", async () => {
-    const fixture = await soldResaleOrder();
-    const current = (
-      await request(app()).get("/api/shifts/current").set(authorization)
-    ).body;
-    await request(app())
-      .post(`/api/shifts/${current.id}/close`)
-      .set(authorization)
-      .send({ actualCash: 100 });
-
-    const response = await request(app())
-      .post("/api/refunds")
-      .set(authorization)
-      .send({
-        clientRequestId: crypto.randomUUID(),
-        orderId: fixture.orderId,
-        reason: "طلب العميل",
-        lines: [
-          {
-            orderLineId: fixture.lineId,
-            quantity: 1,
-            stockAction: "return_to_stock",
-          },
-        ],
-      });
-
-    expect(response.status).toBe(409);
-  });
-
   it("maps repeated partial stock returns exactly across original sale allocations", async () => {
-    const fixture = await soldResaleOrder();
+    const fixture = await soldResaleOrder(authorization);
     const [first] = await db
       .select()
       .from(orderLineAllocations)
@@ -617,26 +349,36 @@ describe("refunds", () => {
       .update(orderLineAllocations)
       .set({ quantity: "2.000" })
       .where(eq(orderLineAllocations.id, first.id));
-    const [secondMovement] = await db.insert(stockMovements).values(testBranchValues({
-      itemId: first.itemId,
-      warehouse: "cafe",
-      batchId: first.batchId,
-      movementType: "sale",
-      quantity: "-1.000",
-      unitCost: "3.000000",
-      referenceType: "order",
-      referenceId: fixture.orderId,
-      occurredAt: new Date(),
-    })).$returningId();
-    const [second] = await db.insert(orderLineAllocations).values(testBranchValues({
-      orderLineId: fixture.lineId,
-      itemId: first.itemId,
-      itemName: first.itemName,
-      batchId: first.batchId,
-      stockMovementId: secondMovement.id,
-      quantity: "1.000",
-      unitCost: "3.000000",
-    })).$returningId();
+    const [secondMovement] = await db
+      .insert(stockMovements)
+      .values(
+        testBranchValues({
+          itemId: first.itemId,
+          warehouse: "cafe",
+          batchId: first.batchId,
+          movementType: "sale",
+          quantity: "-1.000",
+          unitCost: "3.000000",
+          referenceType: "order",
+          referenceId: fixture.orderId,
+          occurredAt: new Date(),
+        }),
+      )
+      .$returningId();
+    const [second] = await db
+      .insert(orderLineAllocations)
+      .values(
+        testBranchValues({
+          orderLineId: fixture.lineId,
+          itemId: first.itemId,
+          itemName: first.itemName,
+          batchId: first.batchId,
+          stockMovementId: secondMovement.id,
+          quantity: "1.000",
+          unitCost: "3.000000",
+        }),
+      )
+      .$returningId();
 
     for (let index = 0; index < 3; index += 1) {
       const response = await request(app())
@@ -666,7 +408,7 @@ describe("refunds", () => {
   });
 
   it("rejects fractional recipe-product refunds", async () => {
-    const fixture = await soldResaleOrder();
+    const fixture = await soldResaleOrder(authorization);
     await db
       .update(orderLines)
       .set({ type: "recipe", itemId: null, quantity: "1.000" })
@@ -681,118 +423,5 @@ describe("refunds", () => {
         lines: [{ orderLineId: fixture.lineId, quantity: 0.5 }],
       });
     expect(response.status).toBe(400);
-  });
-
-  it("uses the sale allocation snapshot when refunding an external product", async () => {
-    const fixture = await soldResaleOrder();
-    await db
-      .update(orderLines)
-      .set({ type: "external_product", itemId: null })
-      .where(eq(orderLines.id, fixture.lineId));
-    await db
-      .update(orderLineAllocations)
-      .set({ quantity: "0.080", unitCost: "10.000000" })
-      .where(eq(orderLineAllocations.orderLineId, fixture.lineId));
-
-    const response = await request(app())
-      .post("/api/refunds")
-      .set(authorization)
-      .send({
-        clientRequestId: crypto.randomUUID(),
-        orderId: fixture.orderId,
-        reason: "طلب العميل",
-        lines: [
-          {
-            orderLineId: fixture.lineId,
-            quantity: 1,
-            stockAction: "not_returnable",
-          },
-        ],
-      });
-
-    expect(response.status).toBe(201);
-    expect(await db.select().from(refundLineAllocations)).toEqual([
-      expect.objectContaining({
-        quantity: "0.040",
-        unitCost: "10.000000",
-        returnedBatchId: null,
-      }),
-    ]);
-  });
-
-  it("records a waste entry when an external product refund is not returnable", async () => {
-    const fixture = await soldExternalOrder();
-
-    const response = await request(app())
-      .post("/api/refunds")
-      .set(authorization)
-      .send({
-        clientRequestId: crypto.randomUUID(),
-        orderId: fixture.orderId,
-        reason: "مشروب مُعد ولا يصلح",
-        lines: [
-          {
-            orderLineId: fixture.lineId,
-            quantity: 1,
-            stockAction: "not_returnable",
-          },
-        ],
-      });
-
-    expect(response.status).toBe(201);
-    const waste = await db.select().from(wasteEntries);
-    expect(waste).toHaveLength(1);
-    expect(waste[0]).toMatchObject({
-      targetType: "external_product",
-      externalProductId: 9101,
-      warehouse: "cafe",
-      quantity: "1.000",
-      totalCost: "1.00",
-    });
-    expect(waste[0].refundLineId).not.toBeNull();
-  });
-
-  it("restocks the ingredient when an external product refund returns to stock", async () => {
-    const fixture = await soldExternalOrder();
-
-    const response = await request(app())
-      .post("/api/refunds")
-      .set(authorization)
-      .send({
-        clientRequestId: crypto.randomUUID(),
-        orderId: fixture.orderId,
-        reason: "لم يُحضّر بعد",
-        lines: [
-          {
-            orderLineId: fixture.lineId,
-            quantity: 1,
-            stockAction: "return_to_stock",
-          },
-        ],
-      });
-
-    expect(response.status).toBe(201);
-    // restocking creates a new FIFO batch for the returned ingredient quantity
-    const restockMovements = await db
-      .select()
-      .from(stockMovements)
-      .where(eq(stockMovements.movementType, "refund_return"));
-    expect(restockMovements).toHaveLength(1);
-    expect(restockMovements[0]).toMatchObject({
-      itemId: fixture.ingredientId,
-      warehouse: "cafe",
-      quantity: "0.100",
-    });
-    const restockBatch = await db
-      .select()
-      .from(stockBatches)
-      .where(eq(stockBatches.id, restockMovements[0].batchId!));
-    expect(restockBatch[0]).toMatchObject({
-      itemId: fixture.ingredientId,
-      warehouse: "cafe",
-      remainingQuantity: "0.100",
-    });
-    // no waste is recorded for a restocked refund
-    expect(await db.select().from(wasteEntries)).toHaveLength(0);
   });
 });

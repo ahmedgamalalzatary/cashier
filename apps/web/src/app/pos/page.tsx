@@ -4,8 +4,6 @@ import {
   AlertTriangle,
   Banknote,
   Clock3,
-  Minus,
-  Plus,
   Printer,
   ReceiptText,
   RefreshCw,
@@ -14,14 +12,7 @@ import {
   ShoppingBasket,
   Trash2,
 } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CashierShiftControls } from "@/components/shifts/cashier-shift-controls";
 import { ExpenseEntryForm } from "@/components/expenses/expense-entry-form";
 import { OrderPicker } from "@/components/refunds/order-picker";
@@ -47,11 +38,8 @@ import { catalogRefreshOutcome } from "@/models/catalog-refresh";
 import {
   addCatalogSelection,
   addLocalSelection,
-  cartLineTotal,
-  catalogSizePrice,
   catalogTilePrice,
   cartTotals,
-  defaultExternalSize,
   filterCatalog,
   filterLocalCatalog,
   isOwnOpenShift,
@@ -60,6 +48,11 @@ import {
   setCartLineQuantity,
   type PosCartLine,
 } from "@/models/pos-model";
+import { quickCashOptions } from "@/models/pos-quick-cash";
+import { CartRow } from "@/components/pos/cart-row";
+import { CategoryButton } from "@/components/pos/category-button";
+import { ProductSelectionModal } from "@/components/pos/product-selection-modal";
+import { Total } from "@/components/pos/pos-total";
 import {
   createOrder,
   getOrder,
@@ -838,269 +831,6 @@ export default function PosPage() {
           />
         </Modal>
       )}
-    </div>
-  );
-}
-
-function ProductSelectionModal({
-  product,
-  nowMs,
-  onClose,
-  onAdd,
-}: {
-  product: ExternalProduct;
-  nowMs: number;
-  onClose: () => void;
-  onAdd: (
-    sizeId: number | null,
-    modifiers: Array<{
-      externalModifierOptionId: number;
-      quantity: number;
-    }>,
-  ) => void;
-}) {
-  const [sizeId, setSizeId] = useState<number | null>(() =>
-    defaultExternalSize(product),
-  );
-  const [quantities, setQuantities] = useState<Record<number, number>>({});
-  const groupsValid = product.modifierGroups.every((group) => {
-    const count = group.options.reduce(
-      (sum, option) => sum + (quantities[option.externalId] ?? 0),
-      0,
-    );
-    return (!group.isRequired || count > 0) && count <= group.maxSelections;
-  });
-
-  return (
-    <Modal open title={product.nameAr} onClose={onClose} size="xl">
-      <div className="space-y-5">
-        {product.sizes.length > 0 && (
-          <section className="space-y-2">
-            <h3 className="font-semibold">اختر المقاس</h3>
-            <div className="flex flex-wrap gap-2">
-              {product.sizes.map((size) => (
-                <button
-                  type="button"
-                  key={size.externalId}
-                  onClick={() => setSizeId(size.externalId)}
-                  className={`min-h-11 rounded-lg border px-3 py-2 text-sm ${sizeId === size.externalId ? "border-primary bg-primary text-white" : "border-line"}`}
-                >
-                  {size.nameAr} ·{" "}
-                  {formatMoney(catalogSizePrice(product, size, nowMs))}
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-        {product.modifierGroups.map((group) => {
-          const selected = group.options.reduce(
-            (sum, option) => sum + (quantities[option.externalId] ?? 0),
-            0,
-          );
-          return (
-            <section
-              key={group.externalId}
-              className="space-y-2 rounded-xl border border-line p-4"
-            >
-              <div className="flex justify-between gap-2">
-                <h3 className="font-semibold">
-                  {group.nameAr} {group.isRequired ? "(مطلوبة)" : ""}
-                </h3>
-                <span className="text-xs text-muted">
-                  {selected}/{group.maxSelections}
-                </span>
-              </div>
-              {group.options.map((option) => (
-                <div
-                  key={option.externalId}
-                  className="flex items-center justify-between gap-3 rounded-lg bg-paper p-2"
-                >
-                  <span className="text-sm">
-                    {option.nameAr} · +{formatMoney(option.extraPrice)}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      aria-label={`تقليل ${option.nameAr}`}
-                      onClick={() =>
-                        setQuantities((current) => ({
-                          ...current,
-                          [option.externalId]: Math.max(
-                            0,
-                            (current[option.externalId] ?? 0) - 1,
-                          ),
-                        }))
-                      }
-                      className="rounded-md border border-line p-1.5"
-                    >
-                      <Minus className="size-4" />
-                    </button>
-                    <span className="min-w-5 text-center">
-                      {quantities[option.externalId] ?? 0}
-                    </span>
-                    <button
-                      type="button"
-                      aria-label={`زيادة ${option.nameAr}`}
-                      disabled={selected >= group.maxSelections}
-                      onClick={() =>
-                        setQuantities((current) => ({
-                          ...current,
-                          [option.externalId]:
-                            (current[option.externalId] ?? 0) + 1,
-                        }))
-                      }
-                      className="rounded-md border border-line p-1.5 disabled:opacity-40"
-                    >
-                      <Plus className="size-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </section>
-          );
-        })}
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
-            إلغاء
-          </Button>
-          <Button
-            disabled={
-              !groupsValid || (product.sizes.length > 0 && sizeId === null)
-            }
-            onClick={() =>
-              onAdd(
-                sizeId,
-                Object.entries(quantities)
-                  .filter(([, quantity]) => quantity > 0)
-                  .map(([optionId, quantity]) => ({
-                    externalModifierOptionId: Number(optionId),
-                    quantity,
-                  })),
-              )
-            }
-          >
-            إضافة إلى الطلب
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-function CartRow({
-  line,
-  onQuantity,
-  onRemove,
-}: {
-  line: PosCartLine;
-  onQuantity: (quantity: number) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <div className="p-3">
-      <div className="flex justify-between gap-3">
-        <div>
-          <p className="font-medium">{line.productName}</p>
-          <p className="text-xs text-muted">
-            {[
-              line.sizeName,
-              ...line.modifiers.map(
-                (modifier) => `${modifier.name} × ${modifier.quantity}`,
-              ),
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-        </div>
-        <span className="flex items-start gap-1">
-          <span className="tnum font-bold">
-            {formatMoney(cartLineTotal(line))}
-          </span>
-          <button
-            type="button"
-            onClick={onRemove}
-            aria-label={`حذف ${line.productName}`}
-            title="حذف الصنف"
-            className="rounded-md p-1 text-muted transition-colors hover:bg-danger/10 hover:text-danger"
-          >
-            <Trash2 className="size-4" />
-          </button>
-        </span>
-      </div>
-      <div className="mt-2 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onQuantity(line.quantity - 1)}
-          className="rounded-md border border-line p-1.5"
-        >
-          <Minus className="size-4" />
-        </button>
-        <span className="tnum">{line.quantity}</span>
-        <button
-          type="button"
-          onClick={() => onQuantity(line.quantity + 1)}
-          className="rounded-md border border-line p-1.5"
-        >
-          <Plus className="size-4" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function CategoryButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      data-active={active}
-      className="chip"
-    >
-      {children}
-    </button>
-  );
-}
-
-const CASH_BILLS = [50, 100, 200, 500];
-
-/**
- * "بالضبط" plus the next three round notes above the total, so the cashier
- * rarely touches the keypad.
- */
-function quickCashOptions(total: number) {
-  if (total <= 0) return [];
-  const rounded = [
-    ...new Set(CASH_BILLS.map((bill) => Math.ceil(total / bill) * bill)),
-  ]
-    .filter((amount) => amount > total)
-    .sort((a, b) => a - b)
-    .slice(0, 3);
-  return rounded;
-}
-
-function Total({
-  label,
-  value,
-  strong = false,
-}: {
-  label: string;
-  value: number;
-  strong?: boolean;
-}) {
-  return (
-    <div
-      className={`flex justify-between ${strong ? "text-base font-bold" : ""}`}
-    >
-      <span>{label}</span>
-      <span className="tnum">{formatMoney(value)}</span>
     </div>
   );
 }

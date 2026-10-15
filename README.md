@@ -54,13 +54,13 @@ cp .env.example .env   # then edit DATABASE_URL, JWT_SECRET and deployment origi
 
 ### Database (run in `packages/db`)
 
-| Command                                    | What it does                                        |
-| ------------------------------------------ | --------------------------------------------------- |
-| `pnpm --filter @cashier/db db:generate`    | Generate SQL migrations from `src/schema.ts`         |
-| `pnpm --filter @cashier/db db:migrate`     | Apply migrations                                     |
-| `pnpm --filter @cashier/db db:push`        | Push schema directly (dev only)                      |
-| `pnpm --filter @cashier/db db:studio`      | Browse the database in Drizzle Studio                |
-| `pnpm --filter @cashier/api db:seed`       | Create the configured admin user if none exists      |
+| Command                                 | What it does                                                              |
+| --------------------------------------- | ------------------------------------------------------------------------- |
+| `pnpm --filter @cashier/db db:generate` | Generate SQL migrations from `src/schema.ts` (barrel over `src/schema/*`) |
+| `pnpm --filter @cashier/db db:migrate`  | Apply migrations                                                          |
+| `pnpm --filter @cashier/db db:push`     | Push schema directly (dev only)                                           |
+| `pnpm --filter @cashier/db db:studio`   | Browse the database in Drizzle Studio                                     |
+| `pnpm --filter @cashier/api db:seed`    | Create the configured admin user if none exists                           |
 
 The schema, migrations, branch scoping and admin seeding live in
 `packages/db`, so every API in the repo uses the same tables and the same
