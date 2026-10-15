@@ -1,11 +1,12 @@
 import { testId } from "@cashier/shared/test-support";
 import { describe, expect, it } from "vitest";
-import type { OrderSummary } from "@cashier/shared";
+import type { OrderDetail, OrderSummary } from "@cashier/shared";
 import { formatMoney } from "@cashier/web-core/lib/format";
 import {
   filterOrders,
   orderCashiers,
   orderMargin,
+  orderWasteTargetKeys,
   ordersTotals,
   splitOrderNumber,
 } from "../../src/models/orders-model";
@@ -160,5 +161,70 @@ describe("orderCashiers", () => {
       { id: testId(2), name: "منى" },
       { id: testId(1), name: "أحمد" },
     ]);
+  });
+});
+
+describe("orderWasteTargetKeys", () => {
+  const orderOf = (
+    lines: Array<Partial<OrderDetail["lines"][number]>>,
+  ) =>
+    ({
+      id: testId(9),
+      lines,
+    } as unknown as OrderDetail);
+
+  it("maps each line kind to its waste target key", () => {
+    const recipe = orderOf([
+      {
+        id: "l1",
+        type: "recipe",
+        recipeId: "r1",
+        recipeSizeId: "s1",
+        itemId: null,
+        externalProductId: null,
+        externalSizeId: null,
+      },
+      {
+        id: "l2",
+        type: "item",
+        recipeId: null,
+        recipeSizeId: null,
+        itemId: "i7",
+        externalProductId: null,
+        externalSizeId: null,
+      },
+      {
+        id: "l3",
+        type: "external_product",
+        recipeId: null,
+        recipeSizeId: null,
+        itemId: null,
+        externalProductId: 12,
+        externalSizeId: 30,
+      },
+    ]);
+    expect(orderWasteTargetKeys(recipe)).toEqual([
+      "recipe:r1:s1",
+      "item:i7",
+      "product:12:30",
+    ]);
+  });
+
+  it("is stable for a product line without a size", () => {
+    expect(
+      orderWasteTargetKeys(
+        orderOf([
+          {
+            id: "l1",
+            type: "external_product",
+            recipeId: null,
+            recipeSizeId: null,
+            itemId: null,
+            externalProductId: 12,
+            externalSizeId: null,
+          },
+        ]),
+      ),
+    ).toEqual(["product:12:0"]);
   });
 });

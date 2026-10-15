@@ -1,4 +1,4 @@
-import type { OrderSummary } from "@cashier/shared";
+import type { OrderDetail, OrderSummary } from "@cashier/shared";
 import { cairoCalendarDate } from "@cashier/web-core/lib/cairo-date";
 import { formatMoney, sumDecimalValues } from "@cashier/web-core/lib/format";
 
@@ -67,4 +67,18 @@ export function orderCashiers(orders: OrderSummary[]) {
     if (!byId.has(order.cashierId)) byId.set(order.cashierId, order.cashierName);
   }
   return [...byId].map(([id, name]) => ({ id, name }));
+}
+
+/**
+ * Waste target keys of an order's products, in the form the waste catalog
+ * uses: recipes, straight items and external products each map to their key.
+ */
+export function orderWasteTargetKeys(order: OrderDetail) {
+  return order.lines.map((line) =>
+    line.type === "recipe"
+      ? `recipe:${line.recipeId}:${line.recipeSizeId}`
+      : line.type === "external_product"
+        ? `product:${line.externalProductId}:${line.externalSizeId ?? 0}`
+        : `item:${line.itemId}`,
+  );
 }

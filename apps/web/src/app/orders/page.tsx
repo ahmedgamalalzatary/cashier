@@ -7,15 +7,20 @@ import type { OrderDetail, OrderSummary } from "@cashier/shared";
 import {
   Coins,
   ReceiptText,
+  RotateCcw,
   Scissors,
   Search,
+  Trash2,
   TriangleAlert,
 } from "lucide-react";
 import { useAuth } from "@cashier/web-core/components/auth/auth-provider";
 import { ExternalOrdersPanel } from "@/components/orders/external-orders-panel";
 import { OrderPrintButton } from "@/components/orders/order-print-button";
+import { OrderWasteModal } from "@/components/orders/order-waste-modal";
+import { RefundOrderModal } from "@/components/refunds/refund-order-modal";
 import { PrintSlip } from "@/components/print/print-slip";
 import { OrderReceipt } from "@/components/pos/order-receipt";
+import { IconButton } from "@cashier/web-core/components/ui/icon-button";
 import { Badge } from "@cashier/web-core/components/ui/badge";
 import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data-table";
 import { PageHeader } from "@cashier/web-core/components/ui/page-header";
@@ -54,6 +59,8 @@ export default function OrdersPage() {
   const [error, setError] = useState("");
   const [printError, setPrintError] = useState("");
   const [printing, setPrinting] = useState<OrderDetail | null>(null);
+  const [refundingId, setRefundingId] = useState<string | null>(null);
+  const [wastingOrder, setWastingOrder] = useState<OrderSummary | null>(null);
 
   // The list owns a single receipt so a second print cannot leave the first
   // slip behind; the dialog reads it, then this clears.
@@ -65,23 +72,26 @@ export default function OrdersPage() {
     setPrinting(null);
   };
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = () =>
     listOrders()
       .then((rows) => {
-        if (cancelled) return;
         setOrders(rows);
         setError("");
       })
       .catch((caught) => {
-        if (cancelled) return;
         setError(
           caught instanceof Error ? caught.message : "تعذر تحميل الطلبات",
         );
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
       });
+
+  useEffect(() => {
+    let cancelled = false;
+    const settle = () => {
+      if (!cancelled) setLoading(false);
+    };
+    load().finally(() => {
+      if (!cancelled) settle();
+    });
     return () => {
       cancelled = true;
     };
@@ -274,6 +284,28 @@ export default function OrdersPage() {
             </PrintSlip>
           )}
 
+          {refundingId && (
+            <RefundOrderModal
+              orderId={refundingId}
+              onClose={() => setRefundingId(null)}
+              onSaved={() => {
+                setRefundingId(null);
+                setPrintError("");
+                void load();
+              }}
+            />
+          )}
+
+          <OrderWasteModal
+            orderId={wastingOrder?.id ?? null}
+            title={`هالك من الطلب ${wastingOrder?.orderNumber ?? ""}`}
+            onClose={() => setWastingOrder(null)}
+            onSaved={() => {
+              setWastingOrder(null);
+              void load();
+            }}
+          />
+
           <div className="toolbar mb-4">
             <label className="relative min-w-[14rem] flex-1">
               <Search className="pointer-events-none absolute inset-y-0 start-3 my-auto size-4 text-muted" />
@@ -325,12 +357,28 @@ export default function OrdersPage() {
               rowKey={(row) => row.id}
               columns={columns}
               actions={(row) => (
-                <OrderPrintButton
-                  orderId={row.id}
-                  orderNumber={row.orderNumber}
-                  onFail={setPrintError}
-                  onOrder={printNow}
-                />
+                <span className="flex items-center gap-0.5">
+                  <OrderPrintButton
+                    orderId={row.id}
+                    orderNumber={row.orderNumber}
+                    onFail={setPrintError}
+                    onOrder={printNow}
+                  />
+                  {row.refundStatus !== "full" && (
+                    <IconButton
+                      title="مرتجع"
+                      onClick={() => setRefundingId(row.id)}
+                    >
+                      <RotateCcw className="size-4" />
+                    </IconButton>
+                  )}
+                  <IconButton
+                    title="هالك"
+                    onClick={() => setWastingOrder(row)}
+                  >
+                    <Trash2 className="size-4" />
+                  </IconButton>
+                </span>
               )}
               empty={
                 orders.length === 0 ? (

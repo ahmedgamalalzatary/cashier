@@ -10,11 +10,13 @@ import {
   Printer,
   RotateCcw,
   Scissors,
+  Trash2,
   TriangleAlert,
   User,
 } from "lucide-react";
 import { useAuth } from "@cashier/web-core/components/auth/auth-provider";
 import { OrderReceipt } from "@/components/pos/order-receipt";
+import { OrderWasteModal } from "@/components/orders/order-waste-modal";
 import { RefundOrderModal } from "@/components/refunds/refund-order-modal";
 import { PrintSlip } from "@/components/print/print-slip";
 import { Badge } from "@cashier/web-core/components/ui/badge";
@@ -50,6 +52,7 @@ function OrderDetailView() {
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [error, setError] = useState("");
   const [refunding, setRefunding] = useState(false);
+  const [wasting, setWasting] = useState(false);
   const [notice, setNotice] = useState("");
 
   const load = useCallback(async () => {
@@ -83,9 +86,18 @@ function OrderDetailView() {
             <span className="rounded-lg border border-line bg-surface px-2.5 py-1 text-sm font-bold tnum">
               {order.orderNumber}
             </span>
-            <Button variant="secondary" onClick={() => setRefunding(true)}>
-              <RotateCcw className="size-4" />
-              مرتجع
+            {order.refundStatus !== "full" && (
+              <Button variant="secondary" onClick={() => setRefunding(true)}>
+                <RotateCcw className="size-4" />
+                مرتجع
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              onClick={() => setWasting(true)}
+            >
+              <Trash2 className="size-4" />
+              هالك
             </Button>
             <Button onClick={() => window.print()}>
               <Printer className="size-4" />
@@ -112,6 +124,18 @@ function OrderDetailView() {
             setRefunding(false);
             setNotice(`تم تسجيل المرتجع بقيمة ${formatMoney(refund.amount)}`);
             void load();
+          }}
+        />
+      )}
+
+      {wasting && (
+        <OrderWasteModal
+          orderId={order.id}
+          title={`هالك من الطلب ${order.orderNumber}`}
+          onClose={() => setWasting(false)}
+          onSaved={() => {
+            setWasting(false);
+            setNotice("تم تسجيل الهالك من الكافيه؛ البيع لم يتغيّر.");
           }}
         />
       )}
