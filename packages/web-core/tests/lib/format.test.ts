@@ -1,5 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { formatItemCode, itemLabel, sumDecimalValues } from "../../src/lib/format";
+import {
+  formatItemCode,
+  formatMoney,
+  formatOptionalMoney,
+  itemLabel,
+  sumDecimalValues,
+} from "../../src/lib/format";
+
+describe("formatOptionalMoney", () => {
+  it("shows a dash when the cost is hidden", () => {
+    expect(formatOptionalMoney(undefined)).toBe("—");
+    expect(formatOptionalMoney(null)).toBe("—");
+  });
+
+  it("formats a present cost as money", () => {
+    expect(formatOptionalMoney("60.00")).toBe(formatMoney("60.00"));
+  });
+});
 
 describe("itemLabel", () => {
   it("puts the padded code before the item name", () => {

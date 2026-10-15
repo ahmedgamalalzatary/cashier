@@ -12,8 +12,10 @@ const form = readFileSync(
 );
 
 describe("waste submission flow", () => {
-  it("formats allocation unit costs as money", () => {
-    expect(page).toContain('formatMoney(allocation.unitCost ?? "0.00")');
+  it("formats allocation unit costs as money, with a dash when hidden", () => {
+    expect(page).toContain("formatOptionalMoney(allocation.unitCost)");
+    expect(page).toContain("formatOptionalMoney(entry.totalCost)");
+    expect(page).toContain("formatOptionalMoney(detail.totalCost)");
   });
 
   it("opens the entry form in a modal from the header, not inline", () => {

@@ -63,4 +63,17 @@ describe("withoutCostFieldsFor", () => {
       allocations: [{ id: "wa1", quantity: "2.000" }],
     });
   });
+
+  it("preserves non-plain objects such as Date for a cashier", () => {
+    const createdAt = new Date("2024-01-02T03:04:05.000Z");
+    const stripped = withoutCostFieldsFor("cashier", {
+      id: "o1",
+      createdAt,
+      totalCost: "60.00",
+    }) as Record<string, unknown>;
+
+    expect(stripped).toEqual({ id: "o1", createdAt });
+    expect(stripped.createdAt).toBeInstanceOf(Date);
+    expect(new Date(stripped.createdAt as Date).toString()).not.toBe("Invalid Date");
+  });
 });

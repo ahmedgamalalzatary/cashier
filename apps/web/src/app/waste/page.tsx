@@ -9,7 +9,7 @@ import { DataTable, type DataColumn } from "@cashier/web-core/components/ui/data
 import { Modal } from "@cashier/web-core/components/ui/modal";
 import { PageHeader } from "@cashier/web-core/components/ui/page-header";
 import { EmptyState, ErrorBanner } from "@cashier/web-core/components/ui/states";
-import { formatMoney } from "@cashier/web-core/lib/format";
+import { formatOptionalMoney } from "@cashier/web-core/lib/format";
 import { getWaste, listWaste } from "@/services/waste-service";
 
 const reasonLabels = wasteReasonLabels;
@@ -81,7 +81,7 @@ export default function WastePage() {
       key: "cost",
       header: "تكلفة FIFO",
       numeric: true,
-      cell: (entry) => formatMoney(entry.totalCost ?? "0.00"),
+      cell: (entry) => formatOptionalMoney(entry.totalCost),
     },
     { key: "by", header: "المسجل", cell: (entry) => entry.recordedByName },
     {
@@ -157,7 +157,7 @@ export default function WastePage() {
             <div>
               <dt className="text-xs text-muted">تكلفة FIFO</dt>
               <dd className="tnum font-bold">
-                {formatMoney(detail.totalCost ?? "0.00")}
+                {formatOptionalMoney(detail.totalCost)}
               </dd>
             </div>
             <div>
@@ -186,7 +186,7 @@ export default function WastePage() {
                   <b className="tnum">{allocation.quantity}</b>
                 </span>
                 <span className="tnum text-muted">
-                  {formatMoney(allocation.unitCost ?? "0.00")}
+                  {formatOptionalMoney(allocation.unitCost)}
                 </span>
               </div>
             ))}

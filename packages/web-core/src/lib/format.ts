@@ -8,6 +8,15 @@ export function formatMoney(value: number | string) {
   return egp.format(Number(value));
 }
 
+/**
+ * Cost figures are hidden from cashiers, so the field arrives absent. Show a
+ * dash instead of a misleading 0.00 when there is nothing to format.
+ */
+export function formatOptionalMoney(value: number | string | null | undefined) {
+  if (value === null || value === undefined) return "—";
+  return formatMoney(value);
+}
+
 export function formatItemCode(code: number) {
   return String(code).padStart(4, "0");
 }

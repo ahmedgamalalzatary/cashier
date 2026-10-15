@@ -15,7 +15,7 @@ export function withoutCostFieldsFor(role: string | undefined, value: unknown): 
   if (role !== "cashier") return value;
   const strip = (node: unknown): unknown => {
     if (Array.isArray(node)) return node.map(strip);
-    if (node && typeof node === "object") {
+    if (node && typeof node === "object" && Object.getPrototypeOf(node) === Object.prototype) {
       const clean: Record<string, unknown> = {};
       for (const [key, child] of Object.entries(node)) {
         if (COST_FIELDS.has(key)) continue;
