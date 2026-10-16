@@ -104,6 +104,9 @@ describe("reports", () => {
     expect(report.body.suppliers.payments[0].purchaseInvoiceId).toBe(
       report.body.suppliers.purchases[0].id,
     );
+    expect(report.body.suppliers.payments[0].purchaseInvoiceNumber).toBe(
+      "2026-09-11",
+    );
     expect(report.body.range.generatedAt).toMatch(/Z$/);
     expect(report.body.money.cashFlow[0].occurredAt).toBe("2026-09-11");
   });
@@ -262,6 +265,66 @@ describe("reports", () => {
     expect(Number(row.sales)).toBe(0);
     expect(Number(row.refunds)).toBe(80);
     expect(Number(row.profit)).toBeCloseTo(-79.8, 6);
+  });
+
+  it("names each document by its own number so no raw ID reaches the screen", async () => {
+    const admin = await loginAs(app, "admin");
+    const cashier = await loginAs(app, "cashier");
+    await request(app)
+      .post("/api/shifts/open")
+      .set(cashier)
+      .send({ openingFloat: 0 })
+      .expect(201);
+    await createExternalCategoryFixture();
+    const sale = await sellLatte(cashier);
+    const refund = await request(app)
+      .post("/api/refunds")
+      .set(cashier)
+      .send({
+        clientRequestId: randomUUID(),
+        orderId: sale.id,
+        reason: "returned",
+        lines: [
+          {
+            orderLineId: sale.lines[0].id,
+            quantity: 1,
+            stockAction: "return_to_stock",
+          },
+        ],
+      })
+      .expect(201);
+    const [order] = await db.select().from(orders).where(eq(orders.id, sale.id));
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Africa/Cairo",
+    }).format(new Date());
+
+    const { body } = await request(app)
+      .get(`/api/reports?from=${today}&to=${today}`)
+      .set(admin)
+      .expect(200);
+
+    expect(body.wasteAndRefunds.refunds[0]).toMatchObject({
+      id: refund.body.id,
+      orderId: sale.id,
+      orderNumber: order.orderNumber,
+    });
+    const sold = body.stock.ledger.find(
+      (row: { referenceType: string }) => row.referenceType === "order",
+    );
+    expect(sold).toMatchObject({
+      referenceId: sale.id,
+      referenceLabel: order.orderNumber,
+    });
+    const cash = (type: string) =>
+      body.money.cashFlow.find((row: { type: string }) => row.type === type);
+    expect(cash("sale")).toMatchObject({
+      referenceId: sale.id,
+      reference: order.orderNumber,
+    });
+    expect(cash("refund")).toMatchObject({
+      referenceId: refund.body.id,
+      reference: order.orderNumber,
+    });
   });
 
   it("includes negative stock without a minimum in dashboard and report alerts", async () => {

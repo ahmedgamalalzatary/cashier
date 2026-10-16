@@ -1,8 +1,9 @@
 import { testId } from "@cashier/shared/test-support";
+import type { ReactElement, ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ReportTable } from '../../../src/components/reports/report-table';
-import type { Column } from '../../../src/models/reports-model';
+import type { Column, TableView } from "../../../src/models/reports-model";
 
 const render = (
   rows: Record<string, string | number | null>[],
@@ -154,6 +155,62 @@ describe("ReportTable event labels", () => {
     expect(dateOnly).not.toMatch(/[٠-٩]+:[٠-٩]+/);
   });
 });
+describe("document references", () => {
+  const order = testId(0x1b4c5d);
+  const html = (
+    row: Record<string, string | number | null>,
+    column: Partial<Column>,
+    documentHref?: (document: string, id: string) => string,
+  ) =>
+    renderToStaticMarkup(
+      <ReportTable
+        title="مراجع"
+        rows={[row]}
+        columns={[{ key: "id", label: "المرجع", kind: "reference", ...column }]}
+        documentHref={documentHref}
+      />,
+    );
+
+  it("shows the document's own number when it has one", () => {
+    const markup = html({ id: order, orderNumber: "POS-20260910-AB12" }, {
+      labelKey: "orderNumber",
+    });
+    expect(markup).toContain("POS-20260910-AB12");
+    expect(markup).not.toContain(order);
+  });
+
+  it("falls back to a short code instead of the raw ID", () => {
+    const markup = html({ id: order }, {});
+    expect(markup).toContain("#1B4C5D");
+    expect(markup).not.toContain(order);
+  });
+
+  it("links to the document where the site has a page for it", () => {
+    const href = (document: string, id: string) => `/${document}?id=${id}`;
+    expect(html({ id: order }, { document: "order" }, href)).toContain(
+      `href="/order?id=${order}"`,
+    );
+    // the online site passes no pages, so the reference stays plain text
+    expect(html({ id: order }, { document: "order" })).not.toContain("href");
+  });
+
+  it("picks the document from the row's own type for mixed ledgers", () => {
+    const href = (document: string, id: string) => `/${document}?id=${id}`;
+    const column = { documentKey: "referenceType" };
+    expect(html({ id: order, referenceType: "purchase_invoice" }, column, href)).toContain(
+      `href="/purchase?id=${order}"`,
+    );
+    // a type with no page keeps the short code without a link
+    expect(html({ id: order, referenceType: "waste" }, column, href)).not.toContain(
+      "href",
+    );
+  });
+
+  it("shows a dash when there is no document", () => {
+    expect(html({ id: null }, {})).toContain("—");
+  });
+});
+
 describe("uncounted cash", () => {
   it("says the drawer was not counted instead of showing a zero", () => {
     const markup = renderToStaticMarkup(
@@ -190,5 +247,108 @@ describe("uncounted cash", () => {
     );
 
     expect(markup).not.toContain("لم يُعدّ");
+  });
+});
+describe("table toolkit", () => {
+  type Element = ReactElement<Record<string, unknown>>;
+  const elements = (node: ReactNode): Element[] => {
+    if (Array.isArray(node)) return node.flatMap(elements);
+    if (!node || typeof node !== "object" || !("props" in node)) return [];
+    const element = node as Element;
+    // function components are expanded so their markup can be inspected
+    if (typeof element.type === "function")
+      return elements((element.type as (props: unknown) => ReactNode)(element.props));
+    return [element, ...elements(element.props.children as ReactNode)];
+  };
+  const table = {
+    title: "الهالك",
+    rows: [
+      { name: "لبن", warehouse: "main", amount: "10.00" },
+      { name: "بن", warehouse: "cafe", amount: "5.50" },
+      { name: "سكر", warehouse: "main", amount: "2.00" },
+    ],
+    columns: [
+      { key: "name", label: "الصنف" },
+      { key: "warehouse", label: "المخزن", kind: "warehouse", filter: true },
+      { key: "amount", label: "التكلفة", kind: "money", total: true },
+    ] as Column[],
+  };
+  const tree = (views: Record<string, TableView> = {}, onView = vi.fn()) =>
+    elements(ReportTable({ ...table, views, onView }));
+
+  it("reports a search as the reader types", () => {
+    const onView = vi.fn();
+    const search = tree({}, onView).find(
+      (node) => node.type === "input" && node.props.type === "search",
+    )!;
+    (search.props.onChange as (e: { target: { value: string } }) => void)({
+      target: { value: "لبن" },
+    });
+    expect(onView).toHaveBeenCalledWith("الهالك", { search: "لبن", filters: {} });
+  });
+
+  it("sorts by a clicked header, then reverses on the next click", () => {
+    const onView = vi.fn();
+    const header = (views: Record<string, TableView>) =>
+      tree(views, onView).find(
+        (node) => node.type === "button" && node.props["data-sort"] === "amount",
+      )!;
+    (header({}).props.onClick as () => void)();
+    expect(onView).toHaveBeenLastCalledWith("الهالك", {
+      search: "",
+      filters: {},
+      sort: { key: "amount", direction: "asc" },
+    });
+    const sorted = { الهالك: { search: "", filters: {}, sort: { key: "amount", direction: "asc" as const } } };
+    (header(sorted).props.onClick as () => void)();
+    expect(onView).toHaveBeenLastCalledWith("الهالك", {
+      search: "",
+      filters: {},
+      sort: { key: "amount", direction: "desc" },
+    });
+    const html = renderToStaticMarkup(<ReportTable {...table} views={sorted} />);
+    expect(html).toContain('aria-sort="ascending"');
+    expect(html.indexOf("سكر")).toBeLessThan(html.indexOf("لبن"));
+  });
+
+  it("filters by a column's values and totals only what is shown", () => {
+    const onView = vi.fn();
+    const select = tree({}, onView).find((node) => node.type === "select")!;
+    (select.props.onChange as (e: { target: { value: string } }) => void)({
+      target: { value: "main" },
+    });
+    expect(onView).toHaveBeenCalledWith("الهالك", {
+      search: "",
+      filters: { warehouse: "main" },
+    });
+    const html = renderToStaticMarkup(
+      <ReportTable {...table} views={{ الهالك: { search: "", filters: { warehouse: "main" } } }} />,
+    );
+    expect(html).not.toContain(">بن<");
+    expect(html).toContain(">لبن<");
+    expect(html).toContain("الإجمالي");
+    expect(html).toContain("١٢٫٠٠");
+    expect(html).toContain("٢ من ٣ سجل");
+  });
+
+  it("says when nothing matches, apart from when there is no data at all", () => {
+    expect(
+      renderToStaticMarkup(
+        <ReportTable {...table} views={{ الهالك: { search: "غير موجود", filters: {} } }} />,
+      ),
+    ).toContain("لا توجد نتائج مطابقة");
+    expect(renderToStaticMarkup(<ReportTable {...table} rows={[]} />)).toContain(
+      "لا توجد بيانات",
+    );
+  });
+
+  it("folds the raw ledger under the summary in a details section", () => {
+    const html = renderToStaticMarkup(
+      <ReportTable
+        {...table}
+        details={{ title: "دفتر الهالك", rows: [{ name: "لبن" }], columns: [{ key: "name", label: "الصنف" }] }}
+      />,
+    );
+    expect(html).toMatch(/<details[^>]*>[\s\S]*التفاصيل[\s\S]*دفتر الهالك/);
   });
 });

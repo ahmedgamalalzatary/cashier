@@ -56,6 +56,94 @@ export function aggregateSalesDays(rows: Record<string, unknown>[]) {
   }));
 }
 
+const round = (value: number) => Math.round(value * 100) / 100;
+
+/** The same number of days immediately before the range. */
+export function previousRange(from: string, to: string) {
+  const days =
+    (Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) /
+    86_400_000;
+  const end = new Date(`${from}T12:00:00Z`);
+  end.setUTCDate(end.getUTCDate() - 1);
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - days);
+  return {
+    from: start.toISOString().slice(0, 10),
+    to: end.toISOString().slice(0, 10),
+  };
+}
+
+/**
+ * Headline figures of one period. Net profit = gross profit − expenses −
+ * waste cost − salaries and advances paid (owner decision 2026-10-15).
+ */
+export function periodFigures(row: Record<string, unknown> = {}) {
+  const value = (key: string) => Number(row[key] ?? 0);
+  const sales = value("sales"),
+    refunds = value("refunds"),
+    ordersCount = value("ordersCount"),
+    cost = value("cost"),
+    returnedCost = value("returnedCost"),
+    netSales = sales - refunds,
+    grossProfit = sales - refunds - cost + returnedCost,
+    expenses = value("expenses"),
+    wasteCost = value("wasteCost"),
+    salaries = value("salaryPayments") + value("salaryAdvances");
+  return {
+    sales: round(sales),
+    refunds: round(refunds),
+    netSales: round(netSales),
+    ordersCount,
+    averageOrder: ordersCount ? round(sales / ordersCount) : 0,
+    cost: round(cost),
+    returnedCost: round(returnedCost),
+    grossProfit: round(grossProfit),
+    margin: netSales > 0 ? Math.round((grossProfit / netSales) * 1000) / 10 : null,
+    expenses: round(expenses),
+    wasteCost: round(wasteCost),
+    salaries: round(salaries),
+    netProfit: round(grossProfit - expenses - wasteCost - salaries),
+  };
+}
+
+const hourFormat = new Intl.DateTimeFormat("en", {
+  timeZone: "Africa/Cairo",
+  hour: "numeric",
+  hourCycle: "h23",
+});
+
+/** Order sales by Cairo hour of the day, every hour 0–23 present. */
+export function salesByHour(rows: Record<string, unknown>[]) {
+  const hours = Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    sales: 0,
+    ordersCount: 0,
+  }));
+  for (const row of rows) {
+    if (!Number(row.ordersCount)) continue;
+    const hour = hours[Number(hourFormat.format(new Date(row.createdAt as string | Date)))]!;
+    hour.sales = round(hour.sales + Number(row.sales ?? 0));
+    hour.ordersCount += Number(row.ordersCount);
+  }
+  return hours;
+}
+
+/** The five best products by a figure; nothing that sold at a loss or not at all. */
+function topProducts(
+  rows: Record<string, unknown>[],
+  figure: (row: Record<string, unknown>) => number,
+) {
+  return rows
+    .map((row) => ({
+      productName: row.productName,
+      sizeName: row.sizeName ?? null,
+      value: round(figure(row)),
+    }))
+    .filter((row) => row.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5);
+}
+
 // Zero disables threshold alerts, but a negative balance always needs attention.
 const isLowStock = (row: Record<string, unknown>) =>
   Boolean(row.isActive) &&
@@ -87,7 +175,8 @@ export class ReportsService {
   }
   private async buildReport({ from, to }: ReportRange) {
     const start = cairoMidnight(from),
-      end = cairoMidnight(nextDate(to));
+      end = cairoMidnight(nextDate(to)),
+      previous = previousRange(from, to);
     const [
       byDay,
       byProduct,
@@ -117,6 +206,8 @@ export class ReportsService {
       preparations,
       ingredients,
       purchaseLines,
+      [currentTotals],
+      [previousTotals],
     ] = await Promise.all([
       this.repo.salesByDay(start, end),
       this.repo.salesByProduct(start, end),
@@ -146,14 +237,42 @@ export class ReportsService {
       this.repo.preparations(start, end),
       this.repo.preparationIngredients(start, end),
       this.repo.purchaseLines(from, to),
+      this.repo.periodTotals(start, end, from, to),
+      this.repo.periodTotals(
+        cairoMidnight(previous.from),
+        start,
+        previous.from,
+        previous.to,
+      ),
     ]);
     const lowStock = stock.filter(isLowStock);
+    const shiftOverShort = shiftHistory.filter((row) =>
+      ["close", "admin_close", "correction"].includes(String(row.action)),
+    );
     return {
       range: {
         from,
         to,
         branchId: currentBranchId(),
         generatedAt: new Date().toISOString(),
+      },
+      overview: {
+        current: periodFigures(currentTotals),
+        previous: { ...previous, ...periodFigures(previousTotals) },
+        byHour: salesByHour(byDay),
+        topBySales: topProducts(
+          byProduct,
+          (row) => Number(row.sales ?? 0) - Number(row.refunds ?? 0),
+        ),
+        topByProfit: topProducts(byProduct, (row) => Number(row.profit ?? 0)),
+        alerts: {
+          lowStock: lowStock.filter((row) => Number(row.quantity) >= 0).length,
+          negativeStock: lowStock.filter((row) => Number(row.quantity) < 0)
+            .length,
+          overShort: shiftOverShort.filter(
+            (row) => row.overShort != null && Number(row.overShort) !== 0,
+          ).length,
+        },
       },
       sales: {
         byDay: aggregateSalesDays(byDay),
@@ -167,9 +286,7 @@ export class ReportsService {
         cashFlow,
         expenses,
         expenseBreakdown,
-        shiftOverShort: shiftHistory.filter((row) =>
-          ["close", "admin_close", "correction"].includes(String(row.action)),
-        ),
+        shiftOverShort,
       },
       employees: { activity: employees, salaryHistory, shiftHistory },
       operations: {

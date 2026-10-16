@@ -174,8 +174,11 @@ Shop PCs then update on their next open, or within 30 minutes through the
 - **Database changes and online endpoints:** the release deploys the VPS
   before it publishes, so online always has a PC's migrations and endpoints
   first (plan D16). The tagged commit must be on `main`.
-- **Online-only changes** (site, API, shared code) need no desktop release:
-  run **Deploy online** (`gh workflow run deploy-online.yml`).
+- **Online-only changes** (`apps/online-web`, `apps/online-api`) need no
+  desktop release: run **Deploy online** (`gh workflow run deploy-online.yml`).
+  Shared code is different: `packages/shared`, `server-core`, `db` and
+  `web-core` are bundled into the desktop, so a change there reaches shop PCs
+  only through a desktop release.
 - **Wrong tag:** the workflow stops if the tag does not match
   `apps/desktop/package.json`; delete the tag (`git push origin :desktop-vX.Y.Z`
   and `git tag -d desktop-vX.Y.Z`), fix the version, and tag again.

@@ -1,6 +1,10 @@
 import type { Workbook } from "exceljs";
 import { reportCellText } from "@cashier/web-core/components/reports/report-table";
 import type { ReportExport } from "@cashier/web-core/features/reports-page";
+import {
+  tableTotals,
+  type ReportTable,
+} from "@cashier/web-core/models/reports-model";
 
 /** Loaded on click only, so the reports page itself stays light. */
 async function loadExcel() {
@@ -28,6 +32,14 @@ export function reportFileName(report: ReportExport) {
   return `تقرير ${report.section} ${report.from} إلى ${report.to}.xlsx`;
 }
 
+/** Each table followed by its details, as the screen lists them. */
+function withDetails(tables: ReportTable[]): ReportTable[] {
+  return tables.flatMap((table) => [
+    table,
+    ...(table.details ? withDetails([table.details]) : []),
+  ]);
+}
+
 /** One right-to-left sheet per table, with the same text the screen shows. */
 export async function buildReportWorkbook(
   report: ReportExport,
@@ -35,7 +47,7 @@ export async function buildReportWorkbook(
   const { Workbook } = await loadExcel();
   const workbook = new Workbook();
   const used = new Set<string>();
-  for (const table of report.tables) {
+  for (const table of withDetails(report.tables)) {
     const sheet = workbook.addWorksheet(sheetName(table.title, used), {
       views: [{ rightToLeft: true }],
     });
@@ -49,11 +61,19 @@ export async function buildReportWorkbook(
     };
     if (table.rows.length === 0) sheet.addRow(["لا توجد بيانات"]);
     for (const row of table.rows)
+      sheet.addRow(table.columns.map((column) => reportCellText(row, column)));
+    // The same totals row the screen shows under the filtered rows.
+    const totals = tableTotals(table.rows, table.columns);
+    if (table.rows.length && Object.keys(totals).length)
       sheet.addRow(
-        table.columns.map((column) =>
-          reportCellText(row[column.key], column.kind, column.labelSet),
+        table.columns.map((column, index) =>
+          column.key in totals
+            ? reportCellText(totals, column)
+            : index === 0
+              ? "الإجمالي"
+              : "",
         ),
-      );
+      ).font = { bold: true };
     sheet.columns.forEach((column) => {
       column.width = 18;
     });

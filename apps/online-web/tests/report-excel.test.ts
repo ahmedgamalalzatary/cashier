@@ -20,7 +20,7 @@ const report: ReportExport = {
       note: "لقطة تسوية الوردية",
       rows: [{ shiftId: 7, cashierName: "سارة", actualCash: null, overShort: "-5.00" }],
       columns: [
-        { key: "shiftId", label: "الوردية", kind: "number" },
+        { key: "shiftId", label: "الوردية", kind: "reference" },
         { key: "cashierName", label: "الكاشير" },
         { key: "actualCash", label: "النقد الفعلي", kind: "uncountedMoney" },
         { key: "overShort", label: "الزيادة / العجز", kind: "uncountedMoney" },
@@ -30,6 +30,17 @@ const report: ReportExport = {
       title: "المصروفات حسب التصنيف",
       rows: [],
       columns: [{ key: "categoryName", label: "التصنيف" }],
+      details: {
+        title: "تفاصيل المصروفات",
+        rows: [
+          { categoryName: "كهرباء", amount: "40.00" },
+          { categoryName: "مياه", amount: "2.50" },
+        ],
+        columns: [
+          { key: "categoryName", label: "التصنيف" },
+          { key: "amount", label: "المبلغ", kind: "money", total: true },
+        ],
+      },
     },
   ],
 };
@@ -43,7 +54,7 @@ describe("report Excel file", () => {
     const workbook = await buildReportWorkbook(report);
     const [shifts, expenses] = workbook.worksheets;
 
-    expect(workbook.worksheets).toHaveLength(2);
+    expect(workbook.worksheets).toHaveLength(3);
     expect(shifts.name).toBe(sheetName("زيادة / عجز الورديات", new Set()));
     expect(shifts.views[0]).toMatchObject({ rightToLeft: true });
     const all = shifts
@@ -57,6 +68,7 @@ describe("report Excel file", () => {
         "لقطة تسوية الوردية",
         "الكاشير",
         "سارة",
+        "#7",
         "لم يُعدّ",
         formatMoney("-5.00"),
       ]),
@@ -64,6 +76,18 @@ describe("report Excel file", () => {
     expect(
       expenses.getSheetValues().flatMap((row) => (row ? texts(row) : [])),
     ).toContain("لا توجد بيانات");
+  });
+
+  it("adds each table's details on the next sheet, with the totals row", async () => {
+    const workbook = await buildReportWorkbook(report);
+    const details = workbook.worksheets[2]!;
+
+    expect(details.name).toBe("تفاصيل المصروفات");
+    const rows = details
+      .getSheetValues()
+      .filter(Boolean)
+      .map((row) => texts(row));
+    expect(rows.at(-1)).toEqual(["الإجمالي", formatMoney("42.50")]);
   });
 
   it("names sheets the way Excel allows: short, unique, without / \\ ? * [ ] :", () => {

@@ -1,6 +1,14 @@
 import type { ReportTable as TableData } from "../../../models/reports-model";
 import type { ReportsData } from "../../../services/reports-service";
-import { date, money, number, uncountedMoney } from "../report-columns";
+import {
+  date,
+  event,
+  money,
+  number,
+  reference,
+  text,
+  uncountedMoney,
+} from "../report-columns";
 
 export function employeesTables(d: ReportsData): TableData[] {
   return [
@@ -8,15 +16,15 @@ export function employeesTables(d: ReportsData): TableData[] {
       title: "وقت وعمل الكاشير",
       rows: d.employees.activity,
       columns: [
-        { key: "name", label: "الموظف" },
-        number("shiftsCount", "الورديات"),
-        number("workedMinutes", "دقائق العمل"),
-        number("ordersCount", "الطلبات"),
-        money("discounts", "الخصومات"),
-        number("refundsCount", "المرتجعات"),
-        number("wasteCount", "الهالك"),
-        number("expensesCount", "المصروفات"),
-        number("transferRequestsCount", "طلبات التحويل"),
+        text("name", "الموظف"),
+        number("shiftsCount", "الورديات", { total: true }),
+        { key: "workedMinutes", label: "وقت العمل", kind: "minutes", total: true },
+        number("ordersCount", "الطلبات", { total: true }),
+        money("discounts", "الخصومات", { total: true }),
+        number("refundsCount", "المرتجعات", { total: true }),
+        number("wasteCount", "الهالك", { total: true }),
+        number("expensesCount", "المصروفات", { total: true }),
+        number("transferRequestsCount", "طلبات التحويل", { total: true }),
       ],
     },
     {
@@ -24,11 +32,11 @@ export function employeesTables(d: ReportsData): TableData[] {
       note: "الأرقام التالية تخص الوردية كاملة حتى وقت تحميل التقرير، وليست مبيعات الفترة فقط. المتوقع يشمل العهدة + المبيعات − المرتجعات − مصروفات الوردية.",
       rows: d.sales.byShift,
       columns: [
-        number("shiftId", "الوردية"),
-        { key: "cashierName", label: "الكاشير" },
+        reference("shiftId", "الوردية"),
+        text("cashierName", "الكاشير", { filter: true }),
         date("openedAt", "الفتح"),
         date("closedAt", "آخر إغلاق"),
-        { key: "status", label: "الحالة", kind: "event", labelSet: "status" },
+        event("status", "الحالة", "status"),
         money("openingFloat", "العهدة"),
         money("lifetimeSales", "كل المبيعات"),
         money("lifetimeRefunds", "كل المرتجعات"),
@@ -37,39 +45,29 @@ export function employeesTables(d: ReportsData): TableData[] {
         uncountedMoney("actualCash", "النقد الفعلي عند التسوية"),
         uncountedMoney("overShort", "آخر زيادة / عجز"),
       ],
-    },
-    {
-      title: "سجل إجراءات الورديات",
-      rows: d.employees.shiftHistory,
-      columns: [
-        date("occurredAt", "التاريخ"),
-        number("shiftId", "الوردية"),
-        { key: "cashierName", label: "الكاشير" },
-        {
-          key: "action",
-          label: "الإجراء",
-          kind: "event",
-          labelSet: "shiftAction",
-        },
-        { key: "actorName", label: "المنفذ" },
-        { key: "note", label: "ملاحظات" },
-      ],
+      details: {
+        title: "سجل إجراءات الورديات",
+        rows: d.employees.shiftHistory,
+        columns: [
+          date("occurredAt", "التاريخ"),
+          reference("shiftId", "الوردية"),
+          text("cashierName", "الكاشير", { filter: true }),
+          event("action", "الإجراء", "shiftAction"),
+          text("actorName", "المنفذ"),
+          text("note", "ملاحظات"),
+        ],
+      },
     },
     {
       title: "سجل المرتبات والسلف والتسويات",
       rows: d.employees.salaryHistory,
       columns: [
         date("occurredAt", "التاريخ"),
-        { key: "employeeName", label: "الموظف" },
-        {
-          key: "type",
-          label: "النوع",
-          kind: "event",
-          labelSet: "salaryHistory",
-        },
+        text("employeeName", "الموظف", { filter: true }),
+        event("type", "النوع", "salaryHistory"),
         money("amount", "المبلغ"),
-        { key: "periodMonth", label: "شهر الاستحقاق" },
-        { key: "note", label: "ملاحظات" },
+        text("periodMonth", "شهر الاستحقاق"),
+        text("note", "ملاحظات"),
       ],
     },
   ];

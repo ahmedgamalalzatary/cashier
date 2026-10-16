@@ -6,12 +6,21 @@ import { Button } from "../components/ui/button";
 import { PageHeader } from "../components/ui/page-header";
 import { TabPanel, Tabs } from "../components/ui/tabs";
 import { ErrorBanner, LoadingState } from "../components/ui/states";
-import { cairoCalendarDate } from "../lib/cairo-date";
-import { formatMoney } from "../lib/format";
-import type { ReportTable as TableData } from "../models/reports-model";
-import { isReportRangeReady, reportTotal } from "../models/reports-model";
+import { cairoCalendarDate, cairoCalendarLabel } from "../lib/cairo-date";
+import type {
+  DocumentHref,
+  ReportPreset,
+  ReportTable as TableData,
+  TableView,
+} from "../models/reports-model";
+import {
+  isReportRangeReady,
+  presetRange,
+  shownTables,
+} from "../models/reports-model";
 import { getReports, type ReportsData } from "../services/reports-service";
 import { useBranch } from "../components/branches/branch-provider";
+import { ReportOverview } from "./reports/report-overview";
 import { tables } from "./reports/report-tables";
 import { tabs, type Tab } from "./reports/report-tabs";
 
@@ -24,34 +33,64 @@ export type ReportExport = {
   tables: TableData[];
 };
 
+const presets: [ReportPreset, string][] = [
+  ["today", "اليوم"],
+  ["yesterday", "أمس"],
+  ["week", "هذا الأسبوع"],
+  ["month", "هذا الشهر"],
+  ["lastMonth", "الشهر الماضي"],
+  ["custom", "مخصص"],
+];
+
+/** The loaded period in Arabic, earliest date first. */
+export function periodText(from: string, to: string) {
+  return from === to
+    ? cairoCalendarLabel(from)
+    : `من ${cairoCalendarLabel(from)} إلى ${cairoCalendarLabel(to)}`;
+}
+
 export function ReportsPage({
   excelDownload,
+  documentHref,
 }: {
   /** Only the online site passes this; the desktop keeps print/PDF only. */
   excelDownload?: (report: ReportExport) => Promise<void>;
+  /** Only the desktop passes this: it has the document pages to open. */
+  documentHref?: DocumentHref;
 } = {}) {
   const today = cairoCalendarDate(),
-    monthStart = `${today.slice(0, 7)}-01`;
+    month = presetRange("month", today);
   const { branch, error: branchError, refresh: refreshBranches } = useBranch();
-  const [from, setFrom] = useState(monthStart),
-    [to, setTo] = useState(today),
-    [tab, setTab] = useState<Tab>("sales");
+  const [preset, setPreset] = useState<ReportPreset>("month"),
+    [from, setFrom] = useState(month.from),
+    [to, setTo] = useState(month.to),
+    [tab, setTab] = useState<Tab>("overview");
   const [loadedData, setData] = useState<ReportsData | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState("");
   const [exporting, setExporting] = useState(false),
     [exportError, setExportError] = useState("");
+  const [views, setViews] = useState<Record<string, TableView>>({});
   const [request, setRequest] = useState({
-    from: monthStart,
-    to: today,
+    from: month.from,
+    to: month.to,
     revision: 0,
   });
-  const load = (start = from, end = to) => {
+  // Any change of dates reloads at once; there is no separate refresh step.
+  const load = (start: string, end: string) => {
+    setFrom(start);
+    setTo(end);
     if (!isReportRangeReady(start, end)) return;
     setLoading(true);
     setError("");
     setData(null);
     setRequest({ from: start, to: end, revision: request.revision + 1 });
+  };
+  const choosePreset = (next: ReportPreset) => {
+    setPreset(next);
+    if (next === "custom") return;
+    const range = presetRange(next, today);
+    load(range.from, range.to);
   };
   // No branch means there is nothing to report on; asking anyway would only
   // produce a failure the reader cannot act on.
@@ -78,7 +117,10 @@ export function ReportsPage({
   }, [request, branchId]);
   const data =
     branchId && loadedData?.range.branchId === branchId ? loadedData : null;
-  const visible = useMemo(() => (data ? tables(data, tab) : []), [data, tab]);
+  // What is on screen after each table's search, filters and sort; print and
+  // the Excel download use exactly these rows.
+  const raw = useMemo(() => (data ? tables(data, tab) : []), [data, tab]);
+  const visible = useMemo(() => shownTables(raw, views), [raw, views]);
   const section = tabs.find(([key]) => key === tab)?.[1] ?? "";
   if (!branch)
     return (
@@ -122,20 +164,14 @@ export function ReportsPage({
       setExporting(false);
     }
   };
+  const onView = (title: string, view: TableView) =>
+    setViews((current) => ({ ...current, [title]: view }));
   return (
     <div className="report-print-root space-y-6">
       <PageHeader
         title="التقارير"
         actions={
           <div className="print-controls flex gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => load()}
-              disabled={loading || !isReportRangeReady(from, to)}
-            >
-              <RefreshCw className="size-4" />
-              تحديث
-            </Button>
             <Button
               onClick={() => {
                 if (!unavailable) window.print();
@@ -159,32 +195,51 @@ export function ReportsPage({
           </div>
         }
       />
-      <div className="print-controls toolbar">
-        <label className="block space-y-1.5 text-sm">
-          <span className="font-medium">من</span>
-          <input
-            aria-label="من"
-            type="date"
-            value={from}
-            max={to}
-            onChange={(e) => setFrom(e.target.value)}
-            className="input"
-          />
-        </label>
-        <label className="block space-y-1.5 text-sm">
-          <span className="font-medium">إلى</span>
-          <input
-            aria-label="إلى"
-            type="date"
-            value={to}
-            min={from}
-            max={today}
-            onChange={(e) => setTo(e.target.value)}
-            className="input"
-          />
-        </label>
-      </div>
-      <div className="print-controls">
+      <div className="print-controls space-y-3">
+        <div
+          role="group"
+          aria-label="الفترة"
+          className="flex flex-wrap gap-2"
+        >
+          {presets.map(([id, label]) => (
+            <Button
+              key={id}
+              variant={preset === id ? "primary" : "secondary"}
+              aria-pressed={preset === id}
+              data-preset={id}
+              onClick={() => choosePreset(id)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+        {preset === "custom" && (
+          <div className="toolbar">
+            <label className="block space-y-1.5 text-sm">
+              <span className="font-medium">من</span>
+              <input
+                aria-label="من"
+                type="date"
+                value={from}
+                max={to}
+                onChange={(e) => load(e.target.value, to)}
+                className="input"
+              />
+            </label>
+            <label className="block space-y-1.5 text-sm">
+              <span className="font-medium">إلى</span>
+              <input
+                aria-label="إلى"
+                type="date"
+                value={to}
+                min={from}
+                max={today}
+                onChange={(e) => load(from, e.target.value)}
+                className="input"
+              />
+            </label>
+          </div>
+        )}
         <Tabs
           idPrefix="reports"
           items={tabs.map(([id, label]) => ({ id, label }))}
@@ -195,68 +250,47 @@ export function ReportsPage({
       </div>
       <TabPanel idPrefix="reports" active={tab}>
         {data && (
-          <div className="space-y-2 rounded-xl border border-line bg-surface p-4 print:border-0">
+          <div className="mb-6 space-y-1 rounded-xl border border-line bg-surface p-4 print:border-0 print:p-0">
+            <h2 className="text-xl font-bold">{section}</h2>
             <p>{branch.name}</p>
-            <p>
-              الفترة: {data.range.from} — {data.range.to}
-            </p>
+            <p>الفترة: {periodText(data.range.from, data.range.to)}</p>
             <p className="text-xs text-muted">
               توقيت القاهرة · وقت التحميل:{" "}
               {new Date(data.range.generatedAt).toLocaleString("ar-EG", {
                 timeZone: "Africa/Cairo",
               })}
             </p>
-            <h2 className="text-xl font-bold">{section}</h2>
-            {(from !== data.range.from || to !== data.range.to) && (
-              <p className="print-controls text-sm text-muted">
-                التواريخ المختارة لم تطبق بعد. حدّث التقرير؛ الطباعة تستخدم
-                الفترة المحملة أعلاه.
-              </p>
-            )}
-            <p className="text-sm text-muted">
-              تقارير العمليات المسجلة في هذا الفرع. مبيعات الأونلاين وتكاليف
-              خصمها وسجل تعديل المعاملات لم تتوفر بعد.
-            </p>
-            {tab === "sales" && (
-              <>
-                <p className="text-sm text-muted">
-                  مجمل الربح = المبيعات − المرتجعات − تكلفة المبيعات + التكلفة
-                  المرتجعة. لا تخصم منه المصروفات أو الرواتب أو الهالك.
-                </p>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {[
-                    [
-                      "صافي المبيعات",
-                      reportTotal(data.sales.byDay, "sales") -
-                        reportTotal(data.sales.byDay, "refunds"),
-                    ],
-                    [
-                      "صافي تكلفة المبيعات",
-                      reportTotal(data.sales.byDay, "cost") -
-                        reportTotal(data.sales.byDay, "returnedCost"),
-                    ],
-                    ["مجمل الربح", reportTotal(data.sales.byDay, "profit")],
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-lg bg-paper p-3">
-                      <p className="text-sm text-muted">{label}</p>
-                      <p className="tnum font-bold">{formatMoney(value)}</p>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
           </div>
         )}
-        {error && <ErrorBanner>{error}</ErrorBanner>}
+        {error && (
+          <ErrorBanner>
+            {error}{" "}
+            <button
+              type="button"
+              className="print-controls font-semibold underline"
+              onClick={() => load(from, to)}
+            >
+              إعادة المحاولة
+            </button>
+          </ErrorBanner>
+        )}
         {exportError && (
           <ErrorBanner className="print-controls">{exportError}</ErrorBanner>
         )}
         {loading ? (
           <LoadingState label="جارِ تحميل التقرير…" />
+        ) : data && tab === "overview" ? (
+          <ReportOverview data={data} onOpenTab={setTab} />
         ) : (
           <div className="space-y-8">
-            {visible.map((table) => (
-              <ReportTable key={table.title} {...table} />
+            {raw.map((table) => (
+              <ReportTable
+                key={table.title}
+                {...table}
+                views={views}
+                onView={onView}
+                documentHref={documentHref}
+              />
             ))}
           </div>
         )}

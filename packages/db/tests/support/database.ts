@@ -60,6 +60,9 @@ const tables = [
   "supplier_payments",
   "suppliers",
   "categories",
+  "salary_adjustments",
+  "salary_advances",
+  "salary_payments",
   "users",
   "employees",
 ] as const;

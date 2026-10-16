@@ -1,6 +1,6 @@
 import type { ReportTable as TableData } from "../../../models/reports-model";
 import type { ReportsData } from "../../../services/reports-service";
-import { date, money, number } from "../report-columns";
+import { date, money, number, reference, text } from "../report-columns";
 
 export function suppliersTables(d: ReportsData): TableData[] {
   return [
@@ -9,11 +9,11 @@ export function suppliersTables(d: ReportsData): TableData[] {
       note: "رصيد حالي يشمل الرصيد الافتتاحي وجميع المشتريات والمدفوعات، وليس رصيد نهاية الفترة المختارة.",
       rows: d.suppliers.summary,
       columns: [
-        { key: "name", label: "المورد" },
-        money("openingBalance", "الرصيد الافتتاحي"),
-        money("purchases", "المشتريات"),
-        money("payments", "المدفوعات"),
-        money("balance", "الرصيد"),
+        text("name", "المورد"),
+        money("openingBalance", "الرصيد الافتتاحي", { total: true }),
+        money("purchases", "المشتريات", { total: true }),
+        money("payments", "المدفوعات", { total: true }),
+        money("balance", "الرصيد", { total: true }),
       ],
     },
     {
@@ -21,37 +21,46 @@ export function suppliersTables(d: ReportsData): TableData[] {
       rows: d.suppliers.purchases,
       columns: [
         date("purchasedAt", "التاريخ"),
-        { key: "supplierName", label: "المورد" },
-        { key: "invoiceNumber", label: "رقم الفاتورة" },
-        money("totalAmount", "الإجمالي"),
-        money("paidAmount", "المدفوع"),
-        { key: "createdByName", label: "المسجل" },
-        { key: "notes", label: "ملاحظات" },
+        text("supplierName", "المورد", { filter: true }),
+        reference("id", "رقم الفاتورة", {
+          labelKey: "invoiceNumber",
+          document: "purchase",
+        }),
+        money("totalAmount", "الإجمالي", { total: true }),
+        money("paidAmount", "المدفوع", { total: true }),
+        text("createdByName", "المسجل"),
+        text("notes", "ملاحظات"),
       ],
-    },
-    {
-      title: "أصناف فواتير المشتريات",
-      rows: d.suppliers.purchaseLines,
-      columns: [
-        number("invoiceId", "الفاتورة"),
-        date("purchasedAt", "التاريخ"),
-        { key: "supplierName", label: "المورد" },
-        { key: "itemName", label: "الصنف" },
-        number("stockQuantity", "كمية المخزون"),
-        { key: "stockUnit", label: "الوحدة" },
-        money("unitCost", "تكلفة الوحدة"),
-        money("lineTotal", "الإجمالي"),
-      ],
+      details: {
+        title: "أصناف فواتير المشتريات",
+        rows: d.suppliers.purchaseLines,
+        columns: [
+          reference("invoiceId", "الفاتورة", {
+            labelKey: "invoiceNumber",
+            document: "purchase",
+          }),
+          date("purchasedAt", "التاريخ"),
+          text("supplierName", "المورد", { filter: true }),
+          text("itemName", "الصنف"),
+          number("stockQuantity", "كمية المخزون"),
+          text("stockUnit", "الوحدة"),
+          money("unitCost", "تكلفة الوحدة"),
+          money("lineTotal", "الإجمالي", { total: true }),
+        ],
+      },
     },
     {
       title: "دفعات الموردين",
       rows: d.suppliers.payments,
       columns: [
         date("paidAt", "التاريخ"),
-        { key: "supplierName", label: "المورد" },
-        money("amount", "المبلغ"),
-        number("purchaseInvoiceId", "الفاتورة المرتبطة"),
-        { key: "notes", label: "ملاحظات" },
+        text("supplierName", "المورد", { filter: true }),
+        money("amount", "المبلغ", { total: true }),
+        reference("purchaseInvoiceId", "الفاتورة المرتبطة", {
+          labelKey: "purchaseInvoiceNumber",
+          document: "purchase",
+        }),
+        text("notes", "ملاحظات"),
       ],
     },
   ];

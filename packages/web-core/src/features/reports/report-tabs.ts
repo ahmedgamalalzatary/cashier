@@ -1,11 +1,10 @@
 export const tabs = [
-  ["sales", "المبيعات ومجمل الربح"],
-  ["stock", "المخزون والحركة"],
-  ["money", "الأموال والمصروفات"],
-  ["employees", "الموظفون ووقت العمل"],
-  ["waste", "الهالك والمرتجعات"],
+  ["overview", "نظرة عامة"],
+  ["sales", "المبيعات"],
+  ["stock", "المخزون"],
+  ["money", "المصروفات والأرباح"],
+  ["employees", "الموظفون والورديات"],
   ["suppliers", "الموردون"],
-  ["operations", "التحويلات والتحضير"],
 ] as const;
 
 export type Tab = (typeof tabs)[number][0];

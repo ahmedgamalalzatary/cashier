@@ -1,5 +1,27 @@
 import { testId } from "@cashier/shared/test-support";
-import type { ReportsData } from '@cashier/web-core/services/reports-service';
+import type {
+  PeriodFigures,
+  ReportsData,
+} from "@cashier/web-core/services/reports-service";
+
+export function periodFixture(values: Partial<PeriodFigures> = {}): PeriodFigures {
+  return {
+    sales: 100,
+    refunds: 10,
+    netSales: 90,
+    ordersCount: 2,
+    averageOrder: 50,
+    cost: 30,
+    returnedCost: 2,
+    grossProfit: 62,
+    margin: 68.9,
+    expenses: 0,
+    wasteCost: 0,
+    salaries: 0,
+    netProfit: 62,
+    ...values,
+  };
+}
 
 export function reportsFixture(): ReportsData {
   return {
@@ -8,6 +30,22 @@ export function reportsFixture(): ReportsData {
       to: "2026-09-10",
       branchId: testId(1),
       generatedAt: "2026-09-10T12:00:00Z",
+    },
+    overview: {
+      current: periodFixture(),
+      previous: {
+        from: "2026-08-22",
+        to: "2026-08-31",
+        ...periodFixture({ netSales: 0, sales: 0, refunds: 0, grossProfit: 0, margin: null, netProfit: 0, ordersCount: 0, averageOrder: 0, cost: 0, returnedCost: 0 }),
+      },
+      byHour: Array.from({ length: 24 }, (_, hour) => ({
+        hour,
+        sales: hour === 9 ? 100 : 0,
+        ordersCount: hour === 9 ? 2 : 0,
+      })),
+      topBySales: [{ productName: "لاتيه", sizeName: "كبير", value: 90 }],
+      topByProfit: [{ productName: "لاتيه", sizeName: "كبير", value: 62 }],
+      alerts: { lowStock: 0, negativeStock: 0, overShort: 0 },
     },
     sales: {
       byDay: [

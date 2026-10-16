@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -36,7 +37,7 @@ export function scratchFolder(prefix: string) {
 
 /** An owned empty database, dropped after the test. */
 export async function scratchDatabase() {
-  const name = `cashier_upgrade_${process.pid}_${cleanups.length}_test`;
+  const name = `cashier_upgrade_${process.pid}_${randomUUID().replaceAll("-", "")}_test`;
   const owner = await mysql.createConnection(loadTestEnvironment());
   await owner.query("DROP DATABASE IF EXISTS ??", [name]);
   await owner.query("CREATE DATABASE ?? CHARACTER SET utf8mb4", [name]);

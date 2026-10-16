@@ -420,10 +420,11 @@ The Reports page is admin-only and reads the selected branch. Supplier reports c
 
 #### Reports page design (owner decision 2026-10-15)
 
-- **Date bar:** presets (اليوم، أمس، هذا الأسبوع، هذا الشهر، الشهر الماضي، مخصص). The report reloads automatically when the range changes, and dates show in Arabic.
+- **Date bar:** presets (اليوم، أمس، هذا الأسبوع، هذا الشهر، الشهر الماضي، مخصص). The week starts on **Saturday** (owner decision 2026-10-15), and "this week/month" end today. The report reloads automatically when the range changes, and dates show in Arabic.
 - **Overview tab (default):** KPI cards compared with the previous period of equal length: net sales, orders, average order, gross profit and margin %, expenses, waste, salaries paid, and **net profit** = gross profit − expenses − waste cost − salaries and advances paid in the period. It also shows sales by day and by hour (peak hours) charts, the top 5 products by sales and by profit, and alerts (low/negative stock, over/short shifts).
 - **Tabs:** نظرة عامة · المبيعات · المخزون · المصروفات والأرباح · الموظفون والورديات · الموردون. Waste and refunds sit under sales/stock; transfers and preparations sit under stock.
-- **Every table** has search, sorting by any column, filters where meaningful (warehouse, category, cashier, type, status), a totals row, readable document references that link to the document (never raw UUIDs), and an empty state. Raw ledgers collapse into an expandable details section under their summary.
+- **Overview details:** average order = sales ÷ orders; margin % = gross profit ÷ net sales (none without net sales; its change shows in points). A KPI change shows "no previous data" when the previous figure is zero. Sales by hour counts order totals by Cairo hour; top 5 lists use net sales and gross profit and leave out products at zero or a loss. Alerts count low stock, negative stock and close/correction events with a non-zero over/short; each opens its tab.
+- **Every table** has search, sorting by any column, filters where meaningful (warehouse, category, cashier, type, status), a totals row, readable document references that link to the document (never raw UUIDs), and an empty state. A reference shows the document's own number (order number, invoice number) or, when it has none, a short code `#` + the last 6 characters of its ID. Links exist on the desktop only (the online site has no document pages); shifts, expenses, requests and stocktakes have no page to open. Totals cover only additive columns: snapshots (expected/actual cash, over/short) and mixed-unit quantities are not summed. Raw ledgers collapse into an expandable details section under their summary.
 - Work time shows in hours, and products and categories show margin %. Charts are inline SVG and print. Print (A4 landscape) and the online Excel download output what is filtered on screen. Desktop and online share the page.
 
 #### Dates and amounts
@@ -444,7 +445,7 @@ Select a report group, load its dates, then choose **طباعة / PDF** and use 
 
 #### Report API
 
-`GET /api/reports?from=YYYY-MM-DD&to=YYYY-MM-DD` returns every group, including `operations` (`transfers`, `transferLines`, `requests`, `requestLines`, `preparations`, `ingredients`), `money.expenses`, `employees.shiftHistory`, `suppliers.purchaseLines`, `sales.byShift` with period and lifetime figures, and `money.shiftOverShort` as dated event snapshots. Deploy matching API and web versions together.
+`GET /api/reports?from=YYYY-MM-DD&to=YYYY-MM-DD` returns every group, including `operations` (`transfers`, `transferLines`, `requests`, `requestLines`, `preparations`, `ingredients`), `money.expenses`, `employees.shiftHistory`, `suppliers.purchaseLines`, `sales.byShift` with period and lifetime figures, and `money.shiftOverShort` as dated event snapshots, and `overview` (`current` and `previous` period figures, `byHour`, `topBySales`, `topByProfit`, `alerts`). Reference rows carry the document number beside the ID (`refunds.orderId`/`orderNumber`, `ledger.referenceLabel`, `cashFlow.referenceId`/`reference`, `payments.purchaseInvoiceNumber`). Deploy matching API and web versions together.
 
 #### Pending
 

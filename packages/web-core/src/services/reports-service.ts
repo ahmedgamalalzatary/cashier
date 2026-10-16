@@ -1,7 +1,39 @@
 import { api } from "@cashier/web-core/lib/api";
 export type ReportRow = Record<string, string | number | null>;
+/** Headline figures of one period (see the API's periodFigures). */
+export type PeriodFigures = {
+  sales: number;
+  refunds: number;
+  netSales: number;
+  ordersCount: number;
+  averageOrder: number;
+  cost: number;
+  returnedCost: number;
+  grossProfit: number;
+  /** Gross profit as % of net sales; null without net sales. */
+  margin: number | null;
+  expenses: number;
+  wasteCost: number;
+  /** Salary payments and advances paid in the period. */
+  salaries: number;
+  netProfit: number;
+};
+export type TopProduct = {
+  productName: string;
+  sizeName: string | null;
+  value: number;
+};
+export type ReportOverview = {
+  current: PeriodFigures;
+  previous: PeriodFigures & { from: string; to: string };
+  byHour: { hour: number; sales: number; ordersCount: number }[];
+  topBySales: TopProduct[];
+  topByProfit: TopProduct[];
+  alerts: { lowStock: number; negativeStock: number; overShort: number };
+};
 export type ReportsData = {
   range: { from: string; to: string; branchId: string; generatedAt: string };
+  overview: ReportOverview;
   sales: Record<
     "byDay" | "byProduct" | "byCategory" | "byShift" | "byCashier",
     ReportRow[]

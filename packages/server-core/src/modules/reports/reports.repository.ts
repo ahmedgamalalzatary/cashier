@@ -78,6 +78,22 @@ export class ReportsRepository {
     `);
   }
 
+  /** Headline totals of one period, for the overview and its comparison. */
+  periodTotals(from: Date, to: Date, fromDate: string, toDate: string) {
+    return this.rows<Record<string, unknown>>(sql`
+      SELECT
+        COALESCE((SELECT SUM(total) FROM ${branchTable("orders")} o WHERE o.created_at >= ${from} AND o.created_at < ${to}), 0) AS sales,
+        (SELECT COUNT(*) FROM ${branchTable("orders")} o WHERE o.created_at >= ${from} AND o.created_at < ${to}) AS ordersCount,
+        COALESCE((SELECT SUM(total_cost) FROM ${branchTable("orders")} o WHERE o.created_at >= ${from} AND o.created_at < ${to}), 0) AS cost,
+        COALESCE((SELECT SUM(amount) FROM ${branchTable("refunds")} r WHERE r.created_at >= ${from} AND r.created_at < ${to}), 0) AS refunds,
+        COALESCE((SELECT SUM(total_cost_returned) FROM ${branchTable("refunds")} r WHERE r.created_at >= ${from} AND r.created_at < ${to}), 0) AS returnedCost,
+        COALESCE((SELECT SUM(amount) FROM ${branchTable("expenses")} x WHERE x.expense_date BETWEEN ${fromDate} AND ${toDate}), 0) AS expenses,
+        COALESCE((SELECT SUM(total_cost) FROM ${branchTable("waste_entries")} w WHERE w.occurred_at >= ${from} AND w.occurred_at < ${to}), 0) AS wasteCost,
+        COALESCE((SELECT SUM(net_pay) FROM ${branchTable("salary_payments")} sp WHERE sp.paid_at >= ${from} AND sp.paid_at < ${to}), 0) AS salaryPayments,
+        COALESCE((SELECT SUM(amount) FROM ${branchTable("salary_advances")} sa WHERE sa.entry_date BETWEEN ${fromDate} AND ${toDate}), 0) AS salaryAdvances
+    `);
+  }
+
   salesByDay(from: Date, to: Date) {
     return this.rows<Record<string, unknown>>(sql`
       SELECT * FROM (
@@ -200,7 +216,11 @@ export class ReportsRepository {
   ledger(from: Date, to: Date) {
     return this.rows<Record<string, unknown>>(sql`
     SELECT sm.id,sm.occurred_at occurredAt,i.code,i.name itemName,sm.warehouse,sm.movement_type movementType,
-      sm.quantity,sm.unit_cost unitCost,sm.quantity*sm.unit_cost totalCost,sm.reference_type referenceType,sm.reference_id referenceId,sm.notes
+      sm.quantity,sm.unit_cost unitCost,sm.quantity*sm.unit_cost totalCost,sm.reference_type referenceType,sm.reference_id referenceId,
+      CASE sm.reference_type
+        WHEN 'order' THEN (SELECT o.order_number FROM ${branchTable("orders")} o WHERE o.id=sm.reference_id)
+        WHEN 'purchase_invoice' THEN (SELECT p.invoice_number FROM ${branchTable("purchase_invoices")} p WHERE p.id=sm.reference_id)
+      END referenceLabel,sm.notes
     FROM ${branchTable("stock_movements")} sm JOIN ${branchTable("items")} i ON i.id=sm.item_id WHERE sm.occurred_at >= ${from} AND sm.occurred_at < ${to}
     ORDER BY sm.occurred_at DESC,sm.id DESC
   `);
@@ -221,12 +241,12 @@ export class ReportsRepository {
   cashFlow(from: Date, to: Date, fromDate: string, toDate: string) {
     return this.rows<Record<string, unknown>>(sql`
     SELECT * FROM (
-      SELECT CAST(created_at AS CHAR) occurredAt,'sale' type,order_number reference,total amount FROM ${branchTable("orders")} orders WHERE created_at >= ${from} AND created_at < ${to}
-      UNION ALL SELECT CAST(created_at AS CHAR),'refund',CONCAT('#',id),-amount FROM ${branchTable("refunds")} refunds WHERE created_at >= ${from} AND created_at < ${to}
-      UNION ALL SELECT CAST(expense_date AS CHAR),'expense',CONCAT('#',id),-amount FROM ${branchTable("expenses")} expenses WHERE expense_date BETWEEN ${fromDate} AND ${toDate}
-      UNION ALL SELECT CAST(paid_at AS CHAR),'supplier_payment',CONCAT('#',id),-amount FROM ${branchTable("supplier_payments")} supplier_payments WHERE paid_at BETWEEN ${fromDate} AND ${toDate}
-      UNION ALL SELECT CAST(paid_at AS CHAR),'salary_payment',CONCAT('#',id),-net_pay FROM ${branchTable("salary_payments")} salary_payments WHERE paid_at >= ${from} AND paid_at < ${to}
-      UNION ALL SELECT CAST(entry_date AS CHAR),'salary_advance',CONCAT('#',id),-amount FROM ${branchTable("salary_advances")} salary_advances WHERE entry_date BETWEEN ${fromDate} AND ${toDate}
+      SELECT CAST(created_at AS CHAR) occurredAt,'sale' type,id referenceId,order_number reference,total amount FROM ${branchTable("orders")} orders WHERE created_at >= ${from} AND created_at < ${to}
+      UNION ALL SELECT CAST(r.created_at AS CHAR),'refund',r.id,o.order_number,-r.amount FROM ${branchTable("refunds")} r JOIN ${branchTable("orders")} o ON o.id=r.order_id WHERE r.created_at >= ${from} AND r.created_at < ${to}
+      UNION ALL SELECT CAST(expense_date AS CHAR),'expense',id,NULL,-amount FROM ${branchTable("expenses")} expenses WHERE expense_date BETWEEN ${fromDate} AND ${toDate}
+      UNION ALL SELECT CAST(paid_at AS CHAR),'supplier_payment',id,NULL,-amount FROM ${branchTable("supplier_payments")} supplier_payments WHERE paid_at BETWEEN ${fromDate} AND ${toDate}
+      UNION ALL SELECT CAST(paid_at AS CHAR),'salary_payment',id,NULL,-net_pay FROM ${branchTable("salary_payments")} salary_payments WHERE paid_at >= ${from} AND paid_at < ${to}
+      UNION ALL SELECT CAST(entry_date AS CHAR),'salary_advance',id,NULL,-amount FROM ${branchTable("salary_advances")} salary_advances WHERE entry_date BETWEEN ${fromDate} AND ${toDate}
     ) x ORDER BY occurredAt DESC
   `);
   }
@@ -379,7 +399,7 @@ export class ReportsRepository {
 
   refunds(from: Date, to: Date) {
     return this.rows<Record<string, unknown>>(sql`
-    SELECT r.id,r.created_at occurredAt,o.order_number orderNumber,u.name cashierName,r.reason,r.amount,r.total_cost_returned totalCostReturned
+    SELECT r.id,r.created_at occurredAt,r.order_id orderId,o.order_number orderNumber,u.name cashierName,r.reason,r.amount,r.total_cost_returned totalCostReturned
     FROM ${branchTable("refunds")} r JOIN ${branchTable("orders")} o ON o.id=r.order_id JOIN users u ON u.id=r.cashier_id
     WHERE r.created_at >= ${from} AND r.created_at < ${to} ORDER BY r.created_at DESC,r.id DESC
   `);
@@ -425,8 +445,9 @@ export class ReportsRepository {
 
   supplierPayments(from: string, to: string) {
     return this.rows<Record<string, unknown>>(sql`
-    SELECT sp.id,sp.paid_at paidAt,s.name supplierName,sp.purchase_invoice_id purchaseInvoiceId,sp.amount,sp.notes
-    FROM ${branchTable("supplier_payments")} sp JOIN ${branchTable("suppliers")} s ON s.id=sp.supplier_id WHERE sp.paid_at BETWEEN ${from} AND ${to}
+    SELECT sp.id,sp.paid_at paidAt,s.name supplierName,sp.purchase_invoice_id purchaseInvoiceId,p.invoice_number purchaseInvoiceNumber,sp.amount,sp.notes
+    FROM ${branchTable("supplier_payments")} sp JOIN ${branchTable("suppliers")} s ON s.id=sp.supplier_id
+    LEFT JOIN ${branchTable("purchase_invoices")} p ON p.id=sp.purchase_invoice_id WHERE sp.paid_at BETWEEN ${from} AND ${to}
     ORDER BY sp.paid_at DESC,sp.id DESC
   `);
   }
