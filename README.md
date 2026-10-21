@@ -3,6 +3,13 @@
 POS + inventory system with independent branch workspaces, each with a main warehouse and a cafe sub-warehouse.
 Full specification: [docs/system-specs.md](docs/system-specs.md).
 
+## Download
+
+Download the Windows installer (`Cashier_<version>_x64-setup.exe`) from the
+[latest release](https://github.com/ahmedgamalalzatary/cashier/releases/latest).
+Free code signing provided by SignPath.io, certificate by SignPath Foundation
+(see [Code signing policy](#code-signing-policy)).
+
 ## Structure
 
 ```
