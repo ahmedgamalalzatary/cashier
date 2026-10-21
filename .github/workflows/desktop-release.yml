@@ -75,6 +75,6 @@ jobs:
           args: --config src-tauri/tauri.release.conf.json
           tagName: desktop-v__VERSION__
           releaseName: Cashier v__VERSION__
-          releaseBody: Download Cashier_*_x64-setup.exe below. Installed PCs update automatically.
+          releaseBody: "Cashier is the point-of-sale and warehouse app for Windows shop PCs. Download Cashier_*_x64-setup.exe below. Installed PCs update automatically. Code signing policy: https://github.com/ahmedgamalalzatary/cashier#code-signing-policy"
           releaseDraft: false
           prerelease: false

@@ -72,3 +72,25 @@ Login, error handling, request validation, branch scoping and the auth, reports,
 branches and users modules live in `packages/server-core`. Both the desktop API
 and the online API mount the same routers, so an online install behaves exactly
 like a shop PC.
+
+## Code signing policy
+
+Free code signing provided by SignPath.io, certificate by SignPath Foundation.
+
+The Windows installer is built and signed from this repository's source by the
+"Desktop release" GitHub Actions workflow (`.github/workflows/desktop-release.yml`).
+This project is licensed under the [MIT License](LICENSE).
+
+**Team roles**
+
+- Author, reviewer and approver: [@ahmedgamalalzatary](https://github.com/ahmedgamalalzatary)
+
+Every signing request is approved by the team member above before the installer
+is signed.
+
+**Privacy statement**
+
+_To be confirmed by the owner before this section is published._ Cashier stores
+its data on the PC it runs on (`C:\ProgramData\Cashier`). When a PC is linked to a
+branch, Cashier sends that branch's sales backups to the online site and downloads
+the branch's user accounts from it. It also checks GitHub for newer releases.
