@@ -25,7 +25,7 @@ packages/
 ## Requirements
 
 - Node.js >= 20.11
-- pnpm 11 (`corepack enable` or `npm i -g pnpm`)
+- pnpm 12 (`npm i -g pnpm@12.4.1`)
 - MySQL 8 (local or hosted)
 
 For the Windows desktop app, install Rust (MSVC), Microsoft C++ Build Tools,
